@@ -6,16 +6,20 @@
     <title>{{ title }} — 知诸网</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/katex/katex.min.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/codemirror/codemirror.css">
+    <link rel="stylesheet" href="/static/codemirror/theme/eclipse.css">
+    <script src="/static/codemirror/codemirror.js"></script>
+    <script src="/static/codemirror/mode/xml/xml.js"></script>
+    <script src="/static/codemirror/mode/markdown/markdown.js"></script>
+    <script src="/static/codemirror/addon/mode/overlay.js"></script>
     <script src="/static/marked.min.js"></script>
-    <link rel="stylesheet" href="/static/easymde/easymde.min.css">
-    <script src="/static/easymde/easymde.min.js"></script>
     <script defer src="/static/katex/katex.min.js"></script>
     <script defer src="/static/katex/auto-render.min.js"></script>
     <style>
-        .EasyMDEContainer { width: 100% !important; height: 100% !important; }
-        .EasyMDEContainer .CodeMirror { height: 100% !important; border: none !important; }
-        /* .editor-preview now used — EasyMDE's built-in side-by-side with KaTeX */
+        #editor-container { display: flex; gap: 12px; height: 60vh; min-height: 400px; }
+        #editor-area { width: 50%; flex-shrink: 0; border: 1px solid var(--border); }
+        #editor-area .CodeMirror { height: 100%; }
+        #preview-pane { width: 50%; flex-shrink: 0; border: 1px solid var(--border); padding: 16px; overflow-y: auto; background: #fff; word-wrap: break-word; }
     </style>
 </head>
 <body>
@@ -40,7 +44,6 @@
             </span>
         </nav>
     </header>
-
     <script>
     function setViewer(uid) {
         if (uid) { document.cookie = "viewer=" + encodeURIComponent(uid) + ";path=/;max-age=86400;SameSite=Lax"; }
@@ -55,16 +58,16 @@
     {% else %}
     <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center;">
         <label style="font-size:0.9em;">格式:
-            <select id="format-select" onchange="switchFormat(this.value)"
-                    style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;">
+            <select id="format-select" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;">
                 <option value="markdown" {% if not article or article.format == 'markdown' %}selected{% endif %}>Markdown + KaTeX</option>
                 <option value="typst" {% if article and article.format == 'typst' %}selected{% endif %}>Typst (WASM)</option>
             </select>
         </label>
     </div>
 
-    <div id="editor-container" style="height:60vh;min-height:400px;">
+    <div id="editor-container">
         <textarea id="editor-area">{{ article.source_content if article and article.source_content else '' }}</textarea>
+        <div id="preview-pane"><p style="color:#888;">预览区域。开始输入...</p></div>
     </div>
 
     <details open style="margin-top:16px;">
@@ -131,8 +134,7 @@
     </details>
 
     <div style="margin-top:16px;display:flex;gap:8px;">
-        <button id="submit-btn" onclick="submitArticle()"
-                style="padding:10px 28px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:1em;font-weight:600;">
+        <button id="submit-btn" style="padding:10px 28px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:1em;font-weight:600;">
             🚀 提交沉淀池
         </button>
         <span id="submit-status" style="font-size:0.9em;color:#888;align-self:center;"></span>
@@ -140,128 +142,81 @@
     {% endif %}
     </main>
 
-    <!-- All JavaScript in one block, runs when DOM is ready -->
     <script>
-    function initEditor() {
+    (function() {
         // ── Stars ──────────────────────────────────────────────────────
         document.querySelectorAll('.star-rating').forEach(function(rating) {
             var stars = rating.querySelectorAll('.stars span');
             var label = rating.querySelector('.star-label');
             var input = rating.querySelector('input[type=hidden]');
-            var initVal = parseInt(input.value) || 0;
-            if (initVal > 0 && stars.length >= initVal) {
-                label.textContent = stars[initVal - 1].title;
-            }
+            var val = parseInt(input.value) || 0;
+            if (val > 0 && stars.length >= val) label.textContent = stars[val - 1].title;
             stars.forEach(function(star, index) {
                 star.addEventListener('mouseenter', function() {
-                    stars.forEach(function(s, i) {
-                        s.textContent = i <= index ? '★' : '☆';
-                        s.style.color = i <= index ? '#f59e0b' : '#ccc';
-                    });
+                    stars.forEach(function(s, i) { s.textContent = i <= index ? '★' : '☆'; s.style.color = i <= index ? '#f59e0b' : '#ccc'; });
                     label.textContent = star.title;
                 });
-                star.addEventListener('click', function() {
-                    var val = parseInt(star.dataset.value);
-                    input.value = val;
-                    label.textContent = star.title;
-                });
+                star.addEventListener('click', function() { input.value = star.dataset.value; label.textContent = star.title; });
             });
             rating.addEventListener('mouseleave', function() {
-                var val = parseInt(input.value);
-                stars.forEach(function(s, i) {
-                    s.textContent = i < val ? '★' : '☆';
-                    s.style.color = i < val ? '#f59e0b' : '#ccc';
-                });
-                label.textContent = val > 0 ? stars[val - 1].title : '';
+                var v = parseInt(input.value);
+                stars.forEach(function(s, i) { s.textContent = i < v ? '★' : '☆'; s.style.color = i < v ? '#f59e0b' : '#ccc'; });
+                label.textContent = v > 0 ? stars[v - 1].title : '';
             });
         });
 
-        // ── Editor (EasyMDE with built-in preview + KaTeX math) ──────
-        var easyMDE = new EasyMDE({
-            element: document.getElementById('editor-area'),
-            spellChecker: false,
-            status: false,
-            autoDownloadFontAwesome: false,
-            indentWithTabs: false,
+        // ── CodeMirror ────────────────────────────────────────────────
+        var cm = CodeMirror.fromTextArea(document.getElementById('editor-area'), {
+            mode: 'markdown',
+            theme: 'eclipse',
+            lineNumbers: true,
+            lineWrapping: true,
+            extraKeys: { 'Enter': 'newlineAndIndentContinueMarkdownList' },
             tabSize: 2,
-            toolbar: false,
-            sideBySideFullscreen: false,
-            previewRender: function(plainText, preview) {
-                // Strip frontmatter, protect math, render, restore math, KaTeX
-                var body = plainText;
-                if (body.startsWith('---')) {
-                    var parts = body.split('---', 3);
-                    if (parts.length >= 3) body = parts.slice(2).join('---');
-                }
-                var mathBlocks = [];
-                var pbody = body
-                    .replace(/\$\$(.+?)\$\$/gs, function(m, g) {
-                        mathBlocks.push({display: true, math: g});
-                        return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
-                    })
-                    .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) {
-                        mathBlocks.push({display: false, math: g});
-                        return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
-                    });
-                var html = marked.parse(pbody);
-                mathBlocks.forEach(function(b, i) {
-                    var cls = b.display ? 'katex-display' : 'katex-inline';
-                    html = html.replace('MATHPLACEHOLDER' + i,
-                        '<span class="' + cls + '">' + (b.display ? '$$' : '$') + b.math + (b.display ? '$$' : '$') + '</span>');
-                });
-                preview.innerHTML = html;
-                if (window.renderMathInElement) {
-                    renderMathInElement(preview, {
-                        delimiters: [
-                            {left: '$$', right: '$$', display: true},
-                            {left: '$', right: '$', display: false},
-                        ]
-                    });
-                }
-                return preview.innerHTML;
-            },
+            indentUnit: 2,
         });
+        cm.setSize(null, '100%');
 
-        // Force side-by-side view by default
-        easyMDE.toggleSideBySide();
-
-        // ── Format switch ──────────────────────────────────────────────
-        window.switchFormat = function(fmt) { /* EasyMDE handles preview */ };
+        // ── Preview ───────────────────────────────────────────────────
+        var preview = document.getElementById('preview-pane');
+        function updatePreview() {
+            var content = cm.getValue();
+            if (!content.trim()) { preview.innerHTML = '<p style="color:#888;">预览区域。开始输入...</p>'; return; }
+            var body = content;
+            if (body.startsWith('---')) { var p = body.split('---', 3); if (p.length >= 3) body = p.slice(2).join('---'); }
+            var mathBlocks = [];
+            var pbody = body
+                .replace(/\$\$(.+?)\$\$/gs, function(m, g) { mathBlocks.push({d:true, m:g}); return 'MPH' + (mathBlocks.length - 1); })
+                .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) { mathBlocks.push({d:false, m:g}); return 'MPH' + (mathBlocks.length - 1); });
+            var html = marked.parse(pbody);
+            mathBlocks.forEach(function(b, i) { html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + (b.d ? '$$' : '$') + b.m + (b.d ? '$$' : '$') + '</span>'); });
+            preview.innerHTML = html;
+            if (window.renderMathInElement) renderMathInElement(preview, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}] });
+        }
+        cm.on('change', updatePreview);
+        updatePreview();
 
         // ── Submit ─────────────────────────────────────────────────────
-        window.submitArticle = function() {
+        document.getElementById('submit-btn').onclick = function() {
             var status = document.getElementById('submit-status');
-            var btn = document.getElementById('submit-btn');
             var dims = ['self_originality','self_rigor','self_completeness','self_pedagogy','self_impact'];
             for (var i = 0; i < dims.length; i++) {
-                var v = parseInt(document.querySelector('input[name="' + dims[i] + '"]').value) || 0;
-                if (v === 0) { status.textContent = '✗ 请完成五维自评（至少 1 星）'; status.style.color = '#c00'; return; }
+                if ((parseInt(document.querySelector('input[name="' + dims[i] + '"]').value) || 0) === 0) {
+                    status.textContent = '✗ 请完成五维自评（至少 1 星）'; status.style.color = '#c00'; return;
+                }
             }
-            status.textContent = '提交中...'; status.style.color = '#888'; btn.disabled = true;
-
+            status.textContent = '提交中...'; status.style.color = '#888';
             var form = document.getElementById('metadata-form');
-            var formData = new FormData(form);
-            var content = easyMDE.value();
-            var format = document.getElementById('format-select').value;
-            var ext = format === 'typst' ? '.typ' : '.md';
-            formData.append('article_file', new Blob([content], {type: 'text/plain'}), 'article' + ext);
-            formData.append('format', format);
-
-            fetch('/api/v1/articles', { method: 'POST', body: formData })
+            var fd = new FormData(form);
+            var f = document.getElementById('format-select').value;
+            fd.append('article_file', new Blob([cm.getValue()], {type:'text/plain'}), 'article.' + (f === 'typst' ? 'typ' : 'md'));
+            fd.append('format', f);
+            fetch('/api/v1/articles', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    status.innerHTML = '✅ 提交成功！<a href="/article/' + data.article_id + '">查看文章</a>';
-                    btn.disabled = false;
-                })
-                .catch(function() { status.textContent = '✗ 提交失败'; status.style.color = '#c00'; btn.disabled = false; });
+                .then(function(data) { status.innerHTML = '✅ 提交成功！<a href="/article/' + data.article_id + '">查看文章</a>'; })
+                .catch(function() { status.textContent = '✗ 提交失败'; status.style.color = '#c00'; });
         };
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initEditor);
-    } else {
-        initEditor();
-    }
+    })();
     </script>
-
 </body>
 </html>

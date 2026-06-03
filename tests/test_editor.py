@@ -12,7 +12,7 @@ def test_edit_page_loads():
     response = client.get("/edit")
     assert response.status_code == 200
     assert "editor-area" in response.text
-    assert "EasyMDE" in response.text
+    assert "CodeMirror" in response.text
 
 
 def test_edit_page_has_metadata_form():
@@ -125,15 +125,14 @@ def test_no_bare_javascript_outside_script_tags():
     assert opens == closes, f"Unbalanced script tags: {opens} open vs {closes} close"
 
 
-def test_editor_script_uses_readystate_guard():
+def test_editor_script_uses_iife():
     """Bug: DOMContentLoaded fires before inline script runs with local assets.
 
-    The initEditor function must check document.readyState to avoid missing
-    the event when all assets load from localhost (no network latency).
+    The editor init script uses an IIFE (function(){...})() to run
+    immediately without waiting for DOMContentLoaded.
     """
     response = client.get("/edit")
-    assert "document.readyState" in response.text
-    assert "initEditor" in response.text
+    assert "CodeMirror.fromTextArea" in response.text
 
 
 def test_five_dimensional_scoring_is_mandatory():
@@ -161,18 +160,18 @@ def test_no_yaml_frontmatter_template_in_editor():
     assert "---\\ntitle:" not in response.text
 
 
-def test_easymde_and_marked_loaded_locally():
-    """Bug: CDN scripts (jsdelivr/unpkg) failed to load in headless browser.
+def test_codemirror_and_marked_loaded_locally():
+    """Bug: CDN scripts failed to load in headless browser.
 
-    EasyMDE and marked.js must be served from /static/, not external CDN.
+    CodeMirror and marked.js must be served from /static/, not external CDN.
     """
     response = client.get("/edit")
-    assert "/static/easymde/easymde.min.js" in response.text
-    assert "/static/easymde/easymde.min.css" in response.text
+    assert "/static/codemirror/codemirror.js" in response.text
+    assert "/static/codemirror/codemirror.css" in response.text
+    assert "/static/codemirror/mode/markdown/markdown.js" in response.text
     assert "/static/marked.min.js" in response.text
-    # Must NOT reference external CDN for these
-    assert "cdn.jsdelivr.net/npm/easymde" not in response.text
-    assert "unpkg.com/easymde" not in response.text
+    assert "cdn.jsdelivr.net" not in response.text
+    assert "unpkg.com" not in response.text
 
 
 def test_format_switch_present():
@@ -183,31 +182,27 @@ def test_format_switch_present():
 
 
 def test_preview_has_math_delimiters():
-    """KaTeX delimiters in previewRender for inline $...$ and display $$...$$."""
+    """KaTeX delimiters for inline $...$ and display $$...$$."""
     response = client.get("/edit")
     assert "renderMathInElement" in response.text
     assert "$$" in response.text
 
 
-def test_editor_uses_easymde_builtin_preview():
-    """Bug: we were hiding EasyMDE's preview and building our own.
+def test_editor_and_preview_separate_panes():
+    """Bug: EasyMDE rendered markdown inside the editor.
 
-    EasyMDE has a built-in side-by-side preview that handles layout
-    correctly. We should use it via previewRender with KaTeX math support.
+    CodeMirror is a pure code editor — no markdown rendering.
+    Preview is a separate div, updated via CodeMirror change event.
     """
     response = client.get("/edit")
-    html = response.text
-    assert 'previewRender' in html
-    assert 'EasyMDE' in html
+    assert 'id="preview-pane"' in response.text
+    assert 'CodeMirror.fromTextArea' in response.text
+    assert "EasyMDE" not in response.text
 
 
-def test_easymde_container_constrained():
-    """Bug: EasyMDE container overflowed its parent.
-
-    CSS must constrain .EasyMDEContainer to 100% width/height.
-    """
+def test_codemirror_container_sized():
+    """Editor pane must have width:50% and CodeMirror fills height."""
     response = client.get("/edit")
     html = response.text
-    assert '.EasyMDEContainer' in html
-    assert 'width: 100% !important' in html
-    assert 'height: 100% !important' in html
+    assert '#editor-area { width: 50%' in html.replace('; ', ';')
+    assert '.CodeMirror { height: 100%' in html.replace('; ', ';')
