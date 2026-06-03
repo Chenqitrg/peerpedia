@@ -148,6 +148,10 @@ class Article(Base):
     # Git
     git_repo_path = Column(String(500), nullable=True)
 
+    # Mirror/import
+    source_arxiv_id = Column(String(50), nullable=True)   # e.g. "2301.00001"
+    mirror_by = Column(String(100), nullable=True)          # user_id of importer
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
@@ -173,6 +177,8 @@ class Article(Base):
             "cid": self.cid,
             "pinned_by": self.pinned_by,
             "git_repo_path": self.git_repo_path,
+            "source_arxiv_id": self.source_arxiv_id,
+            "mirror_by": self.mirror_by,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

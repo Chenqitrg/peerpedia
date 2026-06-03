@@ -11,21 +11,21 @@
     <header>
         <h1>📚 PeerPedia</h1>
         <nav>
-            <a href="/">Home</a>
-            <a href="/submit">Submit</a>
-            <a href="/review">Review Queue</a>
+            <a href="/">首页</a>
+            <a href="/submit">提交</a>
+            <a href="/review">审稿队列</a>
         </nav>
     </header>
 
     <main>
         <section class="article-list">
-            <h2>Articles</h2>
+            <h2>文章</h2>
             {% if articles %}
                 {% for article in articles %}
                 <article class="article-card">
                     <h3><a href="/article/{{ article.id }}">{{ article.title }}</a></h3>
                     <p class="meta">
-                        {{ article.founding_authors | join(", ") if article.founding_authors else "Unknown" }}
+                        {{ article.founding_authors | join(", ") if article.founding_authors else "未知" }}
                         · {{ article.format }}
                         · <span class="status {{ article.status }}">{{ article.status }}</span>
                         · {{ article.created_at[:10] if article.created_at else "" }}
@@ -36,13 +36,13 @@
                 </article>
                 {% endfor %}
             {% else %}
-                <p class="empty-state">No articles yet. <a href="/submit">Submit the first one.</a></p>
+                <p class="empty-state">暂无文章。<a href="/submit">提交第一篇。</a></p>
             {% endif %}
         </section>
     </main>
 
     <footer>
-        <p>PeerPedia v0.1.0 — <a href="/api/v1/health">API</a></p>
+        <p>PeerPedia 去中心化学术出版系统 v0.1.0 — <a href="/api/v1/health">API</a></p>
     </footer>
 </body>
 </html>

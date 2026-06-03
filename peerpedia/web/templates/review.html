@@ -10,37 +10,37 @@
     <header>
         <h1>📚 PeerPedia</h1>
         <nav>
-            <a href="/">Home</a>
-            <a href="/submit">Submit</a>
-            <a href="/review">Review Queue</a>
+            <a href="/">首页</a>
+            <a href="/submit">提交</a>
+            <a href="/review">审稿队列</a>
         </nav>
     </header>
 
     <main>
     {% if article %}
-        <h2>Review: {{ article.title }}</h2>
+        <h2>审稿: {{ article.title }}</h2>
 
         <div class="article-meta">
-            <span>Status: <span class="status {{ article.status }}">{{ article.status }}</span></span>
-            <span>Format: {{ article.format }}</span>
-            <span>Authors: {{ article.founding_authors | join(", ") }}</span>
+            <span>状态: <span class="status {{ article.status }}">{{ article.status }}</span></span>
+            <span>格式: {{ article.format }}</span>
+            <span>作者: {{ article.founding_authors | join(", ") }}</span>
         </div>
 
         <div class="article-abstract">
-            <h3>Abstract</h3>
+            <h3>摘要</h3>
             <p>{{ article.abstract }}</p>
         </div>
 
         {% if reviews %}
         <section class="existing-reviews">
-            <h3>Existing Reviews ({{ reviews | length }})</h3>
+            <h3>已有审稿 ({{ reviews | length }})</h3>
             {% for r in reviews %}
             <div class="review-card">
                 <p class="meta">
                     {{ r.reviewer_id }} · {{ r.decision }} ·
-                    Scientific: {{ r.scientific_correctness }}/5 ·
-                    Clarity: {{ r.clarity }}/5 ·
-                    +{{ r.points_earned }} pts
+                    科学正确性: {{ r.scientific_correctness }}/5 ·
+                    表述清晰度: {{ r.clarity }}/5 ·
+                    +{{ r.points_earned }} 分
                 </p>
                 <p>{{ r.comments }}</p>
             </div>
@@ -49,46 +49,46 @@
         {% endif %}
 
         <section class="review-form">
-            <h3>Submit Your Review</h3>
+            <h3>提交你的审稿</h3>
             <form action="/api/v1/articles/{{ article.id }}/reviews" method="post"
                   hx-post="/api/v1/articles/{{ article.id }}/reviews"
                   hx-target="#review-result"
                   hx-swap="innerHTML">
-                <label>Your Name/ID: <input type="text" name="reviewer_id" required></label>
-                <label>Decision:
+                <label>名字/ID: <input type="text" name="reviewer_id" required></label>
+                <label>决定:
                     <select name="decision" required>
-                        <option value="accept">Accept</option>
-                        <option value="revise">Revise</option>
-                        <option value="reject">Reject</option>
+                        <option value="accept">接受</option>
+                        <option value="revise">修改</option>
+                        <option value="reject">拒绝</option>
                     </select>
                 </label>
-                <label>Scientific Correctness (1-5):
+                <label>科学正确性 (1-5):
                     <input type="range" name="scientific_correctness" min="1" max="5" value="3">
                 </label>
-                <label>Clarity (1-5):
+                <label>表述清晰度 (1-5):
                     <input type="range" name="clarity" min="1" max="5" value="3">
                 </label>
-                <label>Comments (Markdown):
+                <label>审稿意见 (Markdown):
                     <textarea name="comments" rows="6"></textarea>
                 </label>
-                <button type="submit">Submit Review</button>
+                <button type="submit">提交审稿</button>
             </form>
             <div id="review-result"></div>
         </section>
 
         <section class="decision-action">
-            <h3>Make Decision</h3>
+            <h3>做出决定</h3>
             <button hx-post="/api/v1/articles/{{ article.id }}/decide"
                     hx-target="#decision-result"
                     hx-swap="innerHTML">
-                Decide Now
+                决定
             </button>
             <div id="decision-result"></div>
         </section>
 
     {% elif articles is defined and articles %}
-        <h2>Review Queue</h2>
-        <p>{{ articles | length }} article(s) pending review.</p>
+        <h2>审稿队列</h2>
+        <p>{{ articles | length }} 篇文章待审。</p>
         {% for a in articles %}
         <article class="article-card">
             <h3><a href="/review/{{ a.id }}">{{ a.title }}</a></h3>
@@ -100,8 +100,8 @@
         </article>
         {% endfor %}
     {% else %}
-        <h2>Review Queue</h2>
-        <p class="empty-state">No articles pending review.</p>
+        <h2>审稿队列</h2>
+        <p class="empty-state">暂无待审文章。</p>
     {% endif %}
     </main>
 </body>

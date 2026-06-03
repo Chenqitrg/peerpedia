@@ -10,33 +10,33 @@
     <header>
         <h1>📚 PeerPedia</h1>
         <nav>
-            <a href="/">Home</a>
-            <a href="/review">Review Queue</a>
+            <a href="/">首页</a>
+            <a href="/review">审稿队列</a>
         </nav>
     </header>
 
     <main>
-        <h2>Submit Article</h2>
+        <h2>提交文章</h2>
         <form action="/api/v1/articles" method="post" enctype="multipart/form-data">
-            <label>Title: <input type="text" name="title" required></label>
-            <label>Format:
+            <label>标题: <input type="text" name="title" required></label>
+            <label>格式:
                 <select name="format">
                     <option value="typst">Typst</option>
                     <option value="markdown">Markdown + KaTeX</option>
                 </select>
             </label>
-            <label>Abstract: <textarea name="abstract" rows="4"></textarea></label>
-            <label>Categories: <input type="text" name="categories" placeholder="math, physics"></label>
-            <label>Keywords: <input type="text" name="keywords"></label>
-            <label>Language:
+            <label>摘要: <textarea name="abstract" rows="4"></textarea></label>
+            <label>分类: <input type="text" name="categories" placeholder="物理, 数学"></label>
+            <label>关键词: <input type="text" name="keywords"></label>
+            <label>语言:
                 <select name="language">
-                    <option value="en">English</option>
                     <option value="zh">中文</option>
-                    <option value="bilingual">Bilingual</option>
+                    <option value="en">English</option>
+                    <option value="bilingual">双语</option>
                 </select>
             </label>
-            <label>File: <input type="file" name="article_file" accept=".typ,.md"></label>
-            <button type="submit">Submit for Review</button>
+            <label>文件: <input type="file" name="article_file" accept=".typ,.md"></label>
+            <button type="submit">提交审核</button>
         </form>
     </main>
 </body>

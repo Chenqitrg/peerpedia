@@ -118,6 +118,21 @@ def _parse_simple_yaml(lines: list[str]) -> dict:
     if current_key is not None and current_list:
         result[current_key] = current_list
 
+    # Chinese alias mapping
+    zh_aliases = {
+        "标题": "title",
+        "摘要": "abstract",
+        "中文摘要": "abstract_zh",
+        "分类": "categories",
+        "关键词": "keywords",
+        "语言": "language",
+        "关于人物": "about_person",
+        "原始著作": "original_works",
+    }
+    for zh_key, en_key in zh_aliases.items():
+        if zh_key in result and en_key not in result:
+            result[en_key] = result.pop(zh_key)
+
     return result
 
 

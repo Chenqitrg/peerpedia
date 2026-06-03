@@ -10,9 +10,9 @@
     <header>
         <h1>📚 PeerPedia</h1>
         <nav>
-            <a href="/">Home</a>
-            <a href="/submit">Submit</a>
-            <a href="/review">Review Queue</a>
+            <a href="/">首页</a>
+            <a href="/submit">提交</a>
+            <a href="/review">审稿队列</a>
         </nav>
     </header>
 
@@ -21,12 +21,12 @@
         <article class="article-view">
             <h1>{{ article.title }}</h1>
             <div class="article-meta">
-                <span>Authors: {{ article.founding_authors | join(", ") }}</span>
-                <span>Version: {{ article.version }}</span>
-                <span>Status: {{ article.status }}</span>
+                <span>作者: {{ article.founding_authors | join(", ") }}</span>
+                <span>版本: {{ article.version }}</span>
+                <span>状态: {{ article.status }}</span>
             </div>
             <div class="article-abstract">
-                <h2>Abstract</h2>
+                <h2>摘要</h2>
                 <p>{{ article.abstract }}</p>
             </div>
             <div class="article-content">
@@ -39,7 +39,7 @@
             </aside>
         </article>
         {% else %}
-        <p class="empty-state">Article not found.</p>
+        <p class="empty-state">文章未找到。</p>
         {% endif %}
     </main>
 </body>

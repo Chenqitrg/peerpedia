@@ -10,10 +10,9 @@ from peerpedia_core import __version__
 @click.group()
 @click.version_option(__version__)
 def cli():
-    """PeerPedia — Decentralized academic publishing.
+    """PeerPedia — 去中心化学术出版系统。
 
-    Write, review, and publish academic articles with peer review
-    and git-native version control.
+    用 Typst 写作，同行审核，P2P 发布。
     """
     pass
 
@@ -44,10 +43,10 @@ def init():
     engine = get_engine(settings.database_url)
     init_db(engine)
 
-    click.echo(f"PeerPedia initialized at {base}")
-    click.echo(f"  Articles repo dir: {DEFAULT_ARTICLES_DIR}")
-    click.echo(f"  Database: {settings.db_path}")
-    click.echo(f"  Next: peerpedia serve")
+    click.echo(f"PeerPedia 初始化完成: {base}")
+    click.echo(f"  文章仓库目录: {DEFAULT_ARTICLES_DIR}")
+    click.echo(f"  数据库: {settings.db_path}")
+    click.echo(f"  下一步: peerpedia serve")
 
 
 @cli.command()
@@ -61,9 +60,9 @@ def serve(lan: bool, port: int):
     """
     import uvicorn
 
-    mode = "LAN" if lan else "local"
-    click.echo(f"Starting PeerPedia in {mode} mode on port {port}...")
-    click.echo(f"Open http://localhost:{port} in your browser")
+    mode = "局域网" if lan else "本地"
+    click.echo(f"PeerPedia 启动中 ({mode}模式，端口 {port})...")
+    click.echo(f"浏览器打开 http://localhost:{port}")
 
     uvicorn.run(
         "peerpedia.web.app:app",
@@ -75,8 +74,8 @@ def serve(lan: bool, port: int):
 
 @cli.command()
 @click.argument("article_path", type=click.Path(exists=True))
-@click.option("--author", default=None, help="Your name for git commits")
-@click.option("--email", default=None, help="Your email for git commits")
+@click.option("--author", default=None, help="你的名字（用于 git commit）")
+@click.option("--email", default=None, help="你的邮箱（用于 git commit）")
 def submit(article_path: str, author: str | None, email: str | None):
     """Submit a Typst or Markdown article for peer review.
 
@@ -91,8 +90,8 @@ def submit(article_path: str, author: str | None, email: str | None):
     author_name = author or "peerpedia"
     author_email = email or "peerpedia@localhost"
 
-    click.echo(f"Submitting article: {path.name}")
-    click.echo(f"  Format: {'Typst' if path.suffix in ('.typ', '.typst') else 'Markdown'}")
+    click.echo(f"提交文章: {path.name}")
+    click.echo(f"  格式: {'Typst' if path.suffix in ('.typ', '.typst') else 'Markdown'}")
 
     # Ensure database is initialized
     from peerpedia_core.storage.db import get_engine, init_db
@@ -111,28 +110,28 @@ def submit(article_path: str, author: str | None, email: str | None):
 
     if result.success:
         click.echo()
-        click.echo(f"✓ Article submitted successfully!")
+        click.echo(f"✓ 文章提交成功！")
         click.echo(f"  ID:     {result.article_id}")
-        click.echo(f"  Title:  {result.title}")
-        click.echo(f"  Commit: {result.git_commit_hash[:8]}")
+        click.echo(f"  标题:   {result.title}")
+        click.echo(f"  提交:   {result.git_commit_hash[:8]}")
         if result.cid:
             click.echo(f"  CID:    {result.cid[:16]}...")
         if result.compile_output:
-            click.echo(f"  Output: {result.compile_output}")
+            click.echo(f"  输出:   {result.compile_output}")
         click.echo()
-        click.echo(f"  View: peerpedia serve → http://localhost:{settings.port}")
+        click.echo(f"  查看: peerpedia serve → http://localhost:{settings.port}")
     else:
-        click.echo(f"✗ Submission failed: {result.error}", err=True)
+        click.echo(f"✗ 提交失败: {result.error}", err=True)
         raise SystemExit(1)
 
 
 @cli.command()
 @click.argument("article_id")
-@click.option("--decision", "-d", type=click.Choice(["accept", "revise", "reject"]), prompt="Decision (accept/revise/reject)")
-@click.option("--comments", "-c", prompt="Review comments (Markdown)")
-@click.option("--scientific", type=click.IntRange(1, 5), default=3, help="Scientific correctness (1-5)")
-@click.option("--clarity", type=click.IntRange(1, 5), default=3, help="Clarity score (1-5)")
-@click.option("--reviewer", default=None, help="Your reviewer ID/name")
+@click.option("--decision", "-d", type=click.Choice(["accept", "revise", "reject"]), prompt="决定 (accept/revise/reject)")
+@click.option("--comments", "-c", prompt="审稿意见 (Markdown)")
+@click.option("--scientific", type=click.IntRange(1, 5), default=3, help="科学正确性 (1-5)")
+@click.option("--clarity", type=click.IntRange(1, 5), default=3, help="表述清晰度 (1-5)")
+@click.option("--reviewer", default=None, help="你的审稿人 ID/名字")
 def review(article_id: str, decision: str, comments: str, scientific: int, clarity: int, reviewer: str | None):
     """Review an article pending peer review.
 
@@ -147,8 +146,8 @@ def review(article_id: str, decision: str, comments: str, scientific: int, clari
     engine = get_engine(settings.database_url)
     init_db(engine)
 
-    click.echo(f"Reviewing article: {article_id}")
-    click.echo(f"  Reviewer: {reviewer_id}")
+    click.echo(f"审稿文章: {article_id}")
+    click.echo(f"  审稿人: {reviewer_id}")
 
     # Step 1: Assign reviewer (if not already in_review)
     assign_result = assign_reviewer(
@@ -158,9 +157,9 @@ def review(article_id: str, decision: str, comments: str, scientific: int, clari
     )
     if not assign_result.success:
         if "must be" not in assign_result.error:
-            click.echo(f"✗ Assignment failed: {assign_result.error}", err=True)
+            click.echo(f"✗ 分配审稿人失败: {assign_result.error}", err=True)
             raise SystemExit(1)
-        click.echo(f"  (Article already in review)")
+        click.echo(f"  (文章已在审稿中)")
 
     # Step 2: Submit review
     result = submit_review(
@@ -175,12 +174,12 @@ def review(article_id: str, decision: str, comments: str, scientific: int, clari
 
     if result.success:
         click.echo()
-        click.echo(f"✓ Review submitted successfully!")
-        click.echo(f"  Review ID: {result.review_id}")
-        click.echo(f"  Decision:  {decision}")
-        click.echo(f"  Points:    +{result.points_earned}")
+        click.echo(f"✓ 审稿提交成功！")
+        click.echo(f"  审稿 ID: {result.review_id}")
+        click.echo(f"  决定:    {decision}")
+        click.echo(f"  积分:    +{result.points_earned}")
     else:
-        click.echo(f"✗ Review failed: {result.error}", err=True)
+        click.echo(f"✗ 审稿失败: {result.error}", err=True)
         raise SystemExit(1)
 
 
@@ -204,13 +203,52 @@ def decide(article_id: str):
     )
 
     if result.success:
-        click.echo(f"✓ Decision made: {result.new_status}")
+        click.echo(f"✓ 决定已做出: {result.new_status}")
         if result.author_points:
-            click.echo(f"  Author points: +{result.author_points}")
+            click.echo(f"  作者积分: +{result.author_points}")
         if result.new_status == "accepted":
-            click.echo(f"  Next: peerpedia publish {article_id}")
+            click.echo(f"  下一步: peerpedia publish {article_id}")
     else:
-        click.echo(f"✗ Decision failed: {result.error}", err=True)
+        click.echo(f"✗ 决定失败: {result.error}", err=True)
+        raise SystemExit(1)
+
+
+@cli.command()
+@click.argument("arxiv_id")
+@click.option("--user", "-u", default="anonymous", help="你的用户 ID")
+def mirror(arxiv_id: str, user: str):
+    """从 arXiv 搬运一篇文章到 PeerPedia。
+
+    ARXIV_ID: arXiv 文章 ID，例如 2301.00001
+    """
+    from pathlib import Path
+    from peerpedia.config.settings import settings
+    from peerpedia.mirror import mirror_arxiv
+    from peerpedia_core.storage.db import get_engine, init_db
+
+    engine = get_engine(settings.database_url)
+    init_db(engine)
+    settings.ensure_dirs()
+
+    click.echo(f"正在从 arXiv 搬运: {arxiv_id}")
+    click.echo(f"  搬运者: {user}")
+
+    result = mirror_arxiv(
+        arxiv_id=arxiv_id,
+        mirror_user_id=user,
+        database_url=settings.database_url,
+        articles_dir=settings.articles_dir,
+    )
+
+    if result.success:
+        click.echo()
+        click.echo(f"✓ 搬运成功！")
+        click.echo(f"  arXiv:  {result.arxiv_id}")
+        click.echo(f"  标题:   {result.title}")
+        click.echo(f"  作者:   {', '.join(result.authors)}")
+        click.echo(f"  搬运积分: +{result.mirror_points}")
+    else:
+        click.echo(f"✗ 搬运失败: {result.error}", err=True)
         raise SystemExit(1)
 
 
