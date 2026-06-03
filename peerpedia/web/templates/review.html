@@ -12,7 +12,7 @@
         <nav>
             <a href="/">首页</a>
             <a href="/submit">提交</a>
-            <a href="/review">审稿队列</a>
+            <a href="/review">🌊 沉淀池</a>
             {% if viewer %}
             <a href="/user/{{ viewer }}">👤 我的主页</a>
             {% endif %}
@@ -74,13 +74,33 @@
     </script>
 
     <main>
+    <style>
+    .pool-header { background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+    .sink-bar-bg { background: #e5e5e5; border-radius: 4px; height: 8px; margin-top: 8px; }
+    .sink-bar-fill { background: #f59e0b; border-radius: 4px; height: 8px; transition: width 0.5s; }
+    .review-thread { margin-top: 16px; }
+    .review-card { border-left: 3px solid #2563eb; padding: 8px 12px; margin-bottom: 8px; background: #f8f9fa; border-radius: 0 6px 6px 0; }
+    .review-card.author-reply { border-left-color: #f59e0b; background: #fefce8; margin-left: 24px; }
+    .review-card .anon-id { font-weight: 600; color: #6366f1; }
+    .review-card .author-tag { background: #f59e0b; color: #fff; font-size: 0.7em; padding: 1px 6px; border-radius: 3px; }
+    </style>
     {% if article %}
-        <h2>审稿: {{ article.title }}</h2>
+        <h2>🌊 沉淀池: {{ article.title }}</h2>
+
+        <div class="pool-header">
+            {% set days_left = 7 %}
+            {% set pct = 20 %}
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>📍 下沉进度 · 预计 {{ days_left }} 天后发表</span>
+                <span style="font-size:0.85em;color:#888;">评分越高下沉越快</span>
+            </div>
+            <div class="sink-bar-bg"><div class="sink-bar-fill" style="width:{{ pct }}%;"></div></div>
+        </div>
 
         <div class="article-meta">
-            <span>状态: <span class="status {{ article.status }}">{{ article.status }}</span></span>
             <span>格式: {{ article.format }}</span>
             <span>作者: {{ article.founding_authors | join(", ") }}</span>
+            <span>默认 7 天 · 最快 2 天 · 最长 180 天</span>
         </div>
 
         <div class="article-abstract">
@@ -89,44 +109,39 @@
         </div>
 
         {% if reviews %}
-        <section class="existing-reviews">
-            <h3>已有审稿 ({{ reviews | length }})</h3>
+        <section class="review-thread">
+            <h3>💬 讨论 ({{ reviews | length }})</h3>
             {% for r in reviews %}
-            <div class="review-card">
+            <div class="review-card {% if r.reviewer_id in article.founding_authors %}author-reply{% endif %}">
                 <p class="meta">
-                    {{ r.reviewer_id }} · {{ r.decision }} ·
-                    科学正确性: {{ r.scientific_correctness }}/5 ·
-                    表述清晰度: {{ r.clarity }}/5 ·
-                    +{{ r.points_earned }} 分
+                    <span class="anon-id">匿名者_{{ r.reviewer_id[:4].upper() }}</span>
+                    {% if r.reviewer_id in article.founding_authors %}<span class="author-tag">作者</span>{% endif %}
+                    ·
+                    {% if r.review_originality %}
+                    🧠{{ r.review_originality }} 📐{{ r.review_rigor }} 🧩{{ r.review_completeness }} 📖{{ r.review_pedagogy }} 💡{{ r.review_impact }}
+                    {% endif %}
+                    · {{ r.created_at[:10] if r.created_at else '' }}
                 </p>
-                <p>{{ r.comments }}</p>
+                {% if r.comments %}<p style="margin:4px 0;white-space:pre-wrap;">{{ r.comments }}</p>{% endif %}
+                {% if r.collaboration_message %}<p style="font-size:0.85em;color:#888;">🤝 {{ r.collaboration_message }}</p>{% endif %}
             </div>
             {% endfor %}
         </section>
+        {% else %}
+        <p style="color:#888;font-size:0.85em;margin:12px 0;">暂无评分。成为第一个评分的人。</p>
         {% endif %}
 
-        <section class="review-form">
-            <h3>提交你的审稿</h3>
+        {% if viewer %}
+        <section class="review-form" style="margin-top:20px;padding:16px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;">
+            <h3>📊 评分并评论 <span style="font-weight:400;color:#888;font-size:0.85em;">— 身份: 匿名者_{{ viewer[:4].upper() }}</span></h3>
             <form action="/api/v1/articles/{{ article.id }}/reviews" method="post"
                   hx-post="/api/v1/articles/{{ article.id }}/reviews"
                   hx-target="#review-result"
                   hx-swap="innerHTML">
-                <label>名字/ID: <input type="text" name="reviewer_id" required></label>
-                <label>决定:
-                    <select name="decision" required>
-                        <option value="accept">接受</option>
-                        <option value="revise">修改</option>
-                        <option value="reject">拒绝</option>
-                    </select>
-                </label>
-                <label>科学正确性 (1-5):
-                    <input type="range" name="scientific_correctness" min="1" max="5" value="3">
-                </label>
-                <label>表述清晰度 (1-5):
-                    <input type="range" name="clarity" min="1" max="5" value="3">
-                </label>
-                <fieldset class="self-review" style="border:1px solid #e5e5e5;border-radius:8px;padding:14px;margin-bottom:12px;">
-                    <legend style="font-weight:600;">📊 五维评分 <span style="font-weight:400;color:#888;font-size:0.9em;">— 可选，和自评维度一致</span></legend>
+                <input type="hidden" name="reviewer_id" value="{{ viewer }}">
+                <input type="hidden" name="decision" value="accept">
+                <fieldset style="border:1px solid #e5e5e5;border-radius:8px;padding:14px;margin-bottom:12px;">
+                    <legend style="font-weight:600;">五维评分</legend>
                     <div class="star-rating" data-dimension="review_originality" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
                         <span style="width:80px;font-size:0.82em;">🧠 原创性</span>
                         <span class="stars" style="cursor:pointer;font-size:0.9em;">
@@ -168,43 +183,20 @@
                         <input type="hidden" name="review_impact" value="0">
                     </div>
                 </fieldset>
-                <label>审稿意见 (Markdown):
-                    <textarea name="comments" rows="6"></textarea>
+                <label>评论:
+                    <textarea name="comments" rows="4" placeholder="对这篇文章的看法..."></textarea>
                 </label>
-                <label>
-                    <input type="checkbox" name="collaboration_request" value="true"
-                           hx-get="/api/v1/articles/{{ article.id }}/collaboration/{{ viewer or '' }}"
-                           hx-target="#collab-status" hx-swap="innerHTML"
-                           hx-trigger="change" onchange="
-                        var msg = document.getElementById('collab-message');
-                        msg.style.display = this.checked ? '' : 'none';
-                    ">
-                    🤝 申请成为协作者（审稿通过后可共同编辑文章）
-                </label>
-                <div id="collab-message" style="display: none;">
-                    <label>想改进的部分:
-                        <textarea name="collaboration_message" rows="2"
-                                  placeholder="简述你想改进的部分..."></textarea>
-                    </label>
-                </div>
-                <button type="submit">提交审稿</button>
+                <button type="submit" style="margin-top:8px;">💬 发表评分</button>
             </form>
             <div id="review-result"></div>
         </section>
-
-        <section class="decision-action">
-            <h3>做出决定</h3>
-            <button hx-post="/api/v1/articles/{{ article.id }}/decide"
-                    hx-target="#decision-result"
-                    hx-swap="innerHTML">
-                决定
-            </button>
-            <div id="decision-result"></div>
-        </section>
+        {% else %}
+        <p style="color:#888;margin-top:16px;">👽 请先选择身份再参与评分</p>
+        {% endif %}
 
     {% elif articles is defined and articles %}
-        <h2>审稿队列</h2>
-        <p>{{ articles | length }} 篇文章待审。</p>
+        <h2>🌊 沉淀池</h2>
+        <p>{{ articles | length }} 篇文章等待评分。</p>
         {% for a in articles %}
         <article class="article-card">
             <h3><a href="/review/{{ a.id }}">{{ a.title }}</a></h3>
@@ -216,8 +208,8 @@
         </article>
         {% endfor %}
     {% else %}
-        <h2>审稿队列</h2>
-        <p class="empty-state">暂无待审文章。</p>
+        <h2>🌊 沉淀池</h2>
+        <p class="empty-state">沉淀池为空。<a href="/submit">提交第一篇。</a></p>
     {% endif %}
     </main>
 </body>
