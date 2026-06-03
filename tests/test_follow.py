@@ -293,3 +293,62 @@ class TestFollowAPI:
                     assert event["type"] in ("new_article", "new_version")
                     assert "user_id" in event
                     assert "time" in event
+
+    def test_cannot_self_follow(self):
+        """POST /api/v1/users/{id}/follow with same follower_id returns 400."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.post("/api/v1/users/alice/follow", data={"follower_id": "alice"})
+                assert resp.status_code == 400
+
+    def test_followers_html_list_shows_correct_names(self):
+        """GET /users/{id}/followers?format=html returns follower names (not followed_id)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                # bob and charlie follow alice
+                client.post("/api/v1/users/alice/follow", data={"follower_id": "bob"})
+                client.post("/api/v1/users/alice/follow", data={"follower_id": "charlie"})
+
+                resp = client.get("/api/v1/users/alice/followers?format=html&viewer=alice")
+                assert resp.status_code == 200
+                html = resp.text
+                assert "bob" in html, f"Expected bob in followers list: {html}"
+                assert "charlie" in html, f"Expected charlie in followers list: {html}"
+                assert '<ul class="follow-list">' in html
+
+    def test_following_html_list_shows_correct_names(self):
+        """GET /users/{id}/following?format=html returns followed names."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                client.post("/api/v1/users/charlie/follow", data={"follower_id": "alice"})
+
+                resp = client.get("/api/v1/users/alice/following?format=html&viewer=alice")
+                assert resp.status_code == 200
+                html = resp.text
+                assert "bob" in html, f"Expected bob in following: {html}"
+                assert "charlie" in html, f"Expected charlie in following: {html}"
+
+    def test_followers_html_empty_returns_placeholder(self):
+        """GET /users/{id}/followers?format=html with no followers returns placeholder."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get("/api/v1/users/alice/followers?format=html")
+                assert resp.status_code == 200
+                assert "暂无" in resp.text or "follow-empty" in resp.text
