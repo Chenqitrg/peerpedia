@@ -216,7 +216,7 @@ async def review_queue(request: Request):
             name="review.html",
             context={
                 "request": request,
-                "title": "Review Queue",
+                "title": "沉淀池",
                 "articles": [a.to_dict() for a in articles],
                 "viewer": viewer,
                 "all_users": get_all_users(),

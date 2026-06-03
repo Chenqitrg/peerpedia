@@ -256,37 +256,10 @@ async def api_submit_review(
     if not result.success:
         raise HTTPException(status_code=400, detail=result.error)
 
-    decision_labels = {"accept": "接受", "revise": "修改后重投", "reject": "拒绝"}
-    label = decision_labels.get(decision, decision)
+    reviewer_id_anon = reviewer_id[:4].upper()
     return HTMLResponse(
         f'<div style="padding:12px;background:#d1fae5;border-radius:6px;margin-top:8px;">'
-        f'<strong>✓ 审稿已提交</strong><br>'
-        f'决定: {label} · +{result.points_earned} 积分</div>'
-        f'<script>setTimeout(function(){{location.reload()}},800)</script>'
-    )
-
-
-@router.post("/articles/{article_id}/decide")
-async def api_decide_article(article_id: str):
-    """Make a decision on an article. Returns HTML for HTMX swap."""
-    from fastapi.responses import HTMLResponse
-
-    from peerpedia_core.workflow.review import make_decision
-
-    result = make_decision(article_id=article_id, database_url=settings.database_url)
-    if not result.success:
-        raise HTTPException(status_code=400, detail=result.error)
-
-    status_labels = {
-        "accepted": "接受",
-        "rejected": "拒绝",
-        "revisions_requested": "需修改",
-    }
-    label = status_labels.get(result.new_status, result.new_status)
-    author_pts = f" · 作者 +{result.author_points} 积分" if result.author_points else ""
-    return HTMLResponse(
-        f'<div style="padding:12px;background:#dbeafe;border-radius:6px;margin-top:8px;">'
-        f'<strong>✓ 决定已做出: {label}</strong>{author_pts}</div>'
+        f'<strong>✓ 评分已发表</strong> · 身份: 匿名者_{reviewer_id_anon}</div>'
         f'<script>setTimeout(function(){{location.reload()}},800)</script>'
     )
 
