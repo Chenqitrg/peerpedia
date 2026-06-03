@@ -13,8 +13,30 @@
             <a href="/">首页</a>
             <a href="/submit">提交</a>
             <a href="/review">审稿队列</a>
+            {% if viewer %}
+            <a href="/user/{{ viewer }}">👤 我的主页</a>
+            {% endif %}
+            <span style="margin-left: auto; font-size: 0.85em;">
+                <select id="viewer-picker" onchange="setViewer(this.value)"
+                        style="padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px;">
+                    <option value="">👽 游客</option>
+                    {% for u in all_users %}
+                    <option value="{{ u[0] }}" {% if viewer == u[0] %}selected{% endif %}>{{ u[1] }}</option>
+                    {% endfor %}
+                </select>
+            </span>
         </nav>
     </header>
+    <script>
+    function setViewer(uid) {
+        if (uid) {
+            document.cookie = "viewer=" + encodeURIComponent(uid) + ";path=/;max-age=86400;SameSite=Lax";
+        } else {
+            document.cookie = "viewer=;path=/;max-age=0;SameSite=Lax";
+        }
+        location.reload();
+    }
+    </script>
 
     <main>
     {% if article %}

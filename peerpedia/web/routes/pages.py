@@ -1,7 +1,7 @@
 """Web — Route handlers for HTML pages."""
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
@@ -17,13 +17,37 @@ templates_dir = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
 
+def get_viewer(request: Request) -> str:
+    """Get current viewer from cookie, query param, or empty string."""
+    viewer = request.cookies.get("viewer", "")
+    if viewer:
+        return viewer
+    # Fallback: check query params (both 'viewer' and 'user' used historically)
+    viewer = request.query_params.get("viewer", "")
+    if viewer:
+        return viewer
+    return request.query_params.get("user", "")
+
+
+def get_all_users():
+    """Get list of all registered users for the nav picker."""
+    session = get_db_session()
+    try:
+        from peerpedia_core.storage.db import User
+        return [(u.id, u.name) for u in session.query(User).order_by(User.id).all()]
+    except Exception:
+        return []
+    finally:
+        session.close()
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Home page — article listing from database."""
     session = get_db_session()
     try:
         tab = request.query_params.get("tab", "all")
-        viewer = request.query_params.get("user", "")
+        viewer = get_viewer(request)
         articles = list_articles(session)
         return templates.TemplateResponse(
             request=request,
@@ -34,6 +58,7 @@ async def home(request: Request):
                 "articles": [a.to_dict() for a in articles],
                 "tab": tab,
                 "viewer": viewer,
+                "all_users": get_all_users(),
             },
         )
     finally:
@@ -46,12 +71,13 @@ async def view_article(request: Request, article_id: str):
     session = get_db_session()
     try:
         article = get_article(session, article_id)
-        viewer = request.query_params.get("viewer", "")
+        viewer = get_viewer(request)
         if article is None:
             return templates.TemplateResponse(
                 request=request,
                 name="article.html",
-                context={"request": request, "title": "Not Found", "article": None, "viewer": viewer},
+                context={"request": request, "title": "Not Found", "article": None,
+                         "viewer": viewer, "all_users": get_all_users()},
                 status_code=404,
             )
 
@@ -67,6 +93,7 @@ async def view_article(request: Request, article_id: str):
                 "title": article_dict["title"],
                 "article": article_dict,
                 "viewer": viewer,
+                "all_users": get_all_users(),
             },
         )
     finally:
@@ -76,10 +103,12 @@ async def view_article(request: Request, article_id: str):
 @router.get("/submit", response_class=HTMLResponse)
 async def submit_page(request: Request):
     """Article submission page."""
+    viewer = get_viewer(request)
     return templates.TemplateResponse(
         request=request,
         name="submit.html",
-        context={"request": request, "title": "Submit Article"},
+        context={"request": request, "title": "Submit Article",
+                 "viewer": viewer, "all_users": get_all_users()},
     )
 
 
@@ -87,13 +116,15 @@ async def submit_page(request: Request):
 async def review_article_page(request: Request, article_id: str):
     """Review form for a specific article."""
     session = get_db_session()
+    viewer = get_viewer(request)
     try:
         article = get_article(session, article_id)
         if article is None:
             return templates.TemplateResponse(
                 request=request,
                 name="review.html",
-                context={"request": request, "title": "Not Found", "article": None, "reviews": []},
+                context={"request": request, "title": "Not Found", "article": None, "reviews": [],
+                         "viewer": viewer, "all_users": get_all_users()},
                 status_code=404,
             )
 
@@ -108,6 +139,8 @@ async def review_article_page(request: Request, article_id: str):
                 "title": f"Review: {article.title}",
                 "article": article.to_dict(),
                 "reviews": [r.to_dict() for r in reviews],
+                "viewer": viewer,
+                "all_users": get_all_users(),
             },
         )
     finally:
@@ -118,6 +151,7 @@ async def review_article_page(request: Request, article_id: str):
 async def review_queue(request: Request):
     """Review queue — list articles pending review."""
     session = get_db_session()
+    viewer = get_viewer(request)
     try:
         articles = list_articles(session, status="submitted")
         return templates.TemplateResponse(
@@ -127,6 +161,8 @@ async def review_queue(request: Request):
                 "request": request,
                 "title": "Review Queue",
                 "articles": [a.to_dict() for a in articles],
+                "viewer": viewer,
+                "all_users": get_all_users(),
             },
         )
     finally:
@@ -137,6 +173,7 @@ async def review_queue(request: Request):
 async def user_profile(request: Request, user_id: str):
     """User profile page — personal arXiv and activity footprint."""
     session = get_db_session()
+    viewer = get_viewer(request)
     try:
         # Articles authored by this user
         authored = (
@@ -206,21 +243,19 @@ async def user_profile(request: Request, user_id: str):
         # Follow state — always compute counts, even without viewer
         is_self = False
         is_following_user = False
-        current_user_id = request.query_params.get("viewer", "")
         following_count = 0
         follower_count = 0
-        if current_user_id:
+        if viewer:
             from peerpedia_core.storage.db import (
                 is_following, get_following_count, get_follower_count
             )
-            if current_user_id == user_id:
+            if viewer == user_id:
                 is_self = True
             else:
-                is_following_user = is_following(session, current_user_id, user_id)
+                is_following_user = is_following(session, viewer, user_id)
             following_count = get_following_count(session, user_id)
             follower_count = get_follower_count(session, user_id)
         else:
-            # Still compute counts so visitors can see them
             from peerpedia_core.storage.db import (
                 get_following_count, get_follower_count
             )
@@ -255,9 +290,10 @@ async def user_profile(request: Request, user_id: str):
                 "reputation": reputation,
                 "is_self": is_self,
                 "is_following": is_following_user,
-                "current_user": current_user_id,
+                "current_user": viewer,
                 "following_count": following_count,
                 "follower_count": follower_count,
+                "all_users": get_all_users(),
             },
         )
     finally:

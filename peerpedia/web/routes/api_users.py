@@ -125,6 +125,9 @@ async def api_follow_user(user_id: str, follower_id: str = Form(...)):
     )
     from sqlalchemy.exc import IntegrityError
 
+    if follower_id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+
     session = get_db_session()
     try:
         target = get_user(session, user_id)
@@ -191,13 +194,16 @@ async def api_unfollow_user(user_id: str, follower_id: str = Form(...)):
         session.close()
 
 
-def _render_user_list(users: list, viewer: str, label: str, empty_label: str) -> str:
-    """Render a following/followers list as an HTML fragment."""
+def _render_user_list(users: list, viewer: str, *, field: str = "followed_id") -> str:
+    """Render a following/followers list as an HTML fragment.
+
+    field='followed_id' for following list, field='follower_id' for followers list.
+    """
     if not users:
-        return f'<ul class="follow-list"><li class="follow-empty">{empty_label}</li></ul>'
+        return f'<ul class="follow-list"><li class="follow-empty">暂无</li></ul>'
     items = []
     for u in users:
-        uid = u.followed_id if hasattr(u, 'followed_id') else u.follower_id
+        uid = getattr(u, field, str(u))
         profile_url = f"/user/{uid}"
         if viewer:
             profile_url += f"?viewer={viewer}"
@@ -221,7 +227,7 @@ async def api_get_following(user_id: str, format: str = "json", viewer: str = ""
         following = get_following(session, user_id)
         if format == "html":
             return HTMLResponse(_render_user_list(
-                following, viewer, "关注了", "暂未关注任何人"
+                following, viewer, field="followed_id",
             ))
 
         return {
@@ -255,7 +261,7 @@ async def api_get_followers(user_id: str, format: str = "json", viewer: str = ""
         followers = get_followers(session, user_id)
         if format == "html":
             return HTMLResponse(_render_user_list(
-                followers, viewer, "粉丝", "暂无粉丝"
+                followers, viewer, field="follower_id",
             ))
 
         return {
