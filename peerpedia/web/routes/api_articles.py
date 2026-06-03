@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from peerpedia.config.settings import settings
 from peerpedia.submit import submit_article
 from peerpedia.web.db_session import get_db_session
+from peerpedia.web.routes._helpers import get_article_or_404
 from peerpedia_core.storage.db import (
     get_article,
     get_reviews_for_article,
@@ -36,9 +37,7 @@ async def api_get_article(article_id: str):
     """Get article metadata by ID."""
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
         return article.to_dict()
     finally:
         session.close()
@@ -120,9 +119,7 @@ async def api_fork_article(article_id: str, forker_id: str = Form(...)):
 
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
 
         # Clone the git repo
         src_repo = Path(article.git_repo_path) if article.git_repo_path else None
@@ -195,15 +192,11 @@ async def api_create_merge_proposal(
 
     session = get_db_session()
     try:
-        fork = get_article(session, article_id)
-        if fork is None:
-            raise HTTPException(status_code=404, detail="Fork article not found")
+        fork = get_article_or_404(session, article_id)
         if fork.forked_from != target_article_id:
             raise HTTPException(status_code=400, detail="target_article_id must match forked_from")
 
-        target = get_article(session, target_article_id)
-        if target is None:
-            raise HTTPException(status_code=404, detail="Target article not found")
+        target = get_article_or_404(session, target_article_id)
 
         proposal = create_merge_proposal(
             session,
@@ -383,9 +376,7 @@ async def api_get_reviews(article_id: str):
     """Get all reviews for an article."""
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
         reviews = get_reviews_for_article(session, article_id)
         return {
             "article_id": article_id,
@@ -671,9 +662,7 @@ async def api_get_commit_history(article_id: str):
 
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
 
         repo = Path(article.git_repo_path) if article.git_repo_path else None
         if repo is None or not repo.exists():
@@ -782,9 +771,7 @@ async def api_get_diff(article_id: str, commit_hash: str):
 
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
 
         repo = Path(article.git_repo_path) if article.git_repo_path else None
         if repo is None or not repo.exists():
@@ -809,9 +796,7 @@ async def api_get_diff_between(article_id: str, hash1: str, hash2: str):
 
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
 
         repo = Path(article.git_repo_path) if article.git_repo_path else None
         if repo is None or not repo.exists():
@@ -836,9 +821,7 @@ async def api_get_blame(article_id: str):
 
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
 
         repo = Path(article.git_repo_path) if article.git_repo_path else None
         if repo is None or not repo.exists():
@@ -874,9 +857,7 @@ async def api_get_comments(
 
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
 
         comments = get_comments_for_article(
             session,
@@ -913,9 +894,7 @@ async def api_create_comment(
 
     session = get_db_session()
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+        article = get_article_or_404(session, article_id)
 
         comment = create_review_comment(
             session,
