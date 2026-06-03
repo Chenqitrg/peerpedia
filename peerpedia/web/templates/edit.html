@@ -199,9 +199,7 @@
     window.editor.on('input', function() {
         updatePreview();
     });
-    </script>
 
-    <script>
     function switchFormat(fmt) {
         updatePreview();
     }
@@ -304,26 +302,25 @@
                 btn.disabled = false;
             });
     }
-    </script>
 
-    <!-- Typst WASM preview (lazy load) -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@myriaddreamin/typst-all-in-one.ts@0.6.0/dist/esm/index.js"></script>
-    <script>
     function previewTypst(content, preview, status) {
         status.textContent = '编译中...';
         if (!window.$typst) {
-            preview.innerHTML = '<p style="color:#888;">Typst WASM 加载中，请稍候...</p>';
+            preview.innerHTML = '<p style=\"color:#888;\">Typst WASM 加载中，请稍候...</p>';
             return;
         }
         window.$typst.svg({ mainContent: content }).then(function(svg) {
             preview.innerHTML = svg;
             status.textContent = '';
         }).catch(function(err) {
-            preview.innerHTML = '<p style="color:#c00;">Typst 编译错误</p><pre style="font-size:0.85em;color:#888;">'
+            preview.innerHTML = '<p style=\"color:#c00;\">Typst 编译错误</p><pre style=\"font-size:0.85em;color:#888;\">'
                 + (err.message || String(err)).slice(0, 500) + '</pre>';
             status.textContent = '✗';
         });
     }
     </script>
+
+    <!-- Typst WASM module (loads $typst global) -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@myriaddreamin/typst-all-in-one.ts@0.6.0/dist/esm/index.js"></script>
 </body>
 </html>
