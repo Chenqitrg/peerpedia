@@ -144,6 +144,11 @@ def create_review(
     collaboration_request: bool = False,
     collaboration_message: str = "",
     points_earned: int = 0,
+    review_originality: int = 0,
+    review_rigor: int = 0,
+    review_completeness: int = 0,
+    review_pedagogy: int = 0,
+    review_impact: int = 0,
 ) -> Review:
     """Create a new review record."""
     review = Review(
@@ -157,6 +162,11 @@ def create_review(
         collaboration_request=1 if collaboration_request else 0,
         collaboration_message=collaboration_message,
         points_earned=points_earned,
+        review_originality=review_originality,
+        review_rigor=review_rigor,
+        review_completeness=review_completeness,
+        review_pedagogy=review_pedagogy,
+        review_impact=review_impact,
     )
     session.add(review)
     return review

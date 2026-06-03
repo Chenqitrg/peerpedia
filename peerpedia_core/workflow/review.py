@@ -136,6 +136,11 @@ def submit_review(
     clarity: int = 0,
     collaboration_request: bool = False,
     collaboration_message: str = "",
+    review_originality: int = 0,
+    review_rigor: int = 0,
+    review_completeness: int = 0,
+    review_pedagogy: int = 0,
+    review_impact: int = 0,
 ) -> ReviewResult:
     """Submit a review for an article.
 
@@ -191,6 +196,11 @@ def submit_review(
             collaboration_request=collaboration_request,
             collaboration_message=collaboration_message,
             points_earned=points,
+            review_originality=review_originality,
+            review_rigor=review_rigor,
+            review_completeness=review_completeness,
+            review_pedagogy=review_pedagogy,
+            review_impact=review_impact,
         )
         session.commit()
 
