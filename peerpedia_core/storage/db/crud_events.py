@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from peerpedia_core.storage.db.models import ClickEvent, NodeInfo
 
-
 # ── ClickEvent CRUD ─────────────────────────────────────────────────────────────
 
 def create_click_event(

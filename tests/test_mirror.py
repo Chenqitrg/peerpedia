@@ -1,17 +1,14 @@
 """Tests for arXiv mirror functionality."""
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from peerpedia.mirror import (
     ArxivMetadata,
-    MirrorResult,
     _author_slug,
     _parse_arxiv_xml,
     mirror_arxiv,
 )
-
 
 SAMPLE_ARXIV_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -143,7 +140,7 @@ class TestMirrorDeduplication:
                 assert result.article_id != ""
 
                 # Verify in DB
-                from peerpedia_core.storage.db import get_engine, init_db, get_session, get_article
+                from peerpedia_core.storage.db import get_article, get_engine, get_session, init_db
                 engine = get_engine(db_url)
                 init_db(engine)
                 session = get_session(engine)

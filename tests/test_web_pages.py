@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-import pytest
 from fastapi.testclient import TestClient
 
 from peerpedia.submit import submit_article
@@ -86,7 +85,7 @@ Content.
             assert result.success
 
             # Manually add a second founding author in the DB
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+            from peerpedia_core.storage.db import Article, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -172,7 +171,7 @@ class TestUserProfilePage:
         with tempfile.TemporaryDirectory() as tmp:
             db_url, article_id = _setup_db_with_article(tmp, author="bob")
             # Create users in the DB
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -199,7 +198,7 @@ class TestNavMyProfile:
         """GET /?user=X renders nav with '我的主页' link."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="zhangliang")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -232,7 +231,7 @@ class TestNavMyProfile:
         """GET /article/{id}?viewer=X renders nav with '我的主页'."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, article_id = _setup_db_with_article(tmp, author="testuser")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -256,7 +255,7 @@ class TestFollowCountsOnProfile:
         """GET /user/{id}?viewer=X shows follower/following counts."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="bob")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -280,7 +279,7 @@ class TestFollowCountsOnProfile:
         """GET /user/{id}?viewer={id} shows '这是我的主页'."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="alice")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -300,7 +299,7 @@ class TestFollowCountsOnProfile:
         """Follow count links point to HTMX API endpoints."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="bob")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -326,7 +325,7 @@ class TestCookieViewer:
         """Viewer cookie is used as identity on homepage."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="zhangliang")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -361,7 +360,7 @@ class TestCookieViewer:
         """Nav dropdown contains all registered users."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="zhangliang")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -387,7 +386,7 @@ class TestCookieViewer:
         """Dropdown has 'selected' on the cookie viewer's option."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="zhangliang")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -409,7 +408,7 @@ class TestCookieViewer:
         """Viewer cookie is read on user profile page too."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, _ = _setup_db_with_article(tmp, author="wangshouheng")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -432,7 +431,7 @@ class TestCookieViewer:
         """User dropdown appears on submit, review, and article pages."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user
+            from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)
@@ -449,3 +448,107 @@ class TestCookieViewer:
                     if resp.status_code == 200:
                         assert 'viewer-picker' in resp.text, f"{path} missing picker"
                         assert 'setViewer' in resp.text, f"{path} missing setViewer"
+
+
+class TestReviewButtonOnArticle:
+    """B1: Article page should show review button for submitted/in_review articles."""
+
+    def _make_submitted(self, db_url: str, article_id: str):
+        """Set article status to 'submitted' so the review button appears."""
+        from peerpedia_core.storage.db import get_engine, init_db, get_session, get_article
+        engine = get_engine(db_url)
+        init_db(engine)
+        session = get_session(engine)
+        try:
+            a = get_article(session, article_id)
+            if a:
+                a.status = "submitted"
+                session.commit()
+        finally:
+            session.close()
+
+    def test_review_button_visible_for_submitted_article(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
+            self._make_submitted(db_url, article_id)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(f"/article/{article_id}")
+                assert resp.status_code == 200
+                assert "btn-review" in resp.text, f"Expected review button: {resp.text[:500]}"
+
+    def test_review_button_links_to_review_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="wangshouheng")
+            self._make_submitted(db_url, article_id)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(f"/article/{article_id}")
+                assert f'/review/{article_id}' in resp.text
+
+
+class TestCollaborationButtonOnReview:
+    """B2: Review page should show collaboration request checkbox."""
+
+    def test_review_page_has_collaboration_checkbox(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(f"/review/{article_id}")
+                assert resp.status_code == 200
+                assert "collaboration_request" in resp.text, (
+                    f"Expected collaboration checkbox: {resp.text[:500]}"
+                )
+                assert "协作" in resp.text
+
+    def test_collaboration_message_field_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="wangshouheng")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(f"/review/{article_id}")
+                assert "collaboration_message" in resp.text
+
+
+class TestLANStatusPage:
+    """B7: LAN status page should render."""
+
+    def test_lan_status_page_renders(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, _ = _setup_db_with_article(tmp, author="zhangliang")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get("/lan-status")
+                assert resp.status_code == 200
+                assert "局域网状态" in resp.text
+
+    def test_lan_status_shows_empty_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, _ = _setup_db_with_article(tmp, author="zhangliang")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get("/lan-status")
+                # Without LAN mode, shows empty state
+                assert "没有在线节点" in resp.text or "LAN 模式" in resp.text or "peerpedia serve --lan" in resp.text
+
+
+class TestArticlePageWithTransitions:
+    """B5: Article page should load citation transitions."""
+
+    def test_article_page_has_transition_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(f"/article/{article_id}")
+                assert resp.status_code == 200
+                # Transition probability API call should be in the page
+                assert "transitions" in resp.text or "citing" in resp.text.lower()

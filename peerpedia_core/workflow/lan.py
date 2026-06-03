@@ -7,7 +7,11 @@ Split by concern for maintainability:
 All imports from ``peerpedia_core.workflow.lan`` continue to work.
 """
 
-from peerpedia_core.workflow.lan_protocol import (
+from peerpedia_core.workflow.lan_network import (  # noqa: F401
+    start_udp_broadcaster,
+    start_udp_listener,
+)
+from peerpedia_core.workflow.lan_protocol import (  # noqa: F401
     BROADCAST_ADDR,
     CATALOG_YAML_DELIMITER,
     HEARTBEAT_TYPE,
@@ -15,10 +19,6 @@ from peerpedia_core.workflow.lan_protocol import (
     catalog_to_yaml_string,
     parse_catalog_yaml,
     parse_heartbeat_message,
-)
-from peerpedia_core.workflow.lan_network import (
-    start_udp_broadcaster,
-    start_udp_listener,
 )
 
 __all__ = [n for n in dir() if not n.startswith("_")]

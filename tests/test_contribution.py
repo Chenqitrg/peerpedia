@@ -1,15 +1,18 @@
 """Tests for contribution tracking and git blame computation."""
-import pytest
 import tempfile
 import uuid
 from pathlib import Path
 
+import pytest
+
 from peerpedia_core.workflow.contribution import (
+    build_contribution_records_from_git,
     compute_change_type_weight,
     compute_contribution_breakdown,
     compute_contribution_timeline,
-    build_contribution_records_from_git,
 )
+
+
 class TestChangeTypeWeight:
     """Change type weight computation."""
 
@@ -97,7 +100,7 @@ class TestBuildContributionFromGit:
 
     def test_build_records_from_git_repo(self):
         """Build records from a real git repo created by git_backend."""
-        from peerpedia_core.storage.git_backend import init_article_repo, commit_article
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
         with tempfile.TemporaryDirectory() as tmpdir:
             base = Path(tmpdir)

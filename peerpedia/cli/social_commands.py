@@ -37,7 +37,7 @@ def mirror(arxiv_id: str, user: str):
 
     if result.success:
         click.echo()
-        click.echo(f"✓ 搬运成功！")
+        click.echo("✓ 搬运成功！")
         click.echo(f"  arXiv:  {result.arxiv_id}")
         click.echo(f"  标题:   {result.title}")
         click.echo(f"  作者:   {', '.join(result.authors)}")
@@ -60,7 +60,7 @@ def collaborate(article_id: str, reviewer: str):
 
     _ensure_db()
 
-    click.echo(f"接受协作申请")
+    click.echo("接受协作申请")
     click.echo(f"  文章:  {article_id}")
     click.echo(f"  审稿人: {reviewer}")
 
@@ -72,7 +72,7 @@ def collaborate(article_id: str, reviewer: str):
 
     if result.success:
         click.echo()
-        click.echo(f"✓ 协作已建立！")
+        click.echo("✓ 协作已建立！")
         click.echo(f"  合作者: {', '.join(result.founding_authors)}")
     else:
         click.echo(f"✗ 协作失败: {result.error}", err=True)
@@ -103,7 +103,7 @@ def propose_edit(article_id: str, proposal_type: str, description: str, proposer
 
     auto_label = "（自动通过）" if proposal_type == "minor" else "（等待审核）"
 
-    click.echo(f"提交修改提案")
+    click.echo("提交修改提案")
     click.echo(f"  文章:  {article_id}")
     click.echo(f"  类型:  {proposal_type} {auto_label}")
     click.echo(f"  提案人: {proposer}")
@@ -118,14 +118,14 @@ def propose_edit(article_id: str, proposal_type: str, description: str, proposer
 
     if result.success:
         click.echo()
-        click.echo(f"✓ 修改提案已提交！")
+        click.echo("✓ 修改提案已提交！")
         click.echo(f"  提案 ID: {result.proposal_id}")
         if result.auto_approved:
-            click.echo(f"  状态:    自动通过（微小修改）")
+            click.echo("  状态:    自动通过（微小修改）")
             click.echo(f"  下一步:  peerpedia merge-proposal {result.proposal_id} {article_id}")
         else:
-            click.echo(f"  状态:    等待审核")
-            click.echo(f"  下一步:  原作者审核后可合并")
+            click.echo("  状态:    等待审核")
+            click.echo("  下一步:  原作者审核后可合并")
     else:
         click.echo(f"✗ 提案失败: {result.error}", err=True)
         raise SystemExit(1)
@@ -148,7 +148,7 @@ def merge_proposal(proposal_id: str, article_id: str, proposer: str, change_type
 
     _ensure_db()
 
-    click.echo(f"合并修改提案")
+    click.echo("合并修改提案")
     click.echo(f"  提案: {proposal_id}")
     click.echo(f"  文章: {article_id}")
 
@@ -163,7 +163,7 @@ def merge_proposal(proposal_id: str, article_id: str, proposer: str, change_type
 
     if result.success:
         click.echo()
-        click.echo(f"✓ 提案已合并！")
+        click.echo("✓ 提案已合并！")
         click.echo(f"  新版本:  {result.new_version}")
         click.echo(f"  贡献记录: {result.contribution_record_id}")
     else:

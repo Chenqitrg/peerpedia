@@ -11,7 +11,6 @@ from pathlib import Path
 
 from peerpedia_core.reputation.v1 import ReputationParams
 
-
 # ── Change type weight computation ─────────────────────────────────────────────
 
 def compute_change_type_weight(change_type: str) -> int:

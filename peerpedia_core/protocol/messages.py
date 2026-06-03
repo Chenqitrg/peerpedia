@@ -4,11 +4,11 @@ These schemas define the immutable wire protocol. Changes to these schemas
 constitute a protocol fork. See design/brainstorm.md Section 10 for details.
 """
 
-from enum import Enum
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # ── Enums ────────────────────────────────────────────────────────────────────
 

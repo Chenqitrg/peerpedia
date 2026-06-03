@@ -1,16 +1,19 @@
 """API routes for articles, reviews, compilation, and citations."""
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from peerpedia.config.settings import settings
+from peerpedia.submit import submit_article
 from peerpedia.web.db_session import get_db_session
 from peerpedia_core.storage.db import (
-    list_articles, get_article, get_reviews_for_article,
+    get_article,
+    get_reviews_for_article,
+    list_articles,
 )
 from peerpedia_core.workflow.citations import get_citation_info, inject_citation_links
-from peerpedia.submit import submit_article
 
 router = APIRouter()
 
@@ -167,63 +170,72 @@ async def api_decide_article(article_id: str):
     }
 
 
+def _compile_error(message: str, status: int = 200):
+    """Return an HTML error response for compile failures."""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(
+        content=f'<div class="compile-error"><p>⚠️ {message}</p></div>',
+        status_code=status,
+    )
+
+
+def _resolve_compile_backend(repo, article_format: str):
+    """Resolve the compiler backend and find source files in the repo.
+
+    Returns (backend, source_files) or raises HTTPException on failure.
+    """
+    from fastapi import HTTPException
+    from peerpedia_core.storage.compiler import MarkdownBackend, TypstBackend
+
+    ext = "*.typ" if article_format == "typst" else "*.md"
+    source_files = list(repo.glob(ext))
+    if not source_files:
+        raise HTTPException(
+            status_code=400,
+            detail=f"源文件未找到 (格式: {article_format})",
+        )
+    backend = TypstBackend() if article_format == "typst" else MarkdownBackend()
+    return backend, source_files
+
+
 @router.get("/articles/{article_id}/compile")
 async def api_compile_article(article_id: str, fmt: str = "html"):
     """Compile an article on demand. fmt: 'html' (default) or 'pdf'."""
     from pathlib import Path
-    from peerpedia_core.storage.compiler import TypstBackend, MarkdownBackend, CompilerBackend
-    from fastapi.responses import HTMLResponse
+    from fastapi.responses import FileResponse, HTMLResponse
+    from fastapi import HTTPException
 
     session = get_db_session()
     try:
         article = get_article(session, article_id)
         if article is None:
-            return HTMLResponse(
-                content='<div class="compile-error"><p>⚠️ 文章未找到。</p></div>',
-                status_code=404,
-            )
+            return _compile_error("文章未找到。", status=404)
 
         repo = Path(article.git_repo_path) if article.git_repo_path else None
         if repo is None or not repo.exists():
-            return HTMLResponse(
-                content=f'<div class="compile-error"><p>⚠️ 源文件目录不存在。</p><p>路径: {article.git_repo_path}</p><p>文章摘要: {article.abstract}</p></div>',
-            )
+            return _compile_error(f"源文件目录不存在。路径: {article.git_repo_path}")
 
-        if article.format == "typst":
-            source_files = list(repo.glob("*.typ"))
-            backend: CompilerBackend = TypstBackend()
-        else:
-            source_files = list(repo.glob("*.md"))
-            backend = MarkdownBackend()
-
-        if not source_files:
-            return HTMLResponse(
-                content=f'<div class="compile-error"><p>⚠️ 源文件未找到。</p><p>目录: {repo}</p><p>格式: {article.format}</p><hr><h3>摘要</h3><p>{article.abstract}</p></div>',
-            )
+        try:
+            backend, source_files = _resolve_compile_backend(repo, article.format)  # type: ignore[arg-type]
+        except HTTPException as e:
+            return _compile_error(str(e.detail))
 
         result = backend.compile(source_files[0], repo)
         if not result.success:
-            return HTMLResponse(
-                content=f'<div class="compile-error"><p>⚠️ 编译失败: {result.error}</p><hr><h3>摘要</h3><p>{article.abstract}</p></div>',
-            )
+            return _compile_error(f"编译失败: {result.error}")
 
         if fmt == "pdf" and result.output_path:
-            from fastapi.responses import FileResponse
             return FileResponse(
-                result.output_path,
-                media_type="application/pdf",
+                result.output_path, media_type="application/pdf",
                 filename=f"{article.title}.pdf",
             )
         elif result.html_content:
-            linked_html = inject_citation_links(result.html_content)
-            return HTMLResponse(content=linked_html)
+            return HTMLResponse(content=inject_citation_links(result.html_content))
         elif result.output_path:
             output = Path(result.output_path)
             return {"content": output.read_text(), "format": article.format}
         else:
-            return HTMLResponse(
-                content='<div class="compile-error"><p>⚠️ 编译未产生输出。</p></div>',
-            )
+            return _compile_error("编译未产生输出。")
     finally:
         session.close()
 

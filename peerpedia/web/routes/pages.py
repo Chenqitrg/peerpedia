@@ -1,14 +1,16 @@
 """Web — Route handlers for HTML pages."""
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from pathlib import Path
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from peerpedia.web.db_session import get_db_session
 from peerpedia_core.storage.db import (
-    list_articles, get_article,
     Article,
+    get_article,
+    list_articles,
 )
 
 router = APIRouter()
@@ -247,7 +249,9 @@ async def user_profile(request: Request, user_id: str):
         follower_count = 0
         if viewer:
             from peerpedia_core.storage.db import (
-                is_following, get_following_count, get_follower_count
+                get_follower_count,
+                get_following_count,
+                is_following,
             )
             if viewer == user_id:
                 is_self = True
@@ -256,9 +260,7 @@ async def user_profile(request: Request, user_id: str):
             following_count = get_following_count(session, user_id)
             follower_count = get_follower_count(session, user_id)
         else:
-            from peerpedia_core.storage.db import (
-                get_following_count, get_follower_count
-            )
+            from peerpedia_core.storage.db import get_follower_count, get_following_count
             following_count = get_following_count(session, user_id)
             follower_count = get_follower_count(session, user_id)
 
@@ -298,3 +300,41 @@ async def user_profile(request: Request, user_id: str):
         )
     finally:
         session.close()
+
+
+# ── LAN status page ────────────────────────────────────────────────────────────
+
+@router.get("/lan-status", response_class=HTMLResponse)
+async def lan_status_page(request: Request):
+    """Show online LAN nodes and their article counts."""
+    from peerpedia_core.storage.db import get_engine, get_session, init_db, get_online_nodes
+    from peerpedia.web.db_session import settings
+
+    viewer = get_viewer(request)
+    nodes = []
+    try:
+        engine = get_engine(settings.database_url)
+        init_db(engine)
+        session = get_session(engine)
+        try:
+            raw_nodes = get_online_nodes(session, timeout_seconds=3600)
+            for n in raw_nodes:
+                nodes.append({
+                    "node_id": n.node_id,
+                    "host": n.host,
+                    "port": n.port,
+                    "articles_count": n.articles_count,
+                    "is_self": bool(n.is_self),
+                    "last_seen": n.last_seen.isoformat() if n.last_seen else "",
+                })
+        finally:
+            session.close()
+    except Exception:
+        pass
+
+    return templates.TemplateResponse(
+        request=request, name="lan_status.html",
+        context={"request": request, "title": "局域网状态",
+                 "nodes": nodes, "node_count": len(nodes),
+                 "viewer": viewer, "all_users": get_all_users()},
+    )

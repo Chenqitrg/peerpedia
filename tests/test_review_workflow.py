@@ -1,18 +1,14 @@
 """Tests for review workflow orchestration."""
-import pytest
 import tempfile
 from pathlib import Path
 
 from peerpedia.submit import submit_article
 from peerpedia_core.workflow.review import (
     assign_reviewer,
-    submit_review,
-    make_decision,
     calculate_review_points,
-    ReviewResult,
-    DecisionResult,
+    make_decision,
+    submit_review,
 )
-
 
 SIMPLE_ARTICLE = """---
 title: Review Workflow Test
@@ -47,7 +43,12 @@ def _prepare_article(tmp_path, status="submitted"):
     assert result.success
 
     if status != "draft":
-        from peerpedia_core.storage.db import get_engine, init_db, get_session, update_article_status
+        from peerpedia_core.storage.db import (
+            get_engine,
+            get_session,
+            init_db,
+            update_article_status,
+        )
         engine = get_engine(f"sqlite:///{db_path}")
         init_db(engine)
         session = get_session(engine)
@@ -172,7 +173,12 @@ class TestDecisionMaking:
             base = Path(tmp)
             article_id, db_url = _prepare_article(base, status="submitted")
             # Set to in_review without any reviews
-            from peerpedia_core.storage.db import get_engine, init_db, get_session, update_article_status
+            from peerpedia_core.storage.db import (
+                get_engine,
+                get_session,
+                init_db,
+                update_article_status,
+            )
             engine = get_engine(db_url)
             init_db(engine)
             session = get_session(engine)

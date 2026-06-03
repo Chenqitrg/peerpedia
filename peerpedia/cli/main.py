@@ -6,13 +6,12 @@ from pathlib import Path
 
 import click
 
-from peerpedia_core import __version__
-
 # Import subcommand modules
-from peerpedia.cli.article_commands import submit, review, decide
-from peerpedia.cli.social_commands import mirror, collaborate, propose_edit, merge_proposal
-from peerpedia.cli.user_commands import user
+from peerpedia.cli.article_commands import decide, review, submit
 from peerpedia.cli.lan_commands import lan
+from peerpedia.cli.social_commands import collaborate, merge_proposal, mirror, propose_edit
+from peerpedia.cli.user_commands import user
+from peerpedia_core import __version__
 
 
 @click.group()
@@ -32,9 +31,9 @@ def init():
     Creates ~/.peerpedia/ with default configuration, empty database,
     and required directory structure.
     """
+    from peerpedia.config.settings import settings
     from peerpedia_core.storage import DEFAULT_ARTICLES_DIR
     from peerpedia_core.storage.db import get_engine, init_db
-    from peerpedia.config.settings import settings
 
     base = Path.home() / ".peerpedia"
     dirs = [
@@ -52,7 +51,7 @@ def init():
     click.echo(f"PeerPedia 初始化完成: {base}")
     click.echo(f"  文章仓库目录: {DEFAULT_ARTICLES_DIR}")
     click.echo(f"  数据库: {settings.db_path}")
-    click.echo(f"  下一步: peerpedia serve")
+    click.echo("  下一步: peerpedia serve")
 
 
 @cli.command()
@@ -64,8 +63,10 @@ def serve(lan: bool, port: int):
     In default mode, runs as single-user local server.
     With --lan, discovers other PeerPedia nodes on the local network.
     """
-    import uvicorn
     import socket
+
+    import uvicorn
+
     from peerpedia.config.settings import settings
 
     mode = "局域网" if lan else "本地"
@@ -77,7 +78,7 @@ def serve(lan: bool, port: int):
         hostname = socket.gethostname()
         node_id = f"node-{hostname}"
 
-        from peerpedia_core.storage.db import get_engine, init_db, get_session, upsert_node
+        from peerpedia_core.storage.db import get_engine, get_session, init_db, upsert_node
         engine = get_engine(settings.database_url)
         init_db(engine)
         session = get_session(engine)
@@ -91,8 +92,9 @@ def serve(lan: bool, port: int):
         session.commit()
         session.close()
 
-        from peerpedia_core.workflow.lan import start_udp_broadcaster, start_udp_listener
         import threading
+
+        from peerpedia_core.workflow.lan import start_udp_broadcaster, start_udp_listener
         stop = threading.Event()
         start_udp_broadcaster(
             node_id=node_id,

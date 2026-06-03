@@ -1,17 +1,17 @@
 """Tests for LAN node discovery and catalog sync."""
 import json
-import pytest
-import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
-    upsert_node,
-    get_online_nodes,
     cleanup_stale_nodes,
+    get_engine,
+    get_online_nodes,
+    get_session,
+    init_db,
+    upsert_node,
 )
 
 
@@ -156,9 +156,9 @@ class TestNodeInfoCRUD:
 
 
 from peerpedia_core.workflow.lan import (
+    CATALOG_YAML_DELIMITER,
     catalog_to_yaml_string,
     parse_catalog_yaml,
-    CATALOG_YAML_DELIMITER,
 )
 
 
@@ -296,9 +296,10 @@ class TestHeartbeatMessages:
 
 
 from unittest import mock
+
 from fastapi.testclient import TestClient
+
 from peerpedia.web.app import app
-from peerpedia_core.storage.db import get_engine, get_session, init_db
 
 
 class TestLanAPI:
@@ -335,8 +336,9 @@ class TestLanAPI:
 
     def _seed_node(self, db_url, node_id, host="127.0.0.1", port=8080):
         """Insert a node into the test DB."""
-        from peerpedia_core.storage.db.models import NodeInfo
         from datetime import datetime, timezone
+
+        from peerpedia_core.storage.db.models import NodeInfo
 
         engine = get_engine(db_url)
         init_db(engine)
@@ -354,7 +356,6 @@ class TestLanAPI:
     def test_get_catalog(self):
         """GET /api/v1/lan/catalog returns catalog.md content."""
         import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmp:
             db_url = self._setup_test_db(Path(tmp))
@@ -371,7 +372,6 @@ class TestLanAPI:
     def test_get_nodes(self):
         """GET /api/v1/lan/nodes returns node list."""
         import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmp:
             db_url = self._setup_test_db(Path(tmp))
@@ -388,7 +388,6 @@ class TestLanAPI:
     def test_get_status(self):
         """GET /api/v1/lan/status returns status summary."""
         import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmp:
             db_url = self._setup_test_db(Path(tmp))

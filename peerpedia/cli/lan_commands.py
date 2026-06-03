@@ -3,7 +3,7 @@
 import click
 
 from peerpedia.config.settings import settings
-from peerpedia_core.storage.db import get_engine, init_db, get_session, get_online_nodes
+from peerpedia_core.storage.db import get_engine, get_online_nodes, get_session, init_db
 
 
 @click.group()

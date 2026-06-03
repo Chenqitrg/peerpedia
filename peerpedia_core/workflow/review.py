@@ -12,18 +12,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from peerpedia_core.workflow.state_machine import ArticleStatus
+from peerpedia_core.reputation.v1 import ReputationParams
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
-    get_article,
-    get_reviews_for_article,
     create_review,
+    get_article,
+    get_engine,
+    get_reviews_for_article,
+    get_session,
+    init_db,
     update_article_status,
 )
-from peerpedia_core.reputation.v1 import ReputationParams
-
+from peerpedia_core.workflow.state_machine import ArticleStatus
 
 # -- Result types -----------------------------------------------------------------
 

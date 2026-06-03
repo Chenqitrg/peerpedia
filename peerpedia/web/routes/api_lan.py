@@ -4,9 +4,9 @@ from fastapi import APIRouter
 
 from peerpedia.web.db_session import get_db_session
 from peerpedia_core.storage.db import (
+    get_local_click_counts,
     get_online_nodes,
     list_articles,
-    get_local_click_counts,
 )
 
 router = APIRouter()
@@ -18,9 +18,11 @@ async def get_catalog():
 
     Response is plain text (text/plain) since catalog.md is a markdown file.
     """
-    from peerpedia_core.workflow.lan import catalog_to_yaml_string
     from datetime import datetime, timezone
+
     from fastapi.responses import PlainTextResponse
+
+    from peerpedia_core.workflow.lan import catalog_to_yaml_string
 
     session = get_db_session()
     try:

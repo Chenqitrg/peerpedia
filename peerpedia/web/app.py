@@ -4,9 +4,10 @@ This is the reference web client for the PeerPedia protocol.
 It serves a local web UI for browsing, submitting, and reviewing articles.
 """
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 
 app = FastAPI(
     title="知著网 (PeerPedia)",
@@ -20,6 +21,7 @@ static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Import and register route modules
-from peerpedia.web.routes import pages, api  # noqa: E402, F401
+from peerpedia.web.routes import api, pages  # noqa: E402, F401
+
 app.include_router(pages.router)
 app.include_router(api.router)

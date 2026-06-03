@@ -1,26 +1,21 @@
 """Tests for edit proposal workflow (Mode B: post-publication editing)."""
-import pytest
 import tempfile
 import uuid
-from pathlib import Path
 
+import pytest
+
+from peerpedia_core.storage.db import (
+    create_article,
+    get_article,
+    get_engine,
+    get_session,
+    init_db,
+    update_article_status,
+)
 from peerpedia_core.workflow.edit_proposal import (
     create_proposal,
-    review_proposal,
     merge_proposal,
-    CreateProposalResult,
-    ReviewProposalResult,
-    MergeProposalResult,
-)
-from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
-    get_article,
-    create_article,
-    update_article_status,
-    get_edit_proposal,
-    get_contribution_records,
+    review_proposal,
 )
 
 

@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from peerpedia_core.storage.db.models import Follow, Identity, User
 
-
 # ── User CRUD ───────────────────────────────────────────────────────────────────
 
 def create_user(

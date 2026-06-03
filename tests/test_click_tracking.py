@@ -1,23 +1,20 @@
 """Tests for citation click tracking."""
+
 import pytest
-import uuid
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
     create_article,
     create_click_event,
     get_click_events_for_article,
+    get_engine,
     get_local_click_counts,
+    get_session,
+    init_db,
 )
-
 from peerpedia_core.workflow.citations import (
-    record_click,
     compute_transition_probabilities,
     inject_citation_links,
+    record_click,
 )
 
 

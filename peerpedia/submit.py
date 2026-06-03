@@ -23,22 +23,22 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from peerpedia_core.protocol.addressing import compute_article_cid
 from peerpedia_core.storage.compiler import (
     detect_format,
     extract_frontmatter,
 )
-from peerpedia_core.storage.git_backend import (
-    init_article_repo,
-    commit_article,
-)
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
     create_article,
     get_article,
+    get_engine,
+    get_session,
+    init_db,
 )
-from peerpedia_core.protocol.addressing import compute_article_cid
+from peerpedia_core.storage.git_backend import (
+    commit_article,
+    init_article_repo,
+)
 from peerpedia_core.workflow.citations import extract_references
 
 

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import socket
 import threading
-from typing import Optional
 
 from peerpedia_core.workflow.lan_protocol import (
     BROADCAST_ADDR,
@@ -78,7 +77,7 @@ def start_udp_listener(
 
     Received heartbeats are upserted into the local lan_nodes table.
     """
-    from peerpedia_core.storage.db import get_engine, init_db, get_session, upsert_node
+    from peerpedia_core.storage.db import get_engine, get_session, init_db, upsert_node
 
     if stop_event is None:
         stop_event = threading.Event()
@@ -140,7 +139,7 @@ def _count_local_articles(database_url: str) -> int:
     if not database_url:
         return 0
     try:
-        from peerpedia_core.storage.db import get_engine, init_db, get_session, list_articles
+        from peerpedia_core.storage.db import get_engine, get_session, init_db, list_articles
         engine = get_engine(database_url)
         init_db(engine)
         session = get_session(engine)
@@ -155,7 +154,7 @@ def _count_local_articles(database_url: str) -> int:
 def _get_self_node_id(database_url: str) -> str | None:
     """Get this node's own node_id from the database."""
     try:
-        from peerpedia_core.storage.db import get_engine, init_db, get_session, get_online_nodes
+        from peerpedia_core.storage.db import get_engine, get_online_nodes, get_session, init_db
         engine = get_engine(database_url)
         init_db(engine)
         session = get_session(engine)

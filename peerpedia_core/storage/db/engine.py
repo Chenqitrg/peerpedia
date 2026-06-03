@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import json
 
-from sqlalchemy import create_engine, Engine
-from sqlalchemy.orm import Session, DeclarativeBase, sessionmaker
-from sqlalchemy.types import TypeDecorator, Text
-
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.types import Text, TypeDecorator
 
 # ── JSON column types for list/dict fields ───────────────────────────────────
 

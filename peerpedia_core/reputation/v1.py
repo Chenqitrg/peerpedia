@@ -10,11 +10,10 @@ Current v1:
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 from peerpedia_core.protocol import IdentityType, ReputationVector
-
 
 # ── Layer 2: Configurable parameters ─────────────────────────────────────────
 
@@ -106,11 +105,16 @@ class ReputationV1(BaseReputation):
         if session is None:
             return ReputationVector(user_id=user_id)
 
-        from peerpedia_core.storage.db import (
-            Article, Review, ContributionRecord,
-            get_user, get_identities_for_user, update_user_last_active,
-        )
         from sqlalchemy import func
+
+        from peerpedia_core.storage.db import (
+            Article,
+            ContributionRecord,
+            Review,
+            get_identities_for_user,
+            get_user,
+            update_user_last_active,
+        )
 
         update_user_last_active(session, user_id)
 

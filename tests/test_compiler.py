@@ -1,17 +1,16 @@
 """Tests for compiler backends."""
-import pytest
 import tempfile
 from pathlib import Path
 
 from peerpedia_core.storage.compiler import (
-    CompilerBackend,
     CompileResult,
-    TypstBackend,
     MarkdownBackend,
+    TypstBackend,
+    _protect_math,
+    _restore_math,
     detect_format,
     extract_frontmatter,
 )
-
 
 SAMPLE_TYPST = """---
 title: On Quantum Error Correction
@@ -151,14 +150,106 @@ class TestMarkdownBackend:
                 assert "<h1>" in result.html_content or "<h2>" in result.html_content
 
     def test_inline_math_is_preserved(self):
-        """Inline math $...$ should be converted to KaTeX HTML spans."""
+        """Inline math $...$ should survive Markdown rendering."""
         backend = MarkdownBackend()
         with tempfile.TemporaryDirectory() as tmp:
             source = _write(Path(tmp), "math.md", "---\ntitle: Math\n---\n\nSome math: $E = mc^2$")
             result = backend.compile(source, Path(tmp))
             if result.success and result.html_content:
-                # Should contain KaTeX class or at least the math expression
-                assert "E = mc^2" in result.html_content or "katex" in result.html_content.lower()
+                assert "E = mc^2" in result.html_content
+
+    def test_math_with_underscores_preserved(self):
+        """$x_i$ and $a_{bc}$ must NOT have underscores parsed as Markdown emphasis."""
+        backend = MarkdownBackend()
+        with tempfile.TemporaryDirectory() as tmp:
+            source = _write(Path(tmp), "sub.md", "---\ntitle: Subscripts\n---\n\n$x_i + y_j$")
+            result = backend.compile(source, Path(tmp))
+            if result.success and result.html_content:
+                html = result.html_content
+                # Underscores inside $...$ must survive, not become <em>
+                assert "x_i" in html, f"Expected x_i in: {html}"
+                assert "y_j" in html, f"Expected y_j in: {html}"
+                assert "<em>" not in html, f"Underscores should not create <em>: {html}"
+
+    def test_display_math_preserved(self):
+        """$$...$$ display math should survive Markdown rendering."""
+        backend = MarkdownBackend()
+        with tempfile.TemporaryDirectory() as tmp:
+            source = _write(Path(tmp), "display.md",
+                            "---\ntitle: Display\n---\n\n$$\n\\sum_{i=1}^n i = \\frac{n(n+1)}{2}\n$$")
+            result = backend.compile(source, Path(tmp))
+            if result.success and result.html_content:
+                html = result.html_content
+                assert "\\sum" in html or "sum" in html.lower()
+                assert "katex-display" in html, f"Expected display math: {html}"
+
+    def test_math_mixed_with_markdown(self):
+        """Math inside a paragraph with other Markdown formatting should work."""
+        backend = MarkdownBackend()
+        with tempfile.TemporaryDirectory() as tmp:
+            source = _write(Path(tmp), "mixed.md",
+                            "---\ntitle: Mixed\n---\n\n**Bold** and $x^2$ and *italic*.")
+            result = backend.compile(source, Path(tmp))
+            if result.success and result.html_content:
+                html = result.html_content
+                assert "x^2" in html
+                assert "<strong>" in html or "<b>" in html
+
+
+class TestMathProtection:
+    """Unit tests for _protect_math and _restore_math."""
+
+    def test_protect_inline_math(self):
+        text = "Hello $x + y$ world"
+        protected, ph = _protect_math(text)
+        # $x + y$ should be replaced with placeholder
+        assert "$" not in protected
+        assert len(ph) == 1
+        restored = _restore_math(protected, ph)
+        assert "$x + y$" in restored
+
+    def test_protect_display_math(self):
+        text = "$$\n\\alpha + \\beta\n$$"
+        protected, ph = _protect_math(text)
+        assert "$$" not in protected
+        assert len(ph) == 1
+        restored = _restore_math(protected, ph)
+        assert "$$" in restored
+        assert "katex-display" in restored
+
+    def test_protect_underscore_inside_math(self):
+        """Underscores inside $...$ must be protected from Markdown."""
+        text = "$x_i + y_j$"
+        protected, ph = _protect_math(text)
+        # The placeholder should contain the full original text
+        assert "$" not in protected
+        restored = _restore_math(protected, ph)
+        assert "$x_i + y_j$" in restored
+
+    def test_protect_no_math_unchanged(self):
+        text = "Just plain text with _emphasis_ and **bold**."
+        protected, ph = _protect_math(text)
+        assert ph == {}
+        assert protected == text
+
+    def test_protect_multiple_math_expressions(self):
+        text = "$a^2$ plus $b^2$ equals $c^2$"
+        protected, ph = _protect_math(text)
+        assert len(ph) == 3
+        restored = _restore_math(protected, ph)
+        assert restored.count("katex-inline") == 3
+
+    def test_restore_display_math_has_correct_class(self):
+        text = "$$\nx=1\n$$"
+        protected, ph = _protect_math(text)
+        restored = _restore_math(protected, ph)
+        assert 'class="katex-display"' in restored
+
+    def test_restore_inline_math_has_correct_class(self):
+        text = "$E=mc^2$"
+        protected, ph = _protect_math(text)
+        restored = _restore_math(protected, ph)
+        assert 'class="katex-inline"' in restored
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -172,8 +263,10 @@ def _write(base: Path, name: str, content: str) -> Path:
 
 # ── Compile API Endpoint Tests (Bug 2 regression) ───────────────────────────────
 
-from fastapi.testclient import TestClient
 from unittest import mock
+
+from fastapi.testclient import TestClient
+
 from peerpedia.submit import submit_article
 
 
@@ -225,7 +318,7 @@ class TestCompileEndpoint:
             db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
             with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
                 from peerpedia.web.app import app
-                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+                from peerpedia_core.storage.db import Article, get_engine, get_session, init_db
 
                 # Corrupt the git_repo_path to point to nonexistent directory
                 engine = get_engine(db_url)
@@ -249,7 +342,7 @@ class TestCompileEndpoint:
             db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
             with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
                 from peerpedia.web.app import app
-                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+                from peerpedia_core.storage.db import Article, get_engine, get_session, init_db
 
                 # Point to a real but empty directory
                 empty_dir = Path(tmp) / "empty_article"
@@ -275,7 +368,7 @@ class TestCompileEndpoint:
             db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
             with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
                 from peerpedia.web.app import app
-                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+                from peerpedia_core.storage.db import Article, get_engine, get_session, init_db
 
                 # Ensure article points to the actual articles_dir, format=markdown
                 engine = get_engine(db_url)
@@ -312,7 +405,7 @@ Content here with math $x^2 + y^2 = z^2$.
             db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
             with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
                 from peerpedia.web.app import app
-                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+                from peerpedia_core.storage.db import Article, get_engine, get_session, init_db
 
                 # Set format to typst — TypstBackend will fail without CLI installed
                 engine = get_engine(db_url)

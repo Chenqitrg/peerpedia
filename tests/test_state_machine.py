@@ -1,11 +1,11 @@
 """Tests for ArticleStatus state machine."""
 import pytest
+
 from peerpedia_core.workflow.state_machine import (
-    StateMachine,
-    VALID_TRANSITIONS,
     ArticleStatus,
-    transition,
+    StateMachine,
     can_transition,
+    transition,
 )
 
 

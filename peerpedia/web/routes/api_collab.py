@@ -9,7 +9,6 @@ from peerpedia_core.storage.db import (
     get_edit_proposals_for_article,
 )
 
-
 router = APIRouter()
 
 

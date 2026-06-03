@@ -17,25 +17,22 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from urllib.request import urlopen, Request
 from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
-    create_article,
-    get_article,
     Article,
+    create_article,
+    get_engine,
+    get_session,
+    init_db,
 )
 from peerpedia_core.storage.git_backend import (
-    init_article_repo,
     commit_article,
+    init_article_repo,
 )
-
 
 ARXIV_API_URL = "https://export.arxiv.org/api/query"
 
@@ -218,7 +215,7 @@ def _store_mirror_article(
     mirror_user_id: str,
 ) -> str:
     """Store a mirrored article in the database. Returns article_id."""
-    from peerpedia_core.storage.db import get_engine, init_db, get_session, create_article
+    from peerpedia_core.storage.db import get_engine, get_session, init_db
 
     engine = get_engine(database_url)
     init_db(engine)

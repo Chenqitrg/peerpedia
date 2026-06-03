@@ -45,7 +45,7 @@ def submit(article_path: str, author: str | None, email: str | None):
 
     if result.success:
         click.echo()
-        click.echo(f"✓ 文章提交成功！")
+        click.echo("✓ 文章提交成功！")
         click.echo(f"  ID:     {result.article_id}")
         click.echo(f"  标题:   {result.title}")
         commit_hash = result.git_commit_hash or ""
@@ -91,7 +91,7 @@ def review(article_id: str, decision: str, comments: str, scientific: int,
         if "must be" not in assign_result.error:
             click.echo(f"✗ 分配审稿人失败: {assign_result.error}", err=True)
             raise SystemExit(1)
-        click.echo(f"  (文章已在审稿中)")
+        click.echo("  (文章已在审稿中)")
 
     result = submit_review(
         article_id=article_id, reviewer_id=reviewer_id,
@@ -102,7 +102,7 @@ def review(article_id: str, decision: str, comments: str, scientific: int,
 
     if result.success:
         click.echo()
-        click.echo(f"✓ 审稿提交成功！")
+        click.echo("✓ 审稿提交成功！")
         click.echo(f"  审稿 ID: {result.review_id}")
         click.echo(f"  决定:    {decision}")
         click.echo(f"  积分:    +{result.points_earned}")

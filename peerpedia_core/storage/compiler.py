@@ -11,13 +11,12 @@ Abstract interface:
 from __future__ import annotations
 
 import re
-import subprocess
 import shutil
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-
 
 # ── Result types ───────────────────────────────────────────────────────────────
 
@@ -266,8 +265,11 @@ class MarkdownBackend(CompilerBackend):
         try:
             # Strip frontmatter for rendering
             body = _strip_frontmatter(source)
-            html_body = _render_markdown(body)
-            html_body = _wrap_math(html_body)
+            # Protect math BEFORE Markdown rendering so underscores etc.
+            # inside $...$ are not parsed as Markdown emphasis.
+            protected_body, math_placeholders = _protect_math(body)
+            html_body = _render_markdown(protected_body)
+            html_body = _restore_math(html_body, math_placeholders)
 
             full_html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -333,23 +335,50 @@ def _render_markdown(md_text: str) -> str:
         return "\n".join(f"<p>{p.replace(chr(10), '<br>')}</p>" for p in paragraphs if p.strip())
 
 
-def _wrap_math(html: str) -> str:
-    """Wrap $...$ and $$...$$ math expressions in KaTeX-compatible spans.
+_MATH_PLACEHOLDER_PREFIX = "PEERPEDIA_MATH_"
 
-    $$...$$ → display math (block)
+
+def _protect_math(text: str) -> tuple[str, dict[str, str]]:
+    """Replace math expressions with placeholders to protect them from Markdown parsing.
+
+    $$...$$ → display math
     $...$   → inline math
+
+    Returns (protected_text, {placeholder: original_math}).
     """
-    # Display math $$...$$ — must be handled first to not conflict with inline $
-    html = re.sub(
-        r'\$\$(.+?)\$\$',
-        r'<span class="katex-display">$$\1$$</span>',
-        html,
-        flags=re.DOTALL,
-    )
-    # Inline math $...$ (single $, not $$)
-    html = re.sub(
-        r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)',
-        r'<span class="katex-inline">$\1$</span>',
-        html,
-    )
+    placeholders: dict[str, str] = {}
+    counter = 0
+
+    def replace_display(m: re.Match) -> str:
+        nonlocal counter
+        key = f"{_MATH_PLACEHOLDER_PREFIX}D{counter}"
+        placeholders[key] = f"$${m.group(1)}$$"
+        counter += 1
+        return key
+
+    def replace_inline(m: re.Match) -> str:
+        nonlocal counter
+        key = f"{_MATH_PLACEHOLDER_PREFIX}I{counter}"
+        placeholders[key] = f"${m.group(1)}$"
+        counter += 1
+        return key
+
+    # Display math first (must be handled before inline to not conflict on $$)
+    text = re.sub(r'\$\$(.+?)\$\$', replace_display, text, flags=re.DOTALL)
+    # Inline math $...$ (single $ not adjacent to another $)
+    text = re.sub(r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)', replace_inline, text)
+    return text, placeholders
+
+
+def _restore_math(html: str, placeholders: dict[str, str]) -> str:
+    """Restore math expressions from placeholders, wrapped in KaTeX-compatible spans.
+
+    Display math: <span class="katex-display">$$...$$</span>
+    Inline math: <span class="katex-inline">$...$</span>
+    """
+    for key, math in sorted(placeholders.items(), key=lambda x: -len(x[0])):
+        if key.startswith(f"{_MATH_PLACEHOLDER_PREFIX}D"):
+            html = html.replace(key, f'<span class="katex-display">{math}</span>')
+        else:
+            html = html.replace(key, f'<span class="katex-inline">{math}</span>')
     return html

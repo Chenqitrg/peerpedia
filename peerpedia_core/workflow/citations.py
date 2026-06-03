@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -65,6 +65,7 @@ def build_citation_graph(session) -> "nx.DiGraph":
     Edges: A -> B means "A cites B"
     """
     import networkx as nx
+
     from peerpedia_core.storage.db import Article
 
     G = nx.DiGraph()
@@ -169,8 +170,8 @@ def compute_transition_probabilities(
         Sorted by probability descending.
     """
     from peerpedia_core.storage.db import (
-        get_local_click_counts,
         get_article,
+        get_local_click_counts,
     )
 
     # Local counts from SQLite (precise, per-event)

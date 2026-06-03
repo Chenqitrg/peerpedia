@@ -3,7 +3,7 @@
 import click
 
 from peerpedia.config.settings import settings
-from peerpedia_core.storage.db import get_engine, init_db, get_session, create_user, get_user
+from peerpedia_core.storage.db import create_user, get_engine, get_session, get_user, init_db
 
 
 @click.group()
@@ -44,7 +44,7 @@ def register(user_id: str, name: str, email: str, affiliation: str | None, exper
         )
         session.commit()
 
-        click.echo(f"✓ 用户注册成功！")
+        click.echo("✓ 用户注册成功！")
         click.echo(f"  ID:     {user_obj.id}")
         click.echo(f"  名称:   {user_obj.name}")
         click.echo(f"  邮箱:   {user_obj.email}")

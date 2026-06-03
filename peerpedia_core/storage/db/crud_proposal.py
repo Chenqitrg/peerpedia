@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from peerpedia_core.storage.db.models import ContributionRecord, EditProposal
 
-
 # ── ContributionRecord CRUD ─────────────────────────────────────────────────────
 
 def create_contribution_record(

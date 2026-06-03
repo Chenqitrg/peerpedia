@@ -1,23 +1,18 @@
 """Tests for SQLAlchemy database layer."""
-import pytest
 import tempfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from peerpedia_core.storage.db import (
-    Article,
     ArticleStatus,
-    Base,
     create_article,
     create_review,
     get_article,
     get_engine,
-    get_review,
     get_reviews_for_article,
     get_session,
     init_db,
     list_articles,
-    Review,
 )
 
 

@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 
 from peerpedia_core.protocol.messages import ArticleStatus
 
-
 # ── Valid transitions ──────────────────────────────────────────────────────────
 
 VALID_TRANSITIONS: dict[str, set[str]] = {

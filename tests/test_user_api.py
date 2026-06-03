@@ -4,11 +4,10 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-import pytest
 from fastapi.testclient import TestClient
 
-from peerpedia_core.storage.db import get_engine, get_session, init_db
 from peerpedia.web.app import app
+from peerpedia_core.storage.db import get_engine, get_session, init_db
 
 
 def _setup_test_db(tmp_path):

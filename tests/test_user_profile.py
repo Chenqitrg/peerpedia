@@ -1,12 +1,14 @@
 """Tests for user profile page."""
-import pytest
 import tempfile
 from pathlib import Path
 
 from peerpedia.submit import submit_article
 from peerpedia_core.storage.db import (
-    get_engine, init_db, get_session, get_article,
-    create_review, Article,
+    Article,
+    create_review,
+    get_engine,
+    get_session,
+    init_db,
 )
 
 
@@ -99,7 +101,8 @@ Content.
         """Mirrored articles should have mirror_by set."""
         # Uses the mirror module
         from unittest.mock import patch
-        from peerpedia.mirror import mirror_arxiv, ArxivMetadata
+
+        from peerpedia.mirror import ArxivMetadata, mirror_arxiv
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

@@ -2,14 +2,19 @@
 
 from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel as PydanticBaseModel, Field
+from pydantic import BaseModel as PydanticBaseModel
+from pydantic import Field
 
 from peerpedia.web.db_session import get_db_session
 from peerpedia_core.storage.db import (
-    create_user as db_create_user,
-    get_user,
     create_identity as db_create_identity,
+)
+from peerpedia_core.storage.db import (
+    create_user as db_create_user,
+)
+from peerpedia_core.storage.db import (
     get_identities_for_user,
+    get_user,
 )
 
 
@@ -119,11 +124,12 @@ async def api_get_user_reputation(user_id: str):
 @router.post("/users/{user_id}/follow")
 async def api_follow_user(user_id: str, follower_id: str = Form(...)):
     """Follow a user. Returns HTML button snippet."""
+    from sqlalchemy.exc import IntegrityError
+
     from peerpedia_core.storage.db import (
         follow_user,
         get_user,
     )
-    from sqlalchemy.exc import IntegrityError
 
     if follower_id == user_id:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
@@ -163,8 +169,8 @@ async def api_follow_user(user_id: str, follower_id: str = Form(...)):
 async def api_unfollow_user(user_id: str, follower_id: str = Form(...)):
     """Unfollow a user. Returns HTML button snippet."""
     from peerpedia_core.storage.db import (
-        unfollow_user,
         get_user,
+        unfollow_user,
     )
 
     session = get_db_session()
@@ -200,7 +206,7 @@ def _render_user_list(users: list, viewer: str, *, field: str = "followed_id") -
     field='followed_id' for following list, field='follower_id' for followers list.
     """
     if not users:
-        return f'<ul class="follow-list"><li class="follow-empty">暂无</li></ul>'
+        return '<ul class="follow-list"><li class="follow-empty">暂无</li></ul>'
     items = []
     for u in users:
         uid = getattr(u, field, str(u))
@@ -321,7 +327,8 @@ def _collect_user_events(session, user_id: str, cutoff) -> list[dict]:
 @router.get("/following/feed")
 async def api_following_feed(user_id: str):
     """Get activity feed from followed users (last 30 days)."""
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
     from peerpedia_core.storage.db import get_following
 
     session = get_db_session()

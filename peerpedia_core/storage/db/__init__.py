@@ -4,27 +4,7 @@ This package replaces the old monolithic db.py. All imports from
 ``peerpedia_core.storage.db`` continue to work unchanged.
 """
 
-from peerpedia_core.storage.db.engine import (
-    Base,
-    JSONDict,
-    JSONList,
-    get_engine,
-    get_session,
-    init_db,
-)
-
-from peerpedia_core.storage.db.models import (
-    Article,
-    ClickEvent,
-    ContributionRecord,
-    EditProposal,
-    Follow,
-    Identity,
-    NodeInfo,
-    Review,
-    User,
-)
-
+from peerpedia_core.protocol.messages import ArticleStatus
 from peerpedia_core.storage.db.crud_article import (
     create_article,
     create_review,
@@ -36,6 +16,23 @@ from peerpedia_core.storage.db.crud_article import (
     update_article_founding_authors,
     update_article_status,
     update_article_version,
+)
+from peerpedia_core.storage.db.crud_events import (
+    cleanup_stale_nodes,
+    create_click_event,
+    get_click_events_for_article,
+    get_local_click_counts,
+    get_online_nodes,
+    upsert_node,
+)
+from peerpedia_core.storage.db.crud_proposal import (
+    create_contribution_record,
+    create_edit_proposal,
+    get_contribution_records,
+    get_edit_proposal,
+    get_edit_proposals_for_article,
+    get_user_contribution_total,
+    update_edit_proposal_status,
 )
 from peerpedia_core.storage.db.crud_user import (
     create_identity,
@@ -51,25 +48,25 @@ from peerpedia_core.storage.db.crud_user import (
     unfollow_user,
     update_user_last_active,
 )
-from peerpedia_core.storage.db.crud_proposal import (
-    create_contribution_record,
-    create_edit_proposal,
-    get_contribution_records,
-    get_edit_proposal,
-    get_edit_proposals_for_article,
-    get_user_contribution_total,
-    update_edit_proposal_status,
+from peerpedia_core.storage.db.engine import (
+    Base,
+    JSONDict,
+    JSONList,
+    get_engine,
+    get_session,
+    init_db,
 )
-from peerpedia_core.storage.db.crud_events import (
-    cleanup_stale_nodes,
-    create_click_event,
-    get_click_events_for_article,
-    get_local_click_counts,
-    get_online_nodes,
-    upsert_node,
+from peerpedia_core.storage.db.models import (
+    Article,
+    ClickEvent,
+    ContributionRecord,
+    EditProposal,
+    Follow,
+    Identity,
+    NodeInfo,
+    Review,
+    User,
 )
-
-from peerpedia_core.protocol.messages import ArticleStatus
 
 __all__ = [
     # engine

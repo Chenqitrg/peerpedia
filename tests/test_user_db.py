@@ -1,18 +1,14 @@
 """Tests for User and Identity ORM models."""
-import pytest
 import tempfile
 from pathlib import Path
 
 from peerpedia_core.storage.db import (
-    Base,
-    User,
-    Identity,
-    create_user,
-    get_user,
     create_identity,
-    get_identities_for_user,
+    create_user,
     get_engine,
+    get_identities_for_user,
     get_session,
+    get_user,
     init_db,
 )
 
@@ -71,8 +67,9 @@ class TestUserModel:
 
     def test_user_last_active_update(self):
         """update_user_last_active should set last_active to now."""
-        from peerpedia_core.storage.db import update_user_last_active
         from datetime import datetime, timezone
+
+        from peerpedia_core.storage.db import update_user_last_active
 
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "test.db"

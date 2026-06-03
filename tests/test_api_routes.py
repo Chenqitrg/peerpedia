@@ -10,7 +10,6 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _setup_db_with_article(tmp_path: str, author: str = "testuser"):

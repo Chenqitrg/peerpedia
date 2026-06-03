@@ -51,6 +51,9 @@
                 </span>
                 <span>版本: {{ article.version }}</span>
                 <span>状态: {{ article.status }}</span>
+                {% if article.status in ('submitted', 'in_review') %}
+                <span><a href="/review/{{ article.id }}" class="btn-review">✏️ 审稿</a></span>
+                {% endif %}
             </div>
             <div class="article-abstract">
                 <h2>摘要</h2>
@@ -62,6 +65,45 @@
                  hx-swap="innerHTML">
                 <p>编译中...</p>
             </div>
+            </div>
+
+            {% if article.status == 'published' %}
+            <!-- B3: Contribution timeline -->
+            <section class="contribution-timeline" style="margin-top: 24px;">
+                <h3>📜 贡献时间线</h3>
+                <div hx-get="/api/v1/articles/{{ article.id }}/contributions"
+                     hx-trigger="load" hx-swap="innerHTML">
+                    <p style="color: #888;">加载中...</p>
+                </div>
+            </section>
+
+            <!-- B4: Edit proposal form -->
+            <section class="edit-proposal-form" style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px;">
+                <h3>✏️ 提交修改提案</h3>
+                <form hx-post="/api/v1/articles/{{ article.id }}/proposals"
+                      hx-target="#proposal-result" hx-swap="innerHTML">
+                    <input type="hidden" name="proposer_id" value="{{ viewer or '' }}">
+                    <label>提案类型:
+                        <select name="proposal_type" required>
+                            <option value="minor">微小修改（错字/格式）</option>
+                            <option value="medium">中等修改（段落/公式）</option>
+                            <option value="major">重大修改（新章节）</option>
+                        </select>
+                    </label>
+                    <label>描述:
+                        <textarea name="description" rows="3" placeholder="简述你计划修改的内容..."></textarea>
+                    </label>
+                    <button type="submit">提交提案</button>
+                </form>
+                <div id="proposal-result"></div>
+
+                <!-- List existing proposals -->
+                <div hx-get="/api/v1/articles/{{ article.id }}/proposals"
+                     hx-trigger="load" hx-swap="innerHTML"
+                     style="margin-top: 12px; font-size: 0.85em;">
+                </div>
+            </section>
+            {% endif %}
         </article>
         <aside class="citation-sidebar" style="width: 260px; flex-shrink: 0; background: #f8f9fa; border-radius: 8px; padding: 16px; font-size: 0.9em;">
             <h3 style="margin-top: 0;">📚 引用关系</h3>
@@ -105,6 +147,26 @@
                 html += '<p style="color: #888; font-size: 0.85em; margin: 4px 0;">暂无被引用</p>';
             }
             panel.innerHTML = html;
+
+            // B5: Load transition probabilities for citation clicks
+            fetch('/api/v1/citations/transitions?article_id={{ article.id }}&source=local')
+                .then(function(r) { return r.json(); })
+                .then(function(td) {
+                    if (td.transitions && td.transitions.length > 0) {
+                        var thtml = '<h4 style="margin: 16px 0 4px;">📊 引用跃迁 (共 ' + td.total_clicks + ' 次点击)</h4>';
+                        thtml += '<ul style="margin: 0; padding-left: 18px;">';
+                        td.transitions.slice(0, 8).forEach(function(t) {
+                            var pct = Math.round(t.probability * 100);
+                            thtml += '<li style="margin: 4px 0; display: flex; justify-content: space-between;">';
+                            thtml += '<a href="/article/' + t.to_article_id + '" style="text-decoration: none; font-size: 0.85em;">' + escapeHtml(t.title) + '</a>';
+                            thtml += '<span style="color: #888; font-size: 0.8em;">' + pct + '%</span>';
+                            thtml += '</li>';
+                        });
+                        thtml += '</ul>';
+                        panel.innerHTML += thtml;
+                    }
+                })
+                .catch(function() { /* silently ignore transition errors */ });
         })
         .catch(function() {
             panel.innerHTML = '<p style="color: #888;">引用加载失败</p>';

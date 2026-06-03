@@ -7,17 +7,17 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
     create_user,
     follow_user,
-    unfollow_user,
-    is_following,
-    get_following,
-    get_followers,
-    get_following_count,
+    get_engine,
     get_follower_count,
+    get_followers,
+    get_following,
+    get_following_count,
+    get_session,
+    init_db,
+    is_following,
+    unfollow_user,
 )
 
 
@@ -128,8 +128,6 @@ class TestFollowCRUD:
 
 
 from fastapi.testclient import TestClient
-
-from peerpedia_core.storage.db import get_engine, get_session, init_db
 
 
 def _setup_test_db(tmp_path):

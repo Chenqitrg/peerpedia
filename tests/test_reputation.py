@@ -1,9 +1,9 @@
 """Tests for reputation algorithm v1."""
 
-import pytest
-from datetime import datetime, timezone, timedelta
-from peerpedia_core.protocol import ReputationVector, IdentityType
-from peerpedia_core.reputation import ReputationV1, ReputationParams
+from datetime import datetime, timedelta, timezone
+
+from peerpedia_core.protocol import IdentityType, ReputationVector
+from peerpedia_core.reputation import ReputationParams, ReputationV1
 
 
 class TestReputationV1:
@@ -74,9 +74,15 @@ class TestReputationComputeIntegration:
         """compute() should aggregate articles, reviews, and contributions."""
         import tempfile
         from pathlib import Path
+
         from peerpedia_core.storage.db import (
-            get_engine, get_session, init_db,
-            create_user, create_article, create_review, create_contribution_record,
+            create_article,
+            create_contribution_record,
+            create_review,
+            create_user,
+            get_engine,
+            get_session,
+            init_db,
         )
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -124,9 +130,14 @@ class TestReputationComputeIntegration:
         """Verified identities should boost reputation."""
         import tempfile
         from pathlib import Path
+
         from peerpedia_core.storage.db import (
-            get_engine, get_session, init_db,
-            create_user, create_article, create_identity,
+            create_article,
+            create_identity,
+            create_user,
+            get_engine,
+            get_session,
+            init_db,
         )
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -159,6 +170,7 @@ class TestReputationComputeIntegration:
         """compute() should return zero vector for unknown user."""
         import tempfile
         from pathlib import Path
+
         from peerpedia_core.storage.db import get_engine, get_session, init_db
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -179,9 +191,13 @@ class TestReputationComputeIntegration:
         """compute() should update user's last_active timestamp."""
         import tempfile
         from pathlib import Path
+
         from peerpedia_core.storage.db import (
-            get_engine, get_session, init_db,
-            create_user, get_user,
+            create_user,
+            get_engine,
+            get_session,
+            get_user,
+            init_db,
         )
 
         with tempfile.TemporaryDirectory() as tmp:

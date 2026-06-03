@@ -1,6 +1,5 @@
 """Tests for Layer 0 protocol — message schemas and signing."""
 
-import pytest
 from peerpedia_core.protocol import (
     ArticleMeta,
     ArticleStatus,
@@ -12,11 +11,11 @@ from peerpedia_core.protocol import (
     OriginalWork,
     ReviewMessage,
     UserProfile,
+    compute_article_cid,
     generate_keypair,
+    hash_content,
     sign_message,
     verify_signature,
-    hash_content,
-    compute_article_cid,
 )
 
 

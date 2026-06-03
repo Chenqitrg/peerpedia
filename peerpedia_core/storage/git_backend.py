@@ -9,7 +9,6 @@ This is the immutable storage format — the git object format IS the protocol.
 from pathlib import Path
 from typing import Optional
 
-
 DEFAULT_ARTICLES_DIR = Path.home() / ".peerpedia" / "articles"
 
 

@@ -93,6 +93,22 @@
                 <label>审稿意见 (Markdown):
                     <textarea name="comments" rows="6"></textarea>
                 </label>
+                <label>
+                    <input type="checkbox" name="collaboration_request" value="true"
+                           hx-get="/api/v1/articles/{{ article.id }}/collaboration/{{ viewer or '' }}"
+                           hx-target="#collab-status" hx-swap="innerHTML"
+                           hx-trigger="change" onchange="
+                        var msg = document.getElementById('collab-message');
+                        msg.style.display = this.checked ? '' : 'none';
+                    ">
+                    🤝 申请成为协作者（审稿通过后可共同编辑文章）
+                </label>
+                <div id="collab-message" style="display: none;">
+                    <label>想改进的部分:
+                        <textarea name="collaboration_message" rows="2"
+                                  placeholder="简述你想改进的部分..."></textarea>
+                    </label>
+                </div>
                 <button type="submit">提交审稿</button>
             </form>
             <div id="review-result"></div>

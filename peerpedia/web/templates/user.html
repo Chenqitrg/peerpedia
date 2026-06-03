@@ -229,6 +229,32 @@
         {% if not authored and not mirrored and not reviews %}
         <p class="empty-state">该用户暂无活动记录。</p>
         {% endif %}
+
+        <!-- B6: Identity binding form -->
+        {% if is_self %}
+        <section style="margin-top: 32px; border-top: 1px solid var(--border); padding-top: 16px;">
+            <h3>🔗 绑定身份</h3>
+            <p style="color: #888; font-size: 0.85em;">绑定已有信任根以提升信誉权重</p>
+            <form hx-post="/api/v1/users/{{ user_id }}/identities"
+                  hx-target="#identity-result" hx-swap="innerHTML"
+                  style="display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;">
+                <label>类型:
+                    <select name="type" required>
+                        <option value="orcid">ORCID (权重 1.0)</option>
+                        <option value="inst_email">机构邮箱 (权重 0.8)</option>
+                        <option value="arxiv">arXiv ID (权重 0.6)</option>
+                        <option value="scholar">Google Scholar (权重 0.5)</option>
+                        <option value="github">GitHub (权重 0.3)</option>
+                    </select>
+                </label>
+                <label>值/ID:
+                    <input type="text" name="value" required placeholder="如 0000-0002-1825-0097">
+                </label>
+                <button type="submit">绑定</button>
+            </form>
+            <div id="identity-result"></div>
+        </section>
+        {% endif %}
     </main>
 
     <footer>

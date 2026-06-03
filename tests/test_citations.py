@@ -1,14 +1,17 @@
 """Tests for citation scanner and graph builder."""
-import pytest
 import tempfile
 from pathlib import Path
 
 from peerpedia_core.storage.db import (
-    get_engine, get_session, init_db, create_article, Article,
+    Article,
+    create_article,
+    get_engine,
+    get_session,
+    init_db,
 )
 from peerpedia_core.workflow.citations import (
-    extract_references,
     build_citation_graph,
+    extract_references,
     get_citation_info,
     inject_citation_links,
 )

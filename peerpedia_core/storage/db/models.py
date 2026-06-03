@@ -18,11 +18,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import relationship
 
 from peerpedia_core.protocol.messages import ArticleStatus
 from peerpedia_core.storage.db.engine import Base, JSONList
-
 
 # ── ORM Model: Article ──────────────────────────────────────────────────────
 

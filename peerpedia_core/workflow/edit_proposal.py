@@ -6,25 +6,23 @@ Handles the full lifecycle of post-publication edit proposals:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
-from peerpedia_core.workflow.state_machine import ArticleStatus
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
+    create_contribution_record,
+    create_edit_proposal,
     get_article,
+    get_edit_proposal,
+    get_engine,
+    get_session,
+    init_db,
+    update_article_founding_authors,
     update_article_status,
     update_article_version,
-    create_edit_proposal,
-    get_edit_proposal,
     update_edit_proposal_status,
-    create_contribution_record,
-    update_article_founding_authors,
 )
 from peerpedia_core.workflow.contribution import compute_change_type_weight
-
+from peerpedia_core.workflow.state_machine import ArticleStatus
 
 VALID_PROPOSAL_TYPES = {"minor", "medium", "major"}
 

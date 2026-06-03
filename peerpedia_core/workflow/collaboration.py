@@ -8,14 +8,13 @@ becomes a co-author and can contribute directly via git branches.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from peerpedia_core.storage.db import (
-    get_engine,
-    init_db,
-    get_session,
     get_article,
+    get_engine,
     get_reviews_for_article,
+    get_session,
+    init_db,
     update_article_founding_authors,
 )
 

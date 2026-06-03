@@ -1,13 +1,11 @@
 """Tests for article submission orchestrator."""
-import pytest
 import tempfile
 from pathlib import Path
 
 from peerpedia.submit import (
-    submit_article,
     SubmissionResult,
+    submit_article,
 )
-
 
 SIMPLE_TYPST = """---
 title: A Simple Test Article
@@ -86,7 +84,10 @@ class TestSubmitArticle:
 
             # Read from DB
             from peerpedia_core.storage.db import (
-                get_engine, init_db, get_session, get_article,
+                get_article,
+                get_engine,
+                get_session,
+                init_db,
             )
             engine = get_engine(f"sqlite:///{db_path}")
             init_db(engine)
@@ -171,3 +172,73 @@ Some math: $E = mc^2$
             assert result.success is True
             assert result.format == "markdown"
             assert result.title == "Markdown Test"
+
+    def test_submit_typst_with_math_formulas(self):
+        """Submit a Typst article containing mathematical formulas."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            db_path = base / "test.db"
+            articles_dir = base / "articles"
+            articles_dir.mkdir()
+
+            typst_math = """---
+title: Math Test
+abstract: Testing math formulas in Typst.
+language: en
+---
+
+= Math Test
+
+Inline math: $E = mc^2$ and $x_i + y_j$.
+
+Display math:
+$ sum_(i=1)^n i = n(n+1)/2 $
+
+Subscripts and superscripts: $a_(bc)^d$.
+"""
+            source_file = base / "math.typ"
+            source_file.write_text(typst_math)
+
+            result = submit_article(
+                source_path=source_file,
+                database_url=f"sqlite:///{db_path}",
+                articles_dir=articles_dir,
+            )
+
+            assert result.success is True
+            assert result.format == "typst"
+            assert result.title == "Math Test"
+
+    def test_submit_markdown_math_with_underscores(self):
+        """Markdown submission with underscores in math must not break."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            db_path = base / "test.db"
+            articles_dir = base / "articles"
+            articles_dir.mkdir()
+
+            md_math = """---
+title: Subscripts in MD
+abstract: Testing underscores in MD math.
+language: en
+---
+
+# Math with Subscripts
+
+Parameters $x_i$ and $y_j$ with display:
+
+$$
+\\sum_(i=1)^n x_i = \\frac{n(n+1)}{2}
+$$
+"""
+            source_file = base / "subscripts.md"
+            source_file.write_text(md_math)
+
+            result = submit_article(
+                source_path=source_file,
+                database_url=f"sqlite:///{db_path}",
+                articles_dir=articles_dir,
+            )
+
+            assert result.success is True
+            assert result.format == "markdown"
