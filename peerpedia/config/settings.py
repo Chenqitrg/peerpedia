@@ -29,6 +29,14 @@ class Settings:
     # Database
     database_url: str = ""
 
+    # LAN
+    lan_enabled: bool = False
+    lan_broadcast_port: int = 3690
+    lan_broadcast_interval: float = 3.0
+    lan_sync_interval: float = 60.0
+    lan_node_timeout: float = 30.0
+    manual_peers: list[str] = field(default_factory=list)
+
     def __post_init__(self):
         if not self.database_url:
             self.database_url = f"sqlite:///{self.db_path}"

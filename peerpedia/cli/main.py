@@ -12,6 +12,7 @@ from peerpedia_core import __version__
 from peerpedia.cli.article_commands import submit, review, decide
 from peerpedia.cli.social_commands import mirror, collaborate, propose_edit, merge_proposal
 from peerpedia.cli.user_commands import user
+from peerpedia.cli.lan_commands import lan
 
 
 @click.group()
@@ -64,10 +65,49 @@ def serve(lan: bool, port: int):
     With --lan, discovers other PeerPedia nodes on the local network.
     """
     import uvicorn
+    import socket
 
     mode = "局域网" if lan else "本地"
     click.echo(f"PeerPedia 启动中 ({mode}模式，端口 {port})...")
     click.echo(f"浏览器打开 http://localhost:{port}")
+
+    if lan:
+        settings.lan_enabled = True
+        hostname = socket.gethostname()
+        node_id = f"node-{hostname}"
+
+        from peerpedia_core.storage.db import get_engine, init_db, get_session, upsert_node
+        engine = get_engine(settings.database_url)
+        init_db(engine)
+        session = get_session(engine)
+        upsert_node(
+            session,
+            node_id=node_id,
+            host="0.0.0.0",
+            port=port,
+            is_self=True,
+        )
+        session.commit()
+        session.close()
+
+        from peerpedia_core.workflow.lan import start_udp_broadcaster, start_udp_listener
+        import threading
+        stop = threading.Event()
+        start_udp_broadcaster(
+            node_id=node_id,
+            host="0.0.0.0",
+            port=port,
+            broadcast_port=settings.lan_broadcast_port,
+            interval=settings.lan_broadcast_interval,
+            stop_event=stop,
+        )
+        start_udp_listener(
+            database_url=settings.database_url,
+            listen_port=settings.lan_broadcast_port,
+            stop_event=stop,
+        )
+        click.echo(f"  LAN 节点: {node_id}")
+        click.echo(f"  UDP 广播: 端口 {settings.lan_broadcast_port}")
 
     uvicorn.run(
         "peerpedia.web.app:app",
@@ -86,6 +126,7 @@ cli.add_command(collaborate)
 cli.add_command(propose_edit)
 cli.add_command(merge_proposal)
 cli.add_command(user)
+cli.add_command(lan)
 
 
 if __name__ == "__main__":
