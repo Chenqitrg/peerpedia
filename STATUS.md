@@ -1,7 +1,8 @@
 # PeerPedia — Project Status & Restart Guide
 
 > 最后更新: 2026-06-03
-> 当前状态: Phase 3 M1+M2+M2.5+M2.6 完成，代码审查修复完成
+> 当前状态: Phase 3 M1+M2+M2.5+M2.6+M3 完成
+> 测试: 126 tests, 0 failures
 > 测试: 87 tests, 0 failures
 > 中文名: 待定（候选：知节点）
 
@@ -70,7 +71,7 @@ tests/                   # 19 tests, 0 failures
 |---|---|---|---|
 | M1 | 文章提交闭环 | ✅ CLI `peerpedia init` + `submit` 工作。Typst/Markdown 编译集成。git repo + commit。DB 存储。Web 文章列表可读。 | 🔴 最高 |
 | M2 | 审稿工作流 | ArticleStatus 状态机完整实现。审稿分配 → 打分 → 决策。积分首次计算。 | 🔴 最高 |
-| M3 | 协作+开放编辑 | 一键合作（审稿人→合作者）。EditProposal 提案流程。git blame 贡献时间线。 | 🟡 高 |
+| M3 | 协作+开放编辑 | ✅ 一键合作（审稿人→合作者）。EditProposal 提案流程（minor/medium/major）。git blame 贡献时间线。126 tests。 | 🟡 高 |
 | M4 | 信誉+LAN | 雷达图可视化。身份权重计算。LAN 节点发现 + 文章池同步。 | 🟡 高 |
 | M5 | 引用跳转 | Typst/Markdown 引用扫描。引用图（NetworkX DAG）。点击跳转。 | 🟢 中 |
 
@@ -81,6 +82,9 @@ tests/                   # 19 tests, 0 failures
 4. 将文章状态从 draft 推到 published
 5. 获得积分
 6. 两人在同一 WiFi 下（LAN 模式）互相审稿
+7. 审稿人申请协作 → 作者同意 → 审稿人变为合作者
+8. 出版后提交修改提案（minor/medium/major）→ 审核 → 合并
+9. git blame 驱动的贡献时间线追踪
 
 ### Phase 4: IPFS 集成 ⏸ 待开始
 
@@ -117,20 +121,33 @@ tests/                   # 19 tests, 0 failures
 | Git backend (init/commit/blame) | ✅ |
 | FastAPI 启动 | ✅ |
 | Web 模板 (首页/文章/提交/审稿) | ✅ |
-| 19 个测试全部通过 | ✅ |
+| 126 个测试全部通过 | ✅ |
+
+### M3 新增功能
+
+| 功能 | 状态 |
+|---|---|
+| `peerpedia collaborate` | ✅ 接受审稿人协作申请，审稿人→合作者 |
+| `peerpedia propose-edit` | ✅ 提交修改提案（minor/medium/major） |
+| `peerpedia merge-proposal` | ✅ 合并已通过的修改提案 |
+| 贡献追踪（git blame） | ✅ ContributionRecord + 贡献时间线 + 百分比 |
+| 开放编辑提案（DB） | ✅ EditProposal ORM + CRUD + 生命周期 |
+| 状态机 edit_proposed | ✅ published ↔ edit_proposed 转换 |
+| Web API 扩展 | ✅ 7 个新端点（协作/提案/贡献） |
 
 ### 还是空壳的
 
 | 功能 | 状态 |
 |---|---|
 | `peerpedia submit` | ✅ **已实现** — 调用 submit_article() 编排器 |
-| `peerpedia review` | ❌ 只打印 placeholder |
-| `peerpedia serve` | ✅ FastAPI 启动，13 条路由，API 从数据库读取真实数据 |
-| 数据库 (SQLite) | ✅ SQLAlchemy Article 模型 + CRUD，init 时自动建表 |
+| `peerpedia review` | ✅ 审稿分配+提交+决策完整实现 |
+| `peerpedia decide` | ✅ 基于评审投票自动决策 |
+| `peerpedia serve` | ✅ FastAPI 启动，17 条路由，API 从数据库读取真实数据 |
+| 数据库 (SQLite) | ✅ SQLAlchemy 6 表 (Article/Review/ContributionRecord/EditProposal) |
 | Typst 编译 | ✅ TypstBackend: subprocess typst compile → PDF |
 | Markdown/KaTeX | ✅ MarkdownBackend: markdown → HTML + KaTeX CDN |
-| 状态机 | ❌ ArticleStatus 枚举定义了，无业务逻辑 |
-| 审稿流程 | ❌ 无 |
+| 状态机 | ✅ 8 状态 (draft→submitted→in_review→accepted→published→edit_proposed→...) |
+| 审稿流程 | ✅ 分配→审稿→决策 完整闭环 |
 | LAN 同步 | ❌ 无 |
 | 引用图 | ❌ 无 |
 
@@ -148,7 +165,7 @@ peerpedia --help             # CLI 帮助
 |---|---|---|
 | CLI | Python click | `peerpedia/cli/main.py` |
 | Web | FastAPI + Jinja2 + HTMX | `peerpedia/web/` |
-| ORM | SQLAlchemy (未创建表) | `pyproject.toml` |
+| ORM | SQLAlchemy (6 张表) | `pyproject.toml` |
 | Git | GitPython | `peerpedia_core/storage/git_backend.py` |
 | 消息模型 | Pydantic v2 | `peerpedia_core/protocol/messages.py` |
 | 测试 | pytest | `tests/` |

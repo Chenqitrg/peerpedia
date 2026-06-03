@@ -976,7 +976,7 @@ Phase 2: 跨学科扩张
 | Phase 3 M2 | 审稿工作流（状态机 + 审稿 + 决定 + 积分） | ✅ | 76 tests |
 | Phase 3 M2.5 | 中文 UI + ArXiv 搬运 | ✅ | 84 tests |
 | Phase 3 M2.6 | 用户足迹 + 按需编译 | ✅ | **87 tests** |
-| Phase 3 M3 | 协作+开放编辑 | ⏸ 待开始 | — |
+| Phase 3 M3 | 协作+开放编辑 | ✅ | **126 tests** |
 | Phase 3 M4 | 信誉+LAN | ⏸ 待开始 | — |
 | Phase 3 M5 | 引用跳转 | ⏸ 待开始 | — |
 | Phase 4 | IPFS 集成 | ⏸ 远期 | — |
@@ -992,6 +992,9 @@ peerpedia submit article.typ --author 张三    # 提交文章
 peerpedia review <id> -d accept -c "很好"     # 审稿
 peerpedia decide <id>                        # 决定
 peerpedia mirror 2301.00001 -u 张三          # 搬运 arXiv
+peerpedia collaborate <id> -r 审稿人         # 接受协作申请
+peerpedia propose-edit <id> -t minor -d "修改" # 提交修改提案
+peerpedia merge-proposal <pid> <aid>          # 合并提案
 ```
 
 ### 系统架构（实际）
@@ -1001,7 +1004,7 @@ peerpedia_core/
   protocol/        # Layer 0: 消息格式 + 签名 + CID
   reputation/      # Layer 1: 四维信誉算法 v1
   governance/      # Layer 1: PIP 提案流程
-  workflow/        # Layer 1: 状态机 + 审稿编排
+  workflow/        # Layer 1: 状态机 + 审稿编排 + 协作 + 编辑提案 + 贡献追踪
   storage/         # Layer 0: git backend + SQLite DB + compiler backends
 
 peerpedia/
