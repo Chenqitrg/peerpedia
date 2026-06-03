@@ -17,9 +17,9 @@
         </nav>
     </header>
 
-    <main>
+    <main style="display: flex; gap: 24px; align-items: flex-start;">
         {% if article %}
-        <article class="article-view">
+        <article class="article-view" style="flex: 1; min-width: 0;">
             <h1>{{ article.title }}</h1>
             <div class="article-meta">
                 <span>作者: {{ article.founding_authors | join(", ") }}</span>
@@ -36,14 +36,61 @@
                  hx-swap="innerHTML">
                 <p>编译中...</p>
             </div>
-            <aside class="reference-graph">
-                <h3>📚 References</h3>
-                <!-- Reference DAG -->
-            </aside>
         </article>
+        <aside class="citation-sidebar" style="width: 260px; flex-shrink: 0; background: #f8f9fa; border-radius: 8px; padding: 16px; font-size: 0.9em;">
+            <h3 style="margin-top: 0;">📚 引用关系</h3>
+            <div id="citation-panel">
+                <p style="color: #888;">加载中...</p>
+            </div>
+        </aside>
         {% else %}
         <p class="empty-state">文章未找到。</p>
         {% endif %}
     </main>
+{% if article %}
+<script>
+(function() {
+    var panel = document.getElementById('citation-panel');
+    if (!panel) return;
+    fetch('/api/v1/articles/{{ article.id }}/citations')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var html = '';
+            // Cites (references this article makes)
+            html += '<h4 style="margin: 12px 0 4px;">📎 引用 (' + data.cites.length + ')</h4>';
+            if (data.cites.length > 0) {
+                html += '<ul style="margin: 0; padding-left: 18px;">';
+                data.cites.forEach(function(c) {
+                    html += '<li style="margin: 4px 0;"><a href="/article/' + c.id + '" style="text-decoration: none;">' + escapeHtml(c.title) + '</a></li>';
+                });
+                html += '</ul>';
+            } else {
+                html += '<p style="color: #888; font-size: 0.85em; margin: 4px 0;">未引用其他文章</p>';
+            }
+            // Cited by (who references this article)
+            html += '<h4 style="margin: 12px 0 4px;">📌 被引用 (' + data.cited_by.length + ')</h4>';
+            if (data.cited_by.length > 0) {
+                html += '<ul style="margin: 0; padding-left: 18px;">';
+                data.cited_by.forEach(function(c) {
+                    html += '<li style="margin: 4px 0;"><a href="/article/' + c.id + '" style="text-decoration: none;">' + escapeHtml(c.title) + '</a></li>';
+                });
+                html += '</ul>';
+            } else {
+                html += '<p style="color: #888; font-size: 0.85em; margin: 4px 0;">暂无被引用</p>';
+            }
+            panel.innerHTML = html;
+        })
+        .catch(function() {
+            panel.innerHTML = '<p style="color: #888;">引用加载失败</p>';
+        });
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+})();
+</script>
+{% endif %}
 </body>
 </html>
