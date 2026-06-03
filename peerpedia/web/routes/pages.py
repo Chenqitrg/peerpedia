@@ -87,6 +87,25 @@ async def view_article(request: Request, article_id: str):
 
         article_dict["content"] = None  # Compiled on demand via HTMX
 
+        # Compute community review averages for 5 dimensions
+        from peerpedia_core.storage.db import get_reviews_for_article
+        reviews = get_reviews_for_article(session, article_id)
+        community_review = None
+        if reviews:
+            dims = ["originality", "rigor", "completeness", "pedagogy", "impact"]
+            scores = {d: [] for d in dims}
+            for r in reviews:
+                for d in dims:
+                    val = getattr(r, f"review_{d}", 0)
+                    if val > 0:
+                        scores[d].append(val)
+            averages = {}
+            for d in dims:
+                if scores[d]:
+                    averages[d] = round(sum(scores[d]) / len(scores[d]), 1)
+            if averages:
+                community_review = {"scores": averages, "count": len(reviews)}
+
         return templates.TemplateResponse(
             request=request,
             name="article.html",
@@ -96,6 +115,7 @@ async def view_article(request: Request, article_id: str):
                 "article": article_dict,
                 "viewer": viewer,
                 "all_users": get_all_users(),
+                "community_review": community_review,
             },
         )
     finally:

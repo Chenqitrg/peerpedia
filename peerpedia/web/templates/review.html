@@ -38,6 +38,41 @@
     }
     </script>
 
+    <script>
+    // Star rating interaction — wait for DOM
+    document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.star-rating').forEach(function(rating) {
+        var stars = rating.querySelectorAll('.stars span');
+        var label = rating.querySelector('.star-label');
+        var input = rating.querySelector('input[type=hidden]');
+
+        stars.forEach(function(star, index) {
+            star.addEventListener('mouseenter', function() {
+                stars.forEach(function(s, i) {
+                    s.textContent = i <= index ? '★' : '☆';
+                    s.style.color = i <= index ? '#f59e0b' : '#ccc';
+                });
+                label.textContent = star.title;
+            });
+            star.addEventListener('click', function() {
+                var val = parseInt(star.dataset.value);
+                input.value = val;
+                label.textContent = star.title;
+            });
+        });
+
+        rating.addEventListener('mouseleave', function() {
+            var val = parseInt(input.value);
+            stars.forEach(function(s, i) {
+                s.textContent = i < val ? '★' : '☆';
+                s.style.color = i < val ? '#f59e0b' : '#ccc';
+            });
+            label.textContent = val > 0 ? stars[val - 1].title : '';
+        });
+    });
+    });
+    </script>
+
     <main>
     {% if article %}
         <h2>审稿: {{ article.title }}</h2>
@@ -90,6 +125,49 @@
                 <label>表述清晰度 (1-5):
                     <input type="range" name="clarity" min="1" max="5" value="3">
                 </label>
+                <fieldset class="self-review" style="border:1px solid #e5e5e5;border-radius:8px;padding:14px;margin-bottom:12px;">
+                    <legend style="font-weight:600;">📊 五维评分 <span style="font-weight:400;color:#888;font-size:0.9em;">— 可选，和自评维度一致</span></legend>
+                    <div class="star-rating" data-dimension="review_originality" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+                        <span style="width:80px;font-size:0.82em;">🧠 原创性</span>
+                        <span class="stars" style="cursor:pointer;font-size:0.9em;">
+                            <span data-value="1" title="搬运/翻译">☆</span><span data-value="2" title="学习笔记">☆</span><span data-value="3" title="随笔习作">☆</span><span data-value="4" title="综述评论">☆</span><span data-value="5" title="原创研究">☆</span>
+                        </span>
+                        <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                        <input type="hidden" name="review_originality" value="0">
+                    </div>
+                    <div class="star-rating" data-dimension="review_rigor" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+                        <span style="width:80px;font-size:0.82em;">📐 严格性</span>
+                        <span class="stars" style="cursor:pointer;font-size:0.9em;">
+                            <span data-value="1" title="非正式讨论">☆</span><span data-value="2" title="直觉科普">☆</span><span data-value="3" title="标准推导">☆</span><span data-value="4" title="严格证明">☆</span><span data-value="5" title="公理形式">☆</span>
+                        </span>
+                        <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                        <input type="hidden" name="review_rigor" value="0">
+                    </div>
+                    <div class="star-rating" data-dimension="review_completeness" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+                        <span style="width:80px;font-size:0.82em;">🧩 完整性</span>
+                        <span class="stars" style="cursor:pointer;font-size:0.9em;">
+                            <span data-value="1" title="草稿片段">☆</span><span data-value="2" title="部分覆盖">☆</span><span data-value="3" title="核心完整">☆</span><span data-value="4" title="全面覆盖">☆</span><span data-value="5" title="详尽完备">☆</span>
+                        </span>
+                        <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                        <input type="hidden" name="review_completeness" value="0">
+                    </div>
+                    <div class="star-rating" data-dimension="review_pedagogy" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+                        <span style="width:80px;font-size:0.82em;">📖 教学性</span>
+                        <span class="stars" style="cursor:pointer;font-size:0.9em;">
+                            <span data-value="1" title="个人备忘">☆</span><span data-value="2" title="需领域基础">☆</span><span data-value="3" title="有基础可读">☆</span><span data-value="4" title="教学导向">☆</span><span data-value="5" title="零基础入门">☆</span>
+                        </span>
+                        <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                        <input type="hidden" name="review_pedagogy" value="0">
+                    </div>
+                    <div class="star-rating" data-dimension="review_impact" style="margin-bottom:0;display:flex;align-items:center;gap:8px;">
+                        <span style="width:80px;font-size:0.82em;">💡 影响力</span>
+                        <span class="stars" style="cursor:pointer;font-size:0.9em;">
+                            <span data-value="1" title="个人参考">☆</span><span data-value="2" title="小众专题">☆</span><span data-value="3" title="领域相关">☆</span><span data-value="4" title="领域核心">☆</span><span data-value="5" title="奠基/开创">☆</span>
+                        </span>
+                        <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                        <input type="hidden" name="review_impact" value="0">
+                    </div>
+                </fieldset>
                 <label>审稿意见 (Markdown):
                     <textarea name="comments" rows="6"></textarea>
                 </label>

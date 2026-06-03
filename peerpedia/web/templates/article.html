@@ -71,8 +71,21 @@
                 <span title="影响力">💡 {{ article.self_impact }}/5</span>
                 <span style="color:#888;">(作者自评)</span>
             </div>
+            {% elif community_review %}
+            <p style="color:#aaa;font-size:0.85em;margin-bottom:12px;">作者未自评 · 社区评分见下</p>
             {% else %}
             <p style="color:#aaa;font-size:0.85em;margin-bottom:12px;">作者未自评 · 社区审稿后此处显示评分对比</p>
+            {% endif %}
+
+            {% if community_review %}
+            <div class="community-review-display" style="display:flex;gap:12px;padding:10px 14px;background:#e8f0fe;border-radius:6px;margin-bottom:16px;flex-wrap:wrap;font-size:0.85em;">
+                <span title="原创性">🧠 {{ community_review.scores.originality|default('-') }}/5</span>
+                <span title="严格性">📐 {{ community_review.scores.rigor|default('-') }}/5</span>
+                <span title="完整性">🧩 {{ community_review.scores.completeness|default('-') }}/5</span>
+                <span title="教学性">📖 {{ community_review.scores.pedagogy|default('-') }}/5</span>
+                <span title="影响力">💡 {{ community_review.scores.impact|default('-') }}/5</span>
+                <span style="color:#2563eb;">(社区评分 · {{ community_review.count }}人审稿)</span>
+            </div>
             {% endif %}
 
             <!-- Version history / diff panel toggle -->
