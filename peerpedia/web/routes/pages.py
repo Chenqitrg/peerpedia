@@ -107,6 +107,14 @@ async def view_article(request: Request, article_id: str):
             if averages:
                 community_review = {"scores": averages, "count": len(reviews)}
 
+        # Viewer's existing review for pre-filling the comment form
+        my_review = None
+        if viewer:
+            for r in reviews:
+                if r.reviewer_id == viewer:
+                    my_review = r.to_dict()
+                    break
+
         return templates.TemplateResponse(
             request=request,
             name="article.html",
@@ -117,6 +125,8 @@ async def view_article(request: Request, article_id: str):
                 "viewer": viewer,
                 "all_users": get_all_users(),
                 "community_review": community_review,
+                "reviews": [r.to_dict() for r in reviews],
+                "my_review": my_review,
             },
         )
     finally:

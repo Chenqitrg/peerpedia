@@ -91,11 +91,11 @@ def assign_reviewer(
             if article is None:
                 return AssignResult(success=False, article_id=article_id, error="Article not found")
 
-            if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW, ArticleStatus.DRAFT):
+            if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW, ArticleStatus.DRAFT, ArticleStatus.PUBLISHED):
                 return AssignResult(
                     success=False,
                     article_id=article_id,
-                    error=f"Cannot rate: article status is '{article.status}', must be 'submitted'",
+                    error=f"Cannot rate: article status is '{article.status}', must be 'submitted' or 'published'",
                 )
 
             return AssignResult(
@@ -137,12 +137,12 @@ def submit_review(
             if article is None:
                 return ReviewResult(success=False, article_id=article_id, error="Article not found")
 
-            # Accept submitted or in_review for sedimentation pool
-            if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW):
+            # Accept submitted, in_review, or published for sedimentation pool + post-publish comments
+            if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW, ArticleStatus.PUBLISHED):
                 return ReviewResult(
                     success=False,
                     article_id=article_id,
-                    error=f"Cannot submit review: article status is '{article.status}', must be 'submitted' or 'in_review'",
+                    error=f"Cannot submit review: article status is '{article.status}', must be 'submitted', 'in_review', or 'published'",
                 )
 
             # Authors cannot rate their own articles (comment-only)

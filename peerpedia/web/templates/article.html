@@ -17,7 +17,7 @@
         <h1>📚 知诸网</h1>
         <nav>
             <a href="/">首页</a>
-            <a href="/submit">提交</a>
+            <a href="/submit" title="提交文章" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#2563eb;color:#fff;border-radius:50%;text-decoration:none;font-size:1.2em;font-weight:bold;line-height:1;">+</a>
             <a href="/review">🌊 沉淀池</a>
             {% if viewer %}
             <a href="/user/{{ viewer }}">👤 我的主页</a>
@@ -42,6 +42,47 @@
         }
         location.reload();
     }
+    </script>
+
+    <script>
+    // Star rating for comment 5D scoring
+    document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.star-rating').forEach(function(rating) {
+        var stars = rating.querySelectorAll('.stars span');
+        var label = rating.querySelector('.star-label');
+        var input = rating.querySelector('input[type=hidden]');
+        var initVal = parseInt(input.value) || 0;
+        stars.forEach(function(s, i) {
+            s.textContent = i < initVal ? '★' : '☆';
+            s.style.color = i < initVal ? '#f59e0b' : '#ccc';
+        });
+        if (initVal > 0 && stars.length >= initVal) {
+            label.textContent = stars[initVal - 1].title;
+        }
+        stars.forEach(function(star, index) {
+            star.addEventListener('mouseenter', function() {
+                stars.forEach(function(s, i) {
+                    s.textContent = i <= index ? '★' : '☆';
+                    s.style.color = i <= index ? '#f59e0b' : '#ccc';
+                });
+                label.textContent = star.title;
+            });
+            star.addEventListener('click', function() {
+                var val = parseInt(star.dataset.value);
+                input.value = val;
+                label.textContent = star.title;
+            });
+        });
+        rating.addEventListener('mouseleave', function() {
+            var val = parseInt(input.value);
+            stars.forEach(function(s, i) {
+                s.textContent = i < val ? '★' : '☆';
+                s.style.color = i < val ? '#f59e0b' : '#ccc';
+            });
+            label.textContent = val > 0 ? stars[val - 1].title : '';
+        });
+    });
+    });
     </script>
 
     <main style="display: flex; gap: 24px; align-items: flex-start;">
@@ -222,31 +263,97 @@
                 </div>
             </section>
 
-            <!-- B4: Edit proposal form -->
-            <section class="edit-proposal-form" style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px;">
-                <h3>✏️ 提交修改提案</h3>
-                <form hx-post="/api/v1/articles/{{ article.id }}/proposals"
-                      hx-target="#proposal-result" hx-swap="innerHTML">
-                    <input type="hidden" name="proposer_id" value="{{ viewer or '' }}">
-                    <label>提案类型:
-                        <select name="proposal_type" required>
-                            <option value="minor">微小修改（错字/格式）</option>
-                            <option value="medium">中等修改（段落/公式）</option>
-                            <option value="major">重大修改（新章节）</option>
-                        </select>
-                    </label>
-                    <label>描述:
-                        <textarea name="description" rows="3" placeholder="简述你计划修改的内容..."></textarea>
-                    </label>
-                    <button type="submit">提交提案</button>
-                </form>
-                <div id="proposal-result"></div>
+            <!-- Comments + 5D scoring (replaces edit proposals) -->
+            <section class="article-comments" style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px;">
+                <h3>💬 评论 ({{ reviews|length }})</h3>
+                {% set is_author = viewer and viewer in article.founding_authors %}
 
-                <!-- List existing proposals -->
-                <div hx-get="/api/v1/articles/{{ article.id }}/proposals?format=html"
-                     hx-trigger="load" hx-swap="innerHTML"
-                     style="margin-top: 12px; font-size: 0.85em;">
+                {% if reviews %}
+                {% for r in reviews %}
+                <div class="review-card" style="border-left:3px solid {% if r.reviewer_id in article.founding_authors %}#dc2626{% else %}#2563eb{% endif %};padding:8px 12px;margin-bottom:8px;background:#f8f9fa;border-radius:0 6px 6px 0;">
+                    <p class="meta" style="font-size:0.85em;">
+                        {% if r.reviewer_id in article.founding_authors %}
+                        <strong>{{ r.reviewer_id }}</strong> <span style="background:#dc2626;color:#fff;font-size:0.7em;padding:1px 6px;border-radius:3px;">作者</span>
+                        {% else %}
+                        <span style="font-weight:600;color:#6366f1;">匿名者_{{ r.reviewer_id[:4].upper() }}</span>
+                        {% endif %}
+                        {% if r.review_originality %}
+                        · 🧠{{ r.review_originality }} 📐{{ r.review_rigor }} 🧩{{ r.review_completeness }} 📖{{ r.review_pedagogy }} 💡{{ r.review_impact }}
+                        {% endif %}
+                        · {{ r.created_at[:10] if r.created_at else '' }}
+                    </p>
+                    {% if r.comments %}<p style="margin:4px 0;white-space:pre-wrap;font-size:0.9em;">{{ r.comments }}</p>{% endif %}
                 </div>
+                {% endfor %}
+                {% else %}
+                <p style="color:#888;font-size:0.85em;">暂无评论。发表第一条评论。</p>
+                {% endif %}
+
+                {% if viewer %}
+                {% set old_comment = my_review.comments if my_review else '' %}
+                {% set old_orig = my_review.review_originality if my_review else 0 %}
+                {% set old_rig = my_review.review_rigor if my_review else 0 %}
+                {% set old_comp = my_review.review_completeness if my_review else 0 %}
+                {% set old_ped = my_review.review_pedagogy if my_review else 0 %}
+                {% set old_imp = my_review.review_impact if my_review else 0 %}
+                <form id="comment-form" style="margin-top:12px;padding:14px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;"
+                      hx-post="/api/v1/articles/{{ article.id }}/reviews"
+                      hx-target="#comment-result" hx-swap="innerHTML">
+                    <input type="hidden" name="reviewer_id" value="{{ viewer }}">
+                    <input type="hidden" name="decision" value="accept">
+                    <fieldset style="border:1px solid #e5e5e5;border-radius:8px;padding:10px 14px;margin-bottom:10px;">
+                        <legend style="font-weight:600;font-size:0.85em;">五维评分</legend>
+                        <div class="star-rating" data-dimension="review_originality" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                            <span style="width:70px;font-size:0.8em;">🧠 原创性</span>
+                            <span class="stars" style="cursor:pointer;font-size:0.85em;">
+                                <span data-value="1" title="搬运/翻译">☆</span><span data-value="2" title="学习笔记">☆</span><span data-value="3" title="随笔习作">☆</span><span data-value="4" title="综述评论">☆</span><span data-value="5" title="原创研究">☆</span>
+                            </span>
+                            <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                            <input type="hidden" name="review_originality" value="{{ old_orig }}">
+                        </div>
+                        <div class="star-rating" data-dimension="review_rigor" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                            <span style="width:70px;font-size:0.8em;">📐 严格性</span>
+                            <span class="stars" style="cursor:pointer;font-size:0.85em;">
+                                <span data-value="1" title="非正式讨论">☆</span><span data-value="2" title="直觉科普">☆</span><span data-value="3" title="标准推导">☆</span><span data-value="4" title="严格证明">☆</span><span data-value="5" title="公理形式">☆</span>
+                            </span>
+                            <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                            <input type="hidden" name="review_rigor" value="{{ old_rig }}">
+                        </div>
+                        <div class="star-rating" data-dimension="review_completeness" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                            <span style="width:70px;font-size:0.8em;">🧩 完整性</span>
+                            <span class="stars" style="cursor:pointer;font-size:0.85em;">
+                                <span data-value="1" title="草稿片段">☆</span><span data-value="2" title="部分覆盖">☆</span><span data-value="3" title="核心完整">☆</span><span data-value="4" title="全面覆盖">☆</span><span data-value="5" title="详尽完备">☆</span>
+                            </span>
+                            <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                            <input type="hidden" name="review_completeness" value="{{ old_comp }}">
+                        </div>
+                        <div class="star-rating" data-dimension="review_pedagogy" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                            <span style="width:70px;font-size:0.8em;">📖 教学性</span>
+                            <span class="stars" style="cursor:pointer;font-size:0.85em;">
+                                <span data-value="1" title="个人备忘">☆</span><span data-value="2" title="需领域基础">☆</span><span data-value="3" title="有基础可读">☆</span><span data-value="4" title="教学导向">☆</span><span data-value="5" title="零基础入门">☆</span>
+                            </span>
+                            <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                            <input type="hidden" name="review_pedagogy" value="{{ old_ped }}">
+                        </div>
+                        <div class="star-rating" data-dimension="review_impact" style="margin-bottom:0;display:flex;align-items:center;gap:6px;">
+                            <span style="width:70px;font-size:0.8em;">💡 影响力</span>
+                            <span class="stars" style="cursor:pointer;font-size:0.85em;">
+                                <span data-value="1" title="个人参考">☆</span><span data-value="2" title="小众专题">☆</span><span data-value="3" title="领域相关">☆</span><span data-value="4" title="领域核心">☆</span><span data-value="5" title="奠基/开创">☆</span>
+                            </span>
+                            <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                            <input type="hidden" name="review_impact" value="{{ old_imp }}">
+                        </div>
+                    </fieldset>
+                    <label style="font-size:0.85em;">评论:
+                        <textarea name="comments" rows="3" placeholder="写下你的看法..."
+                            style="width:100%;margin-top:4px;padding:6px;font-size:0.9em;">{{ old_comment }}</textarea>
+                    </label>
+                    <button type="submit" style="margin-top:6px;">💬 发表</button>
+                </form>
+                <div id="comment-result" style="margin-top:8px;"></div>
+                {% else %}
+                <p style="color:#888;margin-top:12px;font-size:0.85em;">👽 请先选择身份再评论</p>
+                {% endif %}
             </section>
             {% endif %}
             </div><!-- /#tab-content -->
