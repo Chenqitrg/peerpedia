@@ -29,6 +29,7 @@ class ArticleStatus:
     REVISIONS_REQUESTED = "revisions_requested"
     ACCEPTED = "accepted"
     PUBLISHED = "published"
+    EDIT_PROPOSED = "edit_proposed"
     REJECTED = "rejected"
 
 
@@ -45,7 +46,8 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     ArticleStatus.REVISIONS_REQUESTED: {ArticleStatus.SUBMITTED},
     ArticleStatus.REJECTED: {ArticleStatus.SUBMITTED},
     ArticleStatus.ACCEPTED: {ArticleStatus.PUBLISHED},
-    ArticleStatus.PUBLISHED: set(),  # terminal state for M2
+    ArticleStatus.PUBLISHED: {ArticleStatus.EDIT_PROPOSED},  # post-publication editing
+    ArticleStatus.EDIT_PROPOSED: {ArticleStatus.PUBLISHED},
 }
 
 

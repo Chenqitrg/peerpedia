@@ -19,6 +19,7 @@ class ArticleStatus(str, Enum):
     REVISIONS_REQUESTED = "revisions_requested"
     ACCEPTED = "accepted"
     PUBLISHED = "published"
+    EDIT_PROPOSED = "edit_proposed"
     REJECTED = "rejected"
 
 

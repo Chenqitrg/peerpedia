@@ -36,6 +36,14 @@ class TestValidTransitions:
     def test_rejected_to_submitted(self):
         assert can_transition("rejected", "submitted") is True
 
+    def test_can_transition_published_to_edit_proposed(self):
+        """Published articles can receive edit proposals."""
+        assert can_transition(ArticleStatus.PUBLISHED, ArticleStatus.EDIT_PROPOSED) is True
+
+    def test_can_transition_edit_proposed_to_published(self):
+        """Edit proposals merge back to published."""
+        assert can_transition(ArticleStatus.EDIT_PROPOSED, ArticleStatus.PUBLISHED) is True
+
 
 class TestInvalidTransitions:
     """Invalid transitions should return False."""
@@ -54,6 +62,18 @@ class TestInvalidTransitions:
 
     def test_rejected_to_accepted_invalid(self):
         assert can_transition("rejected", "accepted") is False
+
+    def test_cannot_transition_edit_proposed_to_draft(self):
+        """Edit proposals cannot go back to draft."""
+        assert can_transition(ArticleStatus.EDIT_PROPOSED, ArticleStatus.DRAFT) is False
+
+    def test_cannot_transition_edit_proposed_to_submitted(self):
+        """Edit proposals cannot go back to submitted."""
+        assert can_transition(ArticleStatus.EDIT_PROPOSED, ArticleStatus.SUBMITTED) is False
+
+    def test_cannot_transition_draft_to_edit_proposed(self):
+        """Only published articles can get edit proposals."""
+        assert can_transition(ArticleStatus.DRAFT, ArticleStatus.EDIT_PROPOSED) is False
 
 
 class TestTransitionExecution:
@@ -113,3 +133,19 @@ class TestStateMachineClass:
         sm = StateMachine(article_id="a1", current_status="published")
         assert sm.can_apply("draft") is False
         assert sm.can_apply("submitted") is False
+
+    def test_state_machine_full_edit_proposal_cycle(self):
+        """Full cycle: published -> edit_proposed -> published."""
+        sm = StateMachine(article_id="test-1", current_status=ArticleStatus.PUBLISHED)
+        assert sm.can_apply(ArticleStatus.EDIT_PROPOSED) is True
+
+        sm.apply(ArticleStatus.EDIT_PROPOSED)
+        assert sm.current_status == ArticleStatus.EDIT_PROPOSED
+
+        assert sm.can_apply(ArticleStatus.PUBLISHED) is True
+        sm.apply(ArticleStatus.PUBLISHED)
+        assert sm.current_status == ArticleStatus.PUBLISHED
+
+        assert len(sm.history) == 2
+        assert sm.history[0] == (ArticleStatus.PUBLISHED, ArticleStatus.EDIT_PROPOSED)
+        assert sm.history[1] == (ArticleStatus.EDIT_PROPOSED, ArticleStatus.PUBLISHED)
