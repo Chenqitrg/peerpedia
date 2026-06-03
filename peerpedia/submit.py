@@ -106,17 +106,22 @@ def submit_article(
         return SubmissionResult(success=False, error=f"Git init failed: {e}")
 
     # 6. Copy source file into repo
-    dest_file = repo_path / source_path.name
-    shutil.copy2(source_path, dest_file)
+    try:
+        dest_file = repo_path / source_path.name
+        shutil.copy2(source_path, dest_file)
 
-    # Also copy any supporting files from the same directory
-    for sibling in source_path.parent.iterdir():
-        if sibling == source_path:
-            continue
-        if sibling.is_file():
-            dest_sibling = repo_path / sibling.name
-            if not dest_sibling.exists():
-                shutil.copy2(sibling, dest_sibling)
+        # Also copy any supporting files from the same directory
+        for sibling in source_path.parent.iterdir():
+            if sibling == source_path:
+                continue
+            if sibling.is_file():
+                dest_sibling = repo_path / sibling.name
+                if not dest_sibling.exists():
+                    shutil.copy2(sibling, dest_sibling)
+    except Exception as e:
+        # Clean up repo if file copy fails
+        shutil.rmtree(repo_path, ignore_errors=True)
+        return SubmissionResult(success=False, error=f"文件复制失败: {e}")
 
     # 7. Git commit
     try:
@@ -127,7 +132,9 @@ def submit_article(
             author_email=author_email,
         )
     except Exception as e:
-        return SubmissionResult(success=False, error=f"Git commit failed: {e}")
+        # Clean up repo if commit fails
+        shutil.rmtree(repo_path, ignore_errors=True)
+        return SubmissionResult(success=False, error=f"Git 提交失败: {e}")
 
     # 8. Store metadata in SQLite
     session = None

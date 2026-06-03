@@ -5,6 +5,7 @@ The state machine is versioned — transition rules can be modified via PIP.
 
 MVP transitions (M2):
     draft → submitted
+    draft → in_review        (MVP shortcut: self-assign skips submitted)
     submitted → in_review
     in_review → accepted
     in_review → rejected
@@ -34,7 +35,7 @@ class ArticleStatus:
 # ── Valid transitions ──────────────────────────────────────────────────────────
 
 VALID_TRANSITIONS: dict[str, set[str]] = {
-    ArticleStatus.DRAFT: {ArticleStatus.SUBMITTED},
+    ArticleStatus.DRAFT: {ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW},  # in_review allowed for MVP self-assign shortcut
     ArticleStatus.SUBMITTED: {ArticleStatus.IN_REVIEW},
     ArticleStatus.IN_REVIEW: {
         ArticleStatus.ACCEPTED,

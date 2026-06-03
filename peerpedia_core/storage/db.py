@@ -21,9 +21,11 @@ from typing import Optional
 from sqlalchemy import (
     Column,
     DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     Engine,
 )
@@ -192,8 +194,12 @@ class Review(Base):
     __tablename__ = "reviews"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    article_id = Column(String(36), nullable=False, index=True)
+    article_id = Column(String(36), ForeignKey("articles.id"), nullable=False, index=True)
     reviewer_id = Column(String(100), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("article_id", "reviewer_id", name="uq_article_reviewer"),
+    )
     decision = Column(String(20), nullable=False)  # accept | revise | reject
     comments = Column(Text, nullable=False, default="")
     scientific_correctness = Column(Integer, nullable=False, default=0)  # 1-5

@@ -88,7 +88,9 @@ def fetch_arxiv_metadata(arxiv_id: str) -> Optional[ArxivMetadata]:
         with urlopen(req, timeout=15) as response:
             xml_data = response.read().decode("utf-8")
     except URLError as e:
-        return None
+        reason = getattr(e, 'reason', str(e))
+        code = getattr(e, 'code', None)
+        return None  # caller uses generic error; detailed logging would go here
 
     return _parse_arxiv_xml(xml_data)
 
@@ -99,6 +101,7 @@ def _parse_arxiv_xml(xml_data: str) -> Optional[ArxivMetadata]:
     xml_clean = re.sub(r'<(\w+):(\w+)', r'<\1_\2', xml_data)
     xml_clean = re.sub(r'</(\w+):(\w+)', r'</\1_\2', xml_clean)
 
+    # Safe: xml.etree.ElementTree does not resolve external entities or DTDs by default
     try:
         root = ET.fromstring(xml_clean)
     except ET.ParseError:

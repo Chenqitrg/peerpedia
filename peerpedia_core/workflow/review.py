@@ -66,9 +66,12 @@ def calculate_review_points(
 ) -> int:
     """Calculate points earned for a review.
 
-    MVP: flat 20 points per review. Quality bonus (M4+): extra points
-    for high scores from the author's rating of the review.
+    MVP: flat 20 points per review. The scientific_correctness and clarity
+    parameters are accepted so callers can pass them, but the current (v1)
+    algorithm awards a flat 20 points regardless of score. A future upgrade
+    (via PIP) will make points proportional to review quality.
     """
+    _ = (scientific_correctness, clarity)  # accepted for future v2 algorithm
     params = ReputationParams()
     return params.points_review
 
@@ -153,6 +156,15 @@ def submit_review(
                 success=False,
                 article_id=article_id,
                 error=f"Cannot submit review: article status is '{article.status}', must be 'in_review'",
+            )
+
+        # Validate decision enum
+        VALID_DECISIONS = {"accept", "revise", "reject"}
+        if decision not in VALID_DECISIONS:
+            return ReviewResult(
+                success=False,
+                article_id=article_id,
+                error=f"Invalid decision '{decision}'. Must be one of: {VALID_DECISIONS}",
             )
 
         # Check for duplicate reviewer

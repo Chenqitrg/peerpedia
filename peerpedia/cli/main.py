@@ -116,8 +116,6 @@ def submit(article_path: str, author: str | None, email: str | None):
         click.echo(f"  提交:   {result.git_commit_hash[:8]}")
         if result.cid:
             click.echo(f"  CID:    {result.cid[:16]}...")
-        if result.compile_output:
-            click.echo(f"  输出:   {result.compile_output}")
         click.echo()
         click.echo(f"  查看: peerpedia serve → http://localhost:{settings.port}")
     else:
