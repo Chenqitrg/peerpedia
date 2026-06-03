@@ -156,6 +156,12 @@ def submit_review(
                 error=f"Cannot submit review: article status is '{article.status}', must be 'submitted' or 'in_review'",
             )
 
+        # Authors cannot rate their own articles (comment-only)
+        is_author = reviewer_id in (article.founding_authors or [])
+        if is_author:
+            review_originality = review_rigor = review_completeness = 0
+            review_pedagogy = review_impact = 0
+
         # If same reviewer already has a review, update it instead of creating new
         existing = get_reviews_for_article(session, article_id)
         existing_review = None
