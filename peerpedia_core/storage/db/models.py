@@ -312,3 +312,22 @@ class NodeInfo(Base):
             "last_seen": self.last_seen.isoformat() if self.last_seen else None,
             "is_self": bool(self.is_self),
         }
+
+
+# ── ORM Model: Follow ───────────────────────────────────────────────────────
+
+class Follow(Base):
+    """Follow relationship between users."""
+
+    __tablename__ = "follows"
+
+    follower_id = Column(String(100), ForeignKey("users.id"), primary_key=True)
+    followed_id = Column(String(100), ForeignKey("users.id"), primary_key=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> dict:
+        return {
+            "follower_id": self.follower_id,
+            "followed_id": self.followed_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

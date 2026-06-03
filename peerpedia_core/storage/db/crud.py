@@ -507,3 +507,114 @@ def cleanup_stale_nodes(
         .delete()
     )
     return result
+
+
+# ── Follow CRUD ─────────────────────────────────────────────────────────────
+
+def follow_user(
+    session: Session,
+    *,
+    follower_id: str,
+    followed_id: str,
+) -> "Follow":
+    """Create a follow relationship. Raises IntegrityError on duplicate."""
+    from peerpedia_core.storage.db.models import Follow
+
+    follow = Follow(
+        follower_id=follower_id,
+        followed_id=followed_id,
+    )
+    session.add(follow)
+    session.flush()  # Trigger IntegrityError immediately
+    return follow
+
+
+def unfollow_user(
+    session: Session,
+    *,
+    follower_id: str,
+    followed_id: str,
+) -> bool:
+    """Remove a follow relationship. Returns True if a row was deleted."""
+    from peerpedia_core.storage.db.models import Follow
+
+    result = (
+        session.query(Follow)
+        .filter(
+            Follow.follower_id == follower_id,
+            Follow.followed_id == followed_id,
+        )
+        .delete()
+    )
+    return result > 0
+
+
+def is_following(
+    session: Session,
+    follower_id: str,
+    followed_id: str,
+) -> bool:
+    """Check if follower_id follows followed_id."""
+    from peerpedia_core.storage.db.models import Follow
+
+    return (
+        session.query(Follow)
+        .filter(
+            Follow.follower_id == follower_id,
+            Follow.followed_id == followed_id,
+        )
+        .first()
+        is not None
+    )
+
+
+def get_following(
+    session: Session,
+    user_id: str,
+) -> list["Follow"]:
+    """Get users that user_id follows, newest first."""
+    from peerpedia_core.storage.db.models import Follow
+
+    return (
+        session.query(Follow)
+        .filter(Follow.follower_id == user_id)
+        .order_by(Follow.created_at.desc())
+        .all()
+    )
+
+
+def get_followers(
+    session: Session,
+    user_id: str,
+) -> list["Follow"]:
+    """Get users that follow user_id, newest first."""
+    from peerpedia_core.storage.db.models import Follow
+
+    return (
+        session.query(Follow)
+        .filter(Follow.followed_id == user_id)
+        .order_by(Follow.created_at.desc())
+        .all()
+    )
+
+
+def get_following_count(session: Session, user_id: str) -> int:
+    """Count how many users user_id follows."""
+    from peerpedia_core.storage.db.models import Follow
+
+    return (
+        session.query(Follow)
+        .filter(Follow.follower_id == user_id)
+        .count()
+    )
+
+
+def get_follower_count(session: Session, user_id: str) -> int:
+    """Count how many users follow user_id."""
+    from peerpedia_core.storage.db.models import Follow
+
+    return (
+        session.query(Follow)
+        .filter(Follow.followed_id == user_id)
+        .count()
+    )
