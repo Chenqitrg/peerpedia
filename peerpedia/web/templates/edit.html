@@ -180,8 +180,10 @@
                     var fullLine = cm.getLine(cursor.line);
                     var dollarCount = (fullLine.match(/\$\$/g) || []).length;
                     if (/^\s*\$\$/.test(line) && dollarCount === 1) {
-                        var indent = line.match(/^\s*/)[0];
-                        cm.replaceSelection('\n\n' + indent + '$$');
+                        var indent = line.match(/^\s*/)[0] + '  ';
+                        var pos = { line: cursor.line, ch: cursor.ch };
+                        cm.replaceSelection('\n' + indent + '\n' + indent.slice(0, -2) + '$$');
+                        cm.setCursor({ line: pos.line + 1, ch: indent.length });
                     } else {
                         cm.execCommand('newlineAndIndentContinueMarkdownList');
                     }
