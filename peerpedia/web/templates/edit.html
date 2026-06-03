@@ -97,7 +97,7 @@
     </div>
 
     <div id="editor-container" style="display:flex;gap:12px;height:60vh;min-height:400px;">
-        <div id="editor-area" style="flex:1;min-width:0;border:1px solid var(--border);"></div>
+        <textarea id="editor-area" style="flex:1;min-width:0;border:1px solid var(--border);padding:12px;font-family:'SF Mono',Monaco,Menlo,monospace;font-size:14px;line-height:1.6;resize:none;outline:none;" placeholder="在这里写 Markdown..."></textarea>
         <div id="preview-pane" style="flex:1;min-width:0;border:1px solid var(--border);padding:16px;overflow-y:auto;background:#fff;">
             <p style="color:#888;">预览区域。开始输入...</p>
         </div>
@@ -181,46 +181,28 @@
     {% endif %}
     </main>
 
-    <!-- CodeMirror Editor — reliable, small, CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/stex/stex.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/overlay.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
     <script>
     var format = document.getElementById('format-select').value;
-    var language = format === 'typst' ? 'stex' : 'markdown';
     var initialContent = {{ article.source_content|tojson if article and article.source_content else '""' }};
     if (!initialContent) {
-        initialContent = language === 'markdown'
-            ? '---\ntitle: \nabstract: \ncategories:\n  - \nkeywords:\n  - \nlanguage: en\n---\n\n'
-            : '// Typst article\n#let title = ""\n#let abstract = ""\n\n';
+        initialContent = '---\ntitle: \nabstract: \ncategories:\n  - \nkeywords:\n  - \nlanguage: en\n---\n\n';
     }
-
-    window.editor = CodeMirror(document.getElementById('editor-area'), {
-        value: initialContent,
-        mode: language,
-        theme: 'eclipse',
-        lineNumbers: true,
-        lineWrapping: true,
-        autofocus: true,
-        tabSize: 2,
-        extraKeys: { 'Tab': function(cm) { cm.replaceSelection('  '); } }
-    });
-    // Fix: the div id is still "monaco-editor" for CSS compat
+    var ta = document.getElementById('editor-area');
+    ta.value = initialContent;
+    // Expose editor API for preview/submit functions
+    window.editor = {
+        getValue: function() { return ta.value; },
+        on: function(evt, fn) { ta.addEventListener('input', fn); }
+    };
 
     updatePreview();
-    window.editor.on('change', function() {
+    window.editor.on('input', function() {
         updatePreview();
     });
     </script>
 
+    <script>
     function switchFormat(fmt) {
-        var lang = fmt === 'typst' ? 'stex' : 'markdown';
-        window.editor.setOption('mode', lang);
         updatePreview();
     }
 
@@ -237,15 +219,17 @@
         }
     }
 
-    // ── Markdown preview (KaTeX, instant) ────────────────────────────────
     function previewMarkdown(content, preview, status) {
         status.textContent = '';
+        if (!content || !content.trim()) {
+            preview.innerHTML = '<p style=\"color:#888;\">预览区域。开始输入...</p>';
+            return;
+        }
         var body = content;
         if (body.startsWith('---')) {
             var parts = body.split('---', 3);
             if (parts.length >= 3) body = parts.slice(2).join('---');
         }
-        // Protect math before Markdown parsing
         var mathBlocks = [];
         var protected_ = body
             .replace(/\$\$(.+?)\$\$/gs, function(m, g) {
@@ -270,7 +254,7 @@
             var cls = b.display ? 'katex-display' : 'katex-inline';
             var delim = b.display ? '$$' : '$';
             html = html.replace('MATHPLACEHOLDER' + i,
-                '<span class="' + cls + '">' + delim + b.math + delim + '</span>');
+                '<span class=\"' + cls + '\">' + delim + b.math + delim + '</span>');
         });
         preview.innerHTML = html;
         if (window.renderMathInElement) {
@@ -283,11 +267,20 @@
         }
     }
 
-    // ── Submit ───────────────────────────────────────────────────────────
     function submitArticle() {
         var status = document.getElementById('submit-status');
         var btn = document.getElementById('submit-btn');
+        var dims = ['self_originality','self_rigor','self_completeness','self_pedagogy','self_impact'];
+        for (var i = 0; i < dims.length; i++) {
+            var val = parseInt(document.querySelector('input[name=\"' + dims[i] + '\"]').value) || 0;
+            if (val === 0) {
+                status.textContent = '✗ 请完成五维自评（至少 1 星）';
+                status.style.color = '#c00';
+                return;
+            }
+        }
         status.textContent = '提交中...';
+        status.style.color = '#888';
         btn.disabled = true;
 
         var form = document.getElementById('metadata-form');
@@ -307,6 +300,7 @@
             })
             .catch(function(err) {
                 status.textContent = '✗ 提交失败';
+                status.style.color = '#c00';
                 btn.disabled = false;
             });
     }

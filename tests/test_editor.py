@@ -1,4 +1,4 @@
-"""Tests for the Monaco online editor."""
+"""Tests for the online editor."""
 
 from fastapi.testclient import TestClient
 
@@ -11,7 +11,7 @@ def test_edit_page_loads():
     """GET /edit returns the editor page."""
     response = client.get("/edit")
     assert response.status_code == 200
-    assert "monaco-editor" in response.text
+    assert "editor-area" in response.text
     assert "preview-pane" in response.text
 
 
@@ -37,7 +37,7 @@ def test_edit_existing_article_loads():
             aid = articles[0].id
             response = client.get(f"/edit/{aid}")
             assert response.status_code == 200
-            assert "monaco-editor" in response.text
+            assert "editor-area" in response.text
     finally:
         session.close()
 
