@@ -25,8 +25,14 @@
                 <article class="article-card">
                     <h3><a href="/article/{{ article.id }}">{{ article.title }}</a></h3>
                     <p class="meta">
-                        {{ article.authors | join(", ") }} · {{ article.created_at }}
+                        {{ article.founding_authors | join(", ") if article.founding_authors else "Unknown" }}
+                        · {{ article.format }}
+                        · <span class="status {{ article.status }}">{{ article.status }}</span>
+                        · {{ article.created_at[:10] if article.created_at else "" }}
                     </p>
+                    {% if article.abstract %}
+                    <p class="abstract">{{ article.abstract[:200] }}{% if article.abstract | length > 200 %}...{% endif %}</p>
+                    {% endif %}
                 </article>
                 {% endfor %}
             {% else %}

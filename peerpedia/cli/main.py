@@ -1,5 +1,7 @@
 """PeerPedia CLI — Reference client command-line interface."""
 
+from __future__ import annotations
+
 import click
 
 from peerpedia_core import __version__
@@ -20,10 +22,13 @@ def cli():
 def init():
     """Initialize PeerPedia in the current directory.
 
-    Creates ~/.peerpedia/ with default configuration and empty database.
+    Creates ~/.peerpedia/ with default configuration, empty database,
+    and required directory structure.
     """
     from pathlib import Path
     from peerpedia_core.storage import DEFAULT_ARTICLES_DIR
+    from peerpedia_core.storage.db import get_engine, init_db
+    from peerpedia.config.settings import settings
 
     base = Path.home() / ".peerpedia"
     dirs = [
@@ -35,8 +40,13 @@ def init():
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
 
+    # Initialize database tables
+    engine = get_engine(settings.database_url)
+    init_db(engine)
+
     click.echo(f"PeerPedia initialized at {base}")
     click.echo(f"  Articles repo dir: {DEFAULT_ARTICLES_DIR}")
+    click.echo(f"  Database: {settings.db_path}")
     click.echo(f"  Next: peerpedia serve")
 
 
@@ -65,15 +75,55 @@ def serve(lan: bool, port: int):
 
 @cli.command()
 @click.argument("article_path", type=click.Path(exists=True))
-def submit(article_path: str):
+@click.option("--author", default=None, help="Your name for git commits")
+@click.option("--email", default=None, help="Your email for git commits")
+def submit(article_path: str, author: str | None, email: str | None):
     """Submit a Typst or Markdown article for peer review.
 
     ARTICLE_PATH: Path to the main .typ or .md file.
     """
     from pathlib import Path
-    path = Path(article_path)
+    from peerpedia.config.settings import settings
+    from peerpedia.submit import submit_article
+
+    path = Path(article_path).resolve()
+
+    author_name = author or "peerpedia"
+    author_email = email or "peerpedia@localhost"
+
     click.echo(f"Submitting article: {path.name}")
-    click.echo("(Not yet implemented — coming in Phase 3)")
+    click.echo(f"  Format: {'Typst' if path.suffix in ('.typ', '.typst') else 'Markdown'}")
+
+    # Ensure database is initialized
+    from peerpedia_core.storage.db import get_engine, init_db
+    engine = get_engine(settings.database_url)
+    init_db(engine)
+
+    settings.ensure_dirs()
+
+    result = submit_article(
+        source_path=path,
+        database_url=settings.database_url,
+        articles_dir=settings.articles_dir,
+        author_name=author_name,
+        author_email=author_email,
+    )
+
+    if result.success:
+        click.echo()
+        click.echo(f"✓ Article submitted successfully!")
+        click.echo(f"  ID:     {result.article_id}")
+        click.echo(f"  Title:  {result.title}")
+        click.echo(f"  Commit: {result.git_commit_hash[:8]}")
+        if result.cid:
+            click.echo(f"  CID:    {result.cid[:16]}...")
+        if result.compile_output:
+            click.echo(f"  Output: {result.compile_output}")
+        click.echo()
+        click.echo(f"  View: peerpedia serve → http://localhost:{settings.port}")
+    else:
+        click.echo(f"✗ Submission failed: {result.error}", err=True)
+        raise SystemExit(1)
 
 
 @cli.command()
