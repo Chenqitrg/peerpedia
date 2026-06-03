@@ -75,6 +75,22 @@
 
 **预防**: 对 facade/re-export 模块的 import 行加 `# noqa: F401`。
 
+## 8. ORM 加列导致 DB 数据丢失
+
+**问题**: 在 `Article` ORM 模型上加了 6 个新列后，SQLite DB 文件中的 users/articles 数据全部丢失。下拉框没有用户可选，首页文章消失。
+
+**根因**: SQLAlchemy 的 `Base.metadata.create_all()` 不做 migration。SQLite 无法 ALTER TABLE 加列，旧表和新 ORM 定义冲突后整个 DB 文件被重建。
+
+**修复**:
+- `peerpedia seed --force` 命令一键重建 4 用户 + 5 篇 demo 文章
+- DB 丢了就跑一下，5 秒恢复
+
+**预防**:
+- 每次改 ORM 模型后，跑 `peerpedia seed --force` 恢复数据
+- 跑 `curl -s http://localhost:8080/ | grep -c article-card` 验证首页有文章
+- 跑 `python -c "from peerpedia_core.storage.db.models import User; ..."` 验证 users 表非空
+- 未来用 Alembic 做 migration 可以从根本解决（Phase 5+）
+
 ## 开发检查清单
 
 每次提交前：
@@ -82,6 +98,7 @@
 1. `python -m pytest tests/ -q` — 全部通过
 2. `python -m mypy peerpedia_core/ peerpedia/ --ignore-missing-imports` — 0 errors
 3. `python -m ruff check .` — 无新增 critical issues
-4. 验证 DB 状态（用户数、文章数）
+4. 验证 DB 状态（`peerpedia seed --force` 可重建）
 5. 如果改了模板或 CSS：重启服务器 + gstack browse 验证
-6. 如果加了新功能：添加回归测试
+6. 如果加了 ORM 列：跑 `peerpedia seed --force` + 验证首页
+7. 如果加了新功能：添加回归测试
