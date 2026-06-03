@@ -19,5 +19,7 @@ static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# Import route modules
+# Import and register route modules
 from peerpedia.web.routes import pages, api  # noqa: E402, F401
+app.include_router(pages.router)
+app.include_router(api.router)
