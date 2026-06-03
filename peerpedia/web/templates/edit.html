@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/katex/katex.min.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script defer src="/static/katex/katex.min.js"></script>
     <script defer src="/static/katex/auto-render.min.js"></script>
 </head>
@@ -194,6 +195,7 @@
                     var parts = body.split('---', 3);
                     if (parts.length >= 3) body = parts.slice(2).join('---');
                 }
+                // Protect math, render Markdown via marked, restore math
                 var mathBlocks = [];
                 var pbody = body
                     .replace(/\$\$(.+?)\$\$/gs, function(m, g) {
@@ -204,26 +206,7 @@
                         mathBlocks.push({display: false, math: g});
                         return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
                     });
-                // Unordered lists: lines starting with - or * become <li>
-                var hasList = /^[-*] /m.test(pbody);
-                if (hasList) {
-                    pbody = pbody.replace(/(?:^[-*] .+(?:\n|$))+/gm, function(m) {
-                        var items = m.trim().split('\n').map(function(line) {
-                            return '<li>' + line.replace(/^[-*] /, '') + '</li>';
-                        }).join('');
-                        return '<ul>' + items + '</ul>';
-                    });
-                }
-                var html = pbody
-                    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-                    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-                    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
-                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                    .replace(/`([^`]+)`/g, '<code>$1</code>')
-                    .replace(/\n\n/g, '</p><p>')
-                    .replace(/\n/g, '<br>');
-                html = '<p>' + html + '</p>';
+                var html = marked.parse(pbody);
                 mathBlocks.forEach(function(b, i) {
                     var cls = b.display ? 'katex-display' : 'katex-inline';
                     html = html.replace('MATHPLACEHOLDER' + i,
