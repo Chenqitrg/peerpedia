@@ -1,7 +1,7 @@
 # PeerPedia — Project Status & Restart Guide
 
 > 最后更新: 2026-06-03
-> 当前状态: Phase 2 完成，准备进入 Phase 3
+> 当前状态: Phase 3 M1 完成，准备进入 M2
 
 ---
 
@@ -66,7 +66,7 @@ tests/                   # 19 tests, 0 failures
 
 | ID | 任务 | 描述 | 优先级 |
 |---|---|---|---|
-| M1 | 文章提交闭环 | CLI `peerpedia init` + `submit` 真正工作。Typst/Markdown 编译器集成。git repo 初始化 + commit。Web 文章列表可读。 | 🔴 最高 |
+| M1 | 文章提交闭环 | ✅ CLI `peerpedia init` + `submit` 工作。Typst/Markdown 编译集成。git repo + commit。DB 存储。Web 文章列表可读。 | 🔴 最高 |
 | M2 | 审稿工作流 | ArticleStatus 状态机完整实现。审稿分配 → 打分 → 决策。积分首次计算。 | 🔴 最高 |
 | M3 | 协作+开放编辑 | 一键合作（审稿人→合作者）。EditProposal 提案流程。git blame 贡献时间线。 | 🟡 高 |
 | M4 | 信誉+LAN | 雷达图可视化。身份权重计算。LAN 节点发现 + 文章池同步。 | 🟡 高 |
@@ -121,12 +121,12 @@ tests/                   # 19 tests, 0 failures
 
 | 功能 | 状态 |
 |---|---|
-| `peerpedia submit` | ❌ 只打印 placeholder |
+| `peerpedia submit` | ✅ **已实现** — 调用 submit_article() 编排器 |
 | `peerpedia review` | ❌ 只打印 placeholder |
-| `peerpedia serve` | ❌ 能启动 FastAPI，但 API 全返回 mock 数据 |
-| 数据库 (SQLite) | ❌ 模型定义好了，未创建表和迁移 |
-| Typst 编译 | ❌ 未集成 |
-| Markdown/KaTeX | ❌ 未实现 |
+| `peerpedia serve` | ✅ FastAPI 启动，13 条路由，API 从数据库读取真实数据 |
+| 数据库 (SQLite) | ✅ SQLAlchemy Article 模型 + CRUD，init 时自动建表 |
+| Typst 编译 | ✅ TypstBackend: subprocess typst compile → PDF |
+| Markdown/KaTeX | ✅ MarkdownBackend: markdown → HTML + KaTeX CDN |
 | 状态机 | ❌ ArticleStatus 枚举定义了，无业务逻辑 |
 | 审稿流程 | ❌ 无 |
 | LAN 同步 | ❌ 无 |
