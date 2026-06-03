@@ -260,3 +260,24 @@ def test_monaco_markdown_language_set():
     """Editor initializes with language:'markdown'."""
     response = client.get("/edit")
     assert "'markdown'" in response.text or '"markdown"' in response.text
+
+
+# ── Regression: math rendering ────────────────────────────────────────────
+
+
+def test_math_restore_escapes_dollar_in_replace():
+    """Bug: String.replace() treats $$ as escape, stripping display math.
+
+    The restore code uses .replace('MPH' + i, '...$$...'), and
+    String.replace interprets $$ as an escaped $ (inserts one $).
+    Must use $$$$ (four) to produce $$ (two) in output.
+
+    Verify the template uses $$$$ for display-math delimiters in
+    the restore step.
+    """
+    response = client.get("/edit")
+    html = response.text
+    # The restore code must use $$$$ (not bare $$) for display math
+    assert "$$$$" in html, (
+        "Template must use $$$$ in String.replace to produce $$ in output"
+    )
