@@ -256,3 +256,59 @@ class Identity(Base):
             "verified": bool(self.verified),
             "trust_weight": self.trust_weight / 100.0,
         }
+
+
+# ── ORM Model: ClickEvent ────────────────────────────────────────────────────
+
+class ClickEvent(Base):
+    """Citation click event for transition probability tracking."""
+
+    __tablename__ = "click_events"
+    __table_args__ = (
+        Index("ix_click_from", "from_article_id"),
+        Index("ix_click_to", "to_article_id"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    from_article_id = Column(String(36), ForeignKey("articles.id"), nullable=False, index=True)
+    to_article_id = Column(String(36), ForeignKey("articles.id"), nullable=False)
+    timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    node_id = Column(String(100), nullable=False)
+    user_id = Column(String(100), nullable=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "from_article_id": self.from_article_id,
+            "to_article_id": self.to_article_id,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "node_id": self.node_id,
+            "user_id": self.user_id,
+        }
+
+
+# ── ORM Model: NodeInfo ──────────────────────────────────────────────────────
+
+class NodeInfo(Base):
+    """LAN peer node discovered via UDP broadcast."""
+
+    __tablename__ = "lan_nodes"
+
+    node_id = Column(String(100), primary_key=True)
+    host = Column(String(100), nullable=False)
+    port = Column(Integer, nullable=False)
+    version = Column(String(20), nullable=False, default="0.2.0")
+    articles_count = Column(Integer, nullable=False, default=0)
+    last_seen = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    is_self = Column(Integer, nullable=False, default=0)
+
+    def to_dict(self) -> dict:
+        return {
+            "node_id": self.node_id,
+            "host": self.host,
+            "port": self.port,
+            "version": self.version,
+            "articles_count": self.articles_count,
+            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
+            "is_self": bool(self.is_self),
+        }

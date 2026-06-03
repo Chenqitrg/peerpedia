@@ -15,25 +15,32 @@ from peerpedia_core.storage.db.engine import (
 
 from peerpedia_core.storage.db.models import (
     Article,
+    ClickEvent,
     ContributionRecord,
     EditProposal,
     Identity,
+    NodeInfo,
     Review,
     User,
 )
 
 from peerpedia_core.storage.db.crud import (
+    cleanup_stale_nodes,
     create_article,
+    create_click_event,
     create_contribution_record,
     create_edit_proposal,
     create_identity,
     create_review,
     create_user,
     get_article,
+    get_click_events_for_article,
     get_contribution_records,
     get_edit_proposal,
     get_edit_proposals_for_article,
     get_identities_for_user,
+    get_local_click_counts,
+    get_online_nodes,
     get_review,
     get_reviews_for_article,
     get_user,
@@ -45,6 +52,7 @@ from peerpedia_core.storage.db.crud import (
     update_article_version,
     update_edit_proposal_status,
     update_user_last_active,
+    upsert_node,
 )
 
 from peerpedia_core.protocol.messages import ArticleStatus
@@ -93,4 +101,15 @@ __all__ = [
     # crud — identity
     "create_identity",
     "get_identities_for_user",
+    # models — new
+    "ClickEvent",
+    "NodeInfo",
+    # crud — click
+    "create_click_event",
+    "get_click_events_for_article",
+    "get_local_click_counts",
+    # crud — node
+    "upsert_node",
+    "get_online_nodes",
+    "cleanup_stale_nodes",
 ]
