@@ -37,7 +37,7 @@ def test_edit_existing_article_loads():
             aid = articles[0].id
             response = client.get(f"/edit/{aid}")
             assert response.status_code == 200
-            assert "editor-area" in response.text
+            assert "monaco-editor" in response.text
     finally:
         session.close()
 
@@ -222,7 +222,7 @@ def test_monaco_container_sized():
     response = client.get("/edit")
     html = response.text
     assert 'id="monaco-editor"' in html
-    assert 'flex:1' in html
+    assert 'flex: 1' in html
 
 
 # ── Monaco-specific tests ──────────────────────────────────────────────────
