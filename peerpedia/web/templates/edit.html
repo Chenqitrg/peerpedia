@@ -296,7 +296,13 @@
                     .replace(/\$\$(.+?)\$\$/gs, function(m, g) { mathBlocks.push({d:true, m:g}); return 'MPH' + (mathBlocks.length - 1); })
                     .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) { mathBlocks.push({d:false, m:g}); return 'MPH' + (mathBlocks.length - 1); });
                 var html = marked.parse(pbody);
-                mathBlocks.forEach(function(b, i) { html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + (b.d ? '$$' : '$') + b.m + (b.d ? '$$' : '$') + '</span>'); });
+                mathBlocks.forEach(function(b, i) {
+                    // Note: String.replace() treats $$ as an escape for a literal $,
+                    // so we need $$$$ to produce $$ in the output, and $$ to produce $.
+                    var openDelim = b.d ? '$$$$' : '$$';
+                    var closeDelim = b.d ? '$$$$' : '$$';
+                    html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + openDelim + b.m + closeDelim + '</span>');
+                });
                 preview.innerHTML = html;
                 if (window.renderMathInElement) renderMathInElement(preview, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}] });
             }
@@ -372,7 +378,11 @@
                 .replace(/\$\$(.+?)\$\$/gs, function(m, g) { mathBlocks.push({d:true, m:g}); return 'MPH' + (mathBlocks.length - 1); })
                 .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) { mathBlocks.push({d:false, m:g}); return 'MPH' + (mathBlocks.length - 1); });
             var html = marked.parse(pbody);
-            mathBlocks.forEach(function(b, i) { html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + (b.d ? '$$' : '$') + b.m + (b.d ? '$$' : '$') + '</span>'); });
+            mathBlocks.forEach(function(b, i) {
+                var openDelim = b.d ? '$$$$' : '$$';
+                var closeDelim = b.d ? '$$$$' : '$$';
+                html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + openDelim + b.m + closeDelim + '</span>');
+            });
             preview.innerHTML = html;
             if (window.renderMathInElement) renderMathInElement(preview, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}] });
         }
