@@ -11,12 +11,10 @@ from dataclasses import dataclass, field
 
 from peerpedia_core.storage.db import (
     get_article,
-    get_engine,
     get_reviews_for_article,
-    get_session,
-    init_db,
     update_article_founding_authors,
 )
+from peerpedia_core.storage.db.session_utils import db_session_scope
 
 
 @dataclass
@@ -40,56 +38,49 @@ def accept_collaboration(
     The reviewer must have submitted a review with collaboration_request=True
     for this article.
     """
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            return CollaborationResult(
-                success=False,
-                article_id=article_id,
-                error="Article not found",
-            )
+        with db_session_scope(database_url) as session:
+            article = get_article(session, article_id)
+            if article is None:
+                return CollaborationResult(
+                    success=False,
+                    article_id=article_id,
+                    error="Article not found",
+                )
 
-        # Check reviewer has a collaboration request
-        reviews = get_reviews_for_article(session, article_id)
-        collab_review = None
-        for r in reviews:
-            if r.reviewer_id == reviewer_id and r.collaboration_request:
-                collab_review = r
-                break
+            # Check reviewer has a collaboration request
+            reviews = get_reviews_for_article(session, article_id)
+            collab_review = None
+            for r in reviews:
+                if r.reviewer_id == reviewer_id and r.collaboration_request:
+                    collab_review = r
+                    break
 
-        if collab_review is None:
+            if collab_review is None:
+                return CollaborationResult(
+                    success=False,
+                    article_id=article_id,
+                    reviewer_id=reviewer_id,
+                    error=f"Reviewer '{reviewer_id}' has not requested collaboration on this article",
+                )
+
+            # Add reviewer as co-author
+            update_article_founding_authors(session, article_id, reviewer_id)
+
+            # Re-read to get updated authors
+            updated = get_article(session, article_id)
             return CollaborationResult(
-                success=False,
+                success=True,
                 article_id=article_id,
                 reviewer_id=reviewer_id,
-                error=f"Reviewer '{reviewer_id}' has not requested collaboration on this article",
+                founding_authors=list(updated.founding_authors) if updated else [],
             )
-
-        # Add reviewer as co-author
-        update_article_founding_authors(session, article_id, reviewer_id)
-        session.commit()
-
-        # Re-read to get updated authors
-        updated = get_article(session, article_id)
-        return CollaborationResult(
-            success=True,
-            article_id=article_id,
-            reviewer_id=reviewer_id,
-            founding_authors=list(updated.founding_authors) if updated else [],
-        )
     except Exception as e:
-        session.rollback()
         return CollaborationResult(
             success=False,
             article_id=article_id,
             error=str(e),
         )
-    finally:
-        session.close()
 
 
 def get_collaboration_status(
@@ -103,11 +94,7 @@ def get_collaboration_status(
     Returns:
         Dict with keys: has_requested, has_accepted, message, reviewer_id, article_id.
     """
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
-    try:
+    with db_session_scope(database_url) as session:
         article = get_article(session, article_id)
         has_accepted = reviewer_id in (article.founding_authors if article else [])
 
@@ -127,5 +114,3 @@ def get_collaboration_status(
             "has_accepted": has_accepted,
             "message": message,
         }
-    finally:
-        session.close()

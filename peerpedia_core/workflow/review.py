@@ -16,12 +16,10 @@ from peerpedia_core.reputation.v1 import ReputationParams
 from peerpedia_core.storage.db import (
     create_review,
     get_article,
-    get_engine,
     get_reviews_for_article,
-    get_session,
-    init_db,
     update_article_status,
 )
+from peerpedia_core.storage.db.session_utils import db_session_scope
 from peerpedia_core.workflow.state_machine import ArticleStatus
 
 # -- Result types -----------------------------------------------------------------
@@ -87,33 +85,27 @@ def assign_reviewer(
 
     No status transition needed — articles stay in 'submitted' until auto-published.
     """
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            return AssignResult(success=False, article_id=article_id, error="Article not found")
+        with db_session_scope(database_url) as session:
+            article = get_article(session, article_id)
+            if article is None:
+                return AssignResult(success=False, article_id=article_id, error="Article not found")
 
-        if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW, ArticleStatus.DRAFT):
+            if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW, ArticleStatus.DRAFT):
+                return AssignResult(
+                    success=False,
+                    article_id=article_id,
+                    error=f"Cannot rate: article status is '{article.status}', must be 'submitted'",
+                )
+
             return AssignResult(
-                success=False,
+                success=True,
                 article_id=article_id,
-                error=f"Cannot rate: article status is '{article.status}', must be 'submitted'",
+                reviewer_id=reviewer_id,
+                new_status=article.status,
             )
-
-        return AssignResult(
-            success=True,
-            article_id=article_id,
-            reviewer_id=reviewer_id,
-            new_status=article.status,
-        )
     except Exception as e:
-        session.rollback()
         return AssignResult(success=False, article_id=article_id, error=str(e))
-    finally:
-        session.close()
 
 
 # -- Review submission ------------------------------------------------------------
@@ -139,101 +131,93 @@ def submit_review(
 
     The article must be in_review. A reviewer can only review once.
     """
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            return ReviewResult(success=False, article_id=article_id, error="Article not found")
+        with db_session_scope(database_url) as session:
+            article = get_article(session, article_id)
+            if article is None:
+                return ReviewResult(success=False, article_id=article_id, error="Article not found")
 
-        # Accept submitted or in_review for sedimentation pool
-        if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW):
-            return ReviewResult(
-                success=False,
+            # Accept submitted or in_review for sedimentation pool
+            if article.status not in (ArticleStatus.SUBMITTED, ArticleStatus.IN_REVIEW):
+                return ReviewResult(
+                    success=False,
+                    article_id=article_id,
+                    error=f"Cannot submit review: article status is '{article.status}', must be 'submitted' or 'in_review'",
+                )
+
+            # Authors cannot rate their own articles (comment-only)
+            is_author = reviewer_id in (article.founding_authors or [])
+            if is_author:
+                review_originality = review_rigor = review_completeness = 0
+                review_pedagogy = review_impact = 0
+
+            # If same reviewer already has a review, update it instead of creating new
+            existing = get_reviews_for_article(session, article_id)
+            existing_review = None
+            for r in existing:
+                if r.reviewer_id == reviewer_id:
+                    existing_review = r
+                    break
+
+            if existing_review:
+                # Update existing review. Rating and comment are independent —
+                # each only overwrites if the new value is non-empty.
+                has_new_ratings = any(v > 0 for v in [
+                    review_originality, review_rigor, review_completeness,
+                    review_pedagogy, review_impact,
+                ])
+                existing_review.decision = decision
+                if comments.strip():
+                    existing_review.comments = comments
+                if has_new_ratings:
+                    existing_review.review_originality = review_originality
+                    existing_review.review_rigor = review_rigor
+                    existing_review.review_completeness = review_completeness
+                    existing_review.review_pedagogy = review_pedagogy
+                    existing_review.review_impact = review_impact
+                existing_review.collaboration_request = 1 if collaboration_request else 0
+                if collaboration_message:
+                    existing_review.collaboration_message = collaboration_message
+
+                return ReviewResult(
+                    success=True,
+                    review_id=existing_review.id,
+                    article_id=article_id,
+                    reviewer_id=reviewer_id,
+                    points_earned=existing_review.points_earned,
+                )
+
+            # Calculate points
+            points = calculate_review_points(scientific_correctness, clarity)
+
+            # Create review record
+            review = create_review(
+                session,
                 article_id=article_id,
-                error=f"Cannot submit review: article status is '{article.status}', must be 'submitted' or 'in_review'",
+                reviewer_id=reviewer_id,
+                decision=decision,
+                comments=comments,
+                scientific_correctness=scientific_correctness,
+                clarity=clarity,
+                collaboration_request=collaboration_request,
+                collaboration_message=collaboration_message,
+                points_earned=points,
+                review_originality=review_originality,
+                review_rigor=review_rigor,
+                review_completeness=review_completeness,
+                review_pedagogy=review_pedagogy,
+                review_impact=review_impact,
             )
-
-        # Authors cannot rate their own articles (comment-only)
-        is_author = reviewer_id in (article.founding_authors or [])
-        if is_author:
-            review_originality = review_rigor = review_completeness = 0
-            review_pedagogy = review_impact = 0
-
-        # If same reviewer already has a review, update it instead of creating new
-        existing = get_reviews_for_article(session, article_id)
-        existing_review = None
-        for r in existing:
-            if r.reviewer_id == reviewer_id:
-                existing_review = r
-                break
-
-        if existing_review:
-            # Update existing review. Rating and comment are independent —
-            # each only overwrites if the new value is non-empty.
-            has_new_ratings = any(v > 0 for v in [
-                review_originality, review_rigor, review_completeness,
-                review_pedagogy, review_impact,
-            ])
-            existing_review.decision = decision
-            if comments.strip():
-                existing_review.comments = comments
-            if has_new_ratings:
-                existing_review.review_originality = review_originality
-                existing_review.review_rigor = review_rigor
-                existing_review.review_completeness = review_completeness
-                existing_review.review_pedagogy = review_pedagogy
-                existing_review.review_impact = review_impact
-            existing_review.collaboration_request = 1 if collaboration_request else 0
-            if collaboration_message:
-                existing_review.collaboration_message = collaboration_message
-            session.commit()
 
             return ReviewResult(
                 success=True,
-                review_id=existing_review.id,
+                review_id=review.id,
                 article_id=article_id,
                 reviewer_id=reviewer_id,
-                points_earned=existing_review.points_earned,
+                points_earned=points,
             )
-
-        # Calculate points
-        points = calculate_review_points(scientific_correctness, clarity)
-
-        # Create review record
-        review = create_review(
-            session,
-            article_id=article_id,
-            reviewer_id=reviewer_id,
-            decision=decision,
-            comments=comments,
-            scientific_correctness=scientific_correctness,
-            clarity=clarity,
-            collaboration_request=collaboration_request,
-            collaboration_message=collaboration_message,
-            points_earned=points,
-            review_originality=review_originality,
-            review_rigor=review_rigor,
-            review_completeness=review_completeness,
-            review_pedagogy=review_pedagogy,
-            review_impact=review_impact,
-        )
-        session.commit()
-
-        return ReviewResult(
-            success=True,
-            review_id=review.id,
-            article_id=article_id,
-            reviewer_id=reviewer_id,
-            points_earned=points,
-        )
     except Exception as e:
-        session.rollback()
         return ReviewResult(success=False, article_id=article_id, error=str(e))
-    finally:
-        session.close()
 
 
 # -- Decision ---------------------------------------------------------------------
@@ -248,57 +232,50 @@ def make_decision(
     MVP rule: if any review says 'accept', accept. If any say 'revise'
     (and none accept), revise. If all reject, reject.
     """
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            return DecisionResult(success=False, article_id=article_id, error="Article not found")
+        with db_session_scope(database_url) as session:
+            article = get_article(session, article_id)
+            if article is None:
+                return DecisionResult(success=False, article_id=article_id, error="Article not found")
 
-        if article.status != ArticleStatus.IN_REVIEW:
+            if article.status != ArticleStatus.IN_REVIEW:
+                return DecisionResult(
+                    success=False,
+                    article_id=article_id,
+                    error=f"Cannot decide: article status is '{article.status}', must be 'in_review'",
+                )
+
+            reviews = get_reviews_for_article(session, article_id)
+            if not reviews:
+                return DecisionResult(
+                    success=False,
+                    article_id=article_id,
+                    error="No reviews available for decision",
+                )
+
+            # Count decisions
+            accepts = sum(1 for r in reviews if r.decision == "accept")
+            revises = sum(1 for r in reviews if r.decision == "revise")
+            rejects = sum(1 for r in reviews if r.decision == "reject")
+
+            # MVP logic: accept if any accept, else revise if any revise, else reject
+            if accepts > 0:
+                new_status = ArticleStatus.ACCEPTED
+                author_points = ReputationParams().points_accepted
+            elif revises > 0:
+                new_status = ArticleStatus.REVISIONS_REQUESTED
+                author_points = 0
+            else:
+                new_status = ArticleStatus.REJECTED
+                author_points = 0
+
+            update_article_status(session, article_id, new_status)
+
             return DecisionResult(
-                success=False,
+                success=True,
                 article_id=article_id,
-                error=f"Cannot decide: article status is '{article.status}', must be 'in_review'",
+                new_status=new_status,
+                author_points=author_points,
             )
-
-        reviews = get_reviews_for_article(session, article_id)
-        if not reviews:
-            return DecisionResult(
-                success=False,
-                article_id=article_id,
-                error="No reviews available for decision",
-            )
-
-        # Count decisions
-        accepts = sum(1 for r in reviews if r.decision == "accept")
-        revises = sum(1 for r in reviews if r.decision == "revise")
-        rejects = sum(1 for r in reviews if r.decision == "reject")
-
-        # MVP logic: accept if any accept, else revise if any revise, else reject
-        if accepts > 0:
-            new_status = ArticleStatus.ACCEPTED
-            author_points = ReputationParams().points_accepted
-        elif revises > 0:
-            new_status = ArticleStatus.REVISIONS_REQUESTED
-            author_points = 0
-        else:
-            new_status = ArticleStatus.REJECTED
-            author_points = 0
-
-        update_article_status(session, article_id, new_status)
-        session.commit()
-
-        return DecisionResult(
-            success=True,
-            article_id=article_id,
-            new_status=new_status,
-            author_points=author_points,
-        )
     except Exception as e:
-        session.rollback()
         return DecisionResult(success=False, article_id=article_id, error=str(e))
-    finally:
-        session.close()

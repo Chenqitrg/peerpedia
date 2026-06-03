@@ -13,14 +13,12 @@ from peerpedia_core.storage.db import (
     create_edit_proposal,
     get_article,
     get_edit_proposal,
-    get_engine,
-    get_session,
-    init_db,
     update_article_founding_authors,
     update_article_status,
     update_article_version,
     update_edit_proposal_status,
 )
+from peerpedia_core.storage.db.session_utils import db_session_scope
 from peerpedia_core.workflow.contribution import compute_change_type_weight
 from peerpedia_core.workflow.state_machine import ArticleStatus
 from peerpedia_core.workflow.versioning import bump_minor_version
@@ -80,61 +78,54 @@ def create_proposal(
             error=f"Invalid proposal type '{proposal_type}'. Must be one of: {', '.join(sorted(VALID_PROPOSAL_TYPES))}",
         )
 
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
     try:
-        article = get_article(session, article_id)
-        if article is None:
-            return CreateProposalResult(
-                success=False,
+        with db_session_scope(database_url) as session:
+            article = get_article(session, article_id)
+            if article is None:
+                return CreateProposalResult(
+                    success=False,
+                    article_id=article_id,
+                    error="Article not found",
+                )
+
+            if article.status != ArticleStatus.PUBLISHED:
+                return CreateProposalResult(
+                    success=False,
+                    article_id=article_id,
+                    error=f"Article must be 'published' to accept edit proposals (current: '{article.status}')",
+                )
+
+            auto_approved = proposal_type == "minor"
+            status = "auto_approved" if auto_approved else "pending"
+
+            # Transition article: published -> edit_proposed (for medium/major)
+            if not auto_approved:
+                update_article_status(session, article_id, ArticleStatus.EDIT_PROPOSED)
+
+            proposal = create_edit_proposal(
+                session,
                 article_id=article_id,
-                error="Article not found",
+                proposer_id=proposer_id,
+                proposal_type=proposal_type,
+                description=description,
+                git_branch=git_branch,
+                diff_stat=diff_stat,
             )
+            proposal.status = status
 
-        if article.status != ArticleStatus.PUBLISHED:
             return CreateProposalResult(
-                success=False,
+                success=True,
+                proposal_id=proposal.id,
                 article_id=article_id,
-                error=f"Article must be 'published' to accept edit proposals (current: '{article.status}')",
+                proposal_type=proposal_type,
+                auto_approved=auto_approved,
             )
-
-        auto_approved = proposal_type == "minor"
-        status = "auto_approved" if auto_approved else "pending"
-
-        # Transition article: published -> edit_proposed (for medium/major)
-        if not auto_approved:
-            update_article_status(session, article_id, ArticleStatus.EDIT_PROPOSED)
-
-        proposal = create_edit_proposal(
-            session,
-            article_id=article_id,
-            proposer_id=proposer_id,
-            proposal_type=proposal_type,
-            description=description,
-            git_branch=git_branch,
-            diff_stat=diff_stat,
-        )
-        proposal.status = status
-        session.commit()
-
-        return CreateProposalResult(
-            success=True,
-            proposal_id=proposal.id,
-            article_id=article_id,
-            proposal_type=proposal_type,
-            auto_approved=auto_approved,
-        )
     except Exception as e:
-        session.rollback()
         return CreateProposalResult(
             success=False,
             article_id=article_id,
             error=str(e),
         )
-    finally:
-        session.close()
 
 
 # -- Review proposal --------------------------------------------------------------
@@ -158,50 +149,43 @@ def review_proposal(
             error=f"Decision must be 'approve' or 'reject', got '{decision}'",
         )
 
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
     try:
-        proposal = get_edit_proposal(session, proposal_id)
-        if proposal is None:
-            return ReviewProposalResult(
-                success=False,
-                proposal_id=proposal_id,
-                error="Proposal not found",
+        with db_session_scope(database_url) as session:
+            proposal = get_edit_proposal(session, proposal_id)
+            if proposal is None:
+                return ReviewProposalResult(
+                    success=False,
+                    proposal_id=proposal_id,
+                    error="Proposal not found",
+                )
+
+            if proposal.status != "pending":
+                return ReviewProposalResult(
+                    success=False,
+                    proposal_id=proposal_id,
+                    error=f"Cannot review proposal with status '{proposal.status}'. Only 'pending' proposals can be reviewed.",
+                )
+
+            new_status = "approved" if decision == "approve" else "rejected"
+            update_edit_proposal_status(
+                session,
+                proposal_id,
+                new_status,
+                reviewer_id=reviewer_id,
+                review_comment=comment,
             )
 
-        if proposal.status != "pending":
             return ReviewProposalResult(
-                success=False,
+                success=True,
                 proposal_id=proposal_id,
-                error=f"Cannot review proposal with status '{proposal.status}'. Only 'pending' proposals can be reviewed.",
+                new_status=new_status,
             )
-
-        new_status = "approved" if decision == "approve" else "rejected"
-        update_edit_proposal_status(
-            session,
-            proposal_id,
-            new_status,
-            reviewer_id=reviewer_id,
-            review_comment=comment,
-        )
-        session.commit()
-
-        return ReviewProposalResult(
-            success=True,
-            proposal_id=proposal_id,
-            new_status=new_status,
-        )
     except Exception as e:
-        session.rollback()
         return ReviewProposalResult(
             success=False,
             proposal_id=proposal_id,
             error=str(e),
         )
-    finally:
-        session.close()
 
 
 # -- Merge proposal ---------------------------------------------------------------
@@ -224,73 +208,66 @@ def merge_proposal(
     4. Creates a contribution record for the proposer
     5. Adds proposer as co-author if not already
     """
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
-
     try:
-        proposal = get_edit_proposal(session, proposal_id)
-        if proposal is None:
+        with db_session_scope(database_url) as session:
+            proposal = get_edit_proposal(session, proposal_id)
+            if proposal is None:
+                return MergeProposalResult(
+                    success=False,
+                    proposal_id=proposal_id,
+                    error="Proposal not found",
+                )
+
+            if proposal.status not in ("approved", "auto_approved"):
+                return MergeProposalResult(
+                    success=False,
+                    proposal_id=proposal_id,
+                    error=f"Proposal has not been approved (status: '{proposal.status}')",
+                )
+
+            article = get_article(session, article_id)
+            if article is None:
+                return MergeProposalResult(
+                    success=False,
+                    error="Article not found",
+                )
+
+            # Bump version
+            new_version = bump_minor_version(article.version or "v0.1")
+
+            update_article_version(session, article_id, new_version)
+
+            # Transition status back to published (if currently in edit_proposed)
+            if article.status == ArticleStatus.EDIT_PROPOSED:
+                update_article_status(session, article_id, ArticleStatus.PUBLISHED)
+
+            # Create contribution record
+            weight = compute_change_type_weight(change_type)
+            contribution = create_contribution_record(
+                session,
+                article_id=article_id,
+                user_id=proposer_id,
+                commit_hash="pending",
+                commit_message=f"Edit proposal: {proposal.description[:80]}",
+                lines_added=0,
+                lines_deleted=0,
+                change_type=change_type,
+                contribution_weight=weight,
+            )
+
+            # Add proposer as co-author if not already
+            update_article_founding_authors(session, article_id, proposer_id)
+
             return MergeProposalResult(
-                success=False,
+                success=True,
                 proposal_id=proposal_id,
-                error="Proposal not found",
+                article_id=article_id,
+                new_version=new_version,
+                contribution_record_id=contribution.id,
             )
-
-        if proposal.status not in ("approved", "auto_approved"):
-            return MergeProposalResult(
-                success=False,
-                proposal_id=proposal_id,
-                error=f"Proposal has not been approved (status: '{proposal.status}')",
-            )
-
-        article = get_article(session, article_id)
-        if article is None:
-            return MergeProposalResult(
-                success=False,
-                error="Article not found",
-            )
-
-        # Bump version
-        new_version = bump_minor_version(article.version or "v0.1")
-
-        update_article_version(session, article_id, new_version)
-
-        # Transition status back to published (if currently in edit_proposed)
-        if article.status == ArticleStatus.EDIT_PROPOSED:
-            update_article_status(session, article_id, ArticleStatus.PUBLISHED)
-
-        # Create contribution record
-        weight = compute_change_type_weight(change_type)
-        contribution = create_contribution_record(
-            session,
-            article_id=article_id,
-            user_id=proposer_id,
-            commit_hash="pending",
-            commit_message=f"Edit proposal: {proposal.description[:80]}",
-            lines_added=0,
-            lines_deleted=0,
-            change_type=change_type,
-            contribution_weight=weight,
-        )
-
-        # Add proposer as co-author if not already
-        update_article_founding_authors(session, article_id, proposer_id)
-        session.commit()
-
-        return MergeProposalResult(
-            success=True,
-            proposal_id=proposal_id,
-            article_id=article_id,
-            new_version=new_version,
-            contribution_record_id=contribution.id,
-        )
     except Exception as e:
-        session.rollback()
         return MergeProposalResult(
             success=False,
             proposal_id=proposal_id,
             error=str(e),
         )
-    finally:
-        session.close()
