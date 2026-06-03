@@ -498,6 +498,7 @@ footer {
     font-family: inherit;
     font-size: 0.9em;
     transition: background 0.15s;
+    color: var(--text);
 }
 
 .tab-btn.active {
