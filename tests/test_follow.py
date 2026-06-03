@@ -1,4 +1,8 @@
 """Tests for user follow system."""
+import tempfile
+from pathlib import Path
+from unittest import mock
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -121,3 +125,122 @@ class TestFollowCRUD:
         assert get_following_count(session, "charlie") == 0
         assert get_follower_count(session, "charlie") == 1
         session.close()
+
+
+from fastapi.testclient import TestClient
+
+from peerpedia_core.storage.db import get_engine, get_session, init_db
+
+
+def _setup_test_db(tmp_path):
+    """Create a test database and return the database URL."""
+    db_path = tmp_path / "test.db"
+    engine = get_engine(f"sqlite:///{db_path}")
+    init_db(engine)
+    session = get_session(engine)
+    session.close()
+    return f"sqlite:///{db_path}"
+
+
+def _create_users(db_url):
+    """Create test users via API."""
+    from peerpedia.web.app import app
+    with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+        client = TestClient(app)
+        for uid, name in [("alice", "Alice"), ("bob", "Bob"), ("charlie", "Charlie")]:
+            client.post("/api/v1/users", json={
+                "id": uid, "name": name, "email": f"{uid}@test.com"
+            })
+
+
+class TestFollowAPI:
+
+    def test_follow_user(self):
+        """POST /api/v1/users/{id}/follow creates follow relationship."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                assert resp.status_code == 200
+                assert "已关注" in resp.text
+
+    def test_unfollow_user(self):
+        """DELETE /api/v1/users/{id}/follow removes follow."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                resp = client.request("DELETE", "/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                assert resp.status_code == 200
+                assert "关注" in resp.text
+
+    def test_follow_nonexistent_user(self):
+        """Follow nonexistent user returns 404."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.post("/api/v1/users/nobody/follow", data={"follower_id": "alice"})
+                assert resp.status_code == 404
+
+    def test_duplicate_follow_returns_409(self):
+        """Duplicate follow returns 409."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                resp = client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                assert resp.status_code == 409
+
+    def test_get_following(self):
+        """GET /api/v1/users/{id}/following returns list."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                resp = client.get("/api/v1/users/alice/following")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert data["total"] >= 1
+
+    def test_get_followers(self):
+        """GET /api/v1/users/{id}/followers returns list."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+                resp = client.get("/api/v1/users/bob/followers")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert data["total"] >= 1
+
+    def test_feed(self):
+        """GET /api/v1/following/feed returns events."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get("/api/v1/following/feed?user_id=alice")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert "events" in data
+                assert isinstance(data["events"], list)

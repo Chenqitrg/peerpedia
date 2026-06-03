@@ -1,6 +1,7 @@
 """API routes for users, identities, and reputation."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Form, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel as PydanticBaseModel, Field
 
 from peerpedia.web.db_session import get_db_session
@@ -108,5 +109,207 @@ async def api_get_user_reputation(user_id: str):
         algo = ReputationV1()
         vec = algo.compute(user_id, session=session)
         return vec.model_dump()
+    finally:
+        session.close()
+
+
+# ── Follow ───────────────────────────────────────────────────────────────────
+
+
+@router.post("/users/{user_id}/follow")
+async def api_follow_user(user_id: str, follower_id: str = Form(...)):
+    """Follow a user. Returns HTML button snippet."""
+    from peerpedia_core.storage.db import (
+        follow_user,
+        get_user,
+    )
+    from sqlalchemy.exc import IntegrityError
+
+    session = get_db_session()
+    try:
+        target = get_user(session, user_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        try:
+            follow_user(session, follower_id=follower_id, followed_id=user_id)
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            raise HTTPException(status_code=409, detail="Already following")
+
+        return HTMLResponse(f'''<div id="follow-area" style="margin-bottom: 12px;">
+  <button hx-delete="/api/v1/users/{user_id}/follow"
+          hx-vals='{{"follower_id": "{follower_id}"}}'
+          hx-target="#follow-area"
+          hx-swap="outerHTML"
+          style="background: #28a745; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer;">
+    已关注 ✓
+  </button>
+</div>''')
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
+@router.delete("/users/{user_id}/follow")
+async def api_unfollow_user(user_id: str, follower_id: str = Form(...)):
+    """Unfollow a user. Returns HTML button snippet."""
+    from peerpedia_core.storage.db import (
+        unfollow_user,
+        get_user,
+    )
+
+    session = get_db_session()
+    try:
+        target = get_user(session, user_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        unfollow_user(session, follower_id=follower_id, followed_id=user_id)
+        session.commit()
+
+        return HTMLResponse(f'''<div id="follow-area" style="margin-bottom: 12px;">
+  <button hx-post="/api/v1/users/{user_id}/follow"
+          hx-vals='{{"follower_id": "{follower_id}"}}'
+          hx-target="#follow-area"
+          hx-swap="outerHTML"
+          style="background: #007bff; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer;">
+    + 关注
+  </button>
+</div>''')
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
+@router.get("/users/{user_id}/following")
+async def api_get_following(user_id: str):
+    """Get users that user_id follows."""
+    from peerpedia_core.storage.db import get_following, get_user
+
+    session = get_db_session()
+    try:
+        target = get_user(session, user_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        following = get_following(session, user_id)
+        return {
+            "user_id": user_id,
+            "users": [
+                {
+                    "user_id": f.followed_id,
+                    "followed_at": f.created_at.isoformat() if f.created_at else None,
+                }
+                for f in following
+            ],
+            "total": len(following),
+        }
+    finally:
+        session.close()
+
+
+@router.get("/users/{user_id}/followers")
+async def api_get_followers(user_id: str):
+    """Get users that follow user_id."""
+    from peerpedia_core.storage.db import get_followers, get_user
+
+    session = get_db_session()
+    try:
+        target = get_user(session, user_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        followers = get_followers(session, user_id)
+        return {
+            "user_id": user_id,
+            "users": [
+                {
+                    "user_id": f.follower_id,
+                    "followed_at": f.created_at.isoformat() if f.created_at else None,
+                }
+                for f in followers
+            ],
+            "total": len(followers),
+        }
+    finally:
+        session.close()
+
+
+@router.get("/following/feed")
+async def api_following_feed(user_id: str):
+    """Get activity feed from followed users (last 30 days)."""
+    from datetime import datetime, timezone, timedelta
+    from peerpedia_core.storage.db import (
+        get_following,
+        Article,
+    )
+
+    session = get_db_session()
+    try:
+        following = get_following(session, user_id)
+        followed_ids = [f.followed_id for f in following]
+
+        if not followed_ids:
+            return {"user_id": user_id, "events": []}
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        events = []
+
+        for fid in followed_ids:
+            # New articles by followed user
+            articles = (
+                session.query(Article)
+                .filter(
+                    Article.founding_authors.contains(fid),
+                    Article.created_at >= cutoff,
+                )
+                .order_by(Article.created_at.desc())
+                .all()
+            )
+            for a in articles:
+                events.append({
+                    "type": "new_article",
+                    "user_id": fid,
+                    "article_id": a.id,
+                    "article_title": a.title,
+                    "time": a.created_at.isoformat() if a.created_at else "",
+                })
+
+            # Version updates by followed user (exclude initial versions)
+            updated = (
+                session.query(Article)
+                .filter(
+                    Article.founding_authors.contains(fid),
+                    Article.updated_at >= cutoff,
+                    Article.version > "v0.1",
+                )
+                .order_by(Article.updated_at.desc())
+                .all()
+            )
+            for a in updated:
+                # Skip if article already appears as new_article (created within 30 days)
+                if a.created_at and a.created_at >= cutoff:
+                    continue
+                events.append({
+                    "type": "new_version",
+                    "user_id": fid,
+                    "article_id": a.id,
+                    "article_title": a.title,
+                    "version": a.version,
+                    "time": a.updated_at.isoformat() if a.updated_at else "",
+                })
+
+        events.sort(key=lambda e: e["time"], reverse=True)
+        return {"user_id": user_id, "events": events[:50]}
     finally:
         session.close()
