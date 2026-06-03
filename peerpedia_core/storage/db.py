@@ -313,6 +313,68 @@ class EditProposal(Base):
         }
 
 
+# ── ORM Model: User ──────────────────────────────────────────────────────────────
+
+class User(Base):
+    """SQLAlchemy model for user profiles. Mirrors protocol UserProfile."""
+
+    __tablename__ = "users"
+
+    id = Column(String(100), primary_key=True)  # user-chosen slug
+    name = Column(String(200), nullable=False)
+    email = Column(String(300), nullable=False)
+    affiliation = Column(String(500), nullable=True)
+    expertise = Column(JSONList, nullable=False, default=list)
+    bio = Column(Text, nullable=True)
+    public_key = Column(Text, nullable=True)
+    joined_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_active = Column(DateTime, nullable=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "affiliation": self.affiliation,
+            "expertise": self.expertise,
+            "bio": self.bio,
+            "public_key": self.public_key,
+            "joined_at": self.joined_at.isoformat() if self.joined_at else None,
+            "last_active": self.last_active.isoformat() if self.last_active else None,
+        }
+
+
+# ── ORM Model: Identity ──────────────────────────────────────────────────────────
+
+class Identity(Base):
+    """SQLAlchemy model for verified identity bindings. Mirrors protocol Identity."""
+
+    __tablename__ = "identities"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(100), ForeignKey("users.id"), nullable=False, index=True)
+    type = Column(String(20), nullable=False)
+    # "orcid" | "inst_email" | "arxiv" | "github" | "scholar"
+    value = Column(String(300), nullable=False)
+    verified = Column(Integer, nullable=False, default=0)  # SQLite bool
+    trust_weight = Column(Integer, nullable=False, default=10)
+    # Scaled integer: weight × 100 (1.0 → 100, 0.3 → 30)
+
+    __table_args__ = (
+        Index("ix_identity_user_type", "user_id", "type"),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "type": self.type,
+            "value": self.value,
+            "verified": bool(self.verified),
+            "trust_weight": self.trust_weight / 100.0,  # Convert back to float
+        }
+
+
 # ── CRUD Operations ────────────────────────────────────────────────────────────
 
 def create_article(
@@ -598,3 +660,83 @@ def update_article_version(
         article.version = new_version
         article.updated_at = datetime.now(timezone.utc)
     return article
+
+
+# ── User CRUD ────────────────────────────────────────────────────────────────────
+
+
+def create_user(
+    session: Session,
+    *,
+    id: str,
+    name: str,
+    email: str,
+    affiliation: Optional[str] = None,
+    expertise: Optional[list[str]] = None,
+    bio: Optional[str] = None,
+    public_key: Optional[str] = None,
+) -> User:
+    """Create a new user record."""
+    user = User(
+        id=id,
+        name=name,
+        email=email,
+        affiliation=affiliation,
+        expertise=expertise or [],
+        bio=bio,
+        public_key=public_key,
+    )
+    session.add(user)
+    return user
+
+
+def get_user(session: Session, user_id: str) -> Optional[User]:
+    """Get a user by ID, or None."""
+    return session.query(User).filter(User.id == user_id).first()
+
+
+def update_user_last_active(
+    session: Session, user_id: str
+) -> Optional[User]:
+    """Update a user's last_active timestamp to now."""
+    user = get_user(session, user_id)
+    if user:
+        user.last_active = datetime.now(timezone.utc)
+    return user
+
+
+# ── Identity CRUD ───────────────────────────────────────────────────────────────
+
+
+def create_identity(
+    session: Session,
+    *,
+    user_id: str,
+    type: str,
+    value: str,
+    verified: bool = False,
+    trust_weight: int = 10,
+) -> Identity:
+    """Create an identity binding for a user.
+
+    trust_weight is scaled ×100 (e.g., 100 for ORCID = 1.0 weight).
+    """
+    identity = Identity(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        type=type,
+        value=value,
+        verified=1 if verified else 0,
+        trust_weight=trust_weight,
+    )
+    session.add(identity)
+    return identity
+
+
+def get_identities_for_user(session: Session, user_id: str) -> list[Identity]:
+    """Get all identity bindings for a user."""
+    return (
+        session.query(Identity)
+        .filter(Identity.user_id == user_id)
+        .all()
+    )
