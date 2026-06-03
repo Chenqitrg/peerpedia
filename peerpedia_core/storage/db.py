@@ -22,11 +22,13 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     create_engine,
+    func,
     Engine,
 )
 from sqlalchemy.orm import Session, DeclarativeBase, sessionmaker
@@ -246,6 +248,10 @@ class ContributionRecord(Base):
     contribution_weight = Column(Integer, nullable=False, default=0)
     # Scaled integer: weight * 100 to avoid floating point in DB
 
+    __table_args__ = (
+        Index("ix_contrib_article_user", "article_id", "user_id"),
+    )
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -284,6 +290,10 @@ class EditProposal(Base):
     points_stake = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     resolved_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_ep_status", "status"),
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -481,15 +491,13 @@ def get_user_contribution_total(
     user_id: str,
 ) -> int:
     """Get total contribution weight for a user on an article."""
-    result = (
-        session.query(ContributionRecord)
-        .filter(
-            ContributionRecord.article_id == article_id,
-            ContributionRecord.user_id == user_id,
-        )
-        .all()
-    )
-    return sum(r.contribution_weight for r in result)
+    result = session.query(
+        func.sum(ContributionRecord.contribution_weight)
+    ).filter(
+        ContributionRecord.article_id == article_id,
+        ContributionRecord.user_id == user_id,
+    ).scalar()
+    return result or 0
 
 
 # ── EditProposal CRUD ──────────────────────────────────────────────────────────
@@ -584,7 +592,7 @@ def update_article_version(
     article_id: str,
     new_version: str,
 ) -> Optional[Article]:
-    """Increment an article's version string."""
+    """Set the article version string to the given value."""
     article = get_article(session, article_id)
     if article:
         article.version = new_version
