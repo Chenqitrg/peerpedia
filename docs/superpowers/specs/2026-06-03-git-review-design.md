@@ -236,3 +236,29 @@ peerpedia submit tensor_v2.md --author zhangliang
 3. **评论存储在 SQLite**：不是 JSON 文件（已有 DB 基础设施）
 4. **评论关联到 commit**：不是关联到行号（行号在 commit 间变化）
 5. **PR 模型参考石渠阁**：工作流一致，数据模型相似
+
+---
+
+## 8. 已知限制 & 未来路线图
+
+### 8.1 Typst 文章内嵌显示（当前不可用）
+
+Typst 文章编译后输出 PDF，无法像 Markdown 一样直接在页面内渲染为 HTML。
+当前方案：显示预览卡片（📄 图标 + "在新标签页查看"/"下载 PDF" 按钮）。
+
+**根本解决方案**：等待 Typst 支持 HTML 输出。
+- Typst 0.12+ 已内置 `typst query` 和 `--format html` 实验性支持
+- 跟踪 issue：https://github.com/typst/typst/issues/721
+- 一旦 Typst 稳定支持 `typst compile --format html`，PeerPedia 的 TypstBackend
+  可以直接输出 HTML，像 Markdown 文章一样内嵌显示
+
+**临时方案**：PDF 预览卡片 + 新标签页查看。当前够用，不改动。
+
+### 8.2 其他已知限制
+
+| 限制 | 状态 | 计划 |
+|------|------|------|
+| Typst HTML 输出 | ⏳ 等待上游 | Typst HTML 稳定后接入 |
+| Git diff 视图 | 📋 设计中 | 本 spec 第 3 节 |
+| 行级评论 | 📋 设计中 | 本 spec 第 4 节 |
+| LAN 多节点 review | 🔮 远期 | Phase 5+ |
