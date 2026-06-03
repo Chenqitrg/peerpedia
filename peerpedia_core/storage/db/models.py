@@ -49,6 +49,13 @@ class Article(Base):
     git_repo_path = Column(String(500), nullable=True)
     source_arxiv_id = Column(String(50), nullable=True)
     mirror_by = Column(String(100), nullable=True)
+    # Self-review dimensions (0-5, 0 = not self-rated)
+    self_originality = Column(Integer, nullable=False, default=0)
+    self_rigor = Column(Integer, nullable=False, default=0)
+    self_completeness = Column(Integer, nullable=False, default=0)
+    self_pedagogy = Column(Integer, nullable=False, default=0)
+    self_impact = Column(Integer, nullable=False, default=0)
+    forked_from = Column(String(36), nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
@@ -74,6 +81,12 @@ class Article(Base):
             "git_repo_path": self.git_repo_path,
             "source_arxiv_id": self.source_arxiv_id,
             "mirror_by": self.mirror_by,
+            "self_originality": self.self_originality,
+            "self_rigor": self.self_rigor,
+            "self_completeness": self.self_completeness,
+            "self_pedagogy": self.self_pedagogy,
+            "self_impact": self.self_impact,
+            "forked_from": self.forked_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -327,5 +340,50 @@ class Follow(Base):
         return {
             "follower_id": self.follower_id,
             "followed_id": self.followed_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# ── ORM Model: ReviewComment ────────────────────────────────────────────────
+
+class ReviewComment(Base):
+    """Line-level comment on a git diff, referencing the Shiquge PR model.
+
+    Comments are tied to a specific commit and file path. The line range
+    (line_start, line_end) identifies which diff lines the comment is about.
+    """
+
+    __tablename__ = "review_comments"
+    __table_args__ = (
+        Index("ix_rc_article_commit", "article_id", "commit_hash"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    article_id = Column(String(36), ForeignKey("articles.id"), nullable=False, index=True)
+    commit_hash = Column(String(40), nullable=False)
+    file_path = Column(String(500), nullable=False, default="")
+    line_start = Column(Integer, nullable=False)
+    line_end = Column(Integer, nullable=True)
+    author_id = Column(String(100), nullable=False)
+    body = Column(Text, nullable=False, default="")
+    suggestion = Column(Text, nullable=False, default="")
+    comment_type = Column(String(20), nullable=False, default="comment")
+    # "comment" | "suggestion"
+    resolved = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "article_id": self.article_id,
+            "commit_hash": self.commit_hash,
+            "file_path": self.file_path,
+            "line_start": self.line_start,
+            "line_end": self.line_end,
+            "author_id": self.author_id,
+            "body": self.body,
+            "suggestion": self.suggestion,
+            "comment_type": self.comment_type,
+            "resolved": bool(self.resolved),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
