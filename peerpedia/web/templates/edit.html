@@ -45,6 +45,43 @@
     }
     </script>
 
+    <script>
+    // Star rating interaction (same as sedimentation pool)
+    document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.star-rating').forEach(function(rating) {
+        var stars = rating.querySelectorAll('.stars span');
+        var label = rating.querySelector('.star-label');
+        var input = rating.querySelector('input[type=hidden]');
+        var initVal = parseInt(input.value) || 0;
+        if (initVal > 0 && stars.length >= initVal) {
+            label.textContent = stars[initVal - 1].title;
+        }
+        stars.forEach(function(star, index) {
+            star.addEventListener('mouseenter', function() {
+                stars.forEach(function(s, i) {
+                    s.textContent = i <= index ? '★' : '☆';
+                    s.style.color = i <= index ? '#f59e0b' : '#ccc';
+                });
+                label.textContent = star.title;
+            });
+            star.addEventListener('click', function() {
+                var val = parseInt(star.dataset.value);
+                input.value = val;
+                label.textContent = star.title;
+            });
+        });
+        rating.addEventListener('mouseleave', function() {
+            var val = parseInt(input.value);
+            stars.forEach(function(s, i) {
+                s.textContent = i < val ? '★' : '☆';
+                s.style.color = i < val ? '#f59e0b' : '#ccc';
+            });
+            label.textContent = val > 0 ? stars[val - 1].title : '';
+        });
+    });
+    });
+    </script>
+
     <main>
     {% if error %}
     <p class="empty-state" style="padding:24px;">{{ error }}</p>
@@ -106,27 +143,28 @@
             <!-- 5D self-assessment -->
             <fieldset style="grid-column:1/-1;border:1px solid #e5e5e5;border-radius:6px;padding:10px 14px;">
                 <legend style="font-weight:600;font-size:0.85em;">五维自评（可选）</legend>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <div style="display:flex;flex-direction:column;gap:6px;">
                     {% set dims = [
-                        ('self_originality', '🧠', '原创性'),
-                        ('self_rigor', '📐', '严格性'),
-                        ('self_completeness', '🧩', '完整性'),
-                        ('self_pedagogy', '📖', '教学性'),
-                        ('self_impact', '💡', '影响力')
+                        ('self_originality', '🧠', '原创性', ['搬运/翻译','学习笔记','随笔习作','综述评论','原创研究']),
+                        ('self_rigor', '📐', '严格性', ['非正式讨论','直觉科普','标准推导','严格证明','公理形式']),
+                        ('self_completeness', '🧩', '完整性', ['草稿片段','部分覆盖','核心完整','全面覆盖','详尽完备']),
+                        ('self_pedagogy', '📖', '教学性', ['个人备忘','需领域基础','有基础可读','教学导向','零基础入门']),
+                        ('self_impact', '💡', '影响力', ['个人参考','小众专题','领域相关','领域核心','奠基/开创'])
                     ] %}
-                    {% for name, icon, label in dims %}
-                    <label style="font-size:0.85em;display:flex;align-items:center;gap:4px;">
-                        {{ icon }} {{ label }}
-                        <select name="{{ name }}" style="padding:2px 4px;">
+                    {% for name, icon, label, titles in dims %}
+                    <div class="star-rating" data-dimension="{{ name }}" style="display:flex;align-items:center;gap:8px;">
+                        <span style="width:70px;font-size:0.82em;">{{ icon }} {{ label }}</span>
+                        <span class="stars" style="cursor:pointer;font-size:0.9em;">
                             {% set val = article[name]|default(0) if article else 0 %}
-                            <option value="0" {% if val == 0 %}selected{% endif %}>-</option>
-                            <option value="1" {% if val == 1 %}selected{% endif %}>1</option>
-                            <option value="2" {% if val == 2 %}selected{% endif %}>2</option>
-                            <option value="3" {% if val == 3 %}selected{% endif %}>3</option>
-                            <option value="4" {% if val == 4 %}selected{% endif %}>4</option>
-                            <option value="5" {% if val == 5 %}selected{% endif %}>5</option>
-                        </select>
-                    </label>
+                            <span data-value="1" title="{{ titles[0] }}">{% if val >= 1 %}★{% else %}☆{% endif %}</span>
+                            <span data-value="2" title="{{ titles[1] }}">{% if val >= 2 %}★{% else %}☆{% endif %}</span>
+                            <span data-value="3" title="{{ titles[2] }}">{% if val >= 3 %}★{% else %}☆{% endif %}</span>
+                            <span data-value="4" title="{{ titles[3] }}">{% if val >= 4 %}★{% else %}☆{% endif %}</span>
+                            <span data-value="5" title="{{ titles[4] }}">{% if val >= 5 %}★{% else %}☆{% endif %}</span>
+                        </span>
+                        <span class="star-label" style="font-size:0.7em;color:#888;"></span>
+                        <input type="hidden" name="{{ name }}" value="{{ val }}">
+                    </div>
                     {% endfor %}
                 </div>
             </fieldset>
@@ -144,11 +182,10 @@
     {% endif %}
     </main>
 
-    <!-- Monaco Editor loader -->
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.min.js"></script>
-    <script>
-    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
-    require(['vs/editor/editor.main'], function() {
+    <!-- Monaco Editor — ESM import for reliable loading -->
+    <script type="module">
+        import * as monaco from 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/+esm';
+
         var format = document.getElementById('format-select').value;
         var language = format === 'typst' ? 'plaintext' : 'markdown';
         var initialContent = {{ article.source_content|tojson if article and article.source_content else '""' }};
@@ -174,7 +211,8 @@
         window.editor.onDidChangeModelContent(function() {
             updatePreview();
         });
-    });
+    </script>
+    <script>
 
     function switchFormat(fmt) {
         var lang = fmt === 'typst' ? 'plaintext' : 'markdown';
