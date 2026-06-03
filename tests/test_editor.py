@@ -107,3 +107,83 @@ def test_submit_typst_via_editor():
     assert response.status_code == 200
     data = response.json()
     assert "article_id" in data
+
+
+# ── Regression tests for bugs fixed 2026-06-03/04 ─────────────────────────
+
+
+def test_no_bare_javascript_outside_script_tags():
+    """Bug: functions rendered as visible garbled text when outside <script>.
+
+    Every <script> tag must have a matching </script>. Any JS between
+    </script> and the next <script> is rendered as visible page text.
+    """
+    response = client.get("/edit")
+    html = response.text
+    opens = html.count("<script")
+    closes = html.count("</script>")
+    assert opens == closes, f"Unbalanced script tags: {opens} open vs {closes} close"
+
+
+def test_editor_script_uses_readystate_guard():
+    """Bug: DOMContentLoaded fires before inline script runs with local assets.
+
+    The initEditor function must check document.readyState to avoid missing
+    the event when all assets load from localhost (no network latency).
+    """
+    response = client.get("/edit")
+    assert "document.readyState" in response.text
+    assert "initEditor" in response.text
+
+
+def test_five_dimensional_scoring_is_mandatory():
+    """Bug: 5D self-assessment was optional; users could submit without scoring.
+
+    The template must label the fieldset as required and the submit handler
+    must validate that all five dimensions have non-zero values.
+    """
+    response = client.get("/edit")
+    assert "请完成五维自评" in response.text
+    # Check all five dimensions have hidden inputs
+    dims = ["self_originality", "self_rigor", "self_completeness", "self_pedagogy", "self_impact"]
+    for d in dims:
+        assert f'name="{d}"' in response.text, f"Missing mandatory dimension: {d}"
+
+
+def test_no_yaml_frontmatter_template_in_editor():
+    """Bug: editor pre-filled YAML frontmatter that duplicated the metadata form.
+
+    The textarea should be empty by default — users fill the form below.
+    """
+    response = client.get("/edit")
+    # The textarea content comes from Jinja2, not JS — for new articles
+    # it should be empty (no default frontmatter)
+    assert "---\\ntitle:" not in response.text
+
+
+def test_easymde_and_marked_loaded_locally():
+    """Bug: CDN scripts (jsdelivr/unpkg) failed to load in headless browser.
+
+    EasyMDE and marked.js must be served from /static/, not external CDN.
+    """
+    response = client.get("/edit")
+    assert "/static/easymde/easymde.min.js" in response.text
+    assert "/static/easymde/easymde.min.css" in response.text
+    assert "/static/marked.min.js" in response.text
+    # Must NOT reference external CDN for these
+    assert "cdn.jsdelivr.net/npm/easymde" not in response.text
+    assert "unpkg.com/easymde" not in response.text
+
+
+def test_format_switch_present():
+    """Markdown/Typst format selector must exist in the editor page."""
+    response = client.get("/edit")
+    assert 'id="format-select"' in response.text
+    assert "Markdown" in response.text
+
+
+def test_preview_pane_has_math_delimiters():
+    """KaTeX delimiters must be configured for inline $...$ and display $$...$$."""
+    response = client.get("/edit")
+    assert "renderMathInElement" in response.text
+    assert "$$" in response.text
