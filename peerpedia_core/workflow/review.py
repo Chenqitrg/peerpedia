@@ -165,14 +165,15 @@ def submit_review(
                 break
 
         if existing_review:
-            # Update existing review. Only overwrite ratings if any dimension is non-zero
-            # (a comment-only submission keeps the old ratings)
+            # Update existing review. Rating and comment are independent —
+            # each only overwrites if the new value is non-empty.
             has_new_ratings = any(v > 0 for v in [
                 review_originality, review_rigor, review_completeness,
                 review_pedagogy, review_impact,
             ])
             existing_review.decision = decision
-            existing_review.comments = comments
+            if comments.strip():
+                existing_review.comments = comments
             if has_new_ratings:
                 existing_review.review_originality = review_originality
                 existing_review.review_rigor = review_rigor
