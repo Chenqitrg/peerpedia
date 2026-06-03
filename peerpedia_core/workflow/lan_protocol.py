@@ -27,7 +27,7 @@ def catalog_to_yaml_string(data: dict[str, Any]) -> str:
     _dict_to_yaml_lines(data, lines, indent=0)
     lines.append(CATALOG_YAML_DELIMITER)
     lines.append("")
-    lines.append(f"# 知著网 文章目录 -- {data.get('node_id', 'unknown')}")
+    lines.append(f"# 知诸网 文章目录 -- {data.get('node_id', 'unknown')}")
     lines.append("")
 
     articles = data.get("articles", [])

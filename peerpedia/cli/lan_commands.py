@@ -26,7 +26,7 @@ def status():
         self_nodes = session.query(NodeInfo).filter(NodeInfo.is_self == 1).all()
 
         click.echo()
-        click.echo("知著网 LAN 状态")
+        click.echo("知诸网 LAN 状态")
         click.echo("=" * 50)
 
         for s in self_nodes:

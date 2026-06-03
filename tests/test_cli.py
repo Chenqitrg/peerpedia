@@ -40,7 +40,7 @@ class TestCliHelp:
     def test_help(self, runner, cli):
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "知著网" in result.output
+        assert "知诸网" in result.output
 
     def test_version(self, runner, cli):
         result = runner.invoke(cli, ["--version"])

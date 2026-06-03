@@ -1,8 +1,8 @@
-# 知著网 (PeerPedia)
+# 知诸网 (PeerPedia)
 
 **去中心化学术出版系统 — 取代 arXiv 和学术期刊。**
 
-> 谐音「著作」：学者立言之地。谐音「蜘蛛网」🕸️：P2P 节点互联。典出「见微知著」：一叶知秋，一文见道。
+> 谐音「蜘蛛网」🕸️：P2P 节点互联。取"孜孜以求，诸子百家"之意。
 
 ```
 Author writes in Typst → Peer review → Publish → Cite & collaborate

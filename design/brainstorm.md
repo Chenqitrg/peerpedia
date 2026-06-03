@@ -1,13 +1,12 @@
-# 知著网 (PeerPedia) — 设计蓝图
+# 知诸网 (PeerPedia) — 设计蓝图
 
 > 日期: 2026-06-03
 > 状态: Phase 3 全部完成（211 tests, 0 failures）
 > 英文名: **PeerPedia**（peer review + encyclopedia）
-> 中文名: **知著网**
->   - 知 = 求知，著 = 著述，网 = 网络
->   - 谐音「著作」—— 学者立言之地
+> 中文名: **知诸网**
+>   - 知 = 求知，诸 = 诸位/诸多，网 = 网络
 >   - 谐音「蜘蛛网」🕸️ —— P2P 分布式网络，节点互联如蛛丝
->   - 典出「见微知著」—— 从一篇论文窥见知识全貌，从种子社区走向取代 arXiv
+>   - 诸子百家，众学毕集
 
 ---
 
@@ -995,7 +994,7 @@ Phase 2: 跨学科扩张
 | 31 | 审稿期协作 | **accept_collaboration**：作者同意后审稿人加入 founding_authors，共同拥有文章 |
 | 32 | 编辑提案治理 | **三级分类**：minor（自动通过）→ medium（原作者 review）→ major（社区投票，M4 实现） |
 | 33 | 贡献度计算 | **git blame + change_type 权重**：new_theorem(5×) / proof_fix(4×) / content(2×) / prose(1×) / format(0.3×) |
-| 34 | 中文名 | **知著网**：谐音「著作」「蜘蛛网」🕸️，典出「见微知著」 |
+| 34 | 中文名 | **知诸网**：谐音「诸多」「蜘蛛网」🕸️ |
 | 35 | 信誉可视化 | **Chart.js 雷达图**：四维信誉（学术/审稿/协作/教学）展示在用户主页，CDN 零依赖 |
 | 36 | 身份权重存储 | **整数 ×100**：trust_weight 在 DB 存整数（100=1.0），和 contribution_weight 风格一致 |
 | 37 | 引用扫描 | **正则提取**：Typst `#cite("peerpedia:id")` + 内联 `peerpedia:id` 两种格式，submit 时自动填充 Article.references |

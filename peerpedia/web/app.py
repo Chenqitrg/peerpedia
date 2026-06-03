@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
-    title="知著网 (PeerPedia)",
+    title="知诸网 (PeerPedia)",
     description="Decentralized academic publishing — reference client",
     version="0.1.0",
 )
