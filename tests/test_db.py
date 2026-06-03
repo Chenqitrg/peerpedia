@@ -6,14 +6,18 @@ from datetime import datetime
 
 from peerpedia_core.storage.db import (
     Article,
+    ArticleStatus,
     Base,
+    create_article,
+    create_review,
+    get_article,
     get_engine,
+    get_review,
+    get_reviews_for_article,
     get_session,
     init_db,
-    create_article,
-    get_article,
     list_articles,
-    ArticleStatus,
+    Review,
 )
 
 
@@ -122,3 +126,87 @@ class TestArticleModel:
             assert article.cid is None
             assert article.pinned_by == 0
             assert isinstance(article.created_at, datetime)
+
+
+class TestReviewModel:
+    """Review model CRUD tests."""
+
+    def test_create_review(self):
+        """Create a review for an article."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "test.db"
+            engine = get_engine(f"sqlite:///{db_path}")
+            init_db(engine)
+            session = get_session(engine)
+
+            # First create an article
+            article = create_article(
+                session,
+                title="Review Target",
+                founding_authors=["author-1"],
+                abstract="To be reviewed.",
+                git_repo_path="/tmp/review-test",
+            )
+            session.commit()
+
+            review = create_review(
+                session,
+                article_id=article.id,
+                reviewer_id="reviewer-1",
+                decision="accept",
+                comments="Looks great.",
+                scientific_correctness=5,
+                clarity=4,
+            )
+            session.commit()
+
+            assert review.id is not None
+            assert review.article_id == article.id
+            assert review.reviewer_id == "reviewer-1"
+            assert review.decision == "accept"
+            assert review.scientific_correctness == 5
+
+    def test_get_reviews_for_article(self):
+        """Get all reviews for a specific article."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "test.db"
+            engine = get_engine(f"sqlite:///{db_path}")
+            init_db(engine)
+            session = get_session(engine)
+
+            article = create_article(
+                session,
+                title="Multi-Review Article",
+                founding_authors=["author-1"],
+                abstract="Getting multiple reviews.",
+                git_repo_path="/tmp/multi-review",
+            )
+            session.commit()
+
+            r1 = create_review(session, article_id=article.id, reviewer_id="r1", decision="accept", comments="Good", scientific_correctness=4, clarity=4)
+            r2 = create_review(session, article_id=article.id, reviewer_id="r2", decision="revise", comments="Needs work", scientific_correctness=3, clarity=3)
+            session.commit()
+
+            reviews = get_reviews_for_article(session, article.id)
+            assert len(reviews) == 2
+            assert reviews[0].reviewer_id == "r1"
+            assert reviews[1].reviewer_id == "r2"
+
+    def test_review_defaults(self):
+        """Review should have correct default values."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "test.db"
+            engine = get_engine(f"sqlite:///{db_path}")
+            init_db(engine)
+            session = get_session(engine)
+
+            article = create_article(session, title="Default Test", founding_authors=["a1"], abstract="Test", git_repo_path="/tmp/defaults")
+            session.commit()
+
+            review = create_review(session, article_id=article.id, reviewer_id="r1", decision="accept", comments="OK")
+            session.commit()
+
+            assert review.scientific_correctness == 0
+            assert review.clarity == 0
+            assert review.collaboration_request == 0  # stored as Integer in SQLite
+            assert review.points_earned == 0

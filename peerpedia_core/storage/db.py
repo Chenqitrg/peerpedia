@@ -178,6 +178,41 @@ class Article(Base):
         }
 
 
+# ── ORM Model: Review ──────────────────────────────────────────────────────────
+
+class Review(Base):
+    """SQLAlchemy model for peer reviews. Mirrors protocol ReviewMessage."""
+
+    __tablename__ = "reviews"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    article_id = Column(String(36), nullable=False, index=True)
+    reviewer_id = Column(String(100), nullable=False)
+    decision = Column(String(20), nullable=False)  # accept | revise | reject
+    comments = Column(Text, nullable=False, default="")
+    scientific_correctness = Column(Integer, nullable=False, default=0)  # 1-5
+    clarity = Column(Integer, nullable=False, default=0)  # 1-5
+    collaboration_request = Column(Integer, nullable=False, default=0)  # SQLite bool
+    collaboration_message = Column(Text, nullable=False, default="")
+    points_earned = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "article_id": self.article_id,
+            "reviewer_id": self.reviewer_id,
+            "decision": self.decision,
+            "comments": self.comments,
+            "scientific_correctness": self.scientific_correctness,
+            "clarity": self.clarity,
+            "collaboration_request": bool(self.collaboration_request),
+            "collaboration_message": self.collaboration_message,
+            "points_earned": self.points_earned,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 # ── CRUD Operations ────────────────────────────────────────────────────────────
 
 def create_article(
@@ -256,3 +291,50 @@ def update_article_cid(
         article.cid = cid
         article.updated_at = datetime.now(timezone.utc)
     return article
+
+
+# ── Review CRUD ────────────────────────────────────────────────────────────────
+
+def create_review(
+    session: Session,
+    *,
+    article_id: str,
+    reviewer_id: str,
+    decision: str,
+    comments: str,
+    scientific_correctness: int = 0,
+    clarity: int = 0,
+    collaboration_request: bool = False,
+    collaboration_message: str = "",
+    points_earned: int = 0,
+) -> Review:
+    """Create a new review record."""
+    review = Review(
+        id=str(uuid.uuid4()),
+        article_id=article_id,
+        reviewer_id=reviewer_id,
+        decision=decision,
+        comments=comments,
+        scientific_correctness=scientific_correctness,
+        clarity=clarity,
+        collaboration_request=1 if collaboration_request else 0,
+        collaboration_message=collaboration_message,
+        points_earned=points_earned,
+    )
+    session.add(review)
+    return review
+
+
+def get_review(session: Session, review_id: str) -> Optional[Review]:
+    """Get a review by ID."""
+    return session.query(Review).filter(Review.id == review_id).first()
+
+
+def get_reviews_for_article(session: Session, article_id: str) -> list[Review]:
+    """Get all reviews for an article, oldest first."""
+    return (
+        session.query(Review)
+        .filter(Review.article_id == article_id)
+        .order_by(Review.created_at.asc())
+        .all()
+    )
