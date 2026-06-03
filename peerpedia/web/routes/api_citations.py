@@ -1,10 +1,22 @@
-"""Web — Citation click tracking API endpoints."""
+"""Web — Citation click tracking and citation graph API endpoints."""
 
 from fastapi import APIRouter, Form, HTTPException, Query
 
 from peerpedia.web.db_session import get_db_session
+from peerpedia_core.workflow.citations import get_citation_info
 
 router = APIRouter()
+
+
+@router.get("/articles/{article_id}/citations")
+async def api_get_citations(article_id: str):
+    """Get citation graph info (cites + cited_by) for an article."""
+    session = get_db_session()
+    try:
+        info = get_citation_info(session, article_id)
+        return info
+    finally:
+        session.close()
 
 
 @router.post("/citations/click")

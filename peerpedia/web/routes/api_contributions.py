@@ -77,14 +77,6 @@ async def api_get_contribution_timeline(article_id: str, format: str = "json"):
 
     Set ?format=html to get an HTML fragment for HTMX swap.
     """
-    from fastapi.responses import HTMLResponse
-
-    from peerpedia_core.storage.db import get_contribution_records
-    from peerpedia_core.workflow.contribution import (
-        compute_contribution_breakdown,
-        compute_contribution_timeline,
-    )
-
     session = get_db_session()
     try:
         article = get_article(session, article_id)
@@ -119,10 +111,6 @@ async def api_get_contribution_timeline(article_id: str, format: str = "json"):
 @router.get("/articles/{article_id}/commits")
 async def api_get_commit_history(article_id: str):
     """Get git commit history for an article."""
-    from pathlib import Path
-
-    from peerpedia_core.storage.git_backend import get_commit_history
-
     session = get_db_session()
     try:
         article = get_article_or_404(session, article_id)
@@ -140,12 +128,6 @@ async def api_get_commit_history(article_id: str):
 @router.get("/articles/{article_id}/commits/html")
 async def api_get_commit_history_html(article_id: str):
     """Get git commit history as an HTML fragment for HTMX swap."""
-    from pathlib import Path
-
-    from fastapi.responses import HTMLResponse
-
-    from peerpedia_core.storage.git_backend import get_commit_history
-
     session = get_db_session()
     try:
         article = get_article(session, article_id)
@@ -159,7 +141,6 @@ async def api_get_commit_history_html(article_id: str):
         commits = get_commit_history(repo)
 
         # Also include contribution records (merge, fork, etc.)
-        from peerpedia_core.storage.db import get_contribution_records
         records = get_contribution_records(session, article_id)
 
         if not commits and not records:
@@ -228,10 +209,6 @@ async def api_get_diff(article_id: str, commit_hash: str):
     Returns JSON with commit metadata and unified diff text suitable
     for rendering with diff2html.
     """
-    from pathlib import Path
-
-    from peerpedia_core.storage.git_backend import get_diff
-
     session = get_db_session()
     try:
         article = get_article_or_404(session, article_id)
@@ -253,10 +230,6 @@ async def api_get_diff(article_id: str, commit_hash: str):
 @router.get("/articles/{article_id}/diff/{hash1}/{hash2}")
 async def api_get_diff_between(article_id: str, hash1: str, hash2: str):
     """Get the diff between two commits."""
-    from pathlib import Path
-
-    from peerpedia_core.storage.git_backend import get_diff_between
-
     session = get_db_session()
     try:
         article = get_article_or_404(session, article_id)
@@ -278,10 +251,6 @@ async def api_get_diff_between(article_id: str, hash1: str, hash2: str):
 @router.get("/articles/{article_id}/blame")
 async def api_get_blame(article_id: str):
     """Get git blame data for an article's main source file."""
-    from pathlib import Path
-
-    from peerpedia_core.storage.git_backend import get_blame
-
     session = get_db_session()
     try:
         article = get_article_or_404(session, article_id)

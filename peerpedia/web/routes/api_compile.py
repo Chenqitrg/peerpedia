@@ -1,4 +1,4 @@
-"""API routes for article compilation (Typst -> PDF, Markdown -> HTML) and citation info."""
+"""API routes for article compilation (Typst → PDF, Markdown → HTML)."""
 
 from pathlib import Path
 
@@ -9,14 +9,13 @@ from peerpedia.web.routes._helpers import get_article_or_404
 from peerpedia.web.db_session import get_db_session
 from peerpedia_core.storage.db import get_article
 from peerpedia_core.storage.compiler import MarkdownBackend, TypstBackend
-from peerpedia_core.workflow.citations import get_citation_info, inject_citation_links
+from peerpedia_core.workflow.citations import inject_citation_links
 
 router = APIRouter()
 
 
 def _compile_error(message: str, status: int = 200):
     """Return an HTML error response for compile failures."""
-    from fastapi.responses import HTMLResponse
     return HTMLResponse(
         content=f'<div class="compile-error"><p>⚠️ {message}</p></div>',
         status_code=status,
@@ -30,9 +29,6 @@ def _resolve_compile_backend(repo, article_format: str, article_title: str = "")
     When multiple source files exist, picks the one whose frontmatter title
     best matches the article title stored in the DB.
     """
-    from fastapi import HTTPException
-    from peerpedia_core.storage.compiler import MarkdownBackend, TypstBackend
-
     ext = "*.typ" if article_format == "typst" else "*.md"
     source_files = list(repo.glob(ext))
     if not source_files:
@@ -63,10 +59,6 @@ def _resolve_compile_backend(repo, article_format: str, article_title: str = "")
 @router.get("/articles/{article_id}/compile")
 async def api_compile_article(article_id: str, fmt: str = "html"):
     """Compile an article on demand. fmt: 'html' (default) or 'pdf'."""
-    from pathlib import Path
-    from fastapi.responses import FileResponse, HTMLResponse
-    from fastapi import HTTPException
-
     session = get_db_session()
     try:
         article = get_article(session, article_id)
@@ -122,16 +114,5 @@ async def api_compile_article(article_id: str, fmt: str = "html"):
             return {"content": output.read_text(), "format": article.format}
         else:
             return _compile_error("编译未产生输出。")
-    finally:
-        session.close()
-
-
-@router.get("/articles/{article_id}/citations")
-async def api_get_citations(article_id: str):
-    """Get citation graph info (cites + cited_by) for an article."""
-    session = get_db_session()
-    try:
-        info = get_citation_info(session, article_id)
-        return info
     finally:
         session.close()
