@@ -1,7 +1,7 @@
 # 知诸网 (PeerPedia) — 设计蓝图
 
 > 日期: 2026-06-03
-> 状态: Phase 3 全部完成（211 tests, 0 failures）
+> 状态: Phase 3 M6 完成 — 沉淀池 + 五维评分 + Fork/Merge + 搜索（361 tests）
 > 英文名: **PeerPedia**（peer review + encyclopedia）
 > 中文名: **知诸网**
 >   - 知 = 求知，诸 = 诸位/诸多，网 = 网络
@@ -1014,6 +1014,17 @@ Phase 2: 跨学科扩张
 | 51 | 关注动态范围 | 近 30 天，类型：new_article + new_version |
 | 52 | Follow UI 交互 | HTMX 按钮 swap（POST/DELETE），无需 JS |
 | 53 | Follow LAN 同步 | MVP 不同步关注关系（本地行为） |
+| 54 | 五维自评 | 原创性/严格性/完整性/教学性/影响力（0-5），替代 categorical note_type |
+| 55 | 社区五维审稿 | 审稿人用同样五维评分，自评 vs 社区评分对比展示 |
+| 56 | 沉淀池模型 | 替代审稿分配+决定。匿名评分，加权自动下沉发表（7天默认/2天最快/180天最长） |
+| 57 | 改名知诸网 | 知著网 → 知诸网。谐音「诸多」「蜘蛛网」，取"孜孜以求，诸子百家" |
+| 58 | 匿名讨论 | 跨文章一致匿名 ID（如 匿名者_A3F2），作者真名置顶，不可自评 |
+| 59 | 派生 (Fork) | 文章可派生，forked_from 链 + fork_count，git clone 独立仓库 |
+| 60 | 派生→合并 | 派生后可提议合并回原文，作者审核 approve/reject，版本号+1，双向贡献 |
+| 61 | 本地搜索 | SQLite LIKE 搜标题/摘要/关键词，HTMX 实时过滤 |
+| 62 | seed 命令 | `peerpedia seed --force` 一键重建 4 用户 + 5 篇 demo 文章 |
+| 63 | Git Diff 视图 | diff2html 渲染，行级评论，版本历史 tab |
+| 64 | 合并积分占位 | 当前简单公式：fork 作者 200 + reviewer 100。未来 f(diff, complexity, ...) |
 
 ---
 
@@ -1031,7 +1042,8 @@ Phase 2: 跨学科扩张
 | Phase 3 M4 | 信誉集群（雷达图+身份权重） | ✅ | 144 tests |
 | Phase 3 M4 | LAN 集群（UDP 节点发现 + catalog.md 同步） | ✅ | 196 tests |
 | Phase 3 M5 | 引用跳转 + 点击跃迁概率 | ✅ | **196 tests** |
-| Phase 3 M5+ | 用户关注（Follow + 动态 Feed） | ✅ | **211 tests** |
+| Phase 3 M5+ | 用户关注（Follow + 动态 Feed） | ✅ | 211 tests |
+| Phase 3 M6 | 沉淀池 + 五维评分 + Fork/Merge + 搜索 + Git Diff | ✅ | **361 tests** |
 | Phase 4 | IPFS 集成 | ⏸ 远期 | — |
 | Phase 5 | 种子社区测试 | ⏸ 远期 | — |
 | Phase 6 | AI 辅助 | ⏸ 远期 | — |

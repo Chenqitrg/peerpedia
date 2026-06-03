@@ -1,8 +1,8 @@
 # PeerPedia — Project Status & Restart Guide
 
 > 最后更新: 2026-06-03
-> 当前状态: Phase 3 全部完成 (M1+M2+M2.5+M2.6+M3+M4+M5+M5+)
-> 测试: 242 tests, 0 failures
+> 当前状态: Phase 3 全部完成 + 沉淀池 + 五维评分 + Fork/Merge
+> 测试: 361 tests, 0 failures
 > 中文名: 知诸网 — 谐音「诸多」「蜘蛛网」🕸️
 
 ---
@@ -12,7 +12,9 @@
 ```bash
 cd ~/Projects/peerpedia
 source .venv/bin/activate
-.venv/bin/python -m pytest tests/ -v          # 跑测试（应 242 passed）
+.venv/bin/python -m pytest tests/ -v          # 跑测试（应 361 passed）
+peerpedia seed --force                        # 重建 demo 数据
+peerpedia serve                               # 启动 Web
 open design/brainstorm.md                     # 打开设计文档
 ```
 
@@ -180,18 +182,35 @@ tests/                   # 19 tests, 0 failures
 | 自关注防护 | ✅ POST /users/{id}/follow，follower_id == user_id → 400 |
 | 回归测试 | ✅ +31 tests（15 Bug 修复 + 16 Follow/Cookie UI）|
 
+### 2026-06-03 新增功能
+
+| 功能 | 说明 | 状态 |
+|------|------|------|
+| 知诸网改名 | 知著网 → 知诸网，谐音「诸多」「蜘蛛网」 | ✅ |
+| 五维自评 | 提交时自评原创性/严格性/完整性/教学性/影响力（1-5星） | ✅ |
+| 社区五维评分 | 审稿人用同样五维评分，文章页自评 vs 社区对比 | ✅ |
+| 沉淀池 | 替代审稿队列。匿名评分+讨论，评分加权自动下沉发表 | ✅ |
+| 作者舌战群儒 | 作者真名置顶回复，不能自评，评论独立更新 | ✅ |
+| 评分记忆 | 评分表单预填上次内容（灰色蒙皮），点击激活编辑 | ✅ |
+| 本地搜索 | 首页搜索框，HTMX 实时过滤标题/摘要/关键词 | ✅ |
+| 派生 (Fork) | 文章可派生，forked_from 链 + fork_count | ✅ |
+| 派生→合并 | 派生后可提议合并回原文，原作者审核，版本号+1 | ✅ |
+| Git Diff 视图 | 版本历史 tab，diff2html 渲染，行级评论 | ✅ |
+| seed 命令 | `peerpedia seed --force` 一键重建 4 用户 + 5 文章 | ✅ |
+| Demo 数据 | 5 篇文章（4 Markdown + 1 Typst）+ 自评 + 交叉引用 | ✅ |
+
 ### 已知缺口
 
 | 缺口 | 说明 | 优先级 |
 |---|---|---|
-| 贡献时间线 UI | ✅ API 返回 HTML，文章页展示贡献占比 + 记录列表 | ✅ |
+| 合并积分算法 | 当前简单公式，需设计 f(diff, complexity, reviewer_score) | 🟡 |
+| Fork→Merge UI 完善 | 合并提议列表靠 HTMX 加载，需 viewer cookie | 🟡 |
 | 编辑提案 UI | API 完整，文章页有提交表单，无审核界面 | 🟡 |
 | 协作按钮 | API 有 `/collaborate`，审稿页面无"申请协作"按钮 | 🟡 |
 | 引用跃迁图表 | API 有 `/citations/transitions`，无可视化 | 🟢 |
 | 身份绑定 UI | API 有 POST `/users/{id}/identities`，无表单 | 🟢 |
-| LAN 状态页面 | API 有 `/lan/status`，有专属页面 | 🟢 |
-| 审稿入口 | 文章页有"审稿"按钮（submitted/in_review 状态） | 🟢 |
-| Demo 数据 | 5 篇文章（4 Markdown + 1 Typst）+ 数学公式 + KaTeX 渲染 | ✅ |
+| 搜索界面 | 仅首页搜索框，无独立搜索页 | 🟢 |
+| Typst HTML 输出 | 等上游 Typst 稳定 HTML export | ⏳ |
 
 ---
 

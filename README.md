@@ -44,11 +44,15 @@ peerpedia serve --lan
 
 | Category | Feature | Status |
 |---|---|---|
-| **Submit** | Typst + Markdown/Katex article submission with auto-compile | ✅ |
-| **Review** | Peer review workflow: assign → score → decide | ✅ |
-| **Collaboration** | Reviewer → co-author, post-publication edit proposals | ✅ |
+| **Submit** | Typst + Markdown/KaTeX with 5-dimension self-assessment | ✅ |
+| **Sedimentation Pool** | Anonymous ratings + discussion, auto-publish by sink score | ✅ |
+| **5D Scoring** | Originality/Rigor/Completeness/Pedagogy/Impact (self + community) | ✅ |
+| **Fork & Merge** | Fork articles, propose merge back, author review, version bump | ✅ |
 | **Reputation** | 4D radar chart (academic/review/collaboration/education) + identity boost | ✅ |
-| **Citations** | Reference scanning, NetworkX citation graph, click-to-jump sidebar + click tracking | ✅ |
+| **Citations** | Reference scanning, NetworkX citation graph, click-to-jump sidebar | ✅ |
+| **Collaboration** | Reviewer → co-author, post-publication edit proposals | ✅ |
+| **Search** | Real-time search by title/abstract/keywords (HTMX) | ✅ |
+| **Git Diff** | Version history tab with diff2html side-by-side view | ✅ |
 | **Mirror** | ArXiv article import with dangling founder accounts | ✅ |
 | **LAN** | UDP broadcast node discovery + catalog.md article pool sync | ✅ |
 | **Follow** | Follow authors, activity feed (HTMX-driven) | ✅ |
@@ -57,17 +61,18 @@ peerpedia serve --lan
 
 ```bash
 peerpedia init                                    # Initialize ~/.peerpedia/
-peerpedia serve [--lan] [--port 8080]              # Start web interface
-peerpedia submit article.typ --author zhangsan     # Submit article
-peerpedia review <id> -d accept -c "great work"    # Submit peer review
-peerpedia decide <id>                              # Decide on article
-peerpedia mirror 2301.00001 -u zhangsan            # Mirror from arXiv
-peerpedia collaborate <id> -r reviewer_name        # Accept collaboration
+peerpedia seed --force                            # Rebuild demo data (4 users + 5 articles)
+peerpedia serve [--lan] [--port 8080]             # Start web interface
+peerpedia submit article.typ --author zhangsan    # Submit article
+peerpedia review <id> -d accept -c "great work"   # Submit peer review
+peerpedia decide <id>                             # Decide on article
+peerpedia mirror 2301.00001 -u zhangsan           # Mirror from arXiv
+peerpedia collaborate <id> -r reviewer_name       # Accept collaboration
 peerpedia propose-edit <id> -t minor -d "fix typo" # Propose post-publication edit
-peerpedia merge-proposal <pid> <aid>               # Merge approved proposal
+peerpedia merge-proposal <pid> <aid>              # Merge approved proposal
 peerpedia user register <id> --name 张三 --email .. # Register user
-peerpedia lan status                               # LAN node status
-peerpedia lan sync [-n <node>]                     # Sync article catalog
+peerpedia lan status                              # LAN node status
+peerpedia lan sync [-n <node>]                    # Sync article catalog
 ```
 
 ## API Endpoints (30 routes)
