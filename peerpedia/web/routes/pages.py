@@ -22,6 +22,8 @@ async def home(request: Request):
     """Home page — article listing from database."""
     session = get_db_session()
     try:
+        tab = request.query_params.get("tab", "all")
+        viewer = request.query_params.get("user", "")
         articles = list_articles(session)
         return templates.TemplateResponse(
             "index.html",
@@ -29,6 +31,8 @@ async def home(request: Request):
                 "request": request,
                 "title": "PeerPedia",
                 "articles": [a.to_dict() for a in articles],
+                "tab": tab,
+                "viewer": viewer,
             },
         )
     finally:
@@ -190,6 +194,23 @@ async def user_profile(request: Request, user_id: str):
         except Exception:
             reputation = {}
 
+        # Follow state
+        is_self = False
+        is_following_user = False
+        current_user_id = request.query_params.get("viewer", "")
+        following_count = 0
+        follower_count = 0
+        if current_user_id:
+            from peerpedia_core.storage.db import (
+                is_following, get_following_count, get_follower_count
+            )
+            if current_user_id == user_id:
+                is_self = True
+            else:
+                is_following_user = is_following(session, current_user_id, user_id)
+            following_count = get_following_count(session, user_id)
+            follower_count = get_follower_count(session, user_id)
+
         return templates.TemplateResponse(
             "user.html",
             {
@@ -215,6 +236,11 @@ async def user_profile(request: Request, user_id: str):
                 "total_reviews": len(reviews),
                 "total_points": sum(r.points_earned for r in reviews),
                 "reputation": reputation,
+                "is_self": is_self,
+                "is_following": is_following_user,
+                "current_user": current_user_id,
+                "following_count": following_count,
+                "follower_count": follower_count,
             },
         )
     finally:

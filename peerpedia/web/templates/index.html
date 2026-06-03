@@ -18,6 +18,21 @@
     </header>
 
     <main>
+        <nav class="tabs" style="margin-bottom: 16px; border-bottom: 2px solid #eee; padding-bottom: 0;">
+          <a href="/" style="display: inline-block; padding: 8px 16px; text-decoration: none; {% if tab == 'all' %}border-bottom: 2px solid #007bff; color: #007bff;{% else %}color: #666;{% endif %}">全部文章</a>
+          {% if viewer %}
+          <a href="/?tab=following&user={{ viewer }}" style="display: inline-block; padding: 8px 16px; text-decoration: none; {% if tab == 'following' %}border-bottom: 2px solid #007bff; color: #007bff;{% else %}color: #666;{% endif %}">关注动态</a>
+          {% endif %}
+        </nav>
+
+        {% if tab == 'following' and viewer %}
+        <div id="following-feed"
+             hx-get="/api/v1/following/feed?user_id={{ viewer }}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <p style="color: #888;">加载中...</p>
+        </div>
+        {% else %}
         <section class="article-list">
             <h2>文章</h2>
             {% if articles %}
@@ -39,6 +54,7 @@
                 <p class="empty-state">暂无文章。<a href="/submit">提交第一篇。</a></p>
             {% endif %}
         </section>
+        {% endif %}
     </main>
 
     <footer>
