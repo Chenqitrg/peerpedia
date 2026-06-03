@@ -80,14 +80,14 @@ def get_commit_history(
 
 def get_blame(repo_path: Path, file_path: str) -> list[dict]:
     """Get git blame for a file — maps lines to authors."""
-    import git
+    import git  # type: ignore[import-untyped]
 
     repo = git.Repo(repo_path)
-    blames = []
-    for entry in repo.blame_incremental("HEAD", file_path):
+    blames: list[dict] = []
+    for entry in repo.blame_incremental("HEAD", file_path):  # type: ignore[attr-defined]
         blames.append({
-            "commit": entry.commit.hexsha[:8],
-            "author": str(entry.commit.author),
-            "lines": list(range(entry.linenos_start, entry.linenos_start + entry.linenos_count)),
+            "commit": entry.commit.hexsha[:8],  # type: ignore[attr-defined]
+            "author": str(entry.commit.author),  # type: ignore[attr-defined]
+            "lines": list(range(entry.linenos_start, entry.linenos_start + entry.linenos_count)),  # type: ignore[attr-defined]
         })
     return blames

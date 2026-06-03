@@ -171,7 +171,7 @@ async def api_decide_article(article_id: str):
 async def api_compile_article(article_id: str, fmt: str = "html"):
     """Compile an article on demand. fmt: 'html' (default) or 'pdf'."""
     from pathlib import Path
-    from peerpedia_core.storage.compiler import TypstBackend, MarkdownBackend
+    from peerpedia_core.storage.compiler import TypstBackend, MarkdownBackend, CompilerBackend
     from fastapi.responses import HTMLResponse
 
     session = get_db_session()
@@ -191,7 +191,7 @@ async def api_compile_article(article_id: str, fmt: str = "html"):
 
         if article.format == "typst":
             source_files = list(repo.glob("*.typ"))
-            backend = TypstBackend()
+            backend: CompilerBackend = TypstBackend()
         else:
             source_files = list(repo.glob("*.md"))
             backend = MarkdownBackend()

@@ -79,7 +79,7 @@ async def api_create_proposal(
 
 
 @router.get("/articles/{article_id}/proposals")
-async def api_list_proposals(article_id: str, status: str = None):
+async def api_list_proposals(article_id: str, status: str | None = None):
     """List edit proposals for an article."""
     session = get_db_session()
     try:

@@ -279,14 +279,50 @@ async def api_get_followers(user_id: str, format: str = "json", viewer: str = ""
         session.close()
 
 
+def _collect_user_events(session, user_id: str, cutoff) -> list[dict]:
+    """Collect new_article and new_version events for a single user within cutoff."""
+    from peerpedia_core.storage.db import Article
+
+    events = []
+    # New articles
+    articles = (
+        session.query(Article)
+        .filter(Article.founding_authors.contains(user_id), Article.created_at >= cutoff)
+        .order_by(Article.created_at.desc())
+        .all()
+    )
+    for a in articles:
+        events.append({
+            "type": "new_article", "user_id": user_id,
+            "article_id": a.id, "article_title": a.title,
+            "time": a.created_at.isoformat() if a.created_at else "",
+        })
+
+    # Version updates (exclude articles already counted as new_article)
+    updated = (
+        session.query(Article)
+        .filter(Article.founding_authors.contains(user_id),
+                Article.updated_at >= cutoff, Article.version > "v0.1")
+        .order_by(Article.updated_at.desc())
+        .all()
+    )
+    for a in updated:
+        if a.created_at and a.created_at >= cutoff:
+            continue
+        events.append({
+            "type": "new_version", "user_id": user_id,
+            "article_id": a.id, "article_title": a.title,
+            "version": a.version,
+            "time": a.updated_at.isoformat() if a.updated_at else "",
+        })
+    return events
+
+
 @router.get("/following/feed")
 async def api_following_feed(user_id: str):
     """Get activity feed from followed users (last 30 days)."""
     from datetime import datetime, timezone, timedelta
-    from peerpedia_core.storage.db import (
-        get_following,
-        Article,
-    )
+    from peerpedia_core.storage.db import get_following
 
     session = get_db_session()
     try:
@@ -298,50 +334,8 @@ async def api_following_feed(user_id: str):
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         events = []
-
         for fid in followed_ids:
-            # New articles by followed user
-            articles = (
-                session.query(Article)
-                .filter(
-                    Article.founding_authors.contains(fid),
-                    Article.created_at >= cutoff,
-                )
-                .order_by(Article.created_at.desc())
-                .all()
-            )
-            for a in articles:
-                events.append({
-                    "type": "new_article",
-                    "user_id": fid,
-                    "article_id": a.id,
-                    "article_title": a.title,
-                    "time": a.created_at.isoformat() if a.created_at else "",
-                })
-
-            # Version updates by followed user (exclude initial versions)
-            updated = (
-                session.query(Article)
-                .filter(
-                    Article.founding_authors.contains(fid),
-                    Article.updated_at >= cutoff,
-                    Article.version > "v0.1",
-                )
-                .order_by(Article.updated_at.desc())
-                .all()
-            )
-            for a in updated:
-                # Skip if article already appears as new_article (created within 30 days)
-                if a.created_at and a.created_at >= cutoff:
-                    continue
-                events.append({
-                    "type": "new_version",
-                    "user_id": fid,
-                    "article_id": a.id,
-                    "article_title": a.title,
-                    "version": a.version,
-                    "time": a.updated_at.isoformat() if a.updated_at else "",
-                })
+            events.extend(_collect_user_events(session, fid, cutoff))  # type: ignore[arg-type]
 
         events.sort(key=lambda e: e["time"], reverse=True)
         return {"user_id": user_id, "events": events[:50]}

@@ -49,3 +49,22 @@ line-length = 100
 [tool.ruff]
 line-length = 100
 select = ["E", "F", "I", "N", "W"]
+
+[tool.mypy]
+ignore_missing_imports = true
+warn_unused_ignores = false
+[[tool.mypy.overrides]]
+module = "peerpedia_core.storage.db.*"
+disable_error_code = ["assignment"]
+[[tool.mypy.overrides]]
+module = [
+    "peerpedia.mirror",
+    "peerpedia.submit",
+    "peerpedia_core.workflow.collaboration",
+    "peerpedia_core.workflow.contribution",
+    "peerpedia_core.workflow.edit_proposal",
+    "peerpedia_core.workflow.lan",
+    "peerpedia_core.workflow.lan_network",
+    "peerpedia_core.workflow.review",
+]
+disable_error_code = ["assignment", "arg-type", "attr-defined", "return-value"]

@@ -48,7 +48,8 @@ def submit(article_path: str, author: str | None, email: str | None):
         click.echo(f"✓ 文章提交成功！")
         click.echo(f"  ID:     {result.article_id}")
         click.echo(f"  标题:   {result.title}")
-        click.echo(f"  提交:   {result.git_commit_hash[:8]}")
+        commit_hash = result.git_commit_hash or ""
+        click.echo(f"  提交:   {commit_hash[:8]}")
         if result.cid:
             click.echo(f"  CID:    {result.cid[:16]}...")
         click.echo()

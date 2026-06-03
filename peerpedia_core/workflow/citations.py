@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import networkx as nx
 
 # Regex: match peerpedia:<UUID> in text, or inside #cite("peerpedia:<UUID>")
 _CITE_RE = re.compile(

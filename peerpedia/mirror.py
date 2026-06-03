@@ -173,6 +173,74 @@ def _author_slug(name: str) -> str:
     return f"arxiv:{slug}"
 
 
+# ── Mirror helpers ──────────────────────────────────────────────────────────────
+
+def _build_mirror_source(meta, arxiv_id: str, mirror_user_id: str) -> str:
+    """Build a Markdown source file for a mirrored arXiv article."""
+    nl = "\n"
+    return f"""---
+title: {meta.title}
+abstract: {meta.abstract}
+categories:
+{nl.join(f'  - {c}' for c in meta.categories)}
+language: en
+source: arxiv:{arxiv_id}
+mirror_by: {mirror_user_id}
+original_authors:
+{nl.join(f'  - {a}' for a in meta.authors)}
+---
+
+# {meta.title}
+
+**原文作者**: {', '.join(meta.authors)}
+
+**来源**: [arXiv:{arxiv_id}]({meta.pdf_url})
+
+**搬运者**: {mirror_user_id}
+
+---
+
+{meta.abstract}
+
+---
+
+> 本文由 {mirror_user_id} 从 arXiv 搬运。原作者为 {'、'.join(meta.authors)}。
+> 原文地址: {meta.pdf_url}
+"""
+
+
+def _store_mirror_article(
+    database_url: str,
+    meta,
+    suspended_authors: list[str],
+    repo_path,
+    arxiv_id: str,
+    mirror_user_id: str,
+) -> str:
+    """Store a mirrored article in the database. Returns article_id."""
+    from peerpedia_core.storage.db import get_engine, init_db, get_session, create_article
+
+    engine = get_engine(database_url)
+    init_db(engine)
+    session = get_session(engine)
+    try:
+        article = create_article(
+            session, title=meta.title, founding_authors=suspended_authors,
+            abstract=meta.abstract, categories=meta.categories, keywords=[],
+            language="en", format="markdown", git_repo_path=str(repo_path),
+        )
+        article.source_arxiv_id = arxiv_id
+        article.mirror_by = mirror_user_id
+        article.status = "published"
+        session.commit()
+        return article.id
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 # ── Mirror orchestrator ───────────────────────────────────────────────────────
 
 def mirror_arxiv(
@@ -219,46 +287,12 @@ def mirror_arxiv(
             error=f"无法获取 arXiv:{arxiv_id} 的元数据（API 错误或文章不存在）",
         )
 
-    # 3. Create suspended founder accounts (just use the slug as author name)
+    # 3. Create suspended founder accounts + write source + git commit
     suspended_authors = [_author_slug(a) for a in meta.authors]
-
-    # 4. Initialize git repo + create article
     try:
         repo_path = init_article_repo(arxiv_id, base_dir=articles_dir)
-
-        # Write a minimal source file with metadata
         source_file = repo_path / f"{arxiv_id}.md"
-        source_content = f"""---
-title: {meta.title}
-abstract: {meta.abstract}
-categories:
-{chr(10).join(f'  - {c}' for c in meta.categories)}
-language: en
-source: arxiv:{arxiv_id}
-mirror_by: {mirror_user_id}
-original_authors:
-{chr(10).join(f'  - {a}' for a in meta.authors)}
----
-
-# {meta.title}
-
-**原文作者**: {', '.join(meta.authors)}
-
-**来源**: [arXiv:{arxiv_id}]({meta.pdf_url})
-
-**搬运者**: {mirror_user_id}
-
----
-
-{meta.abstract}
-
----
-
-> 本文由 {mirror_user_id} 从 arXiv 搬运。原作者为 {'、'.join(meta.authors)}。
-> 原文地址: {meta.pdf_url}
-"""
-        source_file.write_text(source_content)
-
+        source_file.write_text(_build_mirror_source(meta, arxiv_id, mirror_user_id))
         commit_article(
             repo_path,
             message=f"Mirror: {meta.title} (arXiv:{arxiv_id})",
@@ -268,34 +302,13 @@ original_authors:
     except Exception as e:
         return MirrorResult(success=False, arxiv_id=arxiv_id, error=f"Git 操作失败: {e}")
 
-    # 5. Store in database
-    engine = get_engine(database_url)
-    init_db(engine)
-    session = get_session(engine)
+    # 4. Store in database
     try:
-        article = create_article(
-            session,
-            title=meta.title,
-            founding_authors=suspended_authors,
-            abstract=meta.abstract,
-            categories=meta.categories,
-            keywords=[],
-            language="en",
-            format="markdown",
-            git_repo_path=str(repo_path),
+        article_id = _store_mirror_article(
+            database_url, meta, suspended_authors, repo_path, arxiv_id, mirror_user_id,
         )
-        # Set mirror-specific fields
-        article.source_arxiv_id = arxiv_id
-        article.mirror_by = mirror_user_id
-        article.status = "published"  # arXiv imports are pre-published
-        session.commit()
-
-        article_id = article.id
     except Exception as e:
-        session.rollback()
         return MirrorResult(success=False, arxiv_id=arxiv_id, error=f"数据库错误: {e}")
-    finally:
-        session.close()
 
     return MirrorResult(
         success=True,

@@ -66,6 +66,7 @@ def serve(lan: bool, port: int):
     """
     import uvicorn
     import socket
+    from peerpedia.config.settings import settings
 
     mode = "局域网" if lan else "本地"
     click.echo(f"PeerPedia 启动中 ({mode}模式，端口 {port})...")
@@ -97,6 +98,7 @@ def serve(lan: bool, port: int):
             node_id=node_id,
             host="0.0.0.0",
             port=port,
+            database_url=settings.database_url,
             broadcast_port=settings.lan_broadcast_port,
             interval=settings.lan_broadcast_interval,
             stop_event=stop,
