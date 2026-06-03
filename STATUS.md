@@ -1,8 +1,8 @@
 # PeerPedia — Project Status & Restart Guide
 
 > 最后更新: 2026-06-03
-> 当前状态: Phase 3 M1+M2+M2.5+M2.6+M3+M4(Rep) 完成
-> 测试: 144 tests, 0 failures
+> 当前状态: Phase 3 M1+M2+M2.5+M2.6+M3+M4(Rep)+M5 完成
+> 测试: 157 tests, 0 failures
 > 中文名: 知著网 — 谐音「著作」「蜘蛛网」🕸️，典出「见微知著」
 
 ---
@@ -72,7 +72,7 @@ tests/                   # 19 tests, 0 failures
 | M2 | 审稿工作流 | ArticleStatus 状态机完整实现。审稿分配 → 打分 → 决策。积分首次计算。 | 🔴 最高 |
 | M3 | 协作+开放编辑 | ✅ 一键合作（审稿人→合作者）。EditProposal 提案流程（minor/medium/major）。git blame 贡献时间线。126 tests。 | 🟡 高 |
 | M4 | 信誉+LAN | 雷达图可视化。身份权重计算。User/Identity 表。4 API 端点。user register CLI。Chart.js 集成。LAN 节点发现/同步（下个迭代）。 | 🟡 高（Reputation Cluster ✅，LAN Cluster ⏸） |
-| M5 | 引用跳转 | Typst/Markdown 引用扫描。引用图（NetworkX DAG）。点击跳转。 | 🟢 中 |
+| M5 | 引用跳转 | ✅ 引用扫描（Typst/Markdown）。NetworkX 引用图。cites/cited_by 查询。编译时引用链接注入。文章侧栏点击跳转。 | 🟢 中 |
 
 **Phase 3 完成后，系统可以**:
 1. 用 CLI 提交 Typst/Markdown 文章
@@ -146,11 +146,20 @@ tests/                   # 19 tests, 0 failures
 | LAN 节点发现 | ⏸ 下个迭代 |
 | 文章池同步 | ⏸ 下个迭代 |
 
+### M5 Citation Jump 新增功能
+
+| 功能 | 状态 |
+|---|---|
+| 引用扫描 | ✅ extract_references() 识别 Typst #cite + 内联 peerpedia:id 格式 |
+| 引用图 | ✅ NetworkX DiGraph + get_citation_info() 查询 cites/cited_by |
+| 引用自动填充 | ✅ submit 时自动扫描源文件，写入 Article.references |
+| 编译时链接注入 | ✅ inject_citation_links() 替换 peerpedia:id → 可点击 HTML 链接 |
+| 引用侧栏 | ✅ 文章页面右侧边栏，fetch API 加载引用关系，点击跳转 |
+
 ### 还是空壳的
 
 | 功能 | 状态 |
 |---|---|
-| 引用图 | ❌ 无 |
 | LAN 同步 | ❌ 无 |
 | LAN 节点发现 | ❌ 无 |
 
