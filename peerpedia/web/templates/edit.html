@@ -12,6 +12,11 @@
     <script src="/static/easymde/easymde.min.js"></script>
     <script defer src="/static/katex/katex.min.js"></script>
     <script defer src="/static/katex/auto-render.min.js"></script>
+    <style>
+        .EasyMDEContainer { width: 100% !important; height: 100% !important; }
+        .EasyMDEContainer .CodeMirror { height: 100% !important; border: none !important; }
+        .EasyMDEContainer .editor-preview { display: none !important; }
+    </style>
 </head>
 <body>
     <header>
@@ -60,9 +65,9 @@
     </div>
 
     <div id="editor-container" style="display:flex;gap:12px;height:60vh;min-height:400px;">
-        <textarea id="editor-area" style="flex:1;min-width:0;border:1px solid var(--border);padding:12px;font-family:'SF Mono',Monaco,Menlo,monospace;font-size:14px;line-height:1.6;resize:none;outline:none;"
+        <textarea id="editor-area" style="width:50%;flex-shrink:0;border:1px solid var(--border);padding:12px;font-family:'SF Mono',Monaco,Menlo,monospace;font-size:14px;line-height:1.6;resize:none;outline:none;"
             placeholder="在这里写 Markdown...">{{ article.source_content if article and article.source_content else '' }}</textarea>
-        <div id="preview-pane" style="flex:1;min-width:0;border:1px solid var(--border);padding:16px;overflow-y:auto;background:#fff;">
+        <div id="preview-pane" style="width:50%;flex-shrink:0;border:1px solid var(--border);padding:16px;overflow-y:auto;background:#fff;word-wrap:break-word;">
             <p style="color:#888;">预览区域。开始输入...</p>
         </div>
     </div>
