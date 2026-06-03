@@ -22,7 +22,11 @@
         <article class="article-view" style="flex: 1; min-width: 0;">
             <h1>{{ article.title }}</h1>
             <div class="article-meta">
-                <span>作者: {{ article.founding_authors | join(", ") }}</span>
+                <span>作者:
+                    {% for author in article.founding_authors %}
+                    <a href="/user/{{ author }}" class="author-link">{{ author }}</a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </span>
                 <span>版本: {{ article.version }}</span>
                 <span>状态: {{ article.status }}</span>
             </div>

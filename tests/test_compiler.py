@@ -168,3 +168,166 @@ def _write(base: Path, name: str, content: str) -> Path:
     filepath = base / name
     filepath.write_text(content)
     return filepath
+
+
+# ── Compile API Endpoint Tests (Bug 2 regression) ───────────────────────────────
+
+from fastapi.testclient import TestClient
+from unittest import mock
+from peerpedia.submit import submit_article
+
+
+def _setup_test_db_with_article(tmp_path, md_content=None):
+    """Create a test DB with one article submitted. Returns (db_url, article_id, articles_dir)."""
+    base = Path(tmp_path)
+    db_path = base / "test.db"
+    articles_dir = base / "articles"
+    articles_dir.mkdir()
+    db_url = f"sqlite:///{db_path}"
+
+    source = base / "test.md"
+    source.write_text(md_content or """---
+title: Test Article
+abstract: A test article for compile tests.
+---
+
+# Test Article
+
+Content paragraph with $E = mc^2$.
+""")
+    result = submit_article(
+        source_path=source,
+        database_url=db_url,
+        articles_dir=articles_dir,
+    )
+    assert result.success, f"submit_article failed: {result.error}"
+    return db_url, result.article_id, articles_dir
+
+
+class TestCompileEndpoint:
+    """Regression tests: compile endpoint must always return HTML, never JSON error."""
+
+    def test_compile_returns_html_when_article_not_found(self):
+        """GET /compile with nonexistent article ID returns HTML (not JSON 404)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, _, _ = _setup_test_db_with_article(tmp)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get("/api/v1/articles/nonexistent-id/compile?fmt=html")
+                # Must return HTML, not JSON error that HTMX can't render
+                assert "text/html" in resp.headers.get("content-type", "")
+                assert "编译" in resp.text or "compile-error" in resp.text.lower() or "文章" in resp.text
+
+    def test_compile_returns_html_when_source_dir_missing(self):
+        """GET /compile returns HTML when git_repo_path doesn't exist on disk."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+
+                # Corrupt the git_repo_path to point to nonexistent directory
+                engine = get_engine(db_url)
+                init_db(engine)
+                session = get_session(engine)
+                article = session.query(Article).filter(Article.id == article_id).first()
+                article.git_repo_path = "/tmp/nonexistent-dir-xyz"
+                session.commit()
+                session.close()
+
+                client = TestClient(app)
+                resp = client.get(f"/api/v1/articles/{article_id}/compile?fmt=html")
+                # Must be HTML, not a 404 JSON error
+                content_type = resp.headers.get("content-type", "")
+                assert "text/html" in content_type, f"Expected HTML, got {content_type}: {resp.text[:200]}"
+                assert "compile-error" in resp.text or "不存在" in resp.text or "not found" in resp.text.lower()
+
+    def test_compile_returns_html_when_source_file_missing(self):
+        """GET /compile returns HTML when directory exists but no source files."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+
+                # Point to a real but empty directory
+                empty_dir = Path(tmp) / "empty_article"
+                empty_dir.mkdir()
+                engine = get_engine(db_url)
+                init_db(engine)
+                session = get_session(engine)
+                article = session.query(Article).filter(Article.id == article_id).first()
+                article.git_repo_path = str(empty_dir)
+                session.commit()
+                session.close()
+
+                client = TestClient(app)
+                resp = client.get(f"/api/v1/articles/{article_id}/compile?fmt=html")
+                # Must return HTML with compile-error class, not JSON error
+                content_type = resp.headers.get("content-type", "")
+                assert "text/html" in content_type, f"Expected HTML, got {content_type}: {resp.text[:200]}"
+                assert "compile-error" in resp.text or "源文件" in resp.text or "source" in resp.text.lower()
+
+    def test_compile_success_markdown_returns_html_content(self):
+        """GET /compile with valid source returns compiled HTML with article content."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+
+                # Ensure article points to the actual articles_dir, format=markdown
+                engine = get_engine(db_url)
+                init_db(engine)
+                session = get_session(engine)
+                article = session.query(Article).filter(Article.id == article_id).first()
+                md_files = list(Path(article.git_repo_path).glob("*.md"))
+                # If no .md file in the repo, create one there
+                if not md_files:
+                    md_path = Path(article.git_repo_path) / "article.md"
+                    md_path.write_text("""---
+title: Direct Test
+abstract: Testing compile.
+---
+
+# Direct Test
+
+Content here with math $x^2 + y^2 = z^2$.
+""")
+                article.format = "markdown"
+                session.commit()
+                session.close()
+
+                client = TestClient(app)
+                resp = client.get(f"/api/v1/articles/{article_id}/compile?fmt=html")
+                # Must return HTML content, not stuck on "编译中..."
+                assert "text/html" in resp.headers.get("content-type", "")
+                # The response should contain the article content, not an error or empty loading state
+                assert "Direct Test" in resp.text or "Content here" in resp.text or "<h1>" in resp.text
+
+    def test_compile_unknown_format_handled(self):
+        """GET /compile with article.format='typst' and no typst CLI should return HTML error."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                from peerpedia_core.storage.db import get_engine, init_db, get_session, Article
+
+                # Set format to typst — TypstBackend will fail without CLI installed
+                engine = get_engine(db_url)
+                init_db(engine)
+                session = get_session(engine)
+                article = session.query(Article).filter(Article.id == article_id).first()
+                article.format = "typst"
+                # Create a .typ file in the repo so we don't hit "source file missing" first
+                typ_path = Path(article.git_repo_path) / "article.typ"
+                typ_path.write_text("= Test\nContent.")
+                session.commit()
+                session.close()
+
+                client = TestClient(app)
+                resp = client.get(f"/api/v1/articles/{article_id}/compile?fmt=html")
+                # Must return HTML, never JSON
+                content_type = resp.headers.get("content-type", "")
+                assert "text/html" in content_type, f"Expected HTML, got {content_type}: {resp.text[:200]}"

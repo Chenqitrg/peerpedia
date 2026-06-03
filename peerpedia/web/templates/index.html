@@ -40,7 +40,11 @@
                 <article class="article-card">
                     <h3><a href="/article/{{ article.id }}">{{ article.title }}</a></h3>
                     <p class="meta">
-                        {{ article.founding_authors | join(", ") if article.founding_authors else "未知" }}
+                        {% if article.founding_authors %}
+                        {% for author in article.founding_authors %}
+                        <a href="/user/{{ author }}{% if viewer %}?viewer={{ viewer }}{% endif %}" class="author-link">{{ author }}</a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                        {% else %}未知{% endif %}
                         · {{ article.format }}
                         · <span class="status {{ article.status }}">{{ article.status }}</span>
                         · {{ article.created_at[:10] if article.created_at else "" }}

@@ -172,16 +172,22 @@ async def api_compile_article(article_id: str, fmt: str = "html"):
     """Compile an article on demand. fmt: 'html' (default) or 'pdf'."""
     from pathlib import Path
     from peerpedia_core.storage.compiler import TypstBackend, MarkdownBackend
+    from fastapi.responses import HTMLResponse
 
     session = get_db_session()
     try:
         article = get_article(session, article_id)
         if article is None:
-            raise HTTPException(status_code=404, detail="Article not found")
+            return HTMLResponse(
+                content='<div class="compile-error"><p>⚠️ 文章未找到。</p></div>',
+                status_code=404,
+            )
 
         repo = Path(article.git_repo_path) if article.git_repo_path else None
         if repo is None or not repo.exists():
-            raise HTTPException(status_code=404, detail="Article source not found")
+            return HTMLResponse(
+                content=f'<div class="compile-error"><p>⚠️ 源文件目录不存在。</p><p>路径: {article.git_repo_path}</p><p>文章摘要: {article.abstract}</p></div>',
+            )
 
         if article.format == "typst":
             source_files = list(repo.glob("*.typ"))
@@ -191,11 +197,15 @@ async def api_compile_article(article_id: str, fmt: str = "html"):
             backend = MarkdownBackend()
 
         if not source_files:
-            raise HTTPException(status_code=404, detail="Source file not found")
+            return HTMLResponse(
+                content=f'<div class="compile-error"><p>⚠️ 源文件未找到。</p><p>目录: {repo}</p><p>格式: {article.format}</p><hr><h3>摘要</h3><p>{article.abstract}</p></div>',
+            )
 
         result = backend.compile(source_files[0], repo)
         if not result.success:
-            raise HTTPException(status_code=500, detail=f"Compilation failed: {result.error}")
+            return HTMLResponse(
+                content=f'<div class="compile-error"><p>⚠️ 编译失败: {result.error}</p><hr><h3>摘要</h3><p>{article.abstract}</p></div>',
+            )
 
         if fmt == "pdf" and result.output_path:
             from fastapi.responses import FileResponse
@@ -205,14 +215,15 @@ async def api_compile_article(article_id: str, fmt: str = "html"):
                 filename=f"{article.title}.pdf",
             )
         elif result.html_content:
-            from fastapi.responses import HTMLResponse
             linked_html = inject_citation_links(result.html_content)
             return HTMLResponse(content=linked_html)
         elif result.output_path:
             output = Path(result.output_path)
             return {"content": output.read_text(), "format": article.format}
         else:
-            raise HTTPException(status_code=500, detail="No output produced")
+            return HTMLResponse(
+                content='<div class="compile-error"><p>⚠️ 编译未产生输出。</p></div>',
+            )
     finally:
         session.close()
 

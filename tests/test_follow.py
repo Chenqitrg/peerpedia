@@ -244,3 +244,52 @@ class TestFollowAPI:
                 data = resp.json()
                 assert "events" in data
                 assert isinstance(data["events"], list)
+
+    def test_feed_with_no_follows_returns_empty(self):
+        """Feed for user with no follows returns empty events, no error."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                # alice follows nobody — feed should be empty, not error
+                resp = client.get("/api/v1/following/feed?user_id=alice")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert data["events"] == []
+                assert data["user_id"] == "alice"
+
+    def test_feed_missing_user_id(self):
+        """Feed without user_id should return empty events, not 500."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get("/api/v1/following/feed")
+                # Should handle gracefully, not crash
+                assert resp.status_code in (200, 400, 422)
+
+    def test_feed_structure_has_required_fields(self):
+        """Feed events should have required fields when articles exist."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = _setup_test_db(Path(tmp))
+            _create_users(db_url)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                # Make alice follow bob
+                client = TestClient(app)
+                client.post("/api/v1/users/bob/follow", data={"follower_id": "alice"})
+
+                resp = client.get("/api/v1/following/feed?user_id=alice")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert "user_id" in data
+                assert "events" in data
+                # Each event, if present, should have required fields
+                for event in data["events"]:
+                    assert "type" in event
+                    assert event["type"] in ("new_article", "new_version")
+                    assert "user_id" in event
+                    assert "time" in event
