@@ -15,7 +15,7 @@
     <style>
         .EasyMDEContainer { width: 100% !important; height: 100% !important; }
         .EasyMDEContainer .CodeMirror { height: 100% !important; border: none !important; }
-        .EasyMDEContainer .editor-preview { display: none !important; }
+        /* .editor-preview now used — EasyMDE's built-in side-by-side with KaTeX */
     </style>
 </head>
 <body>
@@ -61,15 +61,10 @@
                 <option value="typst" {% if article and article.format == 'typst' %}selected{% endif %}>Typst (WASM)</option>
             </select>
         </label>
-        <span id="preview-status" style="font-size:0.8em;color:#888;margin-left:8px;"></span>
     </div>
 
-    <div id="editor-container" style="display:flex;gap:12px;height:60vh;min-height:400px;">
-        <textarea id="editor-area" style="width:50%;flex-shrink:0;border:1px solid var(--border);padding:12px;font-family:'SF Mono',Monaco,Menlo,monospace;font-size:14px;line-height:1.6;resize:none;outline:none;"
-            placeholder="在这里写 Markdown...">{{ article.source_content if article and article.source_content else '' }}</textarea>
-        <div id="preview-pane" style="width:50%;flex-shrink:0;border:1px solid var(--border);padding:16px;overflow-y:auto;background:#fff;word-wrap:break-word;">
-            <p style="color:#888;">预览区域。开始输入...</p>
-        </div>
+    <div id="editor-container" style="height:60vh;min-height:400px;">
+        <textarea id="editor-area">{{ article.source_content if article and article.source_content else '' }}</textarea>
     </div>
 
     <details open style="margin-top:16px;">
@@ -181,35 +176,21 @@
             });
         });
 
-        // ── Editor (EasyMDE) ──────────────────────────────────────────
+        // ── Editor (EasyMDE with built-in preview + KaTeX math) ──────
         var easyMDE = new EasyMDE({
             element: document.getElementById('editor-area'),
             spellChecker: false,
             status: false,
-            toolbar: false,
             autoDownloadFontAwesome: false,
             indentWithTabs: false,
             tabSize: 2,
-        });
-
-        function updatePreview() {
-            var content = easyMDE.value();
-            var format = document.getElementById('format-select').value;
-            var preview = document.getElementById('preview-pane');
-            var status = document.getElementById('preview-status');
-            status.textContent = '';
-
-            if (format === 'markdown') {
-                if (!content || !content.trim()) {
-                    preview.innerHTML = '<p style="color:#888;">预览区域。开始输入...</p>';
-                    return;
-                }
-                var body = content;
+            previewRender: function(plainText, preview) {
+                // Strip frontmatter, protect math, render, restore math, KaTeX
+                var body = plainText;
                 if (body.startsWith('---')) {
                     var parts = body.split('---', 3);
                     if (parts.length >= 3) body = parts.slice(2).join('---');
                 }
-                // Protect math, render Markdown via marked, restore math
                 var mathBlocks = [];
                 var pbody = body
                     .replace(/\$\$(.+?)\$\$/gs, function(m, g) {
@@ -235,17 +216,12 @@
                         ]
                     });
                 }
-            } else {
-                // Typst preview
-                preview.innerHTML = '<p style="color:#888;">Typst 预览需要浏览器加载 WASM 模块...</p>';
-            }
-        }
-
-        easyMDE.codemirror.on('change', updatePreview);
-        updatePreview();
+                return preview.innerHTML;
+            },
+        });
 
         // ── Format switch ──────────────────────────────────────────────
-        window.switchFormat = function(fmt) { updatePreview(); };
+        window.switchFormat = function(fmt) { /* EasyMDE handles preview */ };
 
         // ── Submit ─────────────────────────────────────────────────────
         window.submitArticle = function() {
@@ -282,7 +258,5 @@
     }
     </script>
 
-    <!-- Typst WASM -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@myriaddreamin/typst-all-in-one.ts@0.6.0/dist/esm/index.js"></script>
 </body>
 </html>

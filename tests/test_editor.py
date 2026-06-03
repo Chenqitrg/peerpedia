@@ -12,7 +12,7 @@ def test_edit_page_loads():
     response = client.get("/edit")
     assert response.status_code == 200
     assert "editor-area" in response.text
-    assert "preview-pane" in response.text
+    assert "EasyMDE" in response.text
 
 
 def test_edit_page_has_metadata_form():
@@ -182,38 +182,32 @@ def test_format_switch_present():
     assert "Markdown" in response.text
 
 
-def test_preview_pane_has_math_delimiters():
-    """KaTeX delimiters must be configured for inline $...$ and display $$...$$."""
+def test_preview_has_math_delimiters():
+    """KaTeX delimiters in previewRender for inline $...$ and display $$...$$."""
     response = client.get("/edit")
     assert "renderMathInElement" in response.text
     assert "$$" in response.text
 
 
-def test_editor_and_preview_equal_width():
-    """Bug: panes were different sizes and jumped around while typing.
+def test_editor_uses_easymde_builtin_preview():
+    """Bug: we were hiding EasyMDE's preview and building our own.
 
-    Both panes must have width:50% and flex-shrink:0 to prevent content
-    from pushing the layout around.
+    EasyMDE has a built-in side-by-side preview that handles layout
+    correctly. We should use it via previewRender with KaTeX math support.
     """
     response = client.get("/edit")
     html = response.text
-    # Editor pane must have fixed width
-    assert 'width:50%' in html
-    assert 'flex-shrink:0' in html
-    # Preview pane must have word-wrap to prevent horizontal overflow
-    assert 'word-wrap:break-word' in html
+    assert 'previewRender' in html
+    assert 'EasyMDE' in html
 
 
 def test_easymde_container_constrained():
-    """Bug: EasyMDE container overflowed the left pane.
+    """Bug: EasyMDE container overflowed its parent.
 
-    CSS must constrain .EasyMDEContainer to 100% width/height and hide
-    EasyMDE's built-in preview (we use our own).
+    CSS must constrain .EasyMDEContainer to 100% width/height.
     """
     response = client.get("/edit")
     html = response.text
     assert '.EasyMDEContainer' in html
     assert 'width: 100% !important' in html
     assert 'height: 100% !important' in html
-    assert '.editor-preview' in html
-    assert 'display: none !important' in html
