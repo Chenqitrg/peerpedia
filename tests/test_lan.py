@@ -293,3 +293,111 @@ class TestHeartbeatMessages:
         """Message missing required fields returns None."""
         msg = json.dumps({"type": "peerpedia_hello", "node_id": "x"})
         assert parse_heartbeat_message(msg) is None
+
+
+from unittest import mock
+from fastapi.testclient import TestClient
+from peerpedia.web.app import app
+from peerpedia_core.storage.db import get_engine, get_session, init_db
+
+
+class TestLanAPI:
+    """Tests for LAN API endpoints."""
+
+    def _setup_test_db(self, tmp_path):
+        """Create a test database and return the database URL."""
+        db_path = tmp_path / "test_lan_api.db"
+        engine = get_engine(f"sqlite:///{db_path}")
+        init_db(engine)
+        session = get_session(engine)
+        session.close()
+        return f"sqlite:///{db_path}"
+
+    def _seed_article(self, db_url, article_id, title):
+        """Insert a minimal article into the test DB."""
+        from peerpedia_core.storage.db.models import Article
+
+        engine = get_engine(db_url)
+        init_db(engine)
+        session = get_session(engine)
+        from datetime import datetime, timezone
+        art = Article(
+            id=article_id,
+            title=title,
+            version="v1.1",
+            status="accepted",
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        session.add(art)
+        session.commit()
+        session.close()
+
+    def _seed_node(self, db_url, node_id, host="127.0.0.1", port=8080):
+        """Insert a node into the test DB."""
+        from peerpedia_core.storage.db.models import NodeInfo
+        from datetime import datetime, timezone
+
+        engine = get_engine(db_url)
+        init_db(engine)
+        session = get_session(engine)
+        node = NodeInfo(
+            node_id=node_id,
+            host=host,
+            port=port,
+            last_seen=datetime.now(timezone.utc),
+        )
+        session.add(node)
+        session.commit()
+        session.close()
+
+    def test_get_catalog(self):
+        """GET /api/v1/lan/catalog returns catalog.md content."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = self._setup_test_db(Path(tmp))
+            self._seed_article(db_url, "art1", "Test Article 1")
+
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                client = TestClient(app)
+                response = client.get("/api/v1/lan/catalog")
+                assert response.status_code == 200
+                content = response.text
+                assert "---" in content
+                assert "node_id" in content
+
+    def test_get_nodes(self):
+        """GET /api/v1/lan/nodes returns node list."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = self._setup_test_db(Path(tmp))
+            self._seed_node(db_url, "node-test-1")
+
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                client = TestClient(app)
+                response = client.get("/api/v1/lan/nodes")
+                assert response.status_code == 200
+                data = response.json()
+                assert "nodes" in data
+                assert "total" in data
+
+    def test_get_status(self):
+        """GET /api/v1/lan/status returns status summary."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url = self._setup_test_db(Path(tmp))
+            self._seed_node(db_url, "node-test-1")
+
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                client = TestClient(app)
+                response = client.get("/api/v1/lan/status")
+                assert response.status_code == 200
+                data = response.json()
+                assert "online_nodes" in data
+                assert "total_nodes_seen" in data

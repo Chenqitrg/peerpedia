@@ -10,6 +10,7 @@ from peerpedia.web.routes.api_articles import router as articles_router
 from peerpedia.web.routes.api_users import router as users_router
 from peerpedia.web.routes.api_collab import router as collab_router
 from peerpedia.web.routes.api_citations import router as citations_router
+from peerpedia.web.routes.api_lan import router as lan_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -17,3 +18,4 @@ router.include_router(articles_router)
 router.include_router(users_router)
 router.include_router(collab_router)
 router.include_router(citations_router)
+router.include_router(lan_router)
