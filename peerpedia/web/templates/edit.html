@@ -16,12 +16,13 @@
         body { display: flex; flex-direction: column; }
         #toolbar { display: flex; gap: 8px; align-items: center; padding: 6px 12px;
                    background: var(--bg, #f8f8f8); border-bottom: 1px solid var(--border, #ddd);
-                   font-size: 0.9em; flex-shrink: 0; }
+                   font-size: 0.9em; flex-shrink: 0; z-index: 10; }
         #toolbar .spacer { flex: 1; }
         #toolbar button, #toolbar select { padding: 4px 10px; border: 1px solid var(--border, #ccc);
                    border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9em; }
         #toolbar button:hover { background: #e8e8e8; }
-        #editor-container { display: flex; flex: 1; min-height: 0; }
+        #toolbar button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+        #editor-container { display: flex; flex: 1; min-height: 0; position: relative; }
         #monaco-editor { flex: 1; min-width: 0; }
         #preview-pane { flex: 1; min-width: 0; border-left: 1px solid var(--border, #ddd);
                         padding: 20px; overflow-y: auto; background: #fff; word-wrap: break-word; }
@@ -45,11 +46,18 @@
         body.dark #preview-pane pre { background: #2a2a2a; }
         body.dark #preview-pane blockquote { color: #999; }
         body.dark #preview-pane th { background: #333; }
-        /* Metadata panel */
-        #metadata-panel { display: none; padding: 16px; background: var(--bg, #fafafa);
-                          border-top: 1px solid var(--border, #ddd); max-height: 45vh; overflow-y: auto; }
-        #metadata-panel.open { display: block; }
+        /* Metadata panel — slide-up overlay, never clipped */
+        #metadata-overlay { display: none; position: fixed; inset: 0; z-index: 100;
+                            background: rgba(0,0,0,0.3); }
+        #metadata-overlay.open { display: flex; align-items: flex-end; justify-content: center; }
+        #metadata-panel { background: var(--bg, #fafafa); border-radius: 12px 12px 0 0;
+                          padding: 24px; max-height: 80vh; overflow-y: auto;
+                          width: min(720px, 100vw); box-shadow: 0 -4px 24px rgba(0,0,0,0.15); }
+        body.dark #metadata-panel { background: #2d2d2d; }
+        #metadata-panel h3 { margin: 0 0 16px 0; font-size: 1.1em; }
         #metadata-panel form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.9em; }
+        #metadata-panel .close-btn { float: right; background: none; border: none; font-size: 1.4em;
+                                     cursor: pointer; line-height: 1; padding: 0 4px; color: #888; }
         .star-rating { display: flex; align-items: center; gap: 8px; }
         .star-rating .stars span { cursor: pointer; font-size: 1.1em; user-select: none; }
     </style>
@@ -84,8 +92,11 @@
         <div id="preview-pane"><p style="color:#888;">预览区域。开始输入...</p></div>
     </div>
 
-    <!-- Metadata Panel -->
+    <!-- Metadata Panel (overlay) -->
+    <div id="metadata-overlay" onclick="if(event.target===this) toggleMetadata()">
     <div id="metadata-panel">
+        <button class="close-btn" onclick="toggleMetadata()" title="关闭">×</button>
+        <h3>📋 文章信息</h3>
         <form id="metadata-form">
             <div style="grid-column:1/-1;">
                 <label>标题<input type="text" name="title" required
@@ -146,6 +157,7 @@
             </fieldset>
         </form>
     </div>
+    </div><!-- end metadata-overlay -->
 
     <!-- viewer cookie -->
     <script>
@@ -182,7 +194,7 @@
         });
 
         // ── Monaco Init ────────────────────────────────────────────────
-        var currentTheme = 'vs';
+        var currentTheme = 'peerpedia-md';
         {% autoescape false %}
         var initialContent = {{ article.source_content|tojson if article and article.source_content else '""' }};
         {% endautoescape %}
@@ -192,10 +204,86 @@
             'vs/nls': { availableLanguages: { '*': 'en' } }
         });
         require(['vs/editor/editor.main'], function() {
+            // ── Rich Markdown tokenizer (richer than Monaco default) ─────
+            monaco.languages.setMonarchTokensProvider('markdown', {
+                tokenizer: {
+                    root: [
+                        // Frontmatter
+                        [/^---\s*$/, 'delimiter', '@frontmatter'],
+                        // Headings
+                        [/^#{1,6}\s.*$/, 'keyword'],
+                        // Code blocks
+                        [/^```[\s\S]*?^```\s*$/m, 'string'],
+                        [/^~~~[\s\S]*?^~~~\s*$/m, 'string'],
+                        // Blockquote
+                        [/^>\s.*$/, 'comment'],
+                        // Horizontal rule
+                        [/^[-*_]{3,}\s*$/, 'delimiter'],
+                        // Unordered lists
+                        [/^\s*[-*+]\s/, 'delimiter'],
+                        // Ordered lists
+                        [/^\s*\d+\.\s/, 'delimiter'],
+                        // Bold+italic
+                        [/\*\*\*[^*]+\*\*\*/, 'type'],
+                        // Bold
+                        [/\*\*[^*]+\*\*/, 'type'],
+                        // Italic
+                        [/\*[^*]+\*/, 'number'],
+                        // Strikethrough
+                        [/~~[^~]+~~/, 'delimiter'],
+                        // Inline code
+                        [/`[^`]+`/, 'string'],
+                        // Links (full)
+                        [/\[[^\]]+\]\([^)]+\)/, 'annotation'],
+                        // Images
+                        [/!\[[^\]]*\]\([^)]+\)/, 'annotation'],
+                        // Display math
+                        [/\$\$[^$]+\$\$/, 'type'],
+                        // Inline math
+                        [/\$[^$]+\$/, 'number'],
+                        // HTML tags
+                        [/<\/?[a-zA-Z][^>]*>/, 'delimiter'],
+                    ],
+                    frontmatter: [
+                        [/^---\s*$/, 'delimiter', '@pop'],
+                        [/[^:]+:/, 'keyword'],
+                    ]
+                }
+            });
+            // Map token colors via a custom theme
+            monaco.editor.defineTheme('peerpedia-md', {
+                base: 'vs',
+                inherit: true,
+                colors: {},
+                rules: [
+                    { token: 'keyword', foreground: '2563eb', fontStyle: 'bold' },
+                    { token: 'type', foreground: 'd97706', fontStyle: 'bold' },
+                    { token: 'number', foreground: '7c3aed', fontStyle: 'italic' },
+                    { token: 'string', foreground: 'dc2626' },
+                    { token: 'comment', foreground: '059669' },
+                    { token: 'delimiter', foreground: '6b7280', fontStyle: 'bold' },
+                    { token: 'annotation', foreground: '0891b2', fontStyle: 'underline' },
+                ]
+            });
+            monaco.editor.defineTheme('peerpedia-md-dark', {
+                base: 'vs-dark',
+                inherit: true,
+                colors: {},
+                rules: [
+                    { token: 'keyword', foreground: '60a5fa', fontStyle: 'bold' },
+                    { token: 'type', foreground: 'fbbf24', fontStyle: 'bold' },
+                    { token: 'number', foreground: 'a78bfa', fontStyle: 'italic' },
+                    { token: 'string', foreground: 'f87171' },
+                    { token: 'comment', foreground: '34d399' },
+                    { token: 'delimiter', foreground: '9ca3af', fontStyle: 'bold' },
+                    { token: 'annotation', foreground: '22d3ee', fontStyle: 'underline' },
+                ]
+            });
+
             window.editor = monaco.editor.create(document.getElementById('monaco-editor'), {
                 value: initialContent,
                 language: 'markdown',
-                theme: currentTheme,
+                theme: 'peerpedia-md',
                 fontSize: 16,
                 lineHeight: 26,
                 fontFamily: "'Source Han Sans SC', 'PingFang SC', monospace",
@@ -227,18 +315,55 @@
                 wrappingIndent: 'same',
             });
 
+            // ── Auto-close symmetric pairs ($$ → $$|$$, ** → **|**) ─
+            // Monaco autoClosingPairs can't handle same-char open/close.
+            // Use onKeyDown to catch the second $/* and auto-insert close.
+            editor.onKeyDown(function(e) {
+                var char = null;
+                // Use browserEvent.key for keyboard-layout-independent char
+                var key = (e.browserEvent && e.browserEvent.key) || '';
+                if (key === '$') char = '$';
+                if (key === '*') char = '*';
+                if (!char) return;
+
+                var pos = editor.getPosition();
+                var model = editor.getModel();
+                var prevCol = pos.column - 1;
+                var prevChar = '';
+                if (prevCol > 0) {
+                    prevChar = model.getValueInRange({
+                        startLineNumber: pos.lineNumber, startColumn: prevCol,
+                        endLineNumber: pos.lineNumber, endColumn: prevCol + 1
+                    });
+                }
+                if (prevChar === char) {
+                    // Second same char → auto-close
+                    e.preventDefault();
+                    e.stopPropagation();
+                    model.pushEditOperations([], [{
+                        range: { startLineNumber: pos.lineNumber, startColumn: prevCol,
+                                 endLineNumber: pos.lineNumber, endColumn: pos.column },
+                        text: char + char + char + char
+                    }], null);
+                    editor.setPosition({ lineNumber: pos.lineNumber, column: prevCol + char.length * 2 });
+                }
+                // else: first char → let it through normally
+            });
+
             // ── Theme Toggle ────────────────────────────────────────
             window.toggleTheme = function() {
-                currentTheme = currentTheme === 'vs' ? 'vs-dark' : 'vs';
+                currentTheme = currentTheme === 'peerpedia-md' ? 'peerpedia-md-dark' : 'peerpedia-md';
                 monaco.editor.setTheme(currentTheme);
-                document.body.className = currentTheme === 'vs-dark' ? 'dark' : '';
-                document.getElementById('theme-btn').textContent = currentTheme === 'vs-dark' ? '🌙' : '☀️';
+                document.body.className = currentTheme === 'peerpedia-md-dark' ? 'dark' : '';
+                document.getElementById('theme-btn').textContent = currentTheme === 'peerpedia-md-dark' ? '🌙' : '☀️';
             };
 
             // ── Metadata Toggle ─────────────────────────────────────
             window.toggleMetadata = function() {
-                var panel = document.getElementById('metadata-panel');
-                panel.classList.toggle('open');
+                var overlay = document.getElementById('metadata-overlay');
+                overlay.classList.toggle('open');
+                var btn = document.getElementById('metadata-btn');
+                btn.classList.toggle('active');
             };
 
             // ── Shortcuts ───────────────────────────────────────────

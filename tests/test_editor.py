@@ -231,7 +231,7 @@ def test_monaco_container_sized():
 def test_monaco_theme_toggle_present():
     """Editor page has a theme toggle button for vs/vs-dark."""
     response = client.get("/edit")
-    assert "vs-dark" in response.text
+    assert "peerpedia-md-dark" in response.text
     assert "setTheme" in response.text
 
 
@@ -257,9 +257,11 @@ def test_monaco_peerpedia_completion():
 
 
 def test_monaco_markdown_language_set():
-    """Editor initializes with language:'markdown'."""
+    """Editor initializes with markdown language and custom tokenizer."""
     response = client.get("/edit")
     assert "'markdown'" in response.text or '"markdown"' in response.text
+    assert "setMonarchTokensProvider" in response.text
+    assert "defineTheme" in response.text
 
 
 # ── Regression: math rendering ────────────────────────────────────────────
