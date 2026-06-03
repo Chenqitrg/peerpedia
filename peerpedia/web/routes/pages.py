@@ -186,6 +186,14 @@ async def review_article_page(request: Request, article_id: str):
             session.commit()
             article = get_article(session, article_id)  # refresh
 
+        # Viewer's existing review for pre-filling the form
+        my_review = None
+        if viewer:
+            for r in reviews:
+                if r.reviewer_id == viewer:
+                    my_review = r.to_dict()
+                    break
+
         return templates.TemplateResponse(
             request=request,
             name="review.html",
@@ -198,6 +206,7 @@ async def review_article_page(request: Request, article_id: str):
                 "all_users": get_all_users(),
                 "sink_pct": sink_pct,
                 "days_left": days_left,
+                "my_review": my_review,
             },
         )
     finally:

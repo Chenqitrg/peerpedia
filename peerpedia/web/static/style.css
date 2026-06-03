@@ -562,6 +562,19 @@ footer {
     font-family: inherit;
 }
 
+/* Muted textarea — shows previous comment greyed out until clicked */
+.muted-textarea {
+    color: #999;
+    background: #f5f5f5;
+    border-style: dashed;
+}
+.muted-textarea:focus,
+.muted-textarea:not(.muted-textarea) {
+    color: var(--text);
+    background: #fff;
+    border-style: solid;
+}
+
 .review-comment-form .form-row {
     display: flex;
     gap: 8px;

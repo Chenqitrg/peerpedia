@@ -46,6 +46,16 @@
         var label = rating.querySelector('.star-label');
         var input = rating.querySelector('input[type=hidden]');
 
+        // Initialize stars from hidden input value
+        var initVal = parseInt(input.value) || 0;
+        stars.forEach(function(s, i) {
+            s.textContent = i < initVal ? '★' : '☆';
+            s.style.color = i < initVal ? '#f59e0b' : '#ccc';
+        });
+        if (initVal > 0 && stars.length >= initVal) {
+            label.textContent = stars[initVal - 1].title;
+        }
+
         stars.forEach(function(star, index) {
             star.addEventListener('mouseenter', function() {
                 stars.forEach(function(s, i) {
@@ -155,6 +165,9 @@
 
         {% if viewer %}
         <section class="review-form" style="margin-top:20px;padding:16px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;">
+            {% set old_comment = my_review.comments if my_review else '' %}
+            {% set has_old = old_comment|length > 0 %}
+
             {% if is_author %}
             <h3>⚔️ 舌战群儒 <span style="font-weight:400;color:#888;font-size:0.85em;">— {{ viewer }}（作者 · 置顶，仅一条）</span></h3>
             <form action="/api/v1/articles/{{ article.id }}/reviews" method="post"
@@ -163,11 +176,19 @@
                 <input type="hidden" name="reviewer_id" value="{{ viewer }}">
                 <input type="hidden" name="decision" value="accept">
                 <label>回应所有评论:
-                    <textarea name="comments" rows="5" placeholder="针对大家的评分和意见，逐条回应..."></textarea>
+                    <textarea name="comments" rows="5" class="muted-textarea"
+                        placeholder="针对大家的评分和意见，逐条回应..."
+                        onclick="this.classList.remove('muted-textarea')"
+                        onfocus="this.classList.remove('muted-textarea')">{{ old_comment }}</textarea>
                 </label>
                 <button type="submit" style="margin-top:8px;background:#dc2626;">⚔️ 发表回应</button>
             </form>
             {% else %}
+            {% set old_orig = my_review.review_originality if my_review else 0 %}
+            {% set old_rig = my_review.review_rigor if my_review else 0 %}
+            {% set old_comp = my_review.review_completeness if my_review else 0 %}
+            {% set old_ped = my_review.review_pedagogy if my_review else 0 %}
+            {% set old_imp = my_review.review_impact if my_review else 0 %}
             <h3>📊 评分并评论 <span style="font-weight:400;color:#888;font-size:0.85em;">— 身份: 匿名者_{{ viewer[:4].upper() }}</span></h3>
             <form action="/api/v1/articles/{{ article.id }}/reviews" method="post"
                   hx-post="/api/v1/articles/{{ article.id }}/reviews"
@@ -182,7 +203,7 @@
                             <span data-value="1" title="搬运/翻译">☆</span><span data-value="2" title="学习笔记">☆</span><span data-value="3" title="随笔习作">☆</span><span data-value="4" title="综述评论">☆</span><span data-value="5" title="原创研究">☆</span>
                         </span>
                         <span class="star-label" style="font-size:0.7em;color:#888;"></span>
-                        <input type="hidden" name="review_originality" value="0">
+                        <input type="hidden" name="review_originality" value="{{ old_orig }}">
                     </div>
                     <div class="star-rating" data-dimension="review_rigor" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
                         <span style="width:80px;font-size:0.82em;">📐 严格性</span>
@@ -190,7 +211,7 @@
                             <span data-value="1" title="非正式讨论">☆</span><span data-value="2" title="直觉科普">☆</span><span data-value="3" title="标准推导">☆</span><span data-value="4" title="严格证明">☆</span><span data-value="5" title="公理形式">☆</span>
                         </span>
                         <span class="star-label" style="font-size:0.7em;color:#888;"></span>
-                        <input type="hidden" name="review_rigor" value="0">
+                        <input type="hidden" name="review_rigor" value="{{ old_rig }}">
                     </div>
                     <div class="star-rating" data-dimension="review_completeness" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
                         <span style="width:80px;font-size:0.82em;">🧩 完整性</span>
@@ -198,7 +219,7 @@
                             <span data-value="1" title="草稿片段">☆</span><span data-value="2" title="部分覆盖">☆</span><span data-value="3" title="核心完整">☆</span><span data-value="4" title="全面覆盖">☆</span><span data-value="5" title="详尽完备">☆</span>
                         </span>
                         <span class="star-label" style="font-size:0.7em;color:#888;"></span>
-                        <input type="hidden" name="review_completeness" value="0">
+                        <input type="hidden" name="review_completeness" value="{{ old_comp }}">
                     </div>
                     <div class="star-rating" data-dimension="review_pedagogy" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
                         <span style="width:80px;font-size:0.82em;">📖 教学性</span>
@@ -206,7 +227,7 @@
                             <span data-value="1" title="个人备忘">☆</span><span data-value="2" title="需领域基础">☆</span><span data-value="3" title="有基础可读">☆</span><span data-value="4" title="教学导向">☆</span><span data-value="5" title="零基础入门">☆</span>
                         </span>
                         <span class="star-label" style="font-size:0.7em;color:#888;"></span>
-                        <input type="hidden" name="review_pedagogy" value="0">
+                        <input type="hidden" name="review_pedagogy" value="{{ old_ped }}">
                     </div>
                     <div class="star-rating" data-dimension="review_impact" style="margin-bottom:0;display:flex;align-items:center;gap:8px;">
                         <span style="width:80px;font-size:0.82em;">💡 影响力</span>
@@ -214,11 +235,14 @@
                             <span data-value="1" title="个人参考">☆</span><span data-value="2" title="小众专题">☆</span><span data-value="3" title="领域相关">☆</span><span data-value="4" title="领域核心">☆</span><span data-value="5" title="奠基/开创">☆</span>
                         </span>
                         <span class="star-label" style="font-size:0.7em;color:#888;"></span>
-                        <input type="hidden" name="review_impact" value="0">
+                        <input type="hidden" name="review_impact" value="{{ old_imp }}">
                     </div>
                 </fieldset>
                 <label>评论:
-                    <textarea name="comments" rows="4" placeholder="对这篇文章的看法..."></textarea>
+                    <textarea name="comments" rows="4" class="muted-textarea"
+                        placeholder="对这篇文章的看法..."
+                        onclick="this.classList.remove('muted-textarea')"
+                        onfocus="this.classList.remove('muted-textarea')">{{ old_comment }}</textarea>
                 </label>
                 <button type="submit" style="margin-top:8px;">💬 发表评分</button>
             </form>
