@@ -49,7 +49,7 @@
 
         {% if tab == 'following' and viewer %}
         <div id="following-feed"
-             hx-get="/api/v1/following/feed?user_id={{ viewer }}"
+             hx-get="/api/v1/following/feed?user_id={{ viewer }}&format=html"
              hx-trigger="load"
              hx-swap="innerHTML">
           <p style="color: #888;">加载中...</p>

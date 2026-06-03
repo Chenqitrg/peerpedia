@@ -324,10 +324,38 @@ def _collect_user_events(session, user_id: str, cutoff) -> list[dict]:
     return events
 
 
+def _render_feed_html(events: list[dict]) -> str:
+    """Render feed events as HTML fragment."""
+    if not events:
+        return '<p class="follow-empty">暂无动态。关注其他用户后，这里会显示他们的最新文章。</p>'
+    items = []
+    for e in events:
+        icon = {"new_article": "📄", "new_version": "🔄"}.get(e["type"], "📌")
+        aid = e["article_id"]
+        uid = e["user_id"]
+        ts = e["time"][:10] if e["time"] else ""
+        items.append(
+            f'<div class="activity-item">'
+            f'<span class="activity-icon">{icon}</span>'
+            f'<span class="activity-text">'
+            f'<a href="/user/{uid}">{uid}</a> '
+            f'{"发表了" if e["type"] == "new_article" else "更新了"} '
+            f'<a href="/article/{aid}">{e["article_title"]}</a>'
+            f'</span>'
+            f'<span class="activity-time">{ts}</span>'
+            f'</div>'
+        )
+    return f'<div class="activity-timeline">{"".join(items)}</div>'
+
+
 @router.get("/following/feed")
-async def api_following_feed(user_id: str):
-    """Get activity feed from followed users (last 30 days)."""
+async def api_following_feed(user_id: str, format: str = "json"):
+    """Get activity feed from followed users (last 60 days).
+
+    Set ?format=html to get an HTML fragment for HTMX swap.
+    """
     from datetime import datetime, timedelta, timezone
+    from fastapi.responses import HTMLResponse
 
     from peerpedia_core.storage.db import get_following
 
@@ -337,14 +365,19 @@ async def api_following_feed(user_id: str):
         followed_ids = [f.followed_id for f in following]
 
         if not followed_ids:
+            if format == "html":
+                return HTMLResponse(_render_feed_html([]))
             return {"user_id": user_id, "events": []}
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=60)
         events = []
         for fid in followed_ids:
             events.extend(_collect_user_events(session, fid, cutoff))  # type: ignore[arg-type]
 
         events.sort(key=lambda e: e["time"], reverse=True)
-        return {"user_id": user_id, "events": events[:50]}
+        result = events[:50]
+        if format == "html":
+            return HTMLResponse(_render_feed_html(result))
+        return {"user_id": user_id, "events": result}
     finally:
         session.close()
