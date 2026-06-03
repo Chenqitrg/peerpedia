@@ -92,10 +92,10 @@
             {% if article.forked_from or article.fork_count %}
             <div style="margin-bottom:12px;font-size:0.85em;color:#666;">
                 {% if article.forked_from %}
-                <span>🔗 Forked from <a href="/article/{{ article.forked_from }}">源文章</a></span>
+                <span>🔗 派生自 <a href="/article/{{ article.forked_from }}">源文章</a></span>
                 {% endif %}
                 {% if article.fork_count %}
-                <span style="margin-left:12px;">🍴 {{ article.fork_count }} fork(s)</span>
+                <span style="margin-left:12px;">🍴 {{ article.fork_count }} 派生</span>
                 {% endif %}
             </div>
             {% endif %}
@@ -105,24 +105,24 @@
             <div style="margin-bottom:12px;">
                 <button onclick="forkArticle('{{ article.id }}', '{{ viewer }}')"
                         style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;">
-                    🍴 Fork 此文章
+                    🍴 派生此文
                 </button>
                 <span id="fork-status" style="margin-left:8px;font-size:0.85em;"></span>
             </div>
             <script>
             function forkArticle(articleId, forkerId) {
                 var status = document.getElementById('fork-status');
-                status.textContent = 'Fork 中...';
+                status.textContent = '派生中...';
                 status.style.color = '#888';
                 var formData = new URLSearchParams();
                 formData.append('forker_id', forkerId);
                 fetch('/api/v1/articles/' + articleId + '/fork', { method: 'POST', body: formData })
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
-                        status.innerHTML = '✅ <a href=\"/article/' + data.article_id + '\">Fork 成功！打开新文章</a>';
+                        status.innerHTML = '✅ <a href=\"/article/' + data.article_id + '\">派生成功！打开新文章</a>';
                     })
                     .catch(function(err) {
-                        status.textContent = '✗ Fork 失败';
+                        status.textContent = '✗ 派生失败';
                         status.style.color = '#c00';
                     });
             }

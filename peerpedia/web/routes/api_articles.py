@@ -152,7 +152,7 @@ async def api_fork_article(article_id: str, forker_id: str = Form(...)):
         from peerpedia_core.storage.db import create_article
         fork = create_article(
             session, id=new_id,
-            title=f"{article.title} (Fork)",
+            title=f"{article.title} （派生）",
             founding_authors=[forker_id],
             abstract=article.abstract or "",
             git_repo_path=str(new_repo),
