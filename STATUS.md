@@ -1,8 +1,8 @@
 # PeerPedia — Project Status & Restart Guide
 
 > 最后更新: 2026-06-03
-> 当前状态: Phase 3 全部完成 (M1+M2+M2.5+M2.6+M3+M4+M5)
-> 测试: 211 tests, 0 failures
+> 当前状态: Phase 3 全部完成 (M1+M2+M2.5+M2.6+M3+M4+M5+M5+)
+> 测试: 242 tests, 0 failures
 > 中文名: 知著网 — 谐音「著作」「蜘蛛网」🕸️，典出「见微知著」
 
 ---
@@ -12,7 +12,7 @@
 ```bash
 cd ~/Projects/peerpedia
 source .venv/bin/activate
-.venv/bin/python -m pytest tests/ -v          # 跑测试（应 196 passed）
+.venv/bin/python -m pytest tests/ -v          # 跑测试（应 242 passed）
 open design/brainstorm.md                     # 打开设计文档
 ```
 
@@ -118,11 +118,15 @@ tests/                   # 19 tests, 0 failures
 | PIP 提案模型 | ✅ |
 | Git backend (init/commit/blame) | ✅ |
 | FastAPI 启动 | ✅ |
-| Web 模板 (首页/文章/提交/审稿) | ✅ |
-| 196 个测试全部通过 | ✅ |
+| Web 模板 (首页/文章/提交/审稿/用户) | ✅ 5 个模板，统一导航栏 + 用户选择器 |
+| 242 个测试全部通过 | ✅ |
 | LAN 节点发现 (UDP) | ✅ |
 | 文章池同步 (catalog.md) | ✅ |
 | 引用点击追踪 (跃迁概率) | ✅ |
+| Cookie 身份持久化 | ✅ viewer cookie + 导航栏用户选择器 |
+| 粉丝/关注列表 | ✅ HTMX 点击展开，format=html API |
+| 作者链接 | ✅ 首页/文章页作者名可点击跳转 |
+| 编译错误处理 | ✅ 返回 HTML 错误信息而非 JSON 异常 |
 | **代码审查** (2026-06-03) | ✅ bug修复 + 模块拆分 + SMI 3.7→2.5 |
 
 ### M3 新增功能
@@ -160,13 +164,34 @@ tests/                   # 19 tests, 0 failures
 | 编译时链接注入 | ✅ inject_citation_links() 替换 peerpedia:id → 可点击 HTML 链接 |
 | 引用侧栏 | ✅ 文章页面右侧边栏，fetch API 加载引用关系，点击跳转 |
 
-### 还是空壳的
+### M5+ Follow + UI Polish 新增功能
 
 | 功能 | 状态 |
 |---|---|
-| LAN 节点发现 | ✅ UDP 广播心跳 (port 3690) |
-| LAN 文章池同步 | ✅ catalog.md (YAML + Markdown) |
-| 引用点击追踪 | ✅ ClickEvent + 跃迁概率 API |
+| Follow ORM + CRUD | ✅ 复合主键 (follower_id, followed_id)，7 个 CRUD 函数 |
+| 关注/取关 API | ✅ POST/DELETE /users/{id}/follow，HTMX 按钮 swap |
+| 粉丝/关注列表 | ✅ GET /users/{id}/followers|following?format=html，点击展开 |
+| 关注动态 Feed | ✅ GET /following/feed，近 30 天 new_article + new_version |
+| 首页 tab 切换 | ✅ 全部文章 / 关注动态，HTMX 懒加载 |
+| Cookie 身份持久化 | ✅ viewer cookie + 导航栏下拉选择器，跨页面保持 |
+| 导航栏"我的主页" | ✅ 所有 5 个模板统一导航，viewer 存在时显示 |
+| 作者名链接 | ✅ 首页 + 文章页 founding_authors 渲染为 /user/{id} 链接 |
+| 编译端点容错 | ✅ 目录/源文件缺失时返回 HTML 提示而非 JSON 异常 |
+| 自关注防护 | ✅ POST /users/{id}/follow，follower_id == user_id → 400 |
+| 回归测试 | ✅ +31 tests（15 Bug 修复 + 16 Follow/Cookie UI）|
+
+### 已知缺口
+
+| 缺口 | 说明 | 优先级 |
+|---|---|---|
+| 贡献时间线 UI | API 有 `/contributions`，文章页未展示 git blame 时间线 | 🟡 |
+| 编辑提案 UI | API 完整，无前端提交/审核提案的界面 | 🟡 |
+| 协作按钮 | API 有 `/collaborate`，审稿页面无"申请协作"按钮 | 🟡 |
+| 引用跃迁图表 | API 有 `/citations/transitions`，无可视化 | 🟢 |
+| 身份绑定 UI | API 有 POST `/users/{id}/identities`，无表单 | 🟢 |
+| LAN 状态页面 | API 有 `/lan/status`，无专属页面 | 🟢 |
+| 审稿入口 | 文章页无"审稿"按钮，队列只显示 submitted 状态 | 🟡 |
+| Demo 数据 | 4 篇 Markdown 文章 + 4 个用户 + 7 条关注关系 | ✅ |
 
 ---
 
@@ -182,7 +207,7 @@ peerpedia --help                     # CLI 帮助
 |---|---|---|
 | CLI | Python click | `peerpedia/cli/main.py` |
 | Web | FastAPI + Jinja2 + HTMX | `peerpedia/web/` |
-| ORM | SQLAlchemy (6 张表) | `pyproject.toml` |
+| ORM | SQLAlchemy (8 张表) | `pyproject.toml` |
 | Git | GitPython | `peerpedia_core/storage/git_backend.py` |
 | 消息模型 | Pydantic v2 | `peerpedia_core/protocol/messages.py` |
 | 测试 | pytest | `tests/` |
@@ -192,9 +217,9 @@ peerpedia --help                     # CLI 帮助
 ## 下一步
 
 1. 打开 `design/brainstorm.md` 回顾设计文档
-2. 运行 `.venv/bin/python -m pytest tests/ -v` 确认 157 tests pass
-3. Phase 3 全部完成 ✅ (M1-M5, 196 tests)
-4. 下一步: Phase 4 IPFS 集成 或 Phase 5 种子社区测试
+2. 运行 `.venv/bin/python -m pytest tests/ -v` 确认 242 tests pass
+3. Phase 3 全部完成 ✅ (M1-M5+, 242 tests)
+4. 下一步: Phase 5 种子社区测试（5-10 人实际使用）
 
 ---
 
@@ -202,12 +227,13 @@ peerpedia --help                     # CLI 帮助
 
 ```
 ~/Projects/peerpedia/
-├── design/brainstorm.md     ← 完整设计文档（39项决策）
+├── design/brainstorm.md     ← 完整设计文档（53项决策）
 ├── STATUS.md                ← 本文件，重启指南
 ├── README.md                ← 项目简介
 ├── pyproject.toml           ← 构建配置 + 依赖
+├── docs/superpowers/        ← 设计规范 + 实现计划
 ├── .venv/                   ← Python 虚拟环境
 ├── peerpedia_core/          ← 协议库（5子包，16模块）
 ├── peerpedia/               ← 参考客户端（CLI + Web，12模块）
-└── tests/                   ← 测试（157 passed, 0 failures）
+└── tests/                   ← 测试（242 passed, 0 failures, 20 test files）
 ```
