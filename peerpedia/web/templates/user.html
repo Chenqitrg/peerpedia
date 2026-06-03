@@ -151,7 +151,7 @@
             <article class="article-card">
                 <h4><a href="/article/{{ a.id }}">{{ a.title }}</a></h4>
                 <p class="meta">
-                    <span class="status {{ a.status }}">{{ a.status }}</span>
+                    <span class="status {{ a.status }}">{{ status_zh.get(a.status, a.status) }}</span>
                     · {{ a.format }}
                     · {{ a.created_at[:10] if a.created_at else "" }}
                 </p>
@@ -170,7 +170,7 @@
             <article class="article-card">
                 <h4><a href="/article/{{ m.id }}">{{ m.title }}</a></h4>
                 <p class="meta">
-                    <span class="status {{ m.status }}">{{ m.status }}</span>
+                    <span class="status {{ m.status }}">{{ status_zh.get(m.status, m.status) }}</span>
                     · arXiv:{{ m.source_arxiv_id or '?' }}
                     · {{ m.created_at[:10] if m.created_at else "" }}
                 </p>

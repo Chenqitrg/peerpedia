@@ -18,6 +18,18 @@ router = APIRouter()
 templates_dir = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
+STATUS_ZH = {
+    "draft": "草稿",
+    "submitted": "已提交",
+    "in_review": "审稿中",
+    "revisions_requested": "需修改",
+    "accepted": "已接受",
+    "published": "已发表",
+    "rejected": "已拒绝",
+    "edit_proposed": "编辑提案中",
+}
+templates.env.globals["status_zh"] = STATUS_ZH
+
 
 def get_viewer(request: Request) -> str:
     """Get current viewer from cookie, query param, or empty string."""

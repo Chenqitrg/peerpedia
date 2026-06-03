@@ -80,7 +80,7 @@
                         {% endfor %}
                         {% else %}未知{% endif %}
                         · {{ article.format }}
-                        · <span class="status {{ article.status }}">{{ article.status }}</span>
+                        · <span class="status {{ article.status }}">{{ status_zh.get(article.status, article.status) }}</span>
                         · {{ article.created_at[:10] if article.created_at else "" }}
                     </p>
                     {% if article.abstract %}

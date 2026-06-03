@@ -97,7 +97,7 @@
                     {% endfor %}
                 </span>
                 <span>版本: {{ article.version }}</span>
-                <span>状态: {{ article.status }}</span>
+                <span>状态: {{ status_zh.get(article.status, article.status) }}</span>
                 {% if article.status in ('submitted', 'in_review') %}
                 <span><a href="/review/{{ article.id }}" class="btn-review">✏️ 审稿</a></span>
                 {% endif %}

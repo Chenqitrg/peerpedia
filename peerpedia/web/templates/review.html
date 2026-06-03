@@ -262,7 +262,7 @@
             <h3><a href="/review/{{ a.id }}">{{ a.title }}</a></h3>
             <p class="meta">
                 {{ a.founding_authors | join(", ") }} · {{ a.format }} ·
-                <span class="status {{ a.status }}">{{ a.status }}</span>
+                <span class="status {{ a.status }}">{{ status_zh.get(a.status, a.status) }}</span>
             </p>
             <p class="abstract">{{ a.abstract[:200] }}</p>
         </article>
