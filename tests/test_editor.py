@@ -187,3 +187,33 @@ def test_preview_pane_has_math_delimiters():
     response = client.get("/edit")
     assert "renderMathInElement" in response.text
     assert "$$" in response.text
+
+
+def test_editor_and_preview_equal_width():
+    """Bug: panes were different sizes and jumped around while typing.
+
+    Both panes must have width:50% and flex-shrink:0 to prevent content
+    from pushing the layout around.
+    """
+    response = client.get("/edit")
+    html = response.text
+    # Editor pane must have fixed width
+    assert 'width:50%' in html
+    assert 'flex-shrink:0' in html
+    # Preview pane must have word-wrap to prevent horizontal overflow
+    assert 'word-wrap:break-word' in html
+
+
+def test_easymde_container_constrained():
+    """Bug: EasyMDE container overflowed the left pane.
+
+    CSS must constrain .EasyMDEContainer to 100% width/height and hide
+    EasyMDE's built-in preview (we use our own).
+    """
+    response = client.get("/edit")
+    html = response.text
+    assert '.EasyMDEContainer' in html
+    assert 'width: 100% !important' in html
+    assert 'height: 100% !important' in html
+    assert '.editor-preview' in html
+    assert 'display: none !important' in html
