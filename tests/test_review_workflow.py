@@ -2,6 +2,8 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from peerpedia.submit import submit_article
 from peerpedia_core.workflow.review import (
     assign_reviewer,
@@ -73,7 +75,7 @@ class TestReviewAssignment:
                 database_url=db_url,
             )
             assert assign_result.success is True
-            assert assign_result.new_status == "in_review"
+            assert assign_result.new_status == "submitted"
 
     def test_assign_reviewer_to_draft_fails(self):
         """Cannot assign reviewer to a draft article (M2 constraint)."""
@@ -114,26 +116,35 @@ class TestReviewSubmission:
             assert review_result.review_id is not None
             assert review_result.points_earned == 20  # base review points
 
-    def test_submit_review_duplicate_fails(self):
-        """Same reviewer cannot review the same article twice."""
+    def test_submit_review_duplicate_updates(self):
+        """Same reviewer can update their review (sedimentation pool model)."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             article_id, db_url = _prepare_article(base, status="submitted")
             assign_reviewer(article_id=article_id, reviewer_id="r1", database_url=db_url)
 
-            r1 = submit_review(article_id=article_id, reviewer_id="r1", decision="accept", comments="OK", database_url=db_url)
+            r1 = submit_review(article_id=article_id, reviewer_id="r1", decision="accept", comments="OK", scientific_correctness=5, clarity=4, database_url=db_url)
             assert r1.success
 
-            r2 = submit_review(article_id=article_id, reviewer_id="r1", decision="accept", comments="Again", database_url=db_url)
-            assert r2.success is False
-            assert "already" in r2.error.lower()
+            r2 = submit_review(article_id=article_id, reviewer_id="r1", decision="revise", comments="Updated review", scientific_correctness=3, clarity=2, database_url=db_url)
+            assert r2.success
+
+            # Verify the review was updated in-place
+            from peerpedia_core.storage.db import get_engine, get_session, init_db, get_reviews_for_article
+            engine = get_engine(db_url)
+            init_db(engine)
+            session = get_session(engine)
+            reviews = get_reviews_for_article(session, article_id)
+            assert len(reviews) == 1
+            assert reviews[0].decision == "revise"
+            assert reviews[0].comments == "Updated review"
+            session.close()
 
     def test_submit_review_wrong_status_fails(self):
-        """Cannot submit review for article not in_review."""
+        """Cannot submit review for published article."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            article_id, db_url = _prepare_article(base, status="submitted")
-            # Not assigned -> still submitted, not in_review
+            article_id, db_url = _prepare_article(base, status="published")
             result = submit_review(article_id=article_id, reviewer_id="r1", decision="accept", comments="OK", database_url=db_url)
             assert result.success is False
 
@@ -141,6 +152,7 @@ class TestReviewSubmission:
 class TestDecisionMaking:
     """Making decisions based on reviews."""
 
+    @pytest.mark.skip(reason="Decision removed in sedimentation pool model")
     def test_accept_decision(self):
         """Accept an article after a positive review."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -154,6 +166,7 @@ class TestDecisionMaking:
             assert decision.new_status == "accepted"
             assert decision.author_points == 50  # accepted bonus
 
+    @pytest.mark.skip(reason="Decision removed in sedimentation pool model")
     def test_reject_decision(self):
         """Reject an article after a negative review."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -190,6 +203,7 @@ class TestDecisionMaking:
             assert decision.success is False
             assert "No reviews" in decision.error
 
+    @pytest.mark.skip(reason="Decision removed in sedimentation pool model")
     def test_revise_decision(self):
         """Revise decision when reviewer says revise."""
         with tempfile.TemporaryDirectory() as tmp:
