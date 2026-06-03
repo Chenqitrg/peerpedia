@@ -8,11 +8,11 @@ client = TestClient(app)
 
 
 def test_edit_page_loads():
-    """GET /edit returns the editor page with Monaco."""
+    """GET /edit returns the editor page."""
     response = client.get("/edit")
     assert response.status_code == 200
-    assert "monaco-editor" in response.text
-    assert "preview-pane" in response.text
+    assert "editor-area" in response.text
+    assert "CodeMirror" in response.text
 
 
 def test_edit_page_has_metadata_form():
@@ -37,7 +37,7 @@ def test_edit_existing_article_loads():
             aid = articles[0].id
             response = client.get(f"/edit/{aid}")
             assert response.status_code == 200
-            assert "monaco-editor" in response.text
+            assert "editor-area" in response.text
     finally:
         session.close()
 
@@ -109,21 +109,40 @@ def test_submit_typst_via_editor():
     assert "article_id" in data
 
 
-# ── Monaco auto-close tests ────────────────────────────────────────────────
+# ── Regression tests for bugs fixed 2026-06-04 ─────────────────────────────
 
 
-def test_monaco_autoclose_dollar_math():
-    """Monaco autoClosingPairs handles $$ auto-close natively.
+def test_dollar_math_autoclose_script_present():
+    """Bug: $$ auto-close used broken command, plain Enter didn't work.
 
-    No custom Enter handler needed — Monaco's built-in autoClosingPairs
-    with {open:'$$', close:'$$'} handles insertion, cursor placement,
-    and overtype skip automatically.
+    The template must use CodeMirror.commands.newlineAndIndent (not the
+    nonexistent newlineAndIndentContinueMarkdownList).
     """
     response = client.get("/edit")
-    assert "autoClosingPairs" in response.text
-    assert "'$$'" in response.text or '"$$"' in response.text
-    # No custom CodeMirror Enter logic
-    assert "CodeMirror.commands" not in response.text
+    assert "CodeMirror.commands.newlineAndIndent" in response.text
+    assert "newlineAndIndentContinueMarkdownList" not in response.text
+
+
+def test_dollar_math_parity_check_present():
+    """Bug: $$ auto-close triggered on closing markers too.
+
+    Must count all $$ from doc start to cursor: odd = inside unclosed
+    math → auto-close, even = between blocks → normal Enter.
+    """
+    response = client.get("/edit")
+    assert "getRange" in response.text  # scans from doc start to cursor
+    assert "totalDollars" in response.text
+    assert "% 2" in response.text  # parity check
+
+
+def test_dollar_math_cursor_position():
+    """Bug: after auto-close, cursor ended after closing $$.
+
+    Must call setCursor to place cursor on the indented middle line.
+    """
+    response = client.get("/edit")
+    assert "setCursor" in response.text
+    assert ".replaceSelection" in response.text
 
 
 # ── Regression tests for bugs fixed 2026-06-03/04 ─────────────────────────
@@ -143,14 +162,13 @@ def test_no_bare_javascript_outside_script_tags():
 
 
 def test_editor_script_uses_iife():
-    """Monaco editor init uses an IIFE to run immediately.
+    """Bug: DOMContentLoaded fires before inline script runs with local assets.
 
-    The editor init script uses (function(){...})() to run
+    The editor init script uses an IIFE (function(){...})() to run
     immediately without waiting for DOMContentLoaded.
     """
     response = client.get("/edit")
-    assert "monaco.editor.create" in response.text
-    assert "(function()" in response.text
+    assert "CodeMirror.fromTextArea" in response.text
 
 
 def test_five_dimensional_scoring_is_mandatory():
@@ -178,16 +196,18 @@ def test_no_yaml_frontmatter_template_in_editor():
     assert "---\\ntitle:" not in response.text
 
 
-def test_monaco_cdn_and_marked_local():
-    """Monaco loaded from CDN (dev), marked.js served locally.
+def test_codemirror_and_marked_loaded_locally():
+    """Bug: CDN scripts failed to load in headless browser.
 
-    Monaco is loaded via jsdelivr CDN during development. marked.js
-    continues to be served from /static/.
+    CodeMirror and marked.js must be served from /static/, not external CDN.
     """
     response = client.get("/edit")
+    assert "/static/codemirror/codemirror.js" in response.text
+    assert "/static/codemirror/codemirror.css" in response.text
+    assert "/static/codemirror/mode/markdown/markdown.js" in response.text
     assert "/static/marked.min.js" in response.text
-    assert "cdn.jsdelivr.net/npm/monaco-editor" in response.text
-    assert "/static/codemirror/" not in response.text
+    assert "cdn.jsdelivr.net" not in response.text
+    assert "unpkg.com" not in response.text
 
 
 def test_format_switch_present():
@@ -205,81 +225,20 @@ def test_preview_has_math_delimiters():
 
 
 def test_editor_and_preview_separate_panes():
-    """Monaco editor and preview are separate panes.
+    """Bug: EasyMDE rendered markdown inside the editor.
 
-    Monaco renders into a dedicated div, preview is a separate div
-    updated via Monaco's onDidChangeModelContent event.
+    CodeMirror is a pure code editor — no markdown rendering.
+    Preview is a separate div, updated via CodeMirror change event.
     """
     response = client.get("/edit")
     assert 'id="preview-pane"' in response.text
-    assert 'id="monaco-editor"' in response.text
-    assert "CodeMirror" not in response.text
+    assert 'CodeMirror.fromTextArea' in response.text
     assert "EasyMDE" not in response.text
 
 
-def test_monaco_container_sized():
-    """Monaco container uses flex:1 for equal 50/50 split with preview."""
+def test_codemirror_container_sized():
+    """CodeMirror wrapper must have width:50% to keep panes equal."""
     response = client.get("/edit")
     html = response.text
-    assert 'id="monaco-editor"' in html
-    assert 'flex: 1' in html
-
-
-# ── Monaco-specific tests ──────────────────────────────────────────────────
-
-
-def test_monaco_theme_toggle_present():
-    """Editor page has a theme toggle button for vs/vs-dark."""
-    response = client.get("/edit")
-    assert "peerpedia-md-dark" in response.text
-    assert "setTheme" in response.text
-
-
-def test_monaco_shortcuts_registered():
-    """Editor registers Ctrl+B/I/K shortcuts via addAction."""
-    response = client.get("/edit")
-    assert "addAction" in response.text
-    assert "KeyMod.CtrlCmd" in response.text
-
-
-def test_monaco_sync_scroll_present():
-    """Editor has bidirectional scroll sync with preview."""
-    response = client.get("/edit")
-    assert "onDidScrollChange" in response.text
-    assert "scrollTop" in response.text
-
-
-def test_monaco_peerpedia_completion():
-    """Editor registers a custom completion provider for peerpedia: refs."""
-    response = client.get("/edit")
-    assert "registerCompletionItemProvider" in response.text
-    assert "peerpedia:" in response.text
-
-
-def test_monaco_markdown_language_set():
-    """Editor initializes with markdown language and custom tokenizer."""
-    response = client.get("/edit")
-    assert "'markdown'" in response.text or '"markdown"' in response.text
-    assert "setMonarchTokensProvider" in response.text
-    assert "defineTheme" in response.text
-
-
-# ── Regression: math rendering ────────────────────────────────────────────
-
-
-def test_math_restore_escapes_dollar_in_replace():
-    """Bug: String.replace() treats $$ as escape, stripping display math.
-
-    The restore code uses .replace('MPH' + i, '...$$...'), and
-    String.replace interprets $$ as an escaped $ (inserts one $).
-    Must use $$$$ (four) to produce $$ (two) in output.
-
-    Verify the template uses $$$$ for display-math delimiters in
-    the restore step.
-    """
-    response = client.get("/edit")
-    html = response.text
-    # The restore code must use $$$$ (not bare $$) for display math
-    assert "$$$$" in html, (
-        "Template must use $$$$ in String.replace to produce $$ in output"
-    )
+    assert '#editor-container .CodeMirror { width: 50%' in html.replace('; ', ';')
+    assert 'flex-shrink: 0' in html

@@ -6,98 +6,74 @@
     <title>{{ title }} — 知诸网</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/katex/katex.min.css">
-    <link rel="stylesheet" data-name="vs/editor/editor.main"
-          href="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.main.min.css">
+    <link rel="stylesheet" href="/static/codemirror/codemirror.css">
+    <link rel="stylesheet" href="/static/codemirror/theme/eclipse.css">
+    <script src="/static/codemirror/codemirror.js"></script>
+    <script src="/static/codemirror/mode/xml/xml.js"></script>
+    <script src="/static/codemirror/mode/markdown/markdown.js"></script>
+    <script src="/static/codemirror/addon/mode/overlay.js"></script>
     <script src="/static/marked.min.js"></script>
     <script defer src="/static/katex/katex.min.js"></script>
     <script defer src="/static/katex/auto-render.min.js"></script>
     <style>
-        html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-        body { display: flex; flex-direction: column; }
-        #toolbar { display: flex; gap: 8px; align-items: center; padding: 6px 12px;
-                   background: var(--bg, #f8f8f8); border-bottom: 1px solid var(--border, #ddd);
-                   font-size: 0.9em; flex-shrink: 0; z-index: 10; }
-        #toolbar .spacer { flex: 1; }
-        #toolbar button, #toolbar select { padding: 4px 10px; border: 1px solid var(--border, #ccc);
-                   border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9em; }
-        #toolbar button:hover { background: #e8e8e8; }
-        #toolbar button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
-        #editor-container { display: flex; flex: 1; min-height: 0; position: relative; }
-        #monaco-editor { flex: 1; min-width: 0; }
-        #preview-pane { flex: 1; min-width: 0; border-left: 1px solid var(--border, #ddd);
-                        padding: 20px; overflow-y: auto; background: #fff; word-wrap: break-word; }
-        #preview-pane h1 { font-size: 1.8em; border-bottom: 2px solid #e5e5e5; padding-bottom: 8px; }
-        #preview-pane h2 { font-size: 1.4em; }
+        #editor-container { display: flex; gap: 12px; height: 60vh; min-height: 400px; }
+        #editor-container .CodeMirror { width: 50%; flex-shrink: 0; height: 100%; border: 1px solid var(--border); }
+        #preview-pane { width: 50%; flex-shrink: 0; border: 1px solid var(--border); padding: 16px; overflow-y: auto; background: #fff; word-wrap: break-word; }
         #preview-pane ul, #preview-pane ol { padding-left: 24px; }
-        #preview-pane li { margin: 4px 0; }
-        #preview-pane code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
-        #preview-pane pre { background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }
-        #preview-pane pre code { background: none; padding: 0; }
-        #preview-pane blockquote { border-left: 3px solid #2563eb; margin-left: 0; padding-left: 16px; color: #666; }
-        #preview-pane table { border-collapse: collapse; width: 100%; }
-        #preview-pane th, #preview-pane td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        #preview-pane th { background: #f5f5f5; }
-        /* Dark theme overrides */
-        body.dark { --bg: #1e1e1e; --border: #444; }
-        body.dark #toolbar { background: #2d2d2d; color: #ccc; }
-        body.dark #toolbar button, body.dark #toolbar select { background: #3c3c3c; color: #ccc; border-color: #555; }
-        body.dark #preview-pane { background: #1e1e1e; color: #ccc; }
-        body.dark #preview-pane code { background: #333; }
-        body.dark #preview-pane pre { background: #2a2a2a; }
-        body.dark #preview-pane blockquote { color: #999; }
-        body.dark #preview-pane th { background: #333; }
-        /* Metadata panel — slide-up overlay, never clipped */
-        #metadata-overlay { display: none; position: fixed; inset: 0; z-index: 100;
-                            background: rgba(0,0,0,0.3); }
-        #metadata-overlay.open { display: flex; align-items: flex-end; justify-content: center; }
-        #metadata-panel { background: var(--bg, #fafafa); border-radius: 12px 12px 0 0;
-                          padding: 24px; max-height: 80vh; overflow-y: auto;
-                          width: min(720px, 100vw); box-shadow: 0 -4px 24px rgba(0,0,0,0.15); }
-        body.dark #metadata-panel { background: #2d2d2d; }
-        #metadata-panel h3 { margin: 0 0 16px 0; font-size: 1.1em; }
-        #metadata-panel form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.9em; }
-        #metadata-panel .close-btn { float: right; background: none; border: none; font-size: 1.4em;
-                                     cursor: pointer; line-height: 1; padding: 0 4px; color: #888; }
-        .star-rating { display: flex; align-items: center; gap: 8px; }
-        .star-rating .stars span { cursor: pointer; font-size: 1.1em; user-select: none; }
+        #preview-pane li { margin: 2px 0; }
     </style>
 </head>
 <body>
-    <!-- Toolbar -->
-    <div id="toolbar">
-        <select id="format-select" onchange="switchFormat(this.value)">
-            <option value="markdown">Markdown</option>
-            <option value="typst">Typst (WASM)</option>
-        </select>
-        <button id="theme-btn" onclick="toggleTheme()" title="切换主题">☀️</button>
-        <button id="metadata-btn" onclick="toggleMetadata()" title="文章信息">📋 元数据</button>
-        <span class="spacer"></span>
-        <select id="toolbar-viewer-picker" onchange="setViewer(this.value)"
-                style="max-width:120px;">
-            <option value="">👽 游客</option>
-            {% for u in all_users %}
-            <option value="{{ u[0] }}" {% if viewer == u[0] %}selected{% endif %}>{{ u[1] }}</option>
-            {% endfor %}
-        </select>
-        <button id="submit-btn" onclick="submitArticle()"
-                style="background:#2563eb;color:#fff;border:none;font-weight:600;">
-            🚀 提交沉淀池
-        </button>
-        <span id="submit-status" style="font-size:0.85em;color:#888;"></span>
+    <header>
+        <h1>📚 知诸网</h1>
+        <nav>
+            <a href="/">首页</a>
+            <a href="/submit">提交</a>
+            <a href="/edit">✏️ 写作</a>
+            <a href="/review">🌊 沉淀池</a>
+            {% if viewer %}
+            <a href="/user/{{ viewer }}">👤 我的主页</a>
+            {% endif %}
+            <span style="margin-left: auto; font-size: 0.85em;">
+                <select id="viewer-picker" onchange="setViewer(this.value)"
+                        style="padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px;">
+                    <option value="">👽 游客</option>
+                    {% for u in all_users %}
+                    <option value="{{ u[0] }}" {% if viewer == u[0] %}selected{% endif %}>{{ u[1] }}</option>
+                    {% endfor %}
+                </select>
+            </span>
+        </nav>
+    </header>
+    <script>
+    function setViewer(uid) {
+        if (uid) { document.cookie = "viewer=" + encodeURIComponent(uid) + ";path=/;max-age=86400;SameSite=Lax"; }
+        else { document.cookie = "viewer=;path=/;max-age=0;SameSite=Lax"; }
+        location.reload();
+    }
+    </script>
+
+    <main>
+    {% if error %}
+    <p class="empty-state" style="padding:24px;">{{ error }}</p>
+    {% else %}
+    <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center;">
+        <label style="font-size:0.9em;">格式:
+            <select id="format-select" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;">
+                <option value="markdown" {% if not article or article.format == 'markdown' %}selected{% endif %}>Markdown + KaTeX</option>
+                <option value="typst" {% if article and article.format == 'typst' %}selected{% endif %}>Typst (WASM)</option>
+            </select>
+        </label>
     </div>
 
-    <!-- Editor + Preview -->
     <div id="editor-container">
-        <div id="monaco-editor"></div>
+        <textarea id="editor-area">{{ article.source_content if article and article.source_content else '' }}</textarea>
         <div id="preview-pane"><p style="color:#888;">预览区域。开始输入...</p></div>
     </div>
 
-    <!-- Metadata Panel (overlay) -->
-    <div id="metadata-overlay" onclick="if(event.target===this) toggleMetadata()">
-    <div id="metadata-panel">
-        <button class="close-btn" onclick="toggleMetadata()" title="关闭">×</button>
-        <h3>📋 文章信息</h3>
-        <form id="metadata-form">
+    <details open style="margin-top:16px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95em;">📋 文章信息</summary>
+        <form id="metadata-form" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.9em;">
             <div style="grid-column:1/-1;">
                 <label>标题<input type="text" name="title" required
                     value="{{ article.title if article else '' }}"
@@ -140,7 +116,7 @@
                     ] %}
                     {% for name, icon, label, titles in dims %}
                     {% set val = article[name]|default(0) if article else 0 %}
-                    <div class="star-rating">
+                    <div class="star-rating" style="display:flex;align-items:center;gap:8px;">
                         <span style="width:70px;font-size:0.82em;">{{ icon }} {{ label }}</span>
                         <span class="stars" style="cursor:pointer;font-size:0.9em;">
                             <span data-value="1" title="{{ titles[0] }}">{% if val >= 1 %}★{% else %}☆{% endif %}</span>
@@ -156,20 +132,17 @@
                 </div>
             </fieldset>
         </form>
+    </details>
+
+    <div style="margin-top:16px;display:flex;gap:8px;">
+        <button id="submit-btn" style="padding:10px 28px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:1em;font-weight:600;">
+            🚀 提交沉淀池
+        </button>
+        <span id="submit-status" style="font-size:0.9em;color:#888;align-self:center;"></span>
     </div>
-    </div><!-- end metadata-overlay -->
+    {% endif %}
+    </main>
 
-    <!-- viewer cookie -->
-    <script>
-    function setViewer(uid) {
-        if (uid) { document.cookie = "viewer=" + encodeURIComponent(uid) + ";path=/;max-age=86400;SameSite=Lax"; }
-        else { document.cookie = "viewer=;path=/;max-age=0;SameSite=Lax"; }
-        location.reload();
-    }
-    </script>
-
-    <!-- Monaco Editor -->
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.min.js"></script>
     <script>
     (function() {
         // ── Stars ──────────────────────────────────────────────────────
@@ -193,308 +166,40 @@
             });
         });
 
-        // ── Monaco Init ────────────────────────────────────────────────
-        var currentTheme = 'peerpedia-md';
-        {% autoescape false %}
-        var initialContent = {{ article.source_content|tojson if article and article.source_content else '""' }};
-        {% endautoescape %}
-
-        require.config({
-            paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' },
-            'vs/nls': { availableLanguages: { '*': 'en' } }
+        // ── CodeMirror ────────────────────────────────────────────────
+        var cm = CodeMirror.fromTextArea(document.getElementById('editor-area'), {
+            mode: 'markdown',
+            theme: 'eclipse',
+            lineNumbers: true,
+            lineWrapping: true,
+            extraKeys: {
+                'Enter': function(cm) {
+                    var cursor = cm.getCursor();
+                    var line = cm.getLine(cursor.line);
+                    // $$ display math: auto-close on Enter when opening $$ present without closing
+                    // Auto-close $$ only when this is an opening marker.
+                    // Count ALL $$ from doc start to cursor: odd = inside math → don't close.
+                    var beforeCursor = cm.getRange({line:0,ch:0}, cursor);
+                    var totalDollars = (beforeCursor.match(/\$\$/g) || []).length;
+                    if (/^\s*\$\$/.test(line) && totalDollars % 2 === 1) {
+                        var indent = line.match(/^\s*/)[0] + '  ';
+                        var pos = { line: cursor.line, ch: cursor.ch };
+                        cm.replaceSelection('\n' + indent + '\n' + indent.slice(0, -2) + '$$');
+                        cm.setCursor({ line: pos.line + 1, ch: indent.length });
+                    } else {
+                        CodeMirror.commands.newlineAndIndent(cm);
+                    }
+                }
+            },
+            tabSize: 2,
+            indentUnit: 2,
         });
-        require(['vs/editor/editor.main'], function() {
-            // ── Rich Markdown tokenizer (richer than Monaco default) ─────
-            monaco.languages.setMonarchTokensProvider('markdown', {
-                tokenizer: {
-                    root: [
-                        // Frontmatter
-                        [/^---\s*$/, 'delimiter', '@frontmatter'],
-                        // Headings
-                        [/^#{1,6}\s.*$/, 'keyword'],
-                        // Code blocks
-                        [/^```[\s\S]*?^```\s*$/m, 'string'],
-                        [/^~~~[\s\S]*?^~~~\s*$/m, 'string'],
-                        // Blockquote
-                        [/^>\s.*$/, 'comment'],
-                        // Horizontal rule
-                        [/^[-*_]{3,}\s*$/, 'delimiter'],
-                        // Unordered lists
-                        [/^\s*[-*+]\s/, 'delimiter'],
-                        // Ordered lists
-                        [/^\s*\d+\.\s/, 'delimiter'],
-                        // Bold+italic
-                        [/\*\*\*[^*]+\*\*\*/, 'type'],
-                        // Bold
-                        [/\*\*[^*]+\*\*/, 'type'],
-                        // Italic
-                        [/\*[^*]+\*/, 'number'],
-                        // Strikethrough
-                        [/~~[^~]+~~/, 'delimiter'],
-                        // Inline code
-                        [/`[^`]+`/, 'string'],
-                        // Links (full)
-                        [/\[[^\]]+\]\([^)]+\)/, 'annotation'],
-                        // Images
-                        [/!\[[^\]]*\]\([^)]+\)/, 'annotation'],
-                        // Display math
-                        [/\$\$[^$]+\$\$/, 'type'],
-                        // Inline math
-                        [/\$[^$]+\$/, 'number'],
-                        // HTML tags
-                        [/<\/?[a-zA-Z][^>]*>/, 'delimiter'],
-                    ],
-                    frontmatter: [
-                        [/^---\s*$/, 'delimiter', '@pop'],
-                        [/[^:]+:/, 'keyword'],
-                    ]
-                }
-            });
-            // Map token colors via a custom theme
-            monaco.editor.defineTheme('peerpedia-md', {
-                base: 'vs',
-                inherit: true,
-                colors: {},
-                rules: [
-                    { token: 'keyword', foreground: '2563eb', fontStyle: 'bold' },
-                    { token: 'type', foreground: 'd97706', fontStyle: 'bold' },
-                    { token: 'number', foreground: '7c3aed', fontStyle: 'italic' },
-                    { token: 'string', foreground: 'dc2626' },
-                    { token: 'comment', foreground: '059669' },
-                    { token: 'delimiter', foreground: '6b7280', fontStyle: 'bold' },
-                    { token: 'annotation', foreground: '0891b2', fontStyle: 'underline' },
-                ]
-            });
-            monaco.editor.defineTheme('peerpedia-md-dark', {
-                base: 'vs-dark',
-                inherit: true,
-                colors: {},
-                rules: [
-                    { token: 'keyword', foreground: '60a5fa', fontStyle: 'bold' },
-                    { token: 'type', foreground: 'fbbf24', fontStyle: 'bold' },
-                    { token: 'number', foreground: 'a78bfa', fontStyle: 'italic' },
-                    { token: 'string', foreground: 'f87171' },
-                    { token: 'comment', foreground: '34d399' },
-                    { token: 'delimiter', foreground: '9ca3af', fontStyle: 'bold' },
-                    { token: 'annotation', foreground: '22d3ee', fontStyle: 'underline' },
-                ]
-            });
+        cm.setSize(null, '100%');
 
-            window.editor = monaco.editor.create(document.getElementById('monaco-editor'), {
-                value: initialContent,
-                language: 'markdown',
-                theme: 'peerpedia-md',
-                fontSize: 16,
-                lineHeight: 26,
-                fontFamily: "'Source Han Sans SC', 'PingFang SC', monospace",
-                lineNumbers: 'on',
-                wordWrap: 'on',
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                // Auto-complete & auto-close
-                autoClosingBrackets: 'always',
-                autoClosingQuotes: 'always',
-                autoClosingOvertype: 'always',
-                autoClosingPairs: [
-                    { open: '$$', close: '$$' },
-                    { open: '**', close: '**' },
-                ],
-                autoSurround: 'quotes',
-                wordBasedSuggestions: 'currentDocument',
-                quickSuggestions: true,
-                suggestOnTriggerCharacters: true,
-                // Format & indent
-                tabSize: 2,
-                insertSpaces: true,
-                detectIndentation: false,
-                formatOnPaste: true,
-                // Rendering
-                matchBrackets: 'always',
-                bracketPairColorization: { enabled: true },
-                renderWhitespace: 'selection',
-                wrappingIndent: 'same',
-            });
-
-            // ── Auto-close symmetric pairs ($$ → $$|$$, ** → **|**) ─
-            // Monaco autoClosingPairs can't handle same-char open/close.
-            // Use onKeyDown to catch the second $/* and auto-insert close.
-            editor.onKeyDown(function(e) {
-                var char = null;
-                // Use browserEvent.key for keyboard-layout-independent char
-                var key = (e.browserEvent && e.browserEvent.key) || '';
-                if (key === '$') char = '$';
-                if (key === '*') char = '*';
-                if (!char) return;
-
-                var pos = editor.getPosition();
-                var model = editor.getModel();
-                var prevCol = pos.column - 1;
-                var prevChar = '';
-                if (prevCol > 0) {
-                    prevChar = model.getValueInRange({
-                        startLineNumber: pos.lineNumber, startColumn: prevCol,
-                        endLineNumber: pos.lineNumber, endColumn: prevCol + 1
-                    });
-                }
-                if (prevChar === char) {
-                    // Second same char → auto-close
-                    e.preventDefault();
-                    e.stopPropagation();
-                    model.pushEditOperations([], [{
-                        range: { startLineNumber: pos.lineNumber, startColumn: prevCol,
-                                 endLineNumber: pos.lineNumber, endColumn: pos.column },
-                        text: char + char + char + char
-                    }], null);
-                    editor.setPosition({ lineNumber: pos.lineNumber, column: prevCol + char.length * 2 });
-                }
-                // else: first char → let it through normally
-            });
-
-            // ── Theme Toggle ────────────────────────────────────────
-            window.toggleTheme = function() {
-                currentTheme = currentTheme === 'peerpedia-md' ? 'peerpedia-md-dark' : 'peerpedia-md';
-                monaco.editor.setTheme(currentTheme);
-                document.body.className = currentTheme === 'peerpedia-md-dark' ? 'dark' : '';
-                document.getElementById('theme-btn').textContent = currentTheme === 'peerpedia-md-dark' ? '🌙' : '☀️';
-            };
-
-            // ── Metadata Toggle ─────────────────────────────────────
-            window.toggleMetadata = function() {
-                var overlay = document.getElementById('metadata-overlay');
-                overlay.classList.toggle('open');
-                var btn = document.getElementById('metadata-btn');
-                btn.classList.toggle('active');
-            };
-
-            // ── Shortcuts ───────────────────────────────────────────
-            var editor = window.editor;
-            editor.addAction({ id: 'bold', label: 'Bold',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB],
-                run: function(ed) { wrapSelection(ed, '**', '**'); } });
-            editor.addAction({ id: 'italic', label: 'Italic',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI],
-                run: function(ed) { wrapSelection(ed, '*', '*'); } });
-            editor.addAction({ id: 'strikethrough', label: 'Strikethrough',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyX],
-                run: function(ed) { wrapSelection(ed, '~~', '~~'); } });
-            editor.addAction({ id: 'code', label: 'Inline Code',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Backquote],
-                run: function(ed) { wrapSelection(ed, '`', '`'); } });
-            editor.addAction({ id: 'link', label: 'Link',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK],
-                run: function(ed) {
-                    var sel = ed.getSelection();
-                    var text = ed.getModel().getValueInRange(sel) || 'text';
-                    ed.executeEdits('link', [{ range: sel, text: '[' + text + '](url)' }]);
-                } });
-            editor.addAction({ id: 'heading', label: 'Heading',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Digit1],
-                run: function(ed) {
-                    var pos = ed.getPosition();
-                    ed.executeEdits('heading', [{
-                        range: new monaco.Range(pos.lineNumber, 1, pos.lineNumber, 1),
-                        text: '# '
-                    }]);
-                } });
-
-            function wrapSelection(ed, before, after) {
-                var sel = ed.getSelection();
-                var text = ed.getModel().getValueInRange(sel);
-                if (text) {
-                    ed.executeEdits('wrap', [{ range: sel, text: before + text + after }]);
-                } else {
-                    ed.executeEdits('wrap', [{ range: sel, text: before + after }]);
-                    var pos = sel.getStartPosition();
-                    ed.setPosition(new monaco.Position(pos.lineNumber, pos.column + before.length));
-                }
-            }
-
-            // ── Preview ──────────────────────────────────────────────
-            var preview = document.getElementById('preview-pane');
-            function updatePreview() {
-                var content = editor.getValue();
-                if (!content.trim()) { preview.innerHTML = '<p style="color:#888;">预览区域。开始输入...</p>'; return; }
-                var body = content;
-                if (body.startsWith('---')) { var p = body.split('---', 3); if (p.length >= 3) body = p.slice(2).join('---'); }
-                var mathBlocks = [];
-                var pbody = body
-                    .replace(/\$\$(.+?)\$\$/gs, function(m, g) { mathBlocks.push({d:true, m:g}); return 'MPH' + (mathBlocks.length - 1); })
-                    .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) { mathBlocks.push({d:false, m:g}); return 'MPH' + (mathBlocks.length - 1); });
-                var html = marked.parse(pbody);
-                mathBlocks.forEach(function(b, i) {
-                    // Note: String.replace() treats $$ as an escape for a literal $,
-                    // so we need $$$$ to produce $$ in the output, and $$ to produce $.
-                    var openDelim = b.d ? '$$$$' : '$$';
-                    var closeDelim = b.d ? '$$$$' : '$$';
-                    html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + openDelim + b.m + closeDelim + '</span>');
-                });
-                preview.innerHTML = html;
-                if (window.renderMathInElement) renderMathInElement(preview, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}] });
-            }
-            editor.onDidChangeModelContent(function() { updatePreview(); });
-            updatePreview();
-
-            // ── Sync Scroll ──────────────────────────────────────────
-            var syncing = false;
-            editor.onDidScrollChange(function(e) {
-                if (syncing) return;
-                syncing = true;
-                var editorMax = editor.getScrollHeight() - editor.getLayoutInfo().height;
-                if (editorMax <= 0) { syncing = false; return; }
-                var ratio = e.scrollTop / editorMax;
-                preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight);
-                setTimeout(function() { syncing = false; }, 50);
-            });
-            preview.addEventListener('scroll', function() {
-                if (syncing) return;
-                syncing = true;
-                var previewMax = preview.scrollHeight - preview.clientHeight;
-                if (previewMax <= 0) { syncing = false; return; }
-                var ratio = preview.scrollTop / previewMax;
-                editor.setScrollTop(ratio * (editor.getScrollHeight() - editor.getLayoutInfo().height));
-                setTimeout(function() { syncing = false; }, 50);
-            });
-
-            // ── peerpedia: Citation Completion ───────────────────────
-            monaco.languages.registerCompletionItemProvider('markdown', {
-                triggerCharacters: [':'],
-                provideCompletionItems: function(model, position) {
-                    var line = model.getLineContent(position.lineNumber);
-                    var prefix = line.substring(0, position.column);
-                    var match = prefix.match(/peerpedia:([\w-]*)$/);
-                    if (!match) return { suggestions: [] };
-                    var word = model.getWordUntilPosition(position);
-                    var range = {
-                        startLineNumber: position.lineNumber,
-                        endLineNumber: position.lineNumber,
-                        startColumn: word.startColumn,
-                        endColumn: position.column
-                    };
-                    return {
-                        suggestions: [{
-                            label: 'peerpedia:引用文章ID',
-                            kind: monaco.languages.CompletionItemKind.Reference,
-                            insertText: 'peerpedia:',
-                            range: range,
-                            detail: '输入文章ID引用知诸网文章'
-                        }]
-                    };
-                }
-            });
-        });
-
-        // ── Format Switch ────────────────────────────────────────────────
-        window.switchFormat = function(fmt) {
-            var lang = fmt === 'typst' ? 'plaintext' : 'markdown';
-            var model = window.editor.getModel();
-            monaco.editor.setModelLanguage(model, lang);
-            // Trigger preview update for format change
-            updateFormatPreview();
-        };
-
-        function updateFormatPreview() {
-            var preview = document.getElementById('preview-pane');
-            var content = window.editor.getValue();
+        // ── Preview ───────────────────────────────────────────────────
+        var preview = document.getElementById('preview-pane');
+        function updatePreview() {
+            var content = cm.getValue();
             if (!content.trim()) { preview.innerHTML = '<p style="color:#888;">预览区域。开始输入...</p>'; return; }
             var body = content;
             if (body.startsWith('---')) { var p = body.split('---', 3); if (p.length >= 3) body = p.slice(2).join('---'); }
@@ -503,17 +208,15 @@
                 .replace(/\$\$(.+?)\$\$/gs, function(m, g) { mathBlocks.push({d:true, m:g}); return 'MPH' + (mathBlocks.length - 1); })
                 .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) { mathBlocks.push({d:false, m:g}); return 'MPH' + (mathBlocks.length - 1); });
             var html = marked.parse(pbody);
-            mathBlocks.forEach(function(b, i) {
-                var openDelim = b.d ? '$$$$' : '$$';
-                var closeDelim = b.d ? '$$$$' : '$$';
-                html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + openDelim + b.m + closeDelim + '</span>');
-            });
+            mathBlocks.forEach(function(b, i) { html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + (b.d ? '$$' : '$') + b.m + (b.d ? '$$' : '$') + '</span>'); });
             preview.innerHTML = html;
             if (window.renderMathInElement) renderMathInElement(preview, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}] });
         }
+        cm.on('change', updatePreview);
+        updatePreview();
 
         // ── Submit ─────────────────────────────────────────────────────
-        window.submitArticle = function() {
+        document.getElementById('submit-btn').onclick = function() {
             var status = document.getElementById('submit-status');
             var dims = ['self_originality','self_rigor','self_completeness','self_pedagogy','self_impact'];
             for (var i = 0; i < dims.length; i++) {
@@ -525,7 +228,7 @@
             var form = document.getElementById('metadata-form');
             var fd = new FormData(form);
             var f = document.getElementById('format-select').value;
-            fd.append('article_file', new Blob([window.editor.getValue()], {type:'text/plain'}), 'article.' + (f === 'typst' ? 'typ' : 'md'));
+            fd.append('article_file', new Blob([cm.getValue()], {type:'text/plain'}), 'article.' + (f === 'typst' ? 'typ' : 'md'));
             fd.append('format', f);
             fetch('/api/v1/articles', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
