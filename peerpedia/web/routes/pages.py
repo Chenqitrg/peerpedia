@@ -145,6 +145,73 @@ async def submit_page(request: Request):
     )
 
 
+@router.get("/edit", response_class=HTMLResponse)
+async def edit_page(request: Request):
+    """Online editor — new article."""
+    viewer = get_viewer(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="edit.html",
+        context={
+            "request": request,
+            "title": "编辑文章",
+            "viewer": viewer,
+            "all_users": get_all_users(),
+            "article": None,
+        },
+    )
+
+
+@router.get("/edit/{article_id}", response_class=HTMLResponse)
+async def edit_article_page(request: Request, article_id: str):
+    """Online editor — edit existing article, loading its source."""
+    session = get_db_session()
+    viewer = get_viewer(request)
+    try:
+        article = get_article(session, article_id)
+        if article is None:
+            return templates.TemplateResponse(
+                request=request,
+                name="edit.html",
+                context={
+                    "request": request,
+                    "title": "文章未找到",
+                    "viewer": viewer,
+                    "all_users": get_all_users(),
+                    "article": None,
+                    "error": "文章未找到。",
+                },
+                status_code=404,
+            )
+
+        article_dict = article.to_dict()
+
+        # Read source file content for the editor
+        source_content = ""
+        from pathlib import Path
+        repo = Path(article.git_repo_path) if article.git_repo_path else None
+        if repo and repo.exists():
+            ext = "*.typ" if article.format == "typst" else "*.md"
+            source_files = list(repo.glob(ext))
+            if source_files:
+                source_content = source_files[0].read_text()
+
+        article_dict["source_content"] = source_content
+        return templates.TemplateResponse(
+            request=request,
+            name="edit.html",
+            context={
+                "request": request,
+                "title": f"编辑: {article.title}",
+                "viewer": viewer,
+                "all_users": get_all_users(),
+                "article": article_dict,
+            },
+        )
+    finally:
+        session.close()
+
+
 @router.get("/review/{article_id}", response_class=HTMLResponse)
 async def review_article_page(request: Request, article_id: str):
     """Review form for a specific article."""
