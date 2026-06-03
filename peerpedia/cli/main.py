@@ -10,7 +10,7 @@ from peerpedia_core import __version__
 @click.group()
 @click.version_option(__version__)
 def cli():
-    """PeerPedia — 去中心化学术出版系统。
+    """知著网 (PeerPedia) — 去中心化学术出版系统。
 
     用 Typst 写作，同行审核，P2P 发布。
     """

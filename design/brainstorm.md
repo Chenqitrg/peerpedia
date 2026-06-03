@@ -1,8 +1,9 @@
 # PeerPedia — Brainstorming Document
 
 > 日期: 2026-06-03
-> 状态: Phase 3 M1+M2+M2.5+M2.6 完成（87 tests, 0 failures）
-> 项目名: **PeerPedia**（peer review + encyclopedia）
+> 状态: Phase 3 M1+M2+M2.5+M2.6+M3 完成（126 tests, 0 failures）
+> 英文名: **PeerPedia**（peer review + encyclopedia）
+> 中文名: **知著网**（知 = 求知，著 = 著述，网 = 网络）
 
 ---
 

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 app = FastAPI(
-    title="PeerPedia",
+    title="知著网 (PeerPedia)",
     description="Decentralized academic publishing — reference client",
     version="0.1.0",
 )

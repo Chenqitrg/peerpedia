@@ -1,6 +1,6 @@
-# PeerPedia
+# 知著网 (PeerPedia)
 
-**Decentralized academic publishing protocol — replacing arXiv and academic journals.**
+**去中心化学术出版系统 — 取代 arXiv 和学术期刊。**
 
 ```
 Author writes in Typst → Peer review → Publish to P2P network
