@@ -7,9 +7,9 @@
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/katex/katex.min.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
+    <script src="/static/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/easymde/easymde.min.css">
+    <script src="/static/easymde/easymde.min.js"></script>
     <script defer src="/static/katex/katex.min.js"></script>
     <script defer src="/static/katex/auto-render.min.js"></script>
 </head>
@@ -140,9 +140,9 @@
     {% endif %}
     </main>
 
-    <!-- All JavaScript in one block, runs after DOM is ready -->
+    <!-- All JavaScript in one block, runs when DOM is ready -->
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    function initEditor() {
         // ── Stars ──────────────────────────────────────────────────────
         document.querySelectorAll('.star-rating').forEach(function(rating) {
             var stars = rating.querySelectorAll('.stars span');
@@ -269,7 +269,12 @@
                 })
                 .catch(function() { status.textContent = '✗ 提交失败'; status.style.color = '#c00'; btn.disabled = false; });
         };
-    });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEditor);
+    } else {
+        initEditor();
+    }
     </script>
 
     <!-- Typst WASM -->
