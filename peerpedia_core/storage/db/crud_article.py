@@ -9,7 +9,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from peerpedia_core.protocol.messages import ArticleStatus
-from peerpedia_core.storage.db.models import Article, Review
+from peerpedia_core.storage.db.models import Article, Review, ReviewComment
 
 # ── Article CRUD ────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,11 @@ def create_article(
     keywords: Optional[list[str]] = None,
     language: str = "en",
     format: str = "typst",
+    self_originality: int = 0,
+    self_rigor: int = 0,
+    self_completeness: int = 0,
+    self_pedagogy: int = 0,
+    self_impact: int = 0,
 ) -> Article:
     """Create a new article record in the database."""
     article = Article(
@@ -45,6 +50,11 @@ def create_article(
         version="v0.1",
         format=format,
         git_repo_path=git_repo_path,
+        self_originality=self_originality,
+        self_rigor=self_rigor,
+        self_completeness=self_completeness,
+        self_pedagogy=self_pedagogy,
+        self_impact=self_impact,
     )
     session.add(article)
     return article
@@ -165,3 +175,76 @@ def get_reviews_for_article(session: Session, article_id: str) -> list[Review]:
         .order_by(Review.created_at.asc())
         .all()
     )
+
+
+# ── ReviewComment CRUD ──────────────────────────────────────────────────────────
+
+def create_review_comment(
+    session: Session,
+    *,
+    article_id: str,
+    commit_hash: str,
+    author_id: str,
+    body: str,
+    file_path: str = "",
+    line_start: int = 0,
+    line_end: Optional[int] = None,
+    comment_type: str = "comment",
+    suggestion: str = "",
+) -> ReviewComment:
+    """Create a line-level review comment on a commit diff."""
+    comment = ReviewComment(
+        id=str(uuid.uuid4()),
+        article_id=article_id,
+        commit_hash=commit_hash,
+        file_path=file_path,
+        line_start=line_start,
+        line_end=line_end,
+        author_id=author_id,
+        body=body,
+        suggestion=suggestion,
+        comment_type=comment_type,
+    )
+    session.add(comment)
+    return comment
+
+
+def get_review_comment(session: Session, comment_id: str) -> Optional[ReviewComment]:
+    """Get a review comment by ID."""
+    return session.query(ReviewComment).filter(ReviewComment.id == comment_id).first()
+
+
+def get_comments_for_article(
+    session: Session,
+    article_id: str,
+    *,
+    commit_hash: Optional[str] = None,
+    resolved: Optional[bool] = None,
+) -> list[ReviewComment]:
+    """Get comments for an article, optionally filtered by commit hash and resolved status."""
+    q = session.query(ReviewComment).filter(ReviewComment.article_id == article_id)
+    if commit_hash:
+        q = q.filter(ReviewComment.commit_hash == commit_hash)
+    if resolved is not None:
+        q = q.filter(ReviewComment.resolved == (1 if resolved else 0))
+    return q.order_by(ReviewComment.created_at.asc()).all()
+
+
+def resolve_review_comment(
+    session: Session, comment_id: str, resolved: bool = True
+) -> Optional[ReviewComment]:
+    """Mark a review comment as resolved or unresolved."""
+    comment = get_review_comment(session, comment_id)
+    if comment:
+        comment.resolved = 1 if resolved else 0
+    return comment
+
+
+def apply_comment_suggestion(
+    session: Session, comment_id: str
+) -> Optional[ReviewComment]:
+    """Mark a suggestion comment as resolved (the actual git apply happens elsewhere)."""
+    comment = get_review_comment(session, comment_id)
+    if comment:
+        comment.resolved = 1
+    return comment
