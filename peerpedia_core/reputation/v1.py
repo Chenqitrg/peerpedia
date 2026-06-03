@@ -13,7 +13,17 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import func
+
 from peerpedia_core.protocol import IdentityType, ReputationVector
+from peerpedia_core.storage.db import (
+    Article,
+    ContributionRecord,
+    Review,
+    get_identities_for_user,
+    get_user,
+    update_user_last_active,
+)
 
 # ── Layer 2: Configurable parameters ─────────────────────────────────────────
 
@@ -105,21 +115,9 @@ class ReputationV1(BaseReputation):
         if session is None:
             return ReputationVector(user_id=user_id)
 
-        from sqlalchemy import func
-
-        from peerpedia_core.storage.db import (
-            Article,
-            ContributionRecord,
-            Review,
-            get_identities_for_user,
-            get_user,
-            update_user_last_active,
-        )
-
         update_user_last_active(session, user_id)
 
-        activity = self._aggregate_activity(session, user_id, Article, Review,
-                                            ContributionRecord, func)
+        activity = self._aggregate_activity(session, user_id)
         identity_multiplier = self._compute_identity_multiplier(session, user_id,
                                                                 get_identities_for_user)
         user = get_user(session, user_id)
@@ -147,8 +145,7 @@ class ReputationV1(BaseReputation):
 
     # ── Private helpers ────────────────────────────────────────────────────
 
-    def _aggregate_activity(self, session, user_id: str, Article, Review,
-                            ContributionRecord, func) -> dict:
+    def _aggregate_activity(self, session, user_id: str) -> dict:
         """Query the database for all user activity metrics."""
         article_count = session.query(func.count(Article.id)).filter(
             Article.founding_authors.contains(user_id)
