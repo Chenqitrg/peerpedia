@@ -205,3 +205,45 @@ class TestReviewModel:
             assert review.clarity == 0
             assert review.collaboration_request == 0  # stored as Integer in SQLite
             assert review.points_earned == 0
+
+
+class TestSessionScope:
+    """db_session_scope context manager tests."""
+
+    def test_db_session_scope_commits(self, tmp_path):
+        """Session scope commits on clean exit."""
+        from peerpedia_core.storage.db.session_utils import db_session_scope
+        from peerpedia_core.storage.db.models import User
+
+        db_path = tmp_path / "test.db"
+        db_url = f"sqlite:///{db_path}"
+
+        with db_session_scope(db_url) as session:
+            user = User(id="test1", name="Test", email="test@test.com")
+            session.add(user)
+
+        # New session: user should be persisted
+        with db_session_scope(db_url) as session:
+            found = session.query(User).filter(User.id == "test1").first()
+            assert found is not None
+            assert found.name == "Test"
+
+    def test_db_session_scope_rolls_back(self, tmp_path):
+        """Session scope rolls back on exception."""
+        from peerpedia_core.storage.db.session_utils import db_session_scope
+        from peerpedia_core.storage.db.models import User
+
+        db_path = tmp_path / "test.db"
+        db_url = f"sqlite:///{db_path}"
+
+        try:
+            with db_session_scope(db_url) as session:
+                user = User(id="test2", name="Test", email="test@test.com")
+                session.add(user)
+                raise RuntimeError("forced error")
+        except RuntimeError:
+            pass
+
+        with db_session_scope(db_url) as session:
+            found = session.query(User).filter(User.id == "test2").first()
+            assert found is None
