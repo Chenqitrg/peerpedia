@@ -184,8 +184,8 @@
             autoDownloadFontAwesome: false,
             indentWithTabs: false,
             tabSize: 2,
+            toolbar: false,
             sideBySideFullscreen: false,
-            toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'link', 'image', '|', 'preview', 'side-by-side', 'fullscreen', '|', 'guide'],
             previewRender: function(plainText, preview) {
                 // Strip frontmatter, protect math, render, restore math, KaTeX
                 var body = plainText;
@@ -221,6 +221,9 @@
                 return preview.innerHTML;
             },
         });
+
+        // Force side-by-side view by default
+        easyMDE.toggleSideBySide();
 
         // ── Format switch ──────────────────────────────────────────────
         window.switchFormat = function(fmt) { /* EasyMDE handles preview */ };
