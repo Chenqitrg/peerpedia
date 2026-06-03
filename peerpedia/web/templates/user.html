@@ -39,6 +39,41 @@
             </div>
         </section>
 
+        {% if reputation %}
+        <section class="user-section">
+            <h3>📊 信誉雷达图</h3>
+            <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+                <div style="width: 280px; height: 280px;">
+                    <canvas id="reputationRadar"></canvas>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <table class="rep-table">
+                        <tr>
+                            <td>学术贡献</td>
+                            <td><strong>{{ reputation.academic_contribution }}</strong>/100</td>
+                        </tr>
+                        <tr>
+                            <td>审稿质量</td>
+                            <td><strong>{{ reputation.review_quality }}</strong>/100</td>
+                        </tr>
+                        <tr>
+                            <td>协作精神</td>
+                            <td><strong>{{ reputation.collaboration_spirit }}</strong>/100</td>
+                        </tr>
+                        <tr>
+                            <td>教学传播</td>
+                            <td><strong>{{ reputation.education_outreach }}</strong>/100</td>
+                        </tr>
+                        <tr>
+                            <td>总积分</td>
+                            <td><strong>{{ reputation.total_points }}</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
         {% if authored %}
         <section class="user-section">
             <h3>📝 原创文章 ({{ total_articles }})</h3>
@@ -130,5 +165,48 @@
     <footer>
         <p>知著网 v0.1.0 — <a href="/api/v1/health">API</a></p>
     </footer>
+
+    {% if reputation %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    (function() {
+        var ctx = document.getElementById('reputationRadar');
+        if (!ctx) return;
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['学术贡献', '审稿质量', '协作精神', '教学传播'],
+                datasets: [{
+                    label: '{{ user_id }}',
+                    data: [
+                        {{ reputation.academic_contribution }},
+                        {{ reputation.review_quality }},
+                        {{ reputation.collaboration_spirit }},
+                        {{ reputation.education_outreach }}
+                    ],
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { stepSize: 20 }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    })();
+    </script>
+    {% endif %}
 </body>
 </html>

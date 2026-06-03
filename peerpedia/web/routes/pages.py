@@ -189,6 +189,14 @@ async def user_profile(request: Request, user_id: str):
         # Sort by time descending
         activities.sort(key=lambda x: x["time"], reverse=True)
 
+        # Compute reputation vector for radar chart
+        from peerpedia_core.reputation import ReputationV1
+        try:
+            algo = ReputationV1()
+            reputation = algo.compute(user_id, session=session).model_dump()
+        except Exception:
+            reputation = {}
+
         return templates.TemplateResponse(
             "user.html",
             {
@@ -213,6 +221,7 @@ async def user_profile(request: Request, user_id: str):
                 "total_mirrors": len(mirrored),
                 "total_reviews": len(reviews),
                 "total_points": sum(r.points_earned for r in reviews),
+                "reputation": reputation,
             },
         )
     finally:
