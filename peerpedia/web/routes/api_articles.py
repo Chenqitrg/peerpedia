@@ -107,6 +107,93 @@ async def api_create_article(
             tmp_path.unlink()
 
 
+@router.post("/articles/{article_id}/fork")
+async def api_fork_article(article_id: str, forker_id: str = Form(...)):
+    """Fork an article — clone git repo, create new draft with forked_from."""
+    import shutil
+    import uuid
+
+    from peerpedia.config.settings import settings as s
+    from peerpedia_core.storage.git_backend import commit_article
+
+    session = get_db_session()
+    try:
+        article = get_article(session, article_id)
+        if article is None:
+            raise HTTPException(status_code=404, detail="Article not found")
+
+        # Clone the git repo
+        src_repo = Path(article.git_repo_path) if article.git_repo_path else None
+        if src_repo is None or not src_repo.exists():
+            raise HTTPException(status_code=404, detail="Source git repository not found")
+
+        new_id = str(uuid.uuid4())
+        new_repo = s.articles_dir / new_id
+        new_repo.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src_repo, new_repo, dirs_exist_ok=True)
+
+        # Remove .git and re-init to give the fork its own history
+        old_git = new_repo / ".git"
+        if old_git.exists():
+            shutil.rmtree(old_git)
+
+        from peerpedia_core.storage.git_backend import init_article_repo
+        init_article_repo(new_id, base_dir=s.articles_dir)
+
+        # Find source files and commit
+        source_files = list(new_repo.glob("*.md")) + list(new_repo.glob("*.typ"))
+        if not source_files:
+            shutil.rmtree(new_repo, ignore_errors=True)
+            raise HTTPException(status_code=500, detail="No source files found in fork")
+
+        commit_article(new_repo, f"Fork from: {article.title}",
+                       author_name=forker_id, author_email=f"{forker_id}@peerpedia.local")
+
+        from peerpedia_core.storage.db import create_article
+        fork = create_article(
+            session, id=new_id,
+            title=f"{article.title} (Fork)",
+            founding_authors=[forker_id],
+            abstract=article.abstract or "",
+            git_repo_path=str(new_repo),
+            format=article.format,
+            language=article.language,
+            categories=article.categories or [],
+            keywords=article.keywords or [],
+        )
+        fork.forked_from = article_id
+        # Bump fork count on source
+        article.fork_count = (article.fork_count or 0) + 1
+        session.commit()
+
+        return {"article_id": fork.id, "title": fork.title, "forked_from": article_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
+@router.get("/articles/{article_id}/forks")
+async def api_get_forks(article_id: str):
+    """Get all forks of an article."""
+    from peerpedia_core.storage.db import Article
+
+    session = get_db_session()
+    try:
+        forks = (
+            session.query(Article)
+            .filter(Article.forked_from == article_id)
+            .order_by(Article.created_at.desc())
+            .all()
+        )
+        return {"article_id": article_id, "forks": [f.to_dict() for f in forks], "total": len(forks)}
+    finally:
+        session.close()
+
+
 @router.get("/articles/{article_id}/reviews")
 async def api_get_reviews(article_id: str):
     """Get all reviews for an article."""

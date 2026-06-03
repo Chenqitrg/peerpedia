@@ -56,6 +56,7 @@ class Article(Base):
     self_pedagogy = Column(Integer, nullable=False, default=0)
     self_impact = Column(Integer, nullable=False, default=0)
     forked_from = Column(String(36), nullable=True)
+    fork_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
@@ -87,6 +88,7 @@ class Article(Base):
             "self_pedagogy": self.self_pedagogy,
             "self_impact": self.self_impact,
             "forked_from": self.forked_from,
+            "fork_count": self.fork_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
