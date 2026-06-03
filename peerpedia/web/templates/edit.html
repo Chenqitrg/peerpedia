@@ -9,7 +9,6 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script defer src="/static/katex/katex.min.js"></script>
     <script defer src="/static/katex/auto-render.min.js"></script>
-    <!-- CodeMirror CSS loaded below -->
 </head>
 <body>
     <header>
@@ -33,52 +32,13 @@
             </span>
         </nav>
     </header>
-    <script>
-    function setViewer(uid) {
-        if (uid) {
-            document.cookie = "viewer=" + encodeURIComponent(uid) + ";path=/;max-age=86400;SameSite=Lax";
-        } else {
-            document.cookie = "viewer=;path=/;max-age=0;SameSite=Lax";
-        }
-        location.reload();
-    }
-    </script>
 
     <script>
-    // Star rating interaction (same as sedimentation pool)
-    document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.star-rating').forEach(function(rating) {
-        var stars = rating.querySelectorAll('.stars span');
-        var label = rating.querySelector('.star-label');
-        var input = rating.querySelector('input[type=hidden]');
-        var initVal = parseInt(input.value) || 0;
-        if (initVal > 0 && stars.length >= initVal) {
-            label.textContent = stars[initVal - 1].title;
-        }
-        stars.forEach(function(star, index) {
-            star.addEventListener('mouseenter', function() {
-                stars.forEach(function(s, i) {
-                    s.textContent = i <= index ? '★' : '☆';
-                    s.style.color = i <= index ? '#f59e0b' : '#ccc';
-                });
-                label.textContent = star.title;
-            });
-            star.addEventListener('click', function() {
-                var val = parseInt(star.dataset.value);
-                input.value = val;
-                label.textContent = star.title;
-            });
-        });
-        rating.addEventListener('mouseleave', function() {
-            var val = parseInt(input.value);
-            stars.forEach(function(s, i) {
-                s.textContent = i < val ? '★' : '☆';
-                s.style.color = i < val ? '#f59e0b' : '#ccc';
-            });
-            label.textContent = val > 0 ? stars[val - 1].title : '';
-        });
-    });
-    });
+    function setViewer(uid) {
+        if (uid) { document.cookie = "viewer=" + encodeURIComponent(uid) + ";path=/;max-age=86400;SameSite=Lax"; }
+        else { document.cookie = "viewer=;path=/;max-age=0;SameSite=Lax"; }
+        location.reload();
+    }
     </script>
 
     <main>
@@ -97,13 +57,13 @@
     </div>
 
     <div id="editor-container" style="display:flex;gap:12px;height:60vh;min-height:400px;">
-        <textarea id="editor-area" style="flex:1;min-width:0;border:1px solid var(--border);padding:12px;font-family:'SF Mono',Monaco,Menlo,monospace;font-size:14px;line-height:1.6;resize:none;outline:none;" placeholder="在这里写 Markdown..."></textarea>
+        <textarea id="editor-area" style="flex:1;min-width:0;border:1px solid var(--border);padding:12px;font-family:'SF Mono',Monaco,Menlo,monospace;font-size:14px;line-height:1.6;resize:none;outline:none;"
+            placeholder="在这里写 Markdown...">{{ article.source_content if article and article.source_content else '' }}</textarea>
         <div id="preview-pane" style="flex:1;min-width:0;border:1px solid var(--border);padding:16px;overflow-y:auto;background:#fff;">
             <p style="color:#888;">预览区域。开始输入...</p>
         </div>
     </div>
 
-    <!-- Metadata panel -->
     <details open style="margin-top:16px;">
         <summary style="cursor:pointer;font-weight:600;font-size:0.95em;">📋 文章信息</summary>
         <form id="metadata-form" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.9em;">
@@ -127,21 +87,18 @@
                     style="width:100%;padding:4px;"></label>
             </div>
             <div>
-                <label>语言
-                    <select name="language" style="width:100%;padding:4px;">
-                        <option value="en" {% if not article or article.language == 'en' %}selected{% endif %}>English</option>
-                        <option value="zh" {% if article and article.language == 'zh' %}selected{% endif %}>中文</option>
-                    </select>
-                </label>
+                <label>语言<select name="language" style="width:100%;padding:4px;">
+                    <option value="en" {% if not article or article.language == 'en' %}selected{% endif %}>English</option>
+                    <option value="zh" {% if article and article.language == 'zh' %}selected{% endif %}>中文</option>
+                </select></label>
             </div>
             <div>
                 <label>中文摘要（可选）<input type="text" name="abstract_zh"
                     value="{{ article.abstract_zh if article else '' }}"
                     style="width:100%;padding:4px;"></label>
             </div>
-            <!-- 5D self-assessment -->
             <fieldset style="grid-column:1/-1;border:1px solid #e5e5e5;border-radius:6px;padding:10px 14px;">
-                <legend style="font-weight:600;font-size:0.85em;">五维自评（可选）</legend>
+                <legend style="font-weight:600;font-size:0.85em;">五维自评（必填）</legend>
                 <div style="display:flex;flex-direction:column;gap:6px;">
                     {% set dims = [
                         ('self_originality', '🧠', '原创性', ['搬运/翻译','学习笔记','随笔习作','综述评论','原创研究']),
@@ -151,10 +108,10 @@
                         ('self_impact', '💡', '影响力', ['个人参考','小众专题','领域相关','领域核心','奠基/开创'])
                     ] %}
                     {% for name, icon, label, titles in dims %}
-                    <div class="star-rating" data-dimension="{{ name }}" style="display:flex;align-items:center;gap:8px;">
+                    {% set val = article[name]|default(0) if article else 0 %}
+                    <div class="star-rating" style="display:flex;align-items:center;gap:8px;">
                         <span style="width:70px;font-size:0.82em;">{{ icon }} {{ label }}</span>
                         <span class="stars" style="cursor:pointer;font-size:0.9em;">
-                            {% set val = article[name]|default(0) if article else 0 %}
                             <span data-value="1" title="{{ titles[0] }}">{% if val >= 1 %}★{% else %}☆{% endif %}</span>
                             <span data-value="2" title="{{ titles[1] }}">{% if val >= 2 %}★{% else %}☆{% endif %}</span>
                             <span data-value="3" title="{{ titles[2] }}">{% if val >= 3 %}★{% else %}☆{% endif %}</span>
@@ -170,7 +127,6 @@
         </form>
     </details>
 
-    <!-- Submit -->
     <div style="margin-top:16px;display:flex;gap:8px;">
         <button id="submit-btn" onclick="submitArticle()"
                 style="padding:10px 28px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:1em;font-weight:600;">
@@ -181,146 +137,142 @@
     {% endif %}
     </main>
 
+    <!-- All JavaScript in one block, runs after DOM is ready -->
     <script>
-    var format = document.getElementById('format-select').value;
-    var initialContent = {{ article.source_content|tojson if article and article.source_content else '""' }};
-    if (!initialContent) {
-        initialContent = '---\ntitle: \nabstract: \ncategories:\n  - \nkeywords:\n  - \nlanguage: en\n---\n\n';
-    }
-    var ta = document.getElementById('editor-area');
-    ta.value = initialContent;
-    // Expose editor API for preview/submit functions
-    window.editor = {
-        getValue: function() { return ta.value; },
-        on: function(evt, fn) { ta.addEventListener('input', fn); }
-    };
-
-    updatePreview();
-    window.editor.on('input', function() {
-        updatePreview();
-    });
-
-    function switchFormat(fmt) {
-        updatePreview();
-    }
-
-    function updatePreview() {
-        var content = window.editor.getValue();
-        var format = document.getElementById('format-select').value;
-        var preview = document.getElementById('preview-pane');
-        var status = document.getElementById('preview-status');
-
-        if (format === 'markdown') {
-            previewMarkdown(content, preview, status);
-        } else {
-            previewTypst(content, preview, status);
-        }
-    }
-
-    function previewMarkdown(content, preview, status) {
-        status.textContent = '';
-        if (!content || !content.trim()) {
-            preview.innerHTML = '<p style=\"color:#888;\">预览区域。开始输入...</p>';
-            return;
-        }
-        var body = content;
-        if (body.startsWith('---')) {
-            var parts = body.split('---', 3);
-            if (parts.length >= 3) body = parts.slice(2).join('---');
-        }
-        var mathBlocks = [];
-        var protected_ = body
-            .replace(/\$\$(.+?)\$\$/gs, function(m, g) {
-                mathBlocks.push({display: true, math: g});
-                return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
-            })
-            .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) {
-                mathBlocks.push({display: false, math: g});
-                return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
+    document.addEventListener('DOMContentLoaded', function() {
+        // ── Stars ──────────────────────────────────────────────────────
+        document.querySelectorAll('.star-rating').forEach(function(rating) {
+            var stars = rating.querySelectorAll('.stars span');
+            var label = rating.querySelector('.star-label');
+            var input = rating.querySelector('input[type=hidden]');
+            var initVal = parseInt(input.value) || 0;
+            if (initVal > 0 && stars.length >= initVal) {
+                label.textContent = stars[initVal - 1].title;
+            }
+            stars.forEach(function(star, index) {
+                star.addEventListener('mouseenter', function() {
+                    stars.forEach(function(s, i) {
+                        s.textContent = i <= index ? '★' : '☆';
+                        s.style.color = i <= index ? '#f59e0b' : '#ccc';
+                    });
+                    label.textContent = star.title;
+                });
+                star.addEventListener('click', function() {
+                    var val = parseInt(star.dataset.value);
+                    input.value = val;
+                    label.textContent = star.title;
+                });
             });
-        var html = protected_
-            .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-            .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-            .replace(/^# (.+)$/gm, '<h2>$1</h2>')
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/\n/g, '<br>');
-        html = '<p>' + html + '</p>';
-        mathBlocks.forEach(function(b, i) {
-            var cls = b.display ? 'katex-display' : 'katex-inline';
-            var delim = b.display ? '$$' : '$';
-            html = html.replace('MATHPLACEHOLDER' + i,
-                '<span class=\"' + cls + '\">' + delim + b.math + delim + '</span>');
+            rating.addEventListener('mouseleave', function() {
+                var val = parseInt(input.value);
+                stars.forEach(function(s, i) {
+                    s.textContent = i < val ? '★' : '☆';
+                    s.style.color = i < val ? '#f59e0b' : '#ccc';
+                });
+                label.textContent = val > 0 ? stars[val - 1].title : '';
+            });
         });
-        preview.innerHTML = html;
-        if (window.renderMathInElement) {
-            renderMathInElement(preview, {
-                delimiters: [
-                    {left: '$$', right: '$$', display: true},
-                    {left: '$', right: '$', display: false},
-                ]
-            });
-        }
-    }
 
-    function submitArticle() {
-        var status = document.getElementById('submit-status');
-        var btn = document.getElementById('submit-btn');
-        var dims = ['self_originality','self_rigor','self_completeness','self_pedagogy','self_impact'];
-        for (var i = 0; i < dims.length; i++) {
-            var val = parseInt(document.querySelector('input[name=\"' + dims[i] + '\"]').value) || 0;
-            if (val === 0) {
-                status.textContent = '✗ 请完成五维自评（至少 1 星）';
-                status.style.color = '#c00';
-                return;
+        // ── Editor ─────────────────────────────────────────────────────
+        var ta = document.getElementById('editor-area');
+        if (!ta.value || !ta.value.trim()) {
+            ta.value = '---\ntitle: \nabstract: \ncategories:\n  - \nkeywords:\n  - \nlanguage: en\n---\n\n';
+        }
+
+        function updatePreview() {
+            var content = ta.value;
+            var format = document.getElementById('format-select').value;
+            var preview = document.getElementById('preview-pane');
+            var status = document.getElementById('preview-status');
+            status.textContent = '';
+
+            if (format === 'markdown') {
+                if (!content || !content.trim()) {
+                    preview.innerHTML = '<p style="color:#888;">预览区域。开始输入...</p>';
+                    return;
+                }
+                var body = content;
+                if (body.startsWith('---')) {
+                    var parts = body.split('---', 3);
+                    if (parts.length >= 3) body = parts.slice(2).join('---');
+                }
+                var mathBlocks = [];
+                var pbody = body
+                    .replace(/\$\$(.+?)\$\$/gs, function(m, g) {
+                        mathBlocks.push({display: true, math: g});
+                        return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
+                    })
+                    .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) {
+                        mathBlocks.push({display: false, math: g});
+                        return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
+                    });
+                var html = pbody
+                    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+                    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+                    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                    .replace(/`([^`]+)`/g, '<code>$1</code>')
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/\n/g, '<br>');
+                html = '<p>' + html + '</p>';
+                mathBlocks.forEach(function(b, i) {
+                    var cls = b.display ? 'katex-display' : 'katex-inline';
+                    html = html.replace('MATHPLACEHOLDER' + i,
+                        '<span class="' + cls + '">' + (b.display ? '$$' : '$') + b.math + (b.display ? '$$' : '$') + '</span>');
+                });
+                preview.innerHTML = html;
+                if (window.renderMathInElement) {
+                    renderMathInElement(preview, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                        ]
+                    });
+                }
+            } else {
+                // Typst preview
+                preview.innerHTML = '<p style="color:#888;">Typst 预览需要浏览器加载 WASM 模块...</p>';
             }
         }
-        status.textContent = '提交中...';
-        status.style.color = '#888';
-        btn.disabled = true;
 
-        var form = document.getElementById('metadata-form');
-        var formData = new FormData(form);
-        var content = window.editor.getValue();
-        var format = document.getElementById('format-select').value;
-        var ext = format === 'typst' ? '.typ' : '.md';
-        var blob = new Blob([content], {type: 'text/plain'});
-        formData.append('article_file', blob, 'article' + ext);
-        formData.append('format', format);
+        ta.addEventListener('input', updatePreview);
+        updatePreview();
 
-        fetch('/api/v1/articles', { method: 'POST', body: formData })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                status.innerHTML = '✅ 提交成功！<a href=\"/article/' + data.article_id + '\">查看文章</a>';
-                btn.disabled = false;
-            })
-            .catch(function(err) {
-                status.textContent = '✗ 提交失败';
-                status.style.color = '#c00';
-                btn.disabled = false;
-            });
-    }
+        // ── Format switch ──────────────────────────────────────────────
+        window.switchFormat = function(fmt) { updatePreview(); };
 
-    function previewTypst(content, preview, status) {
-        status.textContent = '编译中...';
-        if (!window.$typst) {
-            preview.innerHTML = '<p style=\"color:#888;\">Typst WASM 加载中，请稍候...</p>';
-            return;
-        }
-        window.$typst.svg({ mainContent: content }).then(function(svg) {
-            preview.innerHTML = svg;
-            status.textContent = '';
-        }).catch(function(err) {
-            preview.innerHTML = '<p style=\"color:#c00;\">Typst 编译错误</p><pre style=\"font-size:0.85em;color:#888;\">'
-                + (err.message || String(err)).slice(0, 500) + '</pre>';
-            status.textContent = '✗';
-        });
-    }
+        // ── Submit ─────────────────────────────────────────────────────
+        window.submitArticle = function() {
+            var status = document.getElementById('submit-status');
+            var btn = document.getElementById('submit-btn');
+            var dims = ['self_originality','self_rigor','self_completeness','self_pedagogy','self_impact'];
+            for (var i = 0; i < dims.length; i++) {
+                var v = parseInt(document.querySelector('input[name="' + dims[i] + '"]').value) || 0;
+                if (v === 0) { status.textContent = '✗ 请完成五维自评（至少 1 星）'; status.style.color = '#c00'; return; }
+            }
+            status.textContent = '提交中...'; status.style.color = '#888'; btn.disabled = true;
+
+            var form = document.getElementById('metadata-form');
+            var formData = new FormData(form);
+            var content = ta.value;
+            var format = document.getElementById('format-select').value;
+            var ext = format === 'typst' ? '.typ' : '.md';
+            formData.append('article_file', new Blob([content], {type: 'text/plain'}), 'article' + ext);
+            formData.append('format', format);
+
+            fetch('/api/v1/articles', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    status.innerHTML = '✅ 提交成功！<a href="/article/' + data.article_id + '">查看文章</a>';
+                    btn.disabled = false;
+                })
+                .catch(function() { status.textContent = '✗ 提交失败'; status.style.color = '#c00'; btn.disabled = false; });
+        };
+    });
     </script>
 
-    <!-- Typst WASM module (loads $typst global) -->
+    <!-- Typst WASM -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/@myriaddreamin/typst-all-in-one.ts@0.6.0/dist/esm/index.js"></script>
 </body>
 </html>
