@@ -40,6 +40,17 @@
     </script>
 
     <main>
+        <div style="margin-bottom: 16px;">
+            <input type="text" id="search-box" placeholder="🔍 搜索文章标题、摘要、关键词..."
+                   style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:0.95em;"
+                   hx-get="/api/v1/search?format=html"
+                   hx-trigger="keyup changed delay:300ms"
+                   hx-target="#article-list"
+                   hx-swap="innerHTML"
+                   hx-include="#search-box"
+                   name="q">
+        </div>
+
         <nav class="tabs" style="margin-bottom: 16px; border-bottom: 2px solid #eee; padding-bottom: 0;">
           <a href="/" style="display: inline-block; padding: 8px 16px; text-decoration: none; {% if tab == 'all' %}border-bottom: 2px solid #007bff; color: #007bff;{% else %}color: #666;{% endif %}">全部文章</a>
           {% if viewer %}
@@ -55,7 +66,7 @@
           <p style="color: #888;">加载中...</p>
         </div>
         {% else %}
-        <section class="article-list">
+        <section class="article-list" id="article-list">
             <h2>文章</h2>
             {% if articles %}
                 {% for article in articles %}
