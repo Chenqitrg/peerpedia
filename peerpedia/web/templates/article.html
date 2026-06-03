@@ -345,7 +345,10 @@
                         </div>
                     </fieldset>
                     <label style="font-size:0.85em;">评论:
-                        <textarea name="comments" rows="3" placeholder="写下你的看法..."
+                        <textarea name="comments" rows="3" class="muted-textarea"
+                            placeholder="写下你的看法..."
+                            onclick="this.classList.remove('muted-textarea')"
+                            onfocus="this.classList.remove('muted-textarea')"
                             style="width:100%;margin-top:4px;padding:6px;font-size:0.9em;">{{ old_comment }}</textarea>
                     </label>
                     <button type="submit" style="margin-top:6px;">💬 发表</button>
