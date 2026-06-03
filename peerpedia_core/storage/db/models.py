@@ -112,6 +112,11 @@ class Review(Base):
     collaboration_request = Column(Integer, nullable=False, default=0)
     collaboration_message = Column(Text, nullable=False, default="")
     points_earned = Column(Integer, nullable=False, default=0)
+    review_originality = Column(Integer, nullable=False, default=0)
+    review_rigor = Column(Integer, nullable=False, default=0)
+    review_completeness = Column(Integer, nullable=False, default=0)
+    review_pedagogy = Column(Integer, nullable=False, default=0)
+    review_impact = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> dict:
@@ -126,6 +131,11 @@ class Review(Base):
             "collaboration_request": bool(self.collaboration_request),
             "collaboration_message": self.collaboration_message,
             "points_earned": self.points_earned,
+            "review_originality": self.review_originality,
+            "review_rigor": self.review_rigor,
+            "review_completeness": self.review_completeness,
+            "review_pedagogy": self.review_pedagogy,
+            "review_impact": self.review_impact,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
