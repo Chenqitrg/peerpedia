@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} — 知诸网</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/katex/katex.min.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="/static/katex/katex.min.js"></script>
+    <script defer src="/static/katex/auto-render.min.js"></script>
+    <link rel="stylesheet" data-name="vs/editor/editor.main"
+          href="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.main.min.css">
+</head>
+<body>
+    <header>
+        <h1>📚 知诸网</h1>
+        <nav>
+            <a href="/">首页</a>
+            <a href="/submit">提交</a>
+            <a href="/edit">✏️ 写作</a>
+            <a href="/review">🌊 沉淀池</a>
+            {% if viewer %}
+            <a href="/user/{{ viewer }}">👤 我的主页</a>
+            {% endif %}
+            <span style="margin-left: auto; font-size: 0.85em;">
+                <select id="viewer-picker" onchange="setViewer(this.value)"
+                        style="padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px;">
+                    <option value="">👽 游客</option>
+                    {% for u in all_users %}
+                    <option value="{{ u[0] }}" {% if viewer == u[0] %}selected{% endif %}>{{ u[1] }}</option>
+                    {% endfor %}
+                </select>
+            </span>
+        </nav>
+    </header>
+    <script>
+    function setViewer(uid) {
+        if (uid) {
+            document.cookie = "viewer=" + encodeURIComponent(uid) + ";path=/;max-age=86400;SameSite=Lax";
+        } else {
+            document.cookie = "viewer=;path=/;max-age=0;SameSite=Lax";
+        }
+        location.reload();
+    }
+    </script>
+
+    <main>
+    {% if error %}
+    <p class="empty-state" style="padding:24px;">{{ error }}</p>
+    {% else %}
+    <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center;">
+        <label style="font-size:0.9em;">格式:
+            <select id="format-select" onchange="switchFormat(this.value)"
+                    style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;">
+                <option value="markdown" {% if not article or article.format == 'markdown' %}selected{% endif %}>Markdown + KaTeX</option>
+                <option value="typst" {% if article and article.format == 'typst' %}selected{% endif %}>Typst (WASM)</option>
+            </select>
+        </label>
+        <span id="preview-status" style="font-size:0.8em;color:#888;margin-left:8px;"></span>
+    </div>
+
+    <div id="editor-container" style="display:flex;gap:12px;height:60vh;min-height:400px;">
+        <div id="monaco-editor" style="flex:1;min-width:0;border:1px solid var(--border);"></div>
+        <div id="preview-pane" style="flex:1;min-width:0;border:1px solid var(--border);padding:16px;overflow-y:auto;background:#fff;">
+            <p style="color:#888;">预览区域。开始输入...</p>
+        </div>
+    </div>
+
+    <!-- Metadata panel -->
+    <details open style="margin-top:16px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95em;">📋 文章信息</summary>
+        <form id="metadata-form" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.9em;">
+            <div style="grid-column:1/-1;">
+                <label>标题<input type="text" name="title" required
+                    value="{{ article.title if article else '' }}"
+                    style="width:100%;padding:6px;font-size:1em;"></label>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>摘要<textarea name="abstract" rows="2"
+                    style="width:100%;padding:6px;">{{ article.abstract if article else '' }}</textarea></label>
+            </div>
+            <div>
+                <label>分类（逗号分隔）<input type="text" name="categories"
+                    value="{{ ', '.join(article.categories) if article else '' }}"
+                    style="width:100%;padding:4px;"></label>
+            </div>
+            <div>
+                <label>关键词（逗号分隔）<input type="text" name="keywords"
+                    value="{{ ', '.join(article.keywords) if article else '' }}"
+                    style="width:100%;padding:4px;"></label>
+            </div>
+            <div>
+                <label>语言
+                    <select name="language" style="width:100%;padding:4px;">
+                        <option value="en" {% if not article or article.language == 'en' %}selected{% endif %}>English</option>
+                        <option value="zh" {% if article and article.language == 'zh' %}selected{% endif %}>中文</option>
+                    </select>
+                </label>
+            </div>
+            <div>
+                <label>中文摘要（可选）<input type="text" name="abstract_zh"
+                    value="{{ article.abstract_zh if article else '' }}"
+                    style="width:100%;padding:4px;"></label>
+            </div>
+            <!-- 5D self-assessment -->
+            <fieldset style="grid-column:1/-1;border:1px solid #e5e5e5;border-radius:6px;padding:10px 14px;">
+                <legend style="font-weight:600;font-size:0.85em;">五维自评（可选）</legend>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    {% set dims = [
+                        ('self_originality', '🧠', '原创性'),
+                        ('self_rigor', '📐', '严格性'),
+                        ('self_completeness', '🧩', '完整性'),
+                        ('self_pedagogy', '📖', '教学性'),
+                        ('self_impact', '💡', '影响力')
+                    ] %}
+                    {% for name, icon, label in dims %}
+                    <label style="font-size:0.85em;display:flex;align-items:center;gap:4px;">
+                        {{ icon }} {{ label }}
+                        <select name="{{ name }}" style="padding:2px 4px;">
+                            {% set val = article[name]|default(0) if article else 0 %}
+                            <option value="0" {% if val == 0 %}selected{% endif %}>-</option>
+                            <option value="1" {% if val == 1 %}selected{% endif %}>1</option>
+                            <option value="2" {% if val == 2 %}selected{% endif %}>2</option>
+                            <option value="3" {% if val == 3 %}selected{% endif %}>3</option>
+                            <option value="4" {% if val == 4 %}selected{% endif %}>4</option>
+                            <option value="5" {% if val == 5 %}selected{% endif %}>5</option>
+                        </select>
+                    </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+        </form>
+    </details>
+
+    <!-- Submit -->
+    <div style="margin-top:16px;display:flex;gap:8px;">
+        <button id="submit-btn" onclick="submitArticle()"
+                style="padding:10px 28px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:1em;font-weight:600;">
+            🚀 提交沉淀池
+        </button>
+        <span id="submit-status" style="font-size:0.9em;color:#888;align-self:center;"></span>
+    </div>
+    {% endif %}
+    </main>
+
+    <!-- Monaco Editor loader -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.min.js"></script>
+    <script>
+    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    require(['vs/editor/editor.main'], function() {
+        var format = document.getElementById('format-select').value;
+        var language = format === 'typst' ? 'plaintext' : 'markdown';
+        var initialContent = {{ article.source_content|tojson if article and article.source_content else '""' }};
+        if (!initialContent) {
+            initialContent = language === 'markdown'
+                ? '---\ntitle: \nabstract: \ncategories:\n  - \nkeywords:\n  - \nlanguage: en\n---\n\n'
+                : '// Typst article\n#let title = ""\n#let abstract = ""\n\n';
+        }
+
+        window.editor = monaco.editor.create(document.getElementById('monaco-editor'), {
+            value: initialContent,
+            language: language,
+            theme: 'vs',
+            automaticLayout: true,
+            minimap: { enabled: false },
+            fontSize: 14,
+            lineNumbers: 'on',
+            wordWrap: 'on',
+            scrollBeyondLastLine: false,
+        });
+
+        updatePreview();
+        window.editor.onDidChangeModelContent(function() {
+            updatePreview();
+        });
+    });
+
+    function switchFormat(fmt) {
+        var lang = fmt === 'typst' ? 'plaintext' : 'markdown';
+        var model = window.editor.getModel();
+        monaco.editor.setModelLanguage(model, lang);
+        updatePreview();
+    }
+
+    function updatePreview() {
+        var content = window.editor.getValue();
+        var format = document.getElementById('format-select').value;
+        var preview = document.getElementById('preview-pane');
+        var status = document.getElementById('preview-status');
+
+        if (format === 'markdown') {
+            previewMarkdown(content, preview, status);
+        } else {
+            previewTypst(content, preview, status);
+        }
+    }
+
+    // ── Markdown preview (KaTeX, instant) ────────────────────────────────
+    function previewMarkdown(content, preview, status) {
+        status.textContent = '';
+        var body = content;
+        if (body.startsWith('---')) {
+            var parts = body.split('---', 3);
+            if (parts.length >= 3) body = parts.slice(2).join('---');
+        }
+        // Protect math before Markdown parsing
+        var mathBlocks = [];
+        var protected_ = body
+            .replace(/\$\$(.+?)\$\$/gs, function(m, g) {
+                mathBlocks.push({display: true, math: g});
+                return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
+            })
+            .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) {
+                mathBlocks.push({display: false, math: g});
+                return 'MATHPLACEHOLDER' + (mathBlocks.length - 1);
+            });
+        var html = protected_
+            .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+            .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+            .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>');
+        html = '<p>' + html + '</p>';
+        mathBlocks.forEach(function(b, i) {
+            var cls = b.display ? 'katex-display' : 'katex-inline';
+            var delim = b.display ? '$$' : '$';
+            html = html.replace('MATHPLACEHOLDER' + i,
+                '<span class="' + cls + '">' + delim + b.math + delim + '</span>');
+        });
+        preview.innerHTML = html;
+        if (window.renderMathInElement) {
+            renderMathInElement(preview, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                ]
+            });
+        }
+    }
+
+    // ── Submit ───────────────────────────────────────────────────────────
+    function submitArticle() {
+        var status = document.getElementById('submit-status');
+        var btn = document.getElementById('submit-btn');
+        status.textContent = '提交中...';
+        btn.disabled = true;
+
+        var form = document.getElementById('metadata-form');
+        var formData = new FormData(form);
+        var content = window.editor.getValue();
+        var format = document.getElementById('format-select').value;
+        var ext = format === 'typst' ? '.typ' : '.md';
+        var blob = new Blob([content], {type: 'text/plain'});
+        formData.append('article_file', blob, 'article' + ext);
+        formData.append('format', format);
+
+        fetch('/api/v1/articles', { method: 'POST', body: formData })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                status.innerHTML = '✅ 提交成功！<a href=\"/article/' + data.article_id + '\">查看文章</a>';
+                btn.disabled = false;
+            })
+            .catch(function(err) {
+                status.textContent = '✗ 提交失败';
+                btn.disabled = false;
+            });
+    }
+    </script>
+
+    <!-- Typst WASM preview (lazy load) -->
+    <script type="module">
+    import * as typst from 'https://cdn.jsdelivr.net/npm/@myriaddreamin/typst.ts@0.5.5/dist/esm/contrib/all-in-one.bundle.js';
+    window.$typst = typst;
+
+    function previewTypst(content, preview, status) {
+        status.textContent = '编译中...';
+        window.$typst.svg({ mainContent: content }).then(function(svg) {
+            preview.innerHTML = svg;
+            status.textContent = '';
+        }).catch(function(err) {
+            preview.innerHTML = '<p style="color:#c00;">Typst 编译错误</p><pre style="font-size:0.85em;color:#888;">'
+                + (err.message || String(err)).slice(0, 500) + '</pre>';
+            status.textContent = '✗';
+        });
+    }
+    </script>
+</body>
+</html>
