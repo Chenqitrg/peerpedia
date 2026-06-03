@@ -17,36 +17,30 @@ from sqlalchemy.types import Text, TypeDecorator
 
 # ── JSON column types for list/dict fields ───────────────────────────────────
 
-class JSONList(TypeDecorator):
-    """Store Python list as JSON string in SQLite."""
-    impl = Text
-    cache_ok = True
+def _make_json_type():
+    """Factory for JSON column TypeDecorators (avoids duplicate implementations)."""
+    class _JSONType(TypeDecorator):
+        impl = Text
+        cache_ok = True
 
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return None
-        return json.dumps(value, ensure_ascii=False)
+        def process_bind_param(self, value, dialect):
+            if value is None:
+                return None
+            return json.dumps(value, ensure_ascii=False)
 
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return None
-        return json.loads(value)
+        def process_result_value(self, value, dialect):
+            if value is None:
+                return None
+            return json.loads(value)
+
+    return _JSONType
 
 
-class JSONDict(TypeDecorator):
-    """Store Python dict as JSON string in SQLite."""
-    impl = Text
-    cache_ok = True
+JSONList = _make_json_type()
+"""Store Python list as JSON string in SQLite."""
 
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return None
-        return json.dumps(value, ensure_ascii=False)
-
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return None
-        return json.loads(value)
+JSONDict = _make_json_type()
+"""Store Python dict as JSON string in SQLite."""
 
 
 # ── Base + Engine ────────────────────────────────────────────────────────────
