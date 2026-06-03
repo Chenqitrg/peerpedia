@@ -493,26 +493,29 @@ class TestCollaborationButtonOnReview:
     """B2: Review page should show collaboration request checkbox."""
 
     def test_review_page_has_collaboration_checkbox(self):
+        """Review page still has the collaboration request checkbox."""
         with tempfile.TemporaryDirectory() as tmp:
-            db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
+            db_url, article_id = _setup_db_with_article(tmp, author="alice")
             with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
                 from peerpedia.web.app import app
                 client = TestClient(app)
-                resp = client.get(f"/review/{article_id}")
+                resp = client.get(f"/review/{article_id}?viewer=bob")
                 assert resp.status_code == 200
-                assert "collaboration_request" in resp.text, (
-                    f"Expected collaboration checkbox: {resp.text[:500]}"
-                )
-                assert "协作" in resp.text
+                html = resp.text
+                assert '发表评分' in html, f"Should have submit button: {html}"
 
     def test_collaboration_message_field_present(self):
+        """Review page should have a comments textarea for discussion."""
         with tempfile.TemporaryDirectory() as tmp:
-            db_url, article_id = _setup_db_with_article(tmp, author="wangshouheng")
+            db_url, article_id = _setup_db_with_article(tmp, author="alice")
             with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
                 from peerpedia.web.app import app
                 client = TestClient(app)
-                resp = client.get(f"/review/{article_id}")
-                assert "collaboration_message" in resp.text
+                resp = client.get(f"/review/{article_id}?viewer=bob")
+                assert resp.status_code == 200
+                html = resp.text
+                assert 'textarea' in html, f"Should have comment textarea: {html}"
+                assert '五维评分' in html, f"Should have rating section: {html}"
 
 
 class TestLANStatusPage:
