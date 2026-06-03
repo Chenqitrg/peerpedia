@@ -191,18 +191,39 @@ async def api_unfollow_user(user_id: str, follower_id: str = Form(...)):
         session.close()
 
 
+def _render_user_list(users: list, viewer: str, label: str, empty_label: str) -> str:
+    """Render a following/followers list as an HTML fragment."""
+    if not users:
+        return f'<ul class="follow-list"><li class="follow-empty">{empty_label}</li></ul>'
+    items = []
+    for u in users:
+        uid = u.followed_id if hasattr(u, 'followed_id') else u.follower_id
+        profile_url = f"/user/{uid}"
+        if viewer:
+            profile_url += f"?viewer={viewer}"
+        items.append(f'<li><a href="{profile_url}" class="author-link">{uid}</a></li>')
+    return f'<ul class="follow-list">{"".join(items)}</ul>'
+
+
 @router.get("/users/{user_id}/following")
-async def api_get_following(user_id: str):
-    """Get users that user_id follows."""
+async def api_get_following(user_id: str, format: str = "json", viewer: str = ""):
+    """Get users that user_id follows. format=html returns an HTML fragment."""
     from peerpedia_core.storage.db import get_following, get_user
 
     session = get_db_session()
     try:
         target = get_user(session, user_id)
         if target is None:
+            if format == "html":
+                return HTMLResponse('<p class="follow-empty">用户不存在</p>')
             raise HTTPException(status_code=404, detail="User not found")
 
         following = get_following(session, user_id)
+        if format == "html":
+            return HTMLResponse(_render_user_list(
+                following, viewer, "关注了", "暂未关注任何人"
+            ))
+
         return {
             "user_id": user_id,
             "users": [
@@ -219,17 +240,24 @@ async def api_get_following(user_id: str):
 
 
 @router.get("/users/{user_id}/followers")
-async def api_get_followers(user_id: str):
-    """Get users that follow user_id."""
+async def api_get_followers(user_id: str, format: str = "json", viewer: str = ""):
+    """Get users that follow user_id. format=html returns an HTML fragment."""
     from peerpedia_core.storage.db import get_followers, get_user
 
     session = get_db_session()
     try:
         target = get_user(session, user_id)
         if target is None:
+            if format == "html":
+                return HTMLResponse('<p class="follow-empty">用户不存在</p>')
             raise HTTPException(status_code=404, detail="User not found")
 
         followers = get_followers(session, user_id)
+        if format == "html":
+            return HTMLResponse(_render_user_list(
+                followers, viewer, "粉丝", "暂无粉丝"
+            ))
+
         return {
             "user_id": user_id,
             "users": [

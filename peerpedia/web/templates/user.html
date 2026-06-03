@@ -10,9 +10,12 @@
     <header>
         <h1>📚 知著网</h1>
         <nav>
-            <a href="/">首页</a>
+            <a href="/{% if current_user %}?user={{ current_user }}{% endif %}">首页</a>
             <a href="/submit">提交</a>
             <a href="/review">审稿队列</a>
+            {% if current_user %}
+            <a href="/user/{{ current_user }}?viewer={{ current_user }}">👤 我的主页</a>
+            {% endif %}
         </nav>
     </header>
 
@@ -42,8 +45,28 @@
             </div>
             {% elif is_self %}
             <div style="margin-bottom: 12px; color: #888; font-size: 0.9em;">
-              粉丝 {{ follower_count }} · 关注了 {{ following_count }}
+              这是我的主页
             </div>
+            {% endif %}
+
+            {% if follower_count >= 0 or following_count >= 0 %}
+            <div id="follow-counts" style="margin-bottom: 12px; font-size: 0.9em;">
+              <a href="#"
+                 hx-get="/api/v1/users/{{ user_id }}/followers?format=html&viewer={{ current_user }}"
+                 hx-target="#follow-list-panel"
+                 hx-swap="innerHTML"
+                 style="color: var(--accent); text-decoration: none; margin-right: 12px;">
+                粉丝 <strong>{{ follower_count }}</strong>
+              </a>
+              <a href="#"
+                 hx-get="/api/v1/users/{{ user_id }}/following?format=html&viewer={{ current_user }}"
+                 hx-target="#follow-list-panel"
+                 hx-swap="innerHTML"
+                 style="color: var(--accent); text-decoration: none;">
+                关注了 <strong>{{ following_count }}</strong>
+              </a>
+            </div>
+            <div id="follow-list-panel"></div>
             {% endif %}
 
             <div class="user-stats">

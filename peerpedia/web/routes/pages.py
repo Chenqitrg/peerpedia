@@ -46,11 +46,12 @@ async def view_article(request: Request, article_id: str):
     session = get_db_session()
     try:
         article = get_article(session, article_id)
+        viewer = request.query_params.get("viewer", "")
         if article is None:
             return templates.TemplateResponse(
                 request=request,
                 name="article.html",
-                context={"request": request, "title": "Not Found", "article": None},
+                context={"request": request, "title": "Not Found", "article": None, "viewer": viewer},
                 status_code=404,
             )
 
@@ -65,6 +66,7 @@ async def view_article(request: Request, article_id: str):
                 "request": request,
                 "title": article_dict["title"],
                 "article": article_dict,
+                "viewer": viewer,
             },
         )
     finally:
@@ -201,7 +203,7 @@ async def user_profile(request: Request, user_id: str):
         except Exception:
             reputation = {}
 
-        # Follow state
+        # Follow state — always compute counts, even without viewer
         is_self = False
         is_following_user = False
         current_user_id = request.query_params.get("viewer", "")
@@ -215,6 +217,13 @@ async def user_profile(request: Request, user_id: str):
                 is_self = True
             else:
                 is_following_user = is_following(session, current_user_id, user_id)
+            following_count = get_following_count(session, user_id)
+            follower_count = get_follower_count(session, user_id)
+        else:
+            # Still compute counts so visitors can see them
+            from peerpedia_core.storage.db import (
+                get_following_count, get_follower_count
+            )
             following_count = get_following_count(session, user_id)
             follower_count = get_follower_count(session, user_id)
 

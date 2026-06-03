@@ -292,6 +292,46 @@ footer {
     color: var(--muted);
 }
 
+/* ── Follow Lists ──────────────────────────────────────────────────────────── */
+
+#follow-counts {
+    margin-bottom: 8px;
+}
+
+#follow-counts a:hover {
+    text-decoration: underline;
+}
+
+#follow-list-panel {
+    margin-bottom: 16px;
+}
+
+.follow-list {
+    list-style: none;
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.follow-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.follow-list li:last-child {
+    border-bottom: none;
+}
+
+.follow-empty {
+    color: var(--muted);
+    font-size: 0.85em;
+    padding: 8px 12px;
+}
+
 /* ── Compile Error ──────────────────────────────────────────────────────────── */
 
 .compile-error {
