@@ -92,7 +92,8 @@ async def view_article(request: Request, article_id: str):
         reviews = get_reviews_for_article(session, article_id)
         community_review = None
         if reviews:
-            dims = ["originality", "rigor", "completeness", "pedagogy", "impact"]
+            from peerpedia_core.workflow.review_dimensions import REVIEW_DIMENSIONS
+            dims = REVIEW_DIMENSIONS
             scores = {d: [] for d in dims}
             for r in reviews:
                 for d in dims:
@@ -157,7 +158,8 @@ async def review_article_page(request: Request, article_id: str):
         sink_pct = 0
         days_left = 7
         if reviews:
-            dims = ["originality", "rigor", "completeness", "pedagogy", "impact"]
+            from peerpedia_core.workflow.review_dimensions import REVIEW_DIMENSIONS
+            dims = REVIEW_DIMENSIONS
             scores = []
             for r in reviews:
                 vals = [getattr(r, f"review_{d}", 0) for d in dims]
