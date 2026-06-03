@@ -271,27 +271,22 @@ class MarkdownBackend(CompilerBackend):
             html_body = _render_markdown(protected_body)
             html_body = _restore_math(html_body, math_placeholders)
 
-            full_html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-</head>
-<body>
-{html_body}
+            # KaTeX CSS/JS loaded in page <head>. Only body + render here.
+            # Target #article-content so HTMX swaps get rendered correctly.
+            full_html = f"""{html_body}
 <script>
-  renderMathInElement(document.body, {{
-    delimiters: [
-      {{left: '$$', right: '$$', display: true}},
-      {{left: '$', right: '$', display: false}},
-    ]
-  }});
-</script>
-</body>
-</html>"""
+  (function() {{
+    var el = document.getElementById('article-content');
+    if (el && window.renderMathInElement) {{
+      renderMathInElement(el, {{
+        delimiters: [
+          {{left: '$$', right: '$$', display: true}},
+          {{left: '$', right: '$', display: false}},
+        ]
+      }});
+    }}
+  }})();
+</script>"""
 
             output_path = output_dir / f"{source_path.stem}.html"
             output_path.write_text(full_html)

@@ -184,14 +184,14 @@ tests/                   # 19 tests, 0 failures
 
 | 缺口 | 说明 | 优先级 |
 |---|---|---|
-| 贡献时间线 UI | API 有 `/contributions`，文章页未展示 git blame 时间线 | 🟡 |
-| 编辑提案 UI | API 完整，无前端提交/审核提案的界面 | 🟡 |
+| 贡献时间线 UI | ✅ API 返回 HTML，文章页展示贡献占比 + 记录列表 | ✅ |
+| 编辑提案 UI | API 完整，文章页有提交表单，无审核界面 | 🟡 |
 | 协作按钮 | API 有 `/collaborate`，审稿页面无"申请协作"按钮 | 🟡 |
 | 引用跃迁图表 | API 有 `/citations/transitions`，无可视化 | 🟢 |
 | 身份绑定 UI | API 有 POST `/users/{id}/identities`，无表单 | 🟢 |
-| LAN 状态页面 | API 有 `/lan/status`，无专属页面 | 🟢 |
-| 审稿入口 | 文章页无"审稿"按钮，队列只显示 submitted 状态 | 🟡 |
-| Demo 数据 | 4 篇 Markdown 文章 + 4 个用户 + 7 条关注关系 | ✅ |
+| LAN 状态页面 | API 有 `/lan/status`，有专属页面 | 🟢 |
+| 审稿入口 | 文章页有"审稿"按钮（submitted/in_review 状态） | 🟢 |
+| Demo 数据 | 5 篇文章（4 Markdown + 1 Typst）+ 数学公式 + KaTeX 渲染 | ✅ |
 
 ---
 

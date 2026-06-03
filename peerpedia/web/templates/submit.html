@@ -38,7 +38,8 @@
     </script>
 
     <script>
-    // Star rating interaction
+    // Star rating interaction — wait for DOM
+    document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.star-rating').forEach(function(rating) {
         var stars = rating.querySelectorAll('.stars span');
         var label = rating.querySelector('.star-label');
@@ -68,6 +69,7 @@
             });
             label.textContent = val > 0 ? stars[val - 1].title : '';
         });
+    });
     });
     </script>
 

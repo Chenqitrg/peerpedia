@@ -77,15 +77,69 @@ async def api_create_proposal(
     }
 
 
+def _render_proposals_html(article_id: str, proposals: list, total: int) -> str:
+    """Render edit proposals as an HTML fragment."""
+    if total == 0:
+        return '<p style="color:#888;font-size:0.85em;">暂无修改提案。</p>'
+
+    status_labels = {
+        "pending": "⏳ 待审",
+        "approved": "✅ 已通过",
+        "rejected": "❌ 已拒绝",
+        "auto_approved": "⚡ 自动通过",
+        "merged": "🔀 已合并",
+    }
+    type_labels = {
+        "minor": "微小修改",
+        "medium": "中等修改",
+        "major": "重大修改",
+    }
+
+    items = []
+    for p in proposals:
+        pd = p.to_dict()
+        s = pd.get("status", "pending")
+        pt = pd.get("proposal_type", "minor")
+        desc = (pd.get("description") or "")[:100]
+        proposer = pd.get("proposer_id", "unknown")
+        ts = str(pd.get("created_at", ""))[:10] if pd.get("created_at") else ""
+        items.append(
+            f'<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:0.85em;">'
+            f'<span>{status_labels.get(s, s)}</span> '
+            f'<span style="color:#888;">[{type_labels.get(pt, pt)}]</span> '
+            f'<strong>{proposer}</strong> '
+            f'<span style="color:#666;">{desc}</span>'
+            f'<span style="float:right;color:#aaa;">{ts}</span>'
+            f'</div>'
+        )
+
+    html = '<div class="proposals-list-html">'
+    html += '<h4 style="margin:0 0 8px 0;">📋 修改提案 ({})</h4>'.format(total)
+    html += "".join(items)
+    html += "</div>"
+    return html
+
+
 @router.get("/articles/{article_id}/proposals")
-async def api_list_proposals(article_id: str, status: str | None = None):
-    """List edit proposals for an article."""
+async def api_list_proposals(article_id: str, format: str = "json", status: str | None = None):
+    """List edit proposals for an article.
+
+    Set ?format=html to get an HTML fragment for HTMX swap.
+    """
+    from fastapi.responses import HTMLResponse
+
     session = get_db_session()
     try:
         article = get_article(session, article_id)
         if article is None:
+            if format == "html":
+                return HTMLResponse('<p style="color:#888;">文章未找到。</p>')
             raise HTTPException(status_code=404, detail="Article not found")
         proposals = get_edit_proposals_for_article(session, article_id, status=status)
+        if format == "html":
+            return HTMLResponse(_render_proposals_html(
+                article_id, proposals, len(proposals),
+            ))
         return {
             "article_id": article_id,
             "proposals": [p.to_dict() for p in proposals],

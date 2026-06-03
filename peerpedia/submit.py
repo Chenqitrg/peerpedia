@@ -156,6 +156,18 @@ def submit_article(
     self_impact: int = 0,
 ) -> SubmissionResult:
     """Submit an article from a Typst or Markdown source file."""
+    # 0. Validate self-rating range
+    for dim, val in [("self_originality", self_originality),
+                     ("self_rigor", self_rigor),
+                     ("self_completeness", self_completeness),
+                     ("self_pedagogy", self_pedagogy),
+                     ("self_impact", self_impact)]:
+        if not (0 <= val <= 5):
+            return SubmissionResult(
+                success=False,
+                error=f"自我评分 {dim}={val} 超出范围（0-5）",
+            )
+
     # 1. Read source
     try:
         source_content = source_path.read_text()

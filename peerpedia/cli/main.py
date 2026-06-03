@@ -285,45 +285,44 @@ The surface code is a stabilizer code defined on a 2D lattice of qubits.
             tmp.write(ad["source"])
             tmp_path = Path(tmp.name)
 
-        result = submit_article(
-            source_path=tmp_path,
-            database_url=settings.database_url,
-            articles_dir=articles_dir,
-            author_name=ad["author"],
-            self_originality=ad["self_originality"],
-            self_rigor=ad["self_rigor"],
-            self_completeness=ad["self_completeness"],
-            self_pedagogy=ad["self_pedagogy"],
-            self_impact=ad["self_impact"],
-        )
-
-        if not result.success:
-            click.echo(f"    ✗ {ad['source'].split(chr(10))[1][7:40]}... 失败: {result.error}")
-            continue
-
-        # Set status
-        session = get_session(engine)
-        session.close()
-        engine2 = get_engine(settings.database_url)
-        session2 = get_session(engine2)
-        update_article_status(session2, result.article_id, "submitted")
-        session2.commit()
-
-        if ad["status"] == "published":
-            assign_reviewer(article_id=result.article_id, reviewer_id="liqun", database_url=settings.database_url)
-            submit_review(
-                article_id=result.article_id, reviewer_id="liqun",
-                decision="accept", comments="Excellent work. Ready for publication.",
-                scientific_correctness=5, clarity=5,
+        try:
+            result = submit_article(
+                source_path=tmp_path,
                 database_url=settings.database_url,
+                articles_dir=articles_dir,
+                author_name=ad["author"],
+                self_originality=ad["self_originality"],
+                self_rigor=ad["self_rigor"],
+                self_completeness=ad["self_completeness"],
+                self_pedagogy=ad["self_pedagogy"],
+                self_impact=ad["self_impact"],
             )
-            make_decision(article_id=result.article_id, database_url=settings.database_url)
-            update_article_status(session2, result.article_id, "published")
-            session2.commit()
 
-        session2.close()
-        tmp_path.unlink()
-        click.echo(f"    ✓ [{ad['status']}] {result.title[:55]}")
+            if not result.success:
+                click.echo(f"    ✗ {ad['source'].split(chr(10))[1][7:40]}... 失败: {result.error}")
+                continue
+
+            # Set status via the existing engine
+            session = get_session(engine)
+            update_article_status(session, result.article_id, "submitted")
+            session.commit()
+
+            if ad["status"] == "published":
+                assign_reviewer(article_id=result.article_id, reviewer_id="liqun", database_url=settings.database_url)
+                submit_review(
+                    article_id=result.article_id, reviewer_id="liqun",
+                    decision="accept", comments="Excellent work. Ready for publication.",
+                    scientific_correctness=5, clarity=5,
+                    database_url=settings.database_url,
+                )
+                make_decision(article_id=result.article_id, database_url=settings.database_url)
+                update_article_status(session, result.article_id, "published")
+                session.commit()
+
+            session.close()
+            click.echo(f"    ✓ [{ad['status']}] {result.title[:55]}")
+        finally:
+            tmp_path.unlink()
 
     # ── Add cross-references ────────────────────────────────────────────
     session = get_session(engine)

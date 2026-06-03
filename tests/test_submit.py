@@ -242,3 +242,119 @@ $$
 
             assert result.success is True
             assert result.format == "markdown"
+
+
+class TestSubmitSiblingIsolation:
+    """Regression: submit must NOT copy sibling .md/.typ files into article repos.
+
+    Bug: submit_article copied ALL files from the source directory into the
+    article git repo, causing cross-contamination when multiple articles were
+    submitted from the same directory.
+    """
+
+    def test_sibling_source_files_not_copied(self):
+        """Other .md files in the source dir are NOT copied to article repo."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            db_path = base / "test.db"
+            articles_dir = base / "articles"
+            articles_dir.mkdir()
+
+            source_file = base / "my_article.md"
+            source_file.write_text("""---
+title: My Article
+abstract: The right one.
+language: en
+---
+# My Article
+Content.
+""")
+            sibling = base / "other_article.md"
+            sibling.write_text("""---
+title: Other Article
+abstract: Should not be copied.
+language: en
+---
+# Other Article
+Do not copy me.
+""")
+
+            result = submit_article(
+                source_path=source_file,
+                database_url=f"sqlite:///{db_path}",
+                articles_dir=articles_dir,
+            )
+
+            assert result.success is True
+            repo_path = articles_dir / result.article_id
+            assert (repo_path / "my_article.md").exists()
+            assert not (repo_path / "other_article.md").exists(), (
+                "Sibling .md file leaked into article repo!"
+            )
+
+    def test_sibling_typst_files_not_copied(self):
+        """Other .typ files in the source dir are NOT copied to article repo."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            db_path = base / "test.db"
+            articles_dir = base / "articles"
+            articles_dir.mkdir()
+
+            source_file = base / "main.typ"
+            source_file.write_text("""---
+title: Main Typst
+language: en
+---
+= Main
+Content.
+""")
+            sibling = base / "extra.typ"
+            sibling.write_text("""---
+title: Extra Typst
+language: en
+---
+= Extra
+Should not copy.
+""")
+
+            result = submit_article(
+                source_path=source_file,
+                database_url=f"sqlite:///{db_path}",
+                articles_dir=articles_dir,
+            )
+
+            assert result.success is True
+            repo_path = articles_dir / result.article_id
+            assert (repo_path / "main.typ").exists()
+            assert not (repo_path / "extra.typ").exists()
+
+    def test_asset_files_still_copied(self):
+        """Non-source assets (images, data) are still copied as before."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            db_path = base / "test.db"
+            articles_dir = base / "articles"
+            articles_dir.mkdir()
+
+            source_file = base / "article.md"
+            source_file.write_text("""---
+title: Article with Assets
+language: en
+---
+# Article
+![plot](plot.png)
+""")
+            (base / "plot.png").write_text("fake-png-data")
+
+            result = submit_article(
+                source_path=source_file,
+                database_url=f"sqlite:///{db_path}",
+                articles_dir=articles_dir,
+            )
+
+            assert result.success is True
+            repo_path = articles_dir / result.article_id
+            assert (repo_path / "article.md").exists()
+            assert (repo_path / "plot.png").exists(), (
+                "Image assets should still be copied"
+            )

@@ -6,12 +6,17 @@ This package replaces the old monolithic db.py. All imports from
 
 from peerpedia_core.protocol.messages import ArticleStatus
 from peerpedia_core.storage.db.crud_article import (
+    apply_comment_suggestion,
     create_article,
     create_review,
+    create_review_comment,
     get_article,
+    get_comments_for_article,
     get_review,
+    get_review_comment,
     get_reviews_for_article,
     list_articles,
+    resolve_review_comment,
     update_article_cid,
     update_article_founding_authors,
     update_article_status,
@@ -65,6 +70,7 @@ from peerpedia_core.storage.db.models import (
     Identity,
     NodeInfo,
     Review,
+    ReviewComment,
     User,
 )
 
@@ -83,6 +89,7 @@ __all__ = [
     "EditProposal",
     "Identity",
     "Review",
+    "ReviewComment",
     "User",
     # crud — article
     "create_article",
@@ -96,6 +103,12 @@ __all__ = [
     "create_review",
     "get_review",
     "get_reviews_for_article",
+    # crud — review comment
+    "create_review_comment",
+    "get_review_comment",
+    "get_comments_for_article",
+    "resolve_review_comment",
+    "apply_comment_suggestion",
     # crud — contribution
     "create_contribution_record",
     "get_contribution_records",

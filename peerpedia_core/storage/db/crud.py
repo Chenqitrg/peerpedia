@@ -14,12 +14,17 @@ Prefer importing from ``peerpedia_core.storage.db`` directly.
 """
 
 from peerpedia_core.storage.db.crud_article import (  # noqa: F401
+    apply_comment_suggestion,
     create_article,
     create_review,
+    create_review_comment,
     get_article,
+    get_comments_for_article,
     get_review,
+    get_review_comment,
     get_reviews_for_article,
     list_articles,
+    resolve_review_comment,
     update_article_cid,
     update_article_founding_authors,
     update_article_status,

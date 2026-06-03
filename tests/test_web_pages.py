@@ -552,3 +552,92 @@ class TestArticlePageWithTransitions:
                 assert resp.status_code == 200
                 # Transition probability API call should be in the page
                 assert "transitions" in resp.text or "citing" in resp.text.lower()
+
+
+class TestArticlePageNoRawJSON:
+    """Regression: article page must not leak raw JSON into rendered HTML.
+
+    Bug: HTMX hx-swap="innerHTML" called API endpoints that returned JSON
+    instead of HTML. The page must use ?format=html on HTMX calls.
+    """
+
+    @staticmethod
+    def _make_published(db_url: str, article_id: str):
+        """Set article status to 'published' so timeline/proposals render."""
+        from peerpedia_core.storage.db import (
+            Article, get_engine, get_session, init_db,
+        )
+        engine = get_engine(db_url)
+        init_db(engine)
+        session = get_session(engine)
+        try:
+            a = session.query(Article).filter(Article.id == article_id).first()
+            if a:
+                a.status = "published"
+                session.commit()
+        finally:
+            session.close()
+
+    def test_article_page_no_contributions_json_leak(self):
+        """Contribution timeline section uses format=html, not raw JSON."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
+            self._make_published(db_url, article_id)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(f"/article/{article_id}")
+                assert resp.status_code == 200
+                html = resp.text
+                # Must NOT contain raw JSON pattern from contributions endpoint
+                assert '"timeline"' not in html, (
+                    f"Raw JSON leak: 'timeline' key found in page HTML"
+                )
+                assert '"breakdown"' not in html, (
+                    f"Raw JSON leak: 'breakdown' key found in page HTML"
+                )
+                assert '"total_records"' not in html, (
+                    f"Raw JSON leak: 'total_records' key found in page HTML"
+                )
+                # HTMX call must use format=html
+                assert 'contributions?format=html' in html, (
+                    f"Missing format=html in contributions hx-get"
+                )
+
+    def test_article_page_no_proposals_json_leak(self):
+        """Proposals section uses format=html, not raw JSON."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
+            self._make_published(db_url, article_id)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(f"/article/{article_id}")
+                assert resp.status_code == 200
+                html = resp.text
+                # HTMX call must use format=html
+                assert 'proposals?format=html' in html, (
+                    f"Missing format=html in proposals hx-get"
+                )
+
+    def test_htmx_endpoints_return_html_not_json(self):
+        """HTMX endpoints with format=html return HTML, not JSON."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, author="testuser")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                # Contributions HTML
+                resp = client.get(
+                    f"/api/v1/articles/{article_id}/contributions?format=html"
+                )
+                assert resp.status_code == 200
+                assert not resp.text.startswith("{")
+                assert "<" in resp.text  # contains HTML tags
+                # Proposals HTML
+                resp = client.get(
+                    f"/api/v1/articles/{article_id}/proposals?format=html"
+                )
+                assert resp.status_code == 200
+                assert not resp.text.startswith("{")
+                assert "<" in resp.text  # contains HTML tags

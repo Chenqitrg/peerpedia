@@ -424,3 +424,43 @@ Content here with math $x^2 + y^2 = z^2$.
                 # Must return HTML, never JSON
                 content_type = resp.headers.get("content-type", "")
                 assert "text/html" in content_type, f"Expected HTML, got {content_type}: {resp.text[:200]}"
+
+    def test_compile_picks_correct_file_when_multiple_exist(self):
+        """When repo has multiple .md files, pick the one matching article title."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id, articles_dir = _setup_test_db_with_article(tmp)
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                from peerpedia_core.storage.db import Article, get_engine, get_session, init_db
+
+                # Add a second .md file with a DIFFERENT title to the repo
+                engine = get_engine(db_url)
+                init_db(engine)
+                session = get_session(engine)
+                article = session.query(Article).filter(Article.id == article_id).first()
+                repo = Path(article.git_repo_path)
+
+                # The primary file (already exists from submit)
+                # Create a decoy file that would be picked alphabetically first
+                decoy = repo / "aaa_decoy.md"
+                decoy.write_text("""---
+title: Decoy Article
+abstract: Should not be picked.
+---
+# Decoy Article
+This is NOT the article you are looking for.
+""")
+                session.commit()
+                session.close()
+
+                client = TestClient(app)
+                resp = client.get(f"/api/v1/articles/{article_id}/compile?fmt=html")
+                assert resp.status_code == 200
+                # The compiled content must be from the real article (Test Article),
+                # NOT from the alphabetically-first decoy
+                assert "Test Article" in resp.text, (
+                    f"Should compile the matching article, got: {resp.text[:300]}"
+                )
+                assert "Decoy Article" not in resp.text, (
+                    f"Should NOT compile the alphabetically-first decoy"
+                )

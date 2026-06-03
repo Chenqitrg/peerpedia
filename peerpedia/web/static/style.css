@@ -492,6 +492,89 @@ footer {
     font-size: 0.85em;
 }
 
+/* ── Tab buttons ──────────────────────────────────────────────────────────────── */
+
+.tab-btn {
+    font-family: inherit;
+    font-size: 0.9em;
+    transition: background 0.15s;
+}
+
+.tab-btn.active {
+    font-weight: 600;
+    border-bottom: 2px solid var(--accent) !important;
+}
+
+/* ── Commit list / diff panel ────────────────────────────────────────────────── */
+
+.commit-item {
+    transition: background 0.15s;
+}
+
+.commit-item:hover {
+    background: #f0f4ff !important;
+}
+
+.commit-item.active {
+    background: #e8f0fe !important;
+    border-left: 3px solid var(--accent);
+}
+
+#diff-view {
+    font-size: 0.82em;
+}
+
+#diff-view .d2h-wrapper {
+    border: none;
+}
+
+#diff-view .d2h-file-header {
+    font-size: 0.9em;
+}
+
+#diff-view .d2h-code-line {
+    font-size: 0.85em;
+}
+
+/* ── ReviewComment ───────────────────────────────────────────────────────────── */
+
+.review-comment-form {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.review-comment-form label {
+    font-size: 0.85em;
+}
+
+.review-comment-form textarea {
+    width: 100%;
+    min-height: 60px;
+    margin-top: 4px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-family: inherit;
+}
+
+.review-comment-form .form-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.review-comment-form select {
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
 /* ── Responsive: stack sidebar below on narrow screens ───────────────────────── */
 
 @media (max-width: 768px) {

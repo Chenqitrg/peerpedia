@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} — 知著网</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/katex/katex.min.css">
+    <link rel="stylesheet" href="/static/diff2html/diff2html.min.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="/static/katex/katex.min.js"></script>
+    <script defer src="/static/katex/auto-render.min.js"></script>
+    <script src="/static/diff2html/diff2html.min.js"></script>
 </head>
 <body>
     <header>
@@ -55,6 +60,36 @@
                 <span><a href="/review/{{ article.id }}" class="btn-review">✏️ 审稿</a></span>
                 {% endif %}
             </div>
+
+            {% set has_self_review = article.self_originality or article.self_rigor or article.self_completeness or article.self_pedagogy or article.self_impact %}
+            {% if has_self_review %}
+            <div class="self-review-display" style="display:flex;gap:16px;padding:10px 14px;background:#f8f9fa;border-radius:6px;margin-bottom:16px;flex-wrap:wrap;font-size:0.85em;">
+                <span title="原创性">🧠 {{ article.self_originality }}/5</span>
+                <span title="严格性">📐 {{ article.self_rigor }}/5</span>
+                <span title="完整性">🧩 {{ article.self_completeness }}/5</span>
+                <span title="教学性">📖 {{ article.self_pedagogy }}/5</span>
+                <span title="影响力">💡 {{ article.self_impact }}/5</span>
+                <span style="color:#888;">(作者自评)</span>
+            </div>
+            {% else %}
+            <p style="color:#aaa;font-size:0.85em;margin-bottom:12px;">作者未自评 · 社区审稿后此处显示评分对比</p>
+            {% endif %}
+
+            <!-- Version history / diff panel toggle -->
+            <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+                <button id="tab-content-btn" class="tab-btn active"
+                        onclick="switchTab('content')"
+                        style="padding:6px 16px;border:1px solid var(--border);border-radius:4px 4px 0 0;background:var(--card-bg);cursor:pointer;font-size:0.9em;">
+                    📄 文章内容
+                </button>
+                <button id="tab-history-btn" class="tab-btn"
+                        onclick="switchTab('history')"
+                        style="padding:6px 16px;border:1px solid var(--border);border-radius:4px 4px 0 0;background:#f0f0f0;cursor:pointer;font-size:0.9em;">
+                    📜 版本历史
+                </button>
+            </div>
+            <!-- Tab: Article content -->
+            <div id="tab-content" class="tab-panel">
             <div class="article-abstract">
                 <h2>摘要</h2>
                 <p>{{ article.abstract }}</p>
@@ -70,7 +105,7 @@
             <!-- B3: Contribution timeline -->
             <section class="contribution-timeline" style="margin-top: 24px;">
                 <h3>📜 贡献时间线</h3>
-                <div hx-get="/api/v1/articles/{{ article.id }}/contributions"
+                <div hx-get="/api/v1/articles/{{ article.id }}/contributions?format=html"
                      hx-trigger="load" hx-swap="innerHTML">
                     <p style="color: #888;">加载中...</p>
                 </div>
@@ -97,12 +132,83 @@
                 <div id="proposal-result"></div>
 
                 <!-- List existing proposals -->
-                <div hx-get="/api/v1/articles/{{ article.id }}/proposals"
+                <div hx-get="/api/v1/articles/{{ article.id }}/proposals?format=html"
                      hx-trigger="load" hx-swap="innerHTML"
                      style="margin-top: 12px; font-size: 0.85em;">
                 </div>
             </section>
             {% endif %}
+            </div><!-- /#tab-content -->
+
+            <!-- Tab: Version history -->
+            <div id="tab-history" class="tab-panel" style="display: none;">
+                <div style="display: flex; gap: 16px;">
+                    <!-- Commit list (left) -->
+                    <div style="width: 280px; flex-shrink: 0; border-right: 1px solid var(--border); padding-right: 12px; max-height: 600px; overflow-y: auto;">
+                        <h4 style="margin: 0 0 8px 0; font-size: 0.9em;">📋 提交记录</h4>
+                        <div id="commit-list"
+                             hx-get="/api/v1/articles/{{ article.id }}/commits/html"
+                             hx-trigger="load"
+                             hx-swap="innerHTML">
+                            <p style="color: #888; font-size: 0.85em;">加载中...</p>
+                        </div>
+                    </div>
+                    <!-- Diff view (right) -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div id="diff-header" style="margin-bottom: 8px; font-size: 0.85em; color: #888;">
+                            ← 点击左侧提交记录查看变更
+                        </div>
+                        <div id="diff-view" style="max-height: 600px; overflow: auto; background: #fafafa; border-radius: 6px; border: 1px solid var(--border);">
+                            <p style="color: #888; padding: 24px; text-align: center;">选择一个提交来查看差异</p>
+                        </div>
+                        <!-- Inline comments for the viewed diff -->
+                        <div id="diff-comments" style="margin-top: 12px; font-size: 0.85em;"></div>
+
+                        <!-- Add comment form -->
+                        <div class="review-comment-form" style="margin-top: 16px;">
+                            <h4 style="margin: 0 0 8px 0; font-size: 0.9em;">💬 添加评论</h4>
+                            <form id="comment-form" onsubmit="submitComment(event, '{{ article.id }}')">
+                                <input type="hidden" name="commit_hash" id="comment-commit-hash" value="">
+                                <div class="form-row" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <label style="font-size: 0.85em;">行号:
+                                        <input type="number" name="line_start" id="comment-line-start"
+                                               min="1" value="" placeholder="起始行"
+                                               style="width: 80px; padding: 3px; font-size: 0.85em;">
+                                    </label>
+                                    <label style="font-size: 0.85em;">到:
+                                        <input type="number" name="line_end" id="comment-line-end"
+                                               min="1" value="" placeholder="结束行"
+                                               style="width: 80px; padding: 3px; font-size: 0.85em;">
+                                    </label>
+                                    <label style="font-size: 0.85em;">类型:
+                                        <select name="comment_type" style="padding: 3px; font-size: 0.85em;">
+                                            <option value="comment">评论</option>
+                                            <option value="suggestion">建议修改</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <label style="font-size: 0.85em; margin-top: 6px;">内容:
+                                    <textarea name="body" rows="2" required
+                                              placeholder="输入评论..."
+                                              style="width: 100%; margin-top: 4px; padding: 6px; font-size: 0.85em; font-family: inherit;"></textarea>
+                                </label>
+                                <label style="font-size: 0.85em; margin-top: 6px;">建议修改内容（可选）:
+                                    <textarea name="suggestion" rows="3"
+                                              placeholder="如果需要建议修改代码，在此输入修改后的内容..."
+                                              style="width: 100%; margin-top: 4px; padding: 6px; font-size: 0.85em; font-family: monospace;"></textarea>
+                                </label>
+                                <input type="hidden" name="author_id" value="{{ viewer or 'anonymous' }}">
+                                <button type="submit"
+                                        style="margin-top: 8px; padding: 6px 16px; font-size: 0.85em;">
+                                    提交评论
+                                </button>
+                                <span id="comment-status" style="margin-left: 8px; font-size: 0.85em; color: #16a34a;"></span>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- /#tab-history -->
+
         </article>
         <aside class="citation-sidebar" style="width: 260px; flex-shrink: 0; background: #f8f9fa; border-radius: 8px; padding: 16px; font-size: 0.9em;">
             <h3 style="margin-top: 0;">📚 引用关系</h3>
@@ -116,6 +222,177 @@
     </main>
 {% if article %}
 <script>
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+    document.getElementById('tab-content').style.display = tab === 'content' ? 'block' : 'none';
+    document.getElementById('tab-history').style.display = tab === 'history' ? 'block' : 'none';
+    document.getElementById('tab-content-btn').style.background = tab === 'content' ? 'var(--card-bg)' : '#f0f0f0';
+    document.getElementById('tab-history-btn').style.background = tab === 'history' ? 'var(--card-bg)' : '#f0f0f0';
+}
+
+// ── Diff loading ───────────────────────────────────────────────────────────
+var currentCommitHash = null;
+
+function loadDiff(articleId, commitHash) {
+    currentCommitHash = commitHash;
+    // Highlight selected commit
+    document.querySelectorAll('.commit-item').forEach(function(el) {
+        el.classList.remove('active');
+        el.style.background = '';
+    });
+    var selected = document.querySelector('.commit-item[data-hash="' + commitHash + '"]');
+    if (selected) {
+        selected.classList.add('active');
+        selected.style.background = '#e8f0fe';
+    }
+
+    var diffView = document.getElementById('diff-view');
+    var diffHeader = document.getElementById('diff-header');
+    diffView.innerHTML = '<p style="color:#888;padding:24px;text-align:center;">加载 diff 中...</p>';
+
+    fetch('/api/v1/articles/' + articleId + '/diff/' + commitHash)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.diff_text) {
+                diffView.innerHTML = '<p style="color:#888;padding:24px;text-align:center;">此提交无差异内容。</p>';
+                diffHeader.innerHTML = '<strong>' + data.author + '</strong> · '
+                    + (data.timestamp || '').slice(0, 10) + ' · '
+                    + (data.message || '').slice(0, 80);
+                return;
+            }
+            diffHeader.innerHTML = '<strong>' + data.author + '</strong> · '
+                + (data.timestamp || '').slice(0, 10) + ' · '
+                + (data.message || '').slice(0, 80)
+                + ' · <code>' + commitHash.slice(0, 8) + '</code>'
+                + (data.files && data.files.length ? ' · ' + data.files.length + ' file(s)' : '');
+
+            // Render with diff2html
+            var diffJson = Diff2Html.parse(data.diff_text);
+            var diffHtml = Diff2Html.html(diffJson, {
+                drawFileList: true,
+                matching: 'lines',
+                outputFormat: 'side-by-side',
+            });
+            diffView.innerHTML = diffHtml;
+
+            // Set up click handlers on diff lines to fill line numbers
+            setTimeout(function() {
+                setupDiffLineClickHandlers(articleId, commitHash);
+            }, 100);
+        })
+        .catch(function(err) {
+            diffView.innerHTML = '<p style="color:#c00;padding:24px;text-align:center;">加载 diff 失败: ' + err.message + '</p>';
+        });
+
+    // Load comments for this commit
+    var commentsDiv = document.getElementById('diff-comments');
+    if (commentsDiv) {
+        commentsDiv.innerHTML = '<p style="color:#888;">加载评论...</p>';
+        fetch('/api/v1/articles/' + articleId + '/comments?commit_hash=' + commitHash)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                renderComments(data.comments || []);
+            })
+            .catch(function() {
+                commentsDiv.innerHTML = '';
+            });
+    }
+}
+
+function renderComments(comments) {
+    var div = document.getElementById('diff-comments');
+    if (!div) return;
+    if (comments.length === 0) {
+        div.innerHTML = '<p style="color:#888;font-size:0.85em;margin-top:8px;">此版本暂无评论。点击 diff 中的行号添加评论。</p>';
+        return;
+    }
+    var html = '<h4 style="margin:12px 0 4px;">💬 评论 (' + comments.length + ')</h4>';
+    comments.forEach(function(c) {
+        html += '<div style="padding:6px 8px;margin:4px 0;background:#fff;border:1px solid var(--border);border-radius:4px;font-size:0.85em;">';
+        html += '<strong>' + escapeHtml(c.author_id) + '</strong> ';
+        html += '<span style="color:#888;">L' + c.line_start + (c.line_end && c.line_end !== c.line_start ? '-' + c.line_end : '') + '</span>';
+        if (c.comment_type === 'suggestion') {
+            html += ' <span style="background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:2px;font-size:0.75em;">建议</span>';
+        }
+        if (c.resolved) {
+            html += ' <span style="color:#16a34a;font-size:0.75em;">✓ 已解决</span>';
+        }
+        html += '<div style="margin-top:2px;">' + escapeHtml(c.body) + '</div>';
+        if (c.suggestion) {
+            html += '<pre style="background:#f8f9fa;padding:4px;margin-top:4px;font-size:0.8em;overflow-x:auto;border-radius:3px;"><code>' + escapeHtml(c.suggestion) + '</code></pre>';
+        }
+        html += '</div>';
+    });
+    div.innerHTML = html;
+}
+
+// ── Diff line click → comment form ────────────────────────────────────────
+function setupDiffLineClickHandlers(articleId, commitHash) {
+    // Set the commit hash in the hidden form field
+    var hashField = document.getElementById('comment-commit-hash');
+    if (hashField) hashField.value = commitHash;
+
+    // Click on diff line number → fill line_start
+    var diffView = document.getElementById('diff-view');
+    diffView.querySelectorAll('.d2h-code-linenumber').forEach(function(el) {
+        el.style.cursor = 'pointer';
+        el.title = '点击添加评论到这一行';
+        el.addEventListener('click', function() {
+            // Extract line number from the element
+            var lineNum = parseInt(el.textContent.trim(), 10);
+            if (!isNaN(lineNum)) {
+                var lineStart = document.getElementById('comment-line-start');
+                if (lineStart) lineStart.value = lineNum;
+                // Scroll to comment form
+                var form = document.querySelector('.review-comment-form');
+                if (form) form.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+}
+
+// ── Submit comment ────────────────────────────────────────────────────────
+function submitComment(event, articleId) {
+    event.preventDefault();
+    var form = document.getElementById('comment-form');
+    var statusEl = document.getElementById('comment-status');
+    if (!statusEl) return;
+
+    var formData = new FormData(form);
+    var data = new URLSearchParams();
+    for (var pair of formData.entries()) {
+        data.append(pair[0], pair[1]);
+    }
+
+    statusEl.textContent = '提交中...';
+    statusEl.style.color = '#888';
+
+    fetch('/api/v1/articles/' + articleId + '/comments', {
+        method: 'POST',
+        body: data,
+    })
+    .then(function(r) {
+        if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'Failed'); });
+        return r.json();
+    })
+    .then(function(result) {
+        statusEl.textContent = '✓ 评论已提交';
+        statusEl.style.color = '#16a34a';
+        form.reset();
+        // Reload comments
+        var commitHash = document.getElementById('comment-commit-hash').value;
+        if (commitHash && currentCommitHash) {
+            loadDiff(articleId, currentCommitHash);
+        }
+        setTimeout(function() { statusEl.textContent = ''; }, 3000);
+    })
+    .catch(function(err) {
+        statusEl.textContent = '✗ ' + err.message;
+        statusEl.style.color = '#c00';
+    });
+}
+
+// ── Citation panel ─────────────────────────────────────────────────────────
 (function() {
     var panel = document.getElementById('citation-panel');
     if (!panel) return;

@@ -302,6 +302,35 @@ class TestProposalListAPI:
                 resp = client.get("/api/v1/articles/nonexistent/proposals")
                 assert resp.status_code == 404
 
+    def test_list_proposals_html_format(self):
+        """GET /api/v1/articles/{id}/proposals?format=html returns HTML, not JSON."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, "testuser")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(
+                    f"/api/v1/articles/{article_id}/proposals?format=html"
+                )
+                assert resp.status_code == 200
+                html = resp.text
+                # Must be HTML, not raw JSON
+                assert not html.startswith("{"), f"Expected HTML, got JSON: {html}"
+                assert "暂无修改提案" in html
+
+    def test_list_proposals_html_nonexistent_article(self):
+        """format=html on nonexistent article returns HTML error, not exception."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, _ = _setup_db_with_article(tmp, "testuser")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(
+                    "/api/v1/articles/nonexistent/proposals?format=html"
+                )
+                assert resp.status_code == 200
+                assert not resp.text.startswith("{")
+
 
 class TestProposalReviewAPI:
     """POST /api/v1/proposals/{id}/review — review an edit proposal."""
@@ -318,6 +347,127 @@ class TestProposalReviewAPI:
                 )
                 # Returns 400 (proposal not found → bad request)
                 assert resp.status_code in (400, 404)
+
+
+class TestContributionTimelineAPI:
+    """GET /api/v1/articles/{id}/contributions — contribution timeline."""
+
+    def test_contributions_empty_json(self):
+        """Default (JSON) format works for empty contributions."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, "testuser")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(
+                    f"/api/v1/articles/{article_id}/contributions"
+                )
+                assert resp.status_code == 200
+                data = resp.json()
+                assert data["article_id"] == article_id
+                assert "timeline" in data
+                assert "breakdown" in data
+                assert data["total_records"] == 0
+
+    def test_contributions_html_format(self):
+        """GET /api/v1/articles/{id}/contributions?format=html returns HTML."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, "testuser")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(
+                    f"/api/v1/articles/{article_id}/contributions?format=html"
+                )
+                assert resp.status_code == 200
+                html = resp.text
+                # Must be HTML, not raw JSON
+                assert not html.startswith("{"), (
+                    f"Expected HTML, got raw JSON: {html}"
+                )
+                assert "暂无贡献记录" in html
+
+    def test_contributions_html_nonexistent_article(self):
+        """format=html on nonexistent article returns HTML error."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, _ = _setup_db_with_article(tmp, "testuser")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(
+                    "/api/v1/articles/nonexistent/contributions?format=html"
+                )
+                assert resp.status_code == 200
+                assert not resp.text.startswith("{"), (
+                    f"404 should return HTML, not JSON: {resp.text}"
+                )
+
+    def test_contributions_with_records_shows_breakdown(self):
+        """HTML format shows contribution breakdown when records exist."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, "testuser")
+            # Create a contribution record
+            from peerpedia_core.storage.db import (
+                create_contribution_record,
+                get_engine,
+                get_session,
+                init_db,
+            )
+            engine = get_engine(db_url)
+            init_db(engine)
+            session = get_session(engine)
+            create_contribution_record(
+                session,
+                article_id=article_id,
+                user_id="testuser",
+                commit_hash="abc123",
+                commit_message="Initial commit",
+                lines_added=50,
+                lines_deleted=0,
+                contribution_weight=200,
+            )
+            create_contribution_record(
+                session,
+                article_id=article_id,
+                user_id="collaborator",
+                commit_hash="def456",
+                commit_message="Fix typos",
+                lines_added=3,
+                lines_deleted=2,
+                contribution_weight=50,
+            )
+            session.commit()
+            session.close()
+
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(
+                    f"/api/v1/articles/{article_id}/contributions?format=html"
+                )
+                assert resp.status_code == 200
+                html = resp.text
+                assert not html.startswith("{"), f"Expected HTML: {html}"
+                assert "贡献占比" in html
+                assert "贡献记录" in html
+                assert "testuser" in html
+                assert "collaborator" in html
+
+    def test_contributions_default_still_json(self):
+        """Default (no format param) still returns JSON for backward compat."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_url, article_id = _setup_db_with_article(tmp, "testuser")
+            with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
+                from peerpedia.web.app import app
+                client = TestClient(app)
+                resp = client.get(
+                    f"/api/v1/articles/{article_id}/contributions"
+                )
+                assert resp.status_code == 200
+                # Should be valid JSON
+                data = resp.json()
+                assert isinstance(data, dict)
+                assert "article_id" in data
 
 
 class TestProposalMergeAPI:
