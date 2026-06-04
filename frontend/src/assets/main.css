@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Crimson+Pro:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Base layer ---- */
+@layer base {
+  html {
+    @apply scroll-smooth antialiased;
+    font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-surface text-ink;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Crimson Pro', Georgia, serif;
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 { @apply text-display md:text-display; }
+  h2 { @apply text-3xl md:text-4xl; }
+  h3 { @apply text-2xl; }
+  h4 { @apply text-xl; }
+
+  a {
+    @apply text-primary-600 hover:text-primary-700 transition-colors duration-200;
+  }
+
+  /* Focus ring for keyboard navigation */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary-500 rounded;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ---- Component layer ---- */
+@layer components {
+  /* Card */
+  .card {
+    @apply bg-white border border-gray-200 rounded-card shadow-card
+           transition-shadow duration-200;
+  }
+  .card-interactive {
+    @apply card cursor-pointer hover:shadow-card-hover;
+  }
+
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
+           text-sm font-semibold rounded-lg
+           transition-all duration-200
+           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-primary-600 text-white
+           hover:bg-primary-700 active:bg-primary-800;
+  }
+  .btn-accent {
+    @apply btn bg-accent-500 text-white
+           hover:bg-accent-600 active:bg-accent-700;
+  }
+  .btn-outline {
+    @apply btn border-2 border-primary-600 text-primary-600 bg-transparent
+           hover:bg-primary-50 active:bg-primary-100;
+  }
+  .btn-ghost {
+    @apply btn text-ink-muted hover:text-ink hover:bg-gray-100
+           active:bg-gray-200;
+  }
+  .btn-sm {
+    @apply text-xs px-3 py-1.5;
+  }
+  .btn-lg {
+    @apply text-base px-6 py-3;
+  }
+
+  /* Form inputs */
+  .input {
+    @apply w-full px-3 py-2.5 text-sm rounded-lg border border-gray-300
+           bg-white text-ink
+           placeholder:text-ink-subtle
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+           transition-colors duration-200;
+  }
+  .label {
+    @apply block text-sm font-semibold text-ink mb-1.5;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-draft {
+    @apply badge bg-gray-100 text-gray-700;
+  }
+  .badge-review {
+    @apply badge bg-accent-100 text-accent-700;
+  }
+  .badge-published {
+    @apply badge bg-success/10 text-success;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-gray-200 rounded animate-skeleton;
+  }
+
+  /* Prose for rendered markdown */
+  .prose-custom {
+    @apply text-ink leading-relaxed;
+  }
+  .prose-custom h1, .prose-custom h2, .prose-custom h3 {
+    @apply mt-8 mb-4;
+  }
+  .prose-custom p {
+    @apply mb-4;
+  }
+  .prose-custom ul, .prose-custom ol {
+    @apply mb-4 pl-6;
+  }
+  .prose-custom ul { @apply list-disc; }
+  .prose-custom ol { @apply list-decimal; }
+  .prose-custom blockquote {
+    @apply border-l-4 border-primary-300 pl-4 my-4 italic text-ink-muted;
+  }
+  .prose-custom code {
+    @apply bg-gray-100 text-primary-700 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+  .prose-custom pre {
+    @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4;
+  }
+  .prose-custom pre code {
+    @apply bg-transparent text-inherit px-0 py-0;
+  }
+  .prose-custom a {
+    @apply text-primary-600 underline hover:text-primary-700;
+  }
+  .prose-custom img {
+    @apply rounded-lg max-w-full my-4;
+  }
+  .prose-custom table {
+    @apply w-full border-collapse my-4;
+  }
+  .prose-custom th, .prose-custom td {
+    @apply border border-gray-200 px-3 py-2 text-left;
+  }
+  .prose-custom th {
+    @apply bg-gray-50 font-semibold;
+  }
+}

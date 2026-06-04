@@ -1,1 +1,0 @@
-"""PeerPedia — Reference client implementation."""

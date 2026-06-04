@@ -1,1 +1,0 @@
-"""PeerPedia configuration."""
