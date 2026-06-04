@@ -46,7 +46,7 @@ def create_article(
         categories=categories or [],
         keywords=keywords or [],
         language=language,
-        status=ArticleStatus.DRAFT,
+        status=ArticleStatus.SUBMITTED,
         version="v0.1",
         format=format,
         git_repo_path=git_repo_path,
@@ -149,12 +149,14 @@ def create_review(
     review_completeness: int = 0,
     review_pedagogy: int = 0,
     review_impact: int = 0,
+    review_version: str = "v0.1",
 ) -> Review:
     """Create a new review record."""
     review = Review(
         id=str(uuid.uuid4()),
         article_id=article_id,
         reviewer_id=reviewer_id,
+        review_version=review_version,
         decision=decision,
         comments=comments,
         scientific_correctness=scientific_correctness,

@@ -1,6 +1,7 @@
 """API routes for articles, reviews, commits, and diffs."""
 
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -56,8 +57,10 @@ async def api_create_article(
     self_completeness: int = Form(0),
     self_pedagogy: int = Form(0),
     self_impact: int = Form(0),
+    author: str = Form(""),
+    article_id: str = Form(""),
 ):
-    """Submit a new article via file upload (multipart form)."""
+    """Submit a new article (or update existing if article_id is set)."""
     if format not in ("typst", "markdown"):
         raise HTTPException(status_code=400, detail="Format must be 'typst' or 'markdown'")
 
@@ -67,7 +70,13 @@ async def api_create_article(
     ) as tmp:
         content = await article_file.read()
         text = content.decode("utf-8")
-        if not text.startswith("---"):
+        had_frontmatter = text.startswith("---")
+        # Typst doesn't understand YAML frontmatter; strip before saving
+        if format == "typst" and had_frontmatter:
+            parts = text.split("---", 2)
+            if len(parts) >= 3:
+                text = parts[2].strip() + "\n"
+        if not had_frontmatter and not text.startswith("---"):
             cats = [c.strip() for c in categories.split(",") if c.strip()]
             kws = [k.strip() for k in keywords.split(",") if k.strip()]
             cats_yaml = "\n".join(f"  - {c}" for c in cats) if cats else ""
@@ -84,6 +93,65 @@ async def api_create_article(
 
     try:
         settings.ensure_dirs()
+
+        # ── Update existing article ──────────────────────────────────
+        if article_id:
+            from peerpedia_core.storage.git_backend import commit_article
+            from peerpedia_core.workflow.versioning import bump_minor_version
+            from peerpedia_core.storage.db import (
+                get_engine, init_db, get_session, get_article,
+            )
+
+            engine = get_engine(settings.database_url)
+            init_db(engine)
+            session = get_session(engine)
+            try:
+                article = get_article(session, article_id)
+                if article is None:
+                    raise HTTPException(status_code=404, detail="Article not found")
+
+                # Update source file in existing git repo
+                repo = Path(article.git_repo_path) if article.git_repo_path else None
+                if repo and repo.exists():
+                    ext = "*.typ" if article.format == "typst" else "*.md"
+                    existing = list(repo.glob(ext))
+                    # Strip YAML frontmatter for Typst (Typst doesn't parse YAML)
+                    content_to_write = text
+                    if article.format == "typst" and content_to_write.startswith("---"):
+                        parts = content_to_write.split("---", 2)
+                        if len(parts) >= 3:
+                            content_to_write = parts[2].strip() + "\n"
+                    dest = existing[0] if existing else repo / f"article{suffix}"
+                    dest.write_text(content_to_write)
+
+                    # Git commit
+                    author_name = author or article.founding_authors[0] if article.founding_authors else "peerpedia"
+                    commit_article(
+                        repo,
+                        message=f"Update: {title}",
+                        author_name=author_name,
+                        author_email=f"{author_name}@peerpedia.local",
+                    )
+
+                # Bump version
+                new_version = bump_minor_version(article.version or "v0.1")
+                article.version = new_version
+                article.title = title
+                article.abstract = abstract
+                article.updated_at = datetime.now(timezone.utc)
+                session.commit()
+
+                return {
+                    "article_id": article_id,
+                    "title": title,
+                    "commit": "updated",
+                    "version": new_version,
+                    "status": article.status,
+                }
+            finally:
+                session.close()
+
+        # ── New article submission ───────────────────────────────────
         result = submit_article(
             source_path=tmp_path,
             database_url=settings.database_url,
@@ -93,6 +161,8 @@ async def api_create_article(
             self_completeness=self_completeness,
             self_pedagogy=self_pedagogy,
             self_impact=self_impact,
+            author_name=author or "peerpedia",
+            author_email=f"{author}@peerpedia.local" if author else "peerpedia@localhost",
         )
         if not result.success:
             raise HTTPException(status_code=500, detail=result.error)
@@ -433,6 +503,7 @@ async def api_submit_review(
     review_completeness: int = Form(0),
     review_pedagogy: int = Form(0),
     review_impact: int = Form(0),
+    review_version: str = Form("v0.1"),
 ):
     """Submit a review for an article. Returns HTML for HTMX swap."""
     from fastapi.responses import HTMLResponse
@@ -459,6 +530,7 @@ async def api_submit_review(
         review_completeness=review_completeness,
         review_pedagogy=review_pedagogy,
         review_impact=review_impact,
+        review_version=review_version,
         database_url=settings.database_url,
     )
     if not result.success:

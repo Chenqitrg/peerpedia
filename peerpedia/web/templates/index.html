@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v={{ v }}">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -12,7 +12,6 @@
         <h1>📚 知诸网</h1>
         <nav>
             <a href="/">首页</a>
-            <a href="/submit">提交</a>
             <a href="/edit">✏️ 写作</a>
             <a href="/review">🌊 沉淀池</a>
             {% if viewer %}
@@ -89,7 +88,7 @@
                 </article>
                 {% endfor %}
             {% else %}
-                <p class="empty-state">暂无文章。<a href="/submit">提交第一篇。</a></p>
+                <p class="empty-state">暂无文章。<a href="/edit">提交第一篇。</a></p>
             {% endif %}
         </section>
         {% endif %}

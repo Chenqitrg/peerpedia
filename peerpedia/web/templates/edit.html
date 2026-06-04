@@ -4,21 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} — 知诸网</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="/static/katex/katex.min.css">
-    <link rel="stylesheet" href="/static/codemirror/codemirror.css">
-    <link rel="stylesheet" href="/static/codemirror/theme/eclipse.css">
-    <script src="/static/codemirror/codemirror.js"></script>
-    <script src="/static/codemirror/mode/xml/xml.js"></script>
-    <script src="/static/codemirror/mode/markdown/markdown.js"></script>
-    <script src="/static/codemirror/addon/mode/overlay.js"></script>
-    <script src="/static/marked.min.js"></script>
-    <script defer src="/static/katex/katex.min.js"></script>
-    <script defer src="/static/katex/auto-render.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css?v={{ v }}">
+    <link rel="stylesheet" href="/static/katex/katex.min.css?v={{ v }}">
+    <link rel="stylesheet" href="/static/codemirror/codemirror.css?v={{ v }}">
+    <link rel="stylesheet" href="/static/codemirror/theme/eclipse.css?v={{ v }}">
+    <script src="/static/codemirror/codemirror.js?v={{ v }}"></script>
+    <script src="/static/codemirror/mode/xml/xml.js?v={{ v }}"></script>
+    <script src="/static/codemirror/mode/markdown/markdown.js?v={{ v }}"></script>
+    <script src="/static/codemirror/addon/mode/overlay.js?v={{ v }}"></script>
+    <script src="/static/marked.min.js?v={{ v }}"></script>
+    <script defer src="/static/katex/katex.min.js?v={{ v }}"></script>
+    <script defer src="/static/katex/auto-render.min.js?v={{ v }}"></script>
     <style>
         #editor-container { display: flex; gap: 12px; height: 60vh; min-height: 400px; }
         #editor-container .CodeMirror { width: 50%; flex-shrink: 0; height: 100%; border: 1px solid var(--border); }
         #preview-pane { width: 50%; flex-shrink: 0; border: 1px solid var(--border); padding: 16px; overflow-y: auto; background: #fff; word-wrap: break-word; }
+        #preview-pane svg { max-width: 100%; height: auto; display: block; }
         #preview-pane ul, #preview-pane ol { padding-left: 24px; }
         #preview-pane li { margin: 2px 0; }
     </style>
@@ -28,7 +29,6 @@
         <h1>📚 知诸网</h1>
         <nav>
             <a href="/">首页</a>
-            <a href="/submit">提交</a>
             <a href="/edit">✏️ 写作</a>
             <a href="/review">🌊 沉淀池</a>
             {% if viewer %}
@@ -57,13 +57,14 @@
     {% if error %}
     <p class="empty-state" style="padding:24px;">{{ error }}</p>
     {% else %}
-    <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center;">
-        <label style="font-size:0.9em;">格式:
-            <select id="format-select" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;">
-                <option value="markdown" {% if not article or article.format == 'markdown' %}selected{% endif %}>Markdown + KaTeX</option>
-                <option value="typst" {% if article and article.format == 'typst' %}selected{% endif %}>Typst (WASM)</option>
-            </select>
-        </label>
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+        <span style="font-size:0.9em;">格式:</span>
+        <select id="format-select" style="padding:3px 8px;height:30px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box;font-size:0.9em;">
+            <option value="markdown" {% if not article or article.format == 'markdown' %}selected{% endif %}>Markdown + KaTeX</option>
+            <option value="typst" {% if article and article.format == 'typst' %}selected{% endif %}>Typst</option>
+        </select>
+        <input type="file" id="upload-input" accept=".typ,.md" style="display:none;">
+        <button id="upload-btn" style="padding:3px 8px;height:30px;box-sizing:border-box;font-size:0.9em;background:#fff;color:#1a1a1a;border:1px solid var(--border);border-radius:4px;cursor:pointer;">📂 上传</button>
     </div>
 
     <div id="editor-container">
@@ -74,6 +75,9 @@
     <details open style="margin-top:16px;">
         <summary style="cursor:pointer;font-weight:600;font-size:0.95em;">📋 文章信息</summary>
         <form id="metadata-form" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.9em;">
+            {% if article and article.id %}
+            <input type="hidden" name="article_id" value="{{ article.id }}">
+            {% endif %}
             <div style="grid-column:1/-1;">
                 <label>标题<input type="text" name="title" required
                     value="{{ article.title if article else '' }}"
@@ -136,7 +140,7 @@
 
     <div style="margin-top:16px;display:flex;gap:8px;">
         <button id="submit-btn" style="padding:10px 28px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:1em;font-weight:600;">
-            🚀 提交沉淀池
+            {% if article and article.id %}🔄 更新{% else %}🚀 提交沉淀池{% endif %}
         </button>
         <span id="submit-status" style="font-size:0.9em;color:#888;align-self:center;"></span>
     </div>
@@ -164,6 +168,33 @@
                 stars.forEach(function(s, i) { s.textContent = i < v ? '★' : '☆'; s.style.color = i < v ? '#f59e0b' : '#ccc'; });
                 label.textContent = v > 0 ? stars[v - 1].title : '';
             });
+        });
+
+        // ── Upload ────────────────────────────────────────────────────
+        var uploadInput = document.getElementById('upload-input');
+        document.getElementById('upload-btn').addEventListener('click', function() {
+            uploadInput.click();
+        });
+        uploadInput.addEventListener('change', function() {
+            var file = uploadInput.files[0];
+            if (!file) return;
+            if (!confirm('⚠️ 上传将替换编辑器中的现有内容。确定上传？')) {
+                uploadInput.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                cm.setValue(e.target.result);
+                // Auto-detect format from extension
+                var ext = file.name.split('.').pop().toLowerCase();
+                var fmt = ext === 'typ' ? 'typst' : 'markdown';
+                document.getElementById('format-select').value = fmt;
+                currentFormat = fmt;
+                updatePreview();
+                // Clear input so same file can be re-selected
+                uploadInput.value = '';
+            };
+            reader.readAsText(file);
         });
 
         // ── CodeMirror ────────────────────────────────────────────────
@@ -198,9 +229,18 @@
 
         // ── Preview ───────────────────────────────────────────────────
         var preview = document.getElementById('preview-pane');
+        var currentFormat = document.getElementById('format-select').value;
+
         function updatePreview() {
             var content = cm.getValue();
             if (!content.trim()) { preview.innerHTML = '<p style="color:#888;">预览区域。开始输入...</p>'; return; }
+
+            if (currentFormat === 'typst') {
+                previewTypst(content);
+                return;
+            }
+
+            // Markdown preview
             var body = content;
             if (body.startsWith('---')) { var p = body.split('---', 3); if (p.length >= 3) body = p.slice(2).join('---'); }
             var mathBlocks = [];
@@ -208,15 +248,69 @@
                 .replace(/\$\$(.+?)\$\$/gs, function(m, g) { mathBlocks.push({d:true, m:g}); return 'MPH' + (mathBlocks.length - 1); })
                 .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, function(m, g) { mathBlocks.push({d:false, m:g}); return 'MPH' + (mathBlocks.length - 1); });
             var html = marked.parse(pbody);
-            mathBlocks.forEach(function(b, i) { html = html.replace('MPH' + i, '<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + (b.d ? '$$' : '$') + b.m + (b.d ? '$$' : '$') + '</span>'); });
+            // Note: String.replace() treats $$ in replacement as an escaped $,
+            // and $& as the matched substring. Use split/join to avoid all
+            // special-pattern interpretation.
+            mathBlocks.forEach(function(b, i) {
+                var delim = b.d ? '$$' : '$';
+                html = html.split('MPH' + i).join('<span class="' + (b.d ? 'katex-display' : 'katex-inline') + '">' + delim + b.m + delim + '</span>');
+            });
             preview.innerHTML = html;
             if (window.renderMathInElement) renderMathInElement(preview, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}] });
         }
+
+        var typstTimer = null;
+        var typstCompiling = false;
+
+        function previewTypst(content) {
+            // Debounce: wait 500ms after typing stops before compiling
+            clearTimeout(typstTimer);
+            if (!typstCompiling) {
+                preview.innerHTML = '<p style="color:#888;">编译中...</p>';
+            }
+            typstTimer = setTimeout(function() {
+                typstCompiling = true;
+                var fd = new FormData();
+                fd.append('source', content);
+                fd.append('format', 'typst');
+                fetch('/api/v1/compile-preview', { method: 'POST', body: fd })
+                    .then(function(r) {
+                        if (!r.ok) throw new Error(r.status);
+                        var ct = r.headers.get('content-type') || '';
+                        if (ct.includes('image/svg+xml')) return r.text();
+                        return r.text(); // HTML error
+                    })
+                    .then(function(svg) {
+                        if (/<svg[\s>]/.test(svg)) {
+                            preview.innerHTML = svg;
+                        } else {
+                            preview.innerHTML = svg; // error HTML from server
+                        }
+                        typstCompiling = false;
+                    })
+                    .catch(function(err) {
+                        preview.innerHTML = '<p style="color:#c00;">⚠️ 编译失败</p>';
+                        typstCompiling = false;
+                    });
+            }, 500);
+        }
+
+        // Format switch
+        document.getElementById('format-select').addEventListener('change', function() {
+            currentFormat = this.value;
+            updatePreview();
+        });
         cm.on('change', updatePreview);
         updatePreview();
+        // KaTeX scripts are deferred — re-render when they become available
+        // so existing articles show rendered math on initial load.
+        var katexCheck = setInterval(function() {
+            if (window.renderMathInElement) { clearInterval(katexCheck); updatePreview(); }
+        }, 200);
 
         // ── Submit ─────────────────────────────────────────────────────
-        document.getElementById('submit-btn').onclick = function() {
+        var submitBtn = document.getElementById('submit-btn');
+        submitBtn.onclick = function() {
             var status = document.getElementById('submit-status');
             var dims = ['self_originality','self_rigor','self_completeness','self_pedagogy','self_impact'];
             for (var i = 0; i < dims.length; i++) {
@@ -224,16 +318,22 @@
                     status.textContent = '✗ 请完成五维自评（至少 1 星）'; status.style.color = '#c00'; return;
                 }
             }
+            var btn = this;
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
             status.textContent = '提交中...'; status.style.color = '#888';
             var form = document.getElementById('metadata-form');
             var fd = new FormData(form);
             var f = document.getElementById('format-select').value;
             fd.append('article_file', new Blob([cm.getValue()], {type:'text/plain'}), 'article.' + (f === 'typst' ? 'typ' : 'md'));
             fd.append('format', f);
+            // Pass viewer cookie as author
+            var viewer = (document.cookie.match(/(?:^|;\s*)viewer=([^;]*)/) || [])[1];
+            if (viewer) fd.append('author', decodeURIComponent(viewer));
             fetch('/api/v1/articles', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
                 .then(function(data) { status.innerHTML = '✅ 提交成功！<a href="/article/' + data.article_id + '">查看文章</a>'; })
-                .catch(function() { status.textContent = '✗ 提交失败'; status.style.color = '#c00'; });
+                .catch(function() { status.textContent = '✗ 提交失败'; status.style.color = '#c00'; btn.disabled = false; btn.style.opacity = '1'; });
         };
     })();
     </script>

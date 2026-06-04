@@ -101,12 +101,14 @@ class Review(Base):
 
     __tablename__ = "reviews"
     __table_args__ = (
-        UniqueConstraint("article_id", "reviewer_id", name="uq_article_reviewer"),
+        UniqueConstraint("article_id", "reviewer_id", "review_version",
+                         name="uq_article_reviewer_version"),
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     article_id = Column(String(36), ForeignKey("articles.id"), nullable=False, index=True)
     reviewer_id = Column(String(100), nullable=False)
+    review_version = Column(String(20), nullable=False, default="v0.1")
     decision = Column(String(20), nullable=False)
     comments = Column(Text, nullable=False, default="")
     scientific_correctness = Column(Integer, nullable=False, default=0)
@@ -126,6 +128,7 @@ class Review(Base):
             "id": self.id,
             "article_id": self.article_id,
             "reviewer_id": self.reviewer_id,
+            "review_version": self.review_version,
             "decision": self.decision,
             "comments": self.comments,
             "scientific_correctness": self.scientific_correctness,

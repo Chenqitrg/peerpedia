@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ title }} — 知诸网</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v={{ v }}">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -11,7 +11,7 @@
         <h1>📚 知诸网</h1>
         <nav>
             <a href="/">首页</a>
-            <a href="/submit">提交</a>
+            <a href="/edit">提交</a>
             <a href="/edit">✏️ 写作</a>
             <a href="/review">审稿队列</a>
             {% if viewer %}

@@ -4,20 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} — 知诸网</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="/static/katex/katex.min.css">
-    <link rel="stylesheet" href="/static/diff2html/diff2html.min.css">
+    <link rel="stylesheet" href="/static/style.css?v={{ v }}">
+    <link rel="stylesheet" href="/static/katex/katex.min.css?v={{ v }}">
+    <link rel="stylesheet" href="/static/diff2html/diff2html.min.css?v={{ v }}">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script defer src="/static/katex/katex.min.js"></script>
-    <script defer src="/static/katex/auto-render.min.js"></script>
-    <script src="/static/diff2html/diff2html.min.js"></script>
+    <script defer src="/static/katex/katex.min.js?v={{ v }}"></script>
+    <script defer src="/static/katex/auto-render.min.js?v={{ v }}"></script>
+    <script src="/static/diff2html/diff2html.min.js?v={{ v }}"></script>
 </head>
 <body>
     <header>
         <h1>📚 知诸网</h1>
         <nav>
             <a href="/">首页</a>
-            <a href="/submit">提交</a>
             <a href="/edit">✏️ 写作</a>
             <a href="/review">🌊 沉淀池</a>
             {% if viewer %}
@@ -89,7 +88,20 @@
     <main style="display: flex; gap: 24px; align-items: flex-start;">
         {% if article %}
         <article class="article-view" style="flex: 1; min-width: 0;">
-            <h1>{{ article.title }}</h1>
+            <h1 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                {{ article.title }}
+                <span style="font-size:0.5em;font-weight:400;display:flex;gap:6px;">
+                    <a href="/api/v1/articles/{{ article.id }}/source"
+                       style="padding:3px 10px;background:#f0f0f0;border:1px solid var(--border);border-radius:4px;color:#1a1a1a;text-decoration:none;font-size:0.9em;">📥 源文件</a>
+                    {% if article.format == 'typst' %}
+                    <a href="/api/v1/articles/{{ article.id }}/compile?fmt=pdf"
+                       style="padding:3px 10px;background:#f0f0f0;border:1px solid var(--border);border-radius:4px;color:#1a1a1a;text-decoration:none;font-size:0.9em;">📥 PDF</a>
+                    {% else %}
+                    <a href="/api/v1/articles/{{ article.id }}/compile?fmt=html"
+                       style="padding:3px 10px;background:#f0f0f0;border:1px solid var(--border);border-radius:4px;color:#1a1a1a;text-decoration:none;font-size:0.9em;">📥 HTML</a>
+                    {% endif %}
+                </span>
+            </h1>
             <div class="article-meta">
                 <span>作者:
                     {% for author in article.founding_authors %}
@@ -98,6 +110,10 @@
                 </span>
                 <span>版本: {{ article.version }}</span>
                 <span>状态: {{ status_zh.get(article.status, article.status) }}</span>
+                {% set is_author = viewer and viewer in article.founding_authors %}
+                {% if is_author %}
+                <span><a href="/edit/{{ article.id }}" style="padding:2px 10px;background:#2563eb;color:#fff;border-radius:4px;text-decoration:none;font-size:0.85em;">✏️ 编辑</a></span>
+                {% endif %}
                 {% if article.status in ('submitted', 'in_review') %}
                 <span><a href="/review/{{ article.id }}" class="btn-review">✏️ 审稿</a></span>
                 {% endif %}
@@ -247,11 +263,54 @@
                 <h2>摘要</h2>
                 <p>{{ article.abstract }}</p>
             </div>
-            <div class="article-content" id="article-content"
-                 hx-get="/api/v1/articles/{{ article.id }}/compile?fmt=html"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-                <p>编译中...</p>
+            <div class="article-content" id="article-content">
+                {% if article.format == 'typst' %}
+                <!-- Typst SVG preview with page slider -->
+                <div id="svg-preview" style="text-align:center;">
+                    <p style="color:#888;">编译中...</p>
+                </div>
+                <div id="page-slider" style="display:none;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <button id="prev-page" onclick="changePage(-1)" style="padding:2px 10px;">◀</button>
+                    <input type="range" id="page-range" min="1" max="1" value="1"
+                           oninput="loadPage(this.value)" style="width:200px;">
+                    <span id="page-label" style="font-size:0.85em;min-width:60px;text-align:center;">1 / 1</span>
+                    <button id="next-page" onclick="changePage(1)" style="padding:2px 10px;">▶</button>
+                </div>
+                <script>
+                (function() {
+                    var currentPage = 1, totalPages = 1;
+                    window.loadPage = function(p) {
+                        currentPage = parseInt(p);
+                        document.getElementById('page-range').value = currentPage;
+                        document.getElementById('page-label').textContent = currentPage + ' / ' + totalPages;
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('GET', '/api/v1/articles/{{ article.id }}/compile?fmt=svg&page=' + currentPage);
+                        xhr.onload = function() {
+                            if (xhr.status === 200) {
+                                var tp = xhr.getResponseHeader('X-Typst-Pages');
+                                if (tp) totalPages = parseInt(tp);
+                                document.getElementById('svg-preview').innerHTML = xhr.responseText;
+                                document.getElementById('page-range').max = totalPages;
+                                document.getElementById('page-label').textContent = currentPage + ' / ' + totalPages;
+                                document.getElementById('page-slider').style.display = totalPages > 1 ? 'flex' : 'none';
+                            }
+                        };
+                        xhr.send();
+                    };
+                    window.changePage = function(delta) {
+                        var np = currentPage + delta;
+                        if (np >= 1 && np <= totalPages) loadPage(np);
+                    };
+                    // Initial load
+                    loadPage(1);
+                })();
+                </script>
+                {% else %}
+                <div hx-get="/api/v1/articles/{{ article.id }}/compile?fmt=html"
+                     hx-trigger="load" hx-swap="innerHTML">
+                    <p>编译中...</p>
+                </div>
+                {% endif %}
             </div>
 
             {% if article.status == 'published' %}
@@ -271,13 +330,17 @@
 
                 {% if reviews %}
                 {% for r in reviews %}
-                <div class="review-card" style="border-left:3px solid {% if r.reviewer_id in article.founding_authors %}#dc2626{% else %}#2563eb{% endif %};padding:8px 12px;margin-bottom:8px;background:#f8f9fa;border-radius:0 6px 6px 0;">
+                <div class="review-card" style="border-left:3px solid {% if r.reviewer_id in article.founding_authors %}#dc2626{% else %}#2563eb{% endif %};padding:8px 12px;margin-bottom:8px;background:#f8f9fa;border-radius:0 6px 6px 0;{% if r.review_version != article.version %}opacity:0.7;{% endif %}">
                     <p class="meta" style="font-size:0.85em;">
                         {% if r.reviewer_id in article.founding_authors %}
                         <strong>{{ r.reviewer_id }}</strong> <span style="background:#dc2626;color:#fff;font-size:0.7em;padding:1px 6px;border-radius:3px;">作者</span>
+                        {% elif article.status == 'published' %}
+                        <span style="font-weight:600;">{{ r.reviewer_id }}</span>
                         {% else %}
                         <span style="font-weight:600;color:#6366f1;">匿名者_{{ r.reviewer_id[:4].upper() }}</span>
                         {% endif %}
+                        <span style="background:#e5e5e5;color:#666;font-size:0.65em;padding:1px 4px;border-radius:2px;">{{ r.review_version }}</span>
+                        {% if r.review_version != article.version %}<span style="color:#888;font-size:0.7em;">(旧版本)</span>{% endif %}
                         {% if r.review_originality %}
                         · 🧠{{ r.review_originality }} 📐{{ r.review_rigor }} 🧩{{ r.review_completeness }} 📖{{ r.review_pedagogy }} 💡{{ r.review_impact }}
                         {% endif %}
@@ -302,6 +365,7 @@
                       hx-target="#comment-result" hx-swap="innerHTML">
                     <input type="hidden" name="reviewer_id" value="{{ viewer }}">
                     <input type="hidden" name="decision" value="accept">
+                    <input type="hidden" name="review_version" value="{{ article.version }}">
                     <fieldset style="border:1px solid #e5e5e5;border-radius:8px;padding:10px 14px;margin-bottom:10px;">
                         <legend style="font-weight:600;font-size:0.85em;">五维评分</legend>
                         <div class="star-rating" data-dimension="review_originality" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;">
@@ -375,57 +439,13 @@
                             <p style="color: #888; font-size: 0.85em;">加载中...</p>
                         </div>
                     </div>
-                    <!-- Diff view (right) -->
+                    <!-- Version preview (right) — compile the selected commit -->
                     <div style="flex: 1; min-width: 0;">
-                        <div id="diff-header" style="margin-bottom: 8px; font-size: 0.85em; color: #888;">
-                            ← 点击左侧提交记录查看变更
+                        <div id="version-header" style="margin-bottom: 8px; font-size: 0.85em; color: #888;">
+                            ← 点击左侧提交记录查看该版本内容
                         </div>
-                        <div id="diff-view" style="max-height: 600px; overflow: auto; background: #fafafa; border-radius: 6px; border: 1px solid var(--border);">
-                            <p style="color: #888; padding: 24px; text-align: center;">选择一个提交来查看差异</p>
-                        </div>
-                        <!-- Inline comments for the viewed diff -->
-                        <div id="diff-comments" style="margin-top: 12px; font-size: 0.85em;"></div>
-
-                        <!-- Add comment form -->
-                        <div class="review-comment-form" style="margin-top: 16px;">
-                            <h4 style="margin: 0 0 8px 0; font-size: 0.9em;">💬 添加评论</h4>
-                            <form id="comment-form" onsubmit="submitComment(event, '{{ article.id }}')">
-                                <input type="hidden" name="commit_hash" id="comment-commit-hash" value="">
-                                <div class="form-row" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                    <label style="font-size: 0.85em;">行号:
-                                        <input type="number" name="line_start" id="comment-line-start"
-                                               min="1" value="" placeholder="起始行"
-                                               style="width: 80px; padding: 3px; font-size: 0.85em;">
-                                    </label>
-                                    <label style="font-size: 0.85em;">到:
-                                        <input type="number" name="line_end" id="comment-line-end"
-                                               min="1" value="" placeholder="结束行"
-                                               style="width: 80px; padding: 3px; font-size: 0.85em;">
-                                    </label>
-                                    <label style="font-size: 0.85em;">类型:
-                                        <select name="comment_type" style="padding: 3px; font-size: 0.85em;">
-                                            <option value="comment">评论</option>
-                                            <option value="suggestion">建议修改</option>
-                                        </select>
-                                    </label>
-                                </div>
-                                <label style="font-size: 0.85em; margin-top: 6px;">内容:
-                                    <textarea name="body" rows="2" required
-                                              placeholder="输入评论..."
-                                              style="width: 100%; margin-top: 4px; padding: 6px; font-size: 0.85em; font-family: inherit;"></textarea>
-                                </label>
-                                <label style="font-size: 0.85em; margin-top: 6px;">建议修改内容（可选）:
-                                    <textarea name="suggestion" rows="3"
-                                              placeholder="如果需要建议修改代码，在此输入修改后的内容..."
-                                              style="width: 100%; margin-top: 4px; padding: 6px; font-size: 0.85em; font-family: monospace;"></textarea>
-                                </label>
-                                <input type="hidden" name="author_id" value="{{ viewer or 'anonymous' }}">
-                                <button type="submit"
-                                        style="margin-top: 8px; padding: 6px 16px; font-size: 0.85em;">
-                                    提交评论
-                                </button>
-                                <span id="comment-status" style="margin-left: 8px; font-size: 0.85em; color: #16a34a;"></span>
-                            </form>
+                        <div id="version-preview" style="max-height: 600px; overflow: auto; background: #fafafa; border-radius: 6px; border: 1px solid var(--border);">
+                            <p style="color: #888; padding: 24px; text-align: center;">选择一个提交来查看版本内容</p>
                         </div>
                     </div>
                 </div>
@@ -455,7 +475,7 @@ function switchTab(tab) {
 // ── Diff loading ───────────────────────────────────────────────────────────
 var currentCommitHash = null;
 
-function loadDiff(articleId, commitHash) {
+function loadVersion(articleId, commitHash, format) {
     currentCommitHash = commitHash;
     // Highlight selected commit
     document.querySelectorAll('.commit-item').forEach(function(el) {
@@ -468,18 +488,18 @@ function loadDiff(articleId, commitHash) {
         selected.style.background = '#e8f0fe';
     }
 
-    var diffView = document.getElementById('diff-view');
-    var diffHeader = document.getElementById('diff-header');
-    diffView.innerHTML = '<p style="color:#888;padding:24px;text-align:center;">加载 diff 中...</p>';
+    var diffView = document.getElementById('version-preview');
+    var diffHeader = document.getElementById('version-header');
+    diffView.innerHTML = '<p style="color:#888;padding:24px;text-align:center;">加载中...</p>';
 
     fetch('/api/v1/articles/' + articleId + '/diff/' + commitHash)
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.diff_text) {
-                diffView.innerHTML = '<p style="color:#888;padding:24px;text-align:center;">此提交无差异内容。</p>';
+                diffView.innerHTML = '<p style="color:#888;padding:24px;text-align:center;">初始提交（无对比版本）。</p>';
                 diffHeader.innerHTML = '<strong>' + data.author + '</strong> · '
                     + (data.timestamp || '').slice(0, 10) + ' · '
-                    + (data.message || '').slice(0, 80);
+                    + (data.message || '').slice(0, 80) + ' | 原文内容';
                 return;
             }
             diffHeader.innerHTML = '<strong>' + data.author + '</strong> · '
@@ -570,47 +590,6 @@ function setupDiffLineClickHandlers(articleId, commitHash) {
                 if (form) form.scrollIntoView({ behavior: 'smooth' });
             }
         });
-    });
-}
-
-// ── Submit comment ────────────────────────────────────────────────────────
-function submitComment(event, articleId) {
-    event.preventDefault();
-    var form = document.getElementById('comment-form');
-    var statusEl = document.getElementById('comment-status');
-    if (!statusEl) return;
-
-    var formData = new FormData(form);
-    var data = new URLSearchParams();
-    for (var pair of formData.entries()) {
-        data.append(pair[0], pair[1]);
-    }
-
-    statusEl.textContent = '提交中...';
-    statusEl.style.color = '#888';
-
-    fetch('/api/v1/articles/' + articleId + '/comments', {
-        method: 'POST',
-        body: data,
-    })
-    .then(function(r) {
-        if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'Failed'); });
-        return r.json();
-    })
-    .then(function(result) {
-        statusEl.textContent = '✓ 评论已提交';
-        statusEl.style.color = '#16a34a';
-        form.reset();
-        // Reload comments
-        var commitHash = document.getElementById('comment-commit-hash').value;
-        if (commitHash && currentCommitHash) {
-            loadDiff(articleId, currentCommitHash);
-        }
-        setTimeout(function() { statusEl.textContent = ''; }, 3000);
-    })
-    .catch(function(err) {
-        statusEl.textContent = '✗ ' + err.message;
-        statusEl.style.color = '#c00';
     });
 }
 

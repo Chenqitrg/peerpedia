@@ -428,7 +428,7 @@ class TestCookieViewer:
                 assert '关注' in html
 
     def test_viewer_dropdown_visible_on_all_pages(self):
-        """User dropdown appears on submit, review, and article pages."""
+        """User dropdown appears on editor, review, and article pages."""
         with tempfile.TemporaryDirectory() as tmp:
             db_url, article_id = _setup_db_with_article(tmp, author="zhangliang")
             from peerpedia_core.storage.db import create_user, get_engine, get_session, init_db
@@ -442,7 +442,7 @@ class TestCookieViewer:
             with mock.patch("peerpedia.web.db_session.settings.database_url", db_url):
                 from peerpedia.web.app import app
                 client = TestClient(app, cookies={"viewer": "zhangliang"})
-                for path in [f"/article/{article_id}", "/submit", "/review"]:
+                for path in [f"/article/{article_id}", "/edit", "/review"]:
                     resp = client.get(path)
                     assert resp.status_code in (200, 404)
                     if resp.status_code == 200:

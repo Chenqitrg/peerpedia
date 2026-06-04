@@ -126,10 +126,11 @@ def submit_review(
     review_completeness: int = 0,
     review_pedagogy: int = 0,
     review_impact: int = 0,
+    review_version: str = "v0.1",
 ) -> ReviewResult:
     """Submit a review for an article.
 
-    The article must be in_review. A reviewer can only review once.
+    One review per reviewer per version. Old-version reviews are frozen.
     """
     try:
         with db_session_scope(database_url) as session:
@@ -151,17 +152,16 @@ def submit_review(
                 review_originality = review_rigor = review_completeness = 0
                 review_pedagogy = review_impact = 0
 
-            # If same reviewer already has a review, update it instead of creating new
+            # Same reviewer + same version → update; different version → new review
             existing = get_reviews_for_article(session, article_id)
             existing_review = None
             for r in existing:
-                if r.reviewer_id == reviewer_id:
+                if r.reviewer_id == reviewer_id and r.review_version == review_version:
                     existing_review = r
                     break
 
             if existing_review:
-                # Update existing review. Rating and comment are independent —
-                # each only overwrites if the new value is non-empty.
+                # Update existing review for this version
                 has_new_ratings = any(v > 0 for v in [
                     review_originality, review_rigor, review_completeness,
                     review_pedagogy, review_impact,
@@ -207,6 +207,7 @@ def submit_review(
                 review_completeness=review_completeness,
                 review_pedagogy=review_pedagogy,
                 review_impact=review_impact,
+                review_version=review_version,
             )
 
             return ReviewResult(

@@ -78,6 +78,8 @@ def get_commit_history(
             "stats": {
                 "total": c.stats.total,
                 "files": list(c.stats.files.keys()),
+                "insertions": c.stats.total.get("insertions", 0) if isinstance(c.stats.total, dict) else 0,
+                "deletions": c.stats.total.get("deletions", 0) if isinstance(c.stats.total, dict) else 0,
             } if c.stats.total else {},
         })
     return commits

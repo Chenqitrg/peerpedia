@@ -146,33 +146,62 @@ async def api_get_commit_history_html(article_id: str):
         if not commits and not records:
             return HTMLResponse('<p style="color:#888;">暂无提交记录。</p>')
 
+        # Parse current version: v0.2 → major=0, minor=2
+        current_major, current_minor = 0, 1
+        if article and article.version:
+            v = article.version.lstrip("v")
+            parts = v.split(".")
+            if len(parts) == 2:
+                try:
+                    current_major = int(parts[0])
+                    current_minor = int(parts[1])
+                except ValueError:
+                    pass
+
         html = '<div class="commit-list-html">'
-        # Git commits
+        # Git commits (oldest first in git, we display newest first)
         for i, c in enumerate(commits):
             short_hash = c["hash"][:8]
             msg = c["message"][:80]
             author = c["author"]
             ts = c["timestamp"][:10] if c["timestamp"] else ""
-            active = "active" if i == 0 else ""
-            files_count = len(c.get("stats", {}).get("files", []))
+
+            # Version label: count backwards from current version
+            rev_index = len(commits) - 1 - i
+            ver_minor = current_minor - rev_index
+            ver_label = f"v{current_major}.{ver_minor}" if ver_minor >= 1 else "—"
+
+            is_current = (i == 0)
+            dot = '🟢' if is_current else '⚫'
+            current_badge = ' <span style="background:#16a34a;color:#fff;font-size:0.65em;padding:1px 4px;border-radius:2px;">当前</span>' if is_current else ''
+            active = "active" if is_current else ""
+
+            ins = c.get("stats", {}).get("insertions", 0)
+            dels = c.get("stats", {}).get("deletions", 0)
+            diff_line = ""
+            if ins or dels:
+                diff_line = f' <span style="color:#16a34a;">+{ins}</span> <span style="color:#dc2626;">−{dels}</span>'
             event_icon = ""
             if "Merge:" in msg:
                 event_icon = "🔀 "
             elif "Fork" in msg:
                 event_icon = "🍴 "
+
             html += (
                 f'<div class="commit-item {active}" data-hash="{c["hash"]}"'
-                f' onclick="loadDiff(\'{article_id}\', \'{c["hash"]}\')"'
+                f' onclick="loadVersion(\'{article_id}\', \'{c["hash"]}\', \'{article.format}\')"'
                 f' style="padding:8px;border-bottom:1px solid #eee;cursor:pointer;'
                 f'font-size:0.85em;border-radius:4px;transition:background 0.15s;">'
-                f'<code style="color:#2563eb;font-size:0.8em;">{event_icon}{short_hash}</code> '
+                f'<div style="display:flex;align-items:center;gap:6px;">'
+                f'{dot} <strong style="font-size:0.8em;">{ver_label}</strong>{current_badge}'
+                f'<code style="color:#2563eb;font-size:0.75em;">{short_hash}</code>'
+                f'{diff_line}'
+                f'</div>'
                 f'<strong>{author}</strong>'
-                f'<div style="color:#666;font-size:0.85em;margin-top:2px;">{msg}</div>'
-                f'<span style="color:#888;font-size:0.75em;">{ts}'
+                f'<div style="color:#666;font-size:0.85em;margin-top:2px;">{event_icon}{msg}</div>'
+                f'<span style="color:#888;font-size:0.75em;">{ts}</span>'
             )
-            if files_count:
-                html += f' · {files_count} file(s)'
-            html += '</span></div>'
+            html += '</div>'
 
         # Contribution records (non-git events: merge proposals, etc.)
         for r in records:

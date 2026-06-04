@@ -17,6 +17,8 @@ router = APIRouter()
 
 templates_dir = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+from datetime import datetime, timezone
+templates.env.globals['v'] = datetime.now(timezone.utc).strftime('%Y%m%d%H%M')
 
 STATUS_ZH = {
     "draft": "草稿",
@@ -147,14 +149,9 @@ async def view_article(request: Request, article_id: str):
 
 @router.get("/submit", response_class=HTMLResponse)
 async def submit_page(request: Request):
-    """Article submission page."""
-    viewer = get_viewer(request)
-    return templates.TemplateResponse(
-        request=request,
-        name="submit.html",
-        context={"request": request, "title": "Submit Article",
-                 "viewer": viewer, "all_users": get_all_users()},
-    )
+    """Redirect to the online editor (submit + edit are now unified)."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/edit", status_code=302)
 
 
 @router.get("/edit", response_class=HTMLResponse)

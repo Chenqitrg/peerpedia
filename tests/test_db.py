@@ -53,7 +53,7 @@ class TestArticleModel:
 
             assert article.id is not None
             assert article.title == "Test Article"
-            assert article.status == ArticleStatus.DRAFT
+            assert article.status == ArticleStatus.SUBMITTED
 
             retrieved = get_article(session, article.id)
             assert retrieved is not None
@@ -112,7 +112,7 @@ class TestArticleModel:
             )
             session.commit()
 
-            assert article.status == ArticleStatus.DRAFT
+            assert article.status == ArticleStatus.SUBMITTED
             assert article.version == "v0.1"
             assert article.language == "en"
             assert article.format == "typst"
