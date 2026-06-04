@@ -38,7 +38,8 @@ frontend/ (Vue 3 + Vite, port 5173) → HTTP JSON → backend/ (FastAPI, port 80
 
 | Priority | Task |
 |----------|------|
-| Low | DELETE article, Upload endpoint, Feed with content |
+| Medium | Per-commit independent scoring |
+| Deferred | P2P distributed storage |
 
 ## Quick start
 
