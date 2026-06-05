@@ -4,6 +4,8 @@
 
 PeerPedia is an open-source platform that combines Git-backed version control with blind peer review and community-driven scoring. Think: GitHub meets arXiv, with a built-in reputation system.
 
+_This is an on-going Vibe-coding project with Claude code + Deepseek V4, awaiting for your contribution_
+
 ---
 
 ## Why PeerPedia?
