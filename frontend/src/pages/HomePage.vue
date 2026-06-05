@@ -1,60 +1,50 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { useUserStore } from '../stores/useUserStore'
 import { fetchFeed } from '../api/feed'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
-import type { ArticleSummary } from '../api/types'
+import Pagination from '../components/Pagination.vue'
+import type { FeedResponse } from '../api/types'
 import { BookOpen } from 'lucide-vue-next'
 
 const userStore = useUserStore()
-
 const isLoggedIn = computed(() => !!userStore.viewer)
 
-const articles = ref<ArticleSummary[]>([])
-const total = ref(0)
-const currentPage = ref(1)
 const pageSize = 20
-const loading = ref(false)
-const error = ref('')
+const currentPage = ref(1)
 
-const totalPages = ref(1)
+const { state: feed, isLoading: loading, error: rawError, execute: loadFeed } = useAsyncState(
+  () => fetchFeed(),
+  null as FeedResponse | null,
+  { immediate: false, resetOnExecute: false },
+)
 
-const { toggle: handleToggleBookmark } = useBookmarkToggle(articles, (msg) => {
-  error.value = msg
+const articles = computed(() => feed.value?.articles ?? [])
+const total = computed(() => feed.value?.total ?? 0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const error = computed(() => {
+  if (!rawError.value) return ''
+  const e = rawError.value as any
+  return e.response?.data?.detail || 'Failed to load feed'
 })
+
+const { toggle: handleToggleBookmark } = useBookmarkToggle(articles, (_msg: string) => {})
 
 function openAuth() {
   userStore.showAuthModal = true
 }
 
-async function loadFeed(page: number) {
-  if (!userStore.viewer) return
-  loading.value = true
-  error.value = ''
-  try {
-    const data = await fetchFeed()
-    const items = data.articles ?? []
-    articles.value = items
-    total.value = data.total ?? items.length
-    totalPages.value = Math.max(1, Math.ceil(total.value / pageSize))
-    currentPage.value = page
-  } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to load feed'
-    articles.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
 function goToPage(page: number) {
   if (page < 1 || page > totalPages.value) return
-  loadFeed(page)
+  currentPage.value = page
+  loadFeed()
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 onMounted(() => {
-  loadFeed(1)
+  if (isLoggedIn.value) loadFeed()
 })
 </script>
 
@@ -130,46 +120,7 @@ onMounted(() => {
         @toggle-bookmark="handleToggleBookmark"
       />
 
-      <!-- Pagination -->
-      <div
-        v-if="totalPages > 1"
-        class="flex items-center justify-center gap-2 pt-6 pb-4"
-      >
-        <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-mono
-                 text-ink-muted hover:text-ink hover:bg-[#21262d]
-                 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          :disabled="currentPage <= 1"
-          @click="goToPage(currentPage - 1)"
-          aria-label="Previous page"
-        >
-          &lsaquo;
-        </button>
-
-        <button
-          v-for="p in totalPages"
-          :key="p"
-          class="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-mono
-                 transition-colors duration-200"
-          :class="p === currentPage
-            ? 'bg-accent text-[#0d1117] font-bold'
-            : 'text-ink-muted hover:text-ink hover:bg-[#21262d]'"
-          @click="goToPage(p)"
-        >
-          {{ p }}
-        </button>
-
-        <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-mono
-                 text-ink-muted hover:text-ink hover:bg-[#21262d]
-                 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          :disabled="currentPage >= totalPages"
-          @click="goToPage(currentPage + 1)"
-          aria-label="Next page"
-        >
-          &rsaquo;
-        </button>
-      </div>
+      <Pagination :page="currentPage" :totalPages="totalPages" @change="goToPage" />
     </div>
     </template>
   </div>
