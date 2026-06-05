@@ -254,34 +254,35 @@ def api_update_article(article_id: str, body: ArticleUpdate,
     commit_hash = commit_article(rp, commit_msg, author,
                                  f"{author}@peerpedia")
 
-    # Re-enter pool: first-time publication gets full 7 days, edits get 3
-    if a.status == "draft":
-        sink_days = params.sink.new_article_default_days
-    else:
-        sink_days = params.sink.edit_article_default_days
-    a = set_sink_start(db, article_id, sink_days)
+    # Only publish to pool when explicitly requested
+    if body.publish:
+        if a.status == "draft":
+            sink_days = params.sink.new_article_default_days
+        else:
+            sink_days = params.sink.edit_article_default_days
+        a = set_sink_start(db, article_id, sink_days)
 
-    # Create or update self-review
-    if body.self_review:
-        contributions = None
-        if body.contributions:
-            contributions = {
-                aid: c.model_dump() for aid, c in body.contributions.items()
-            }
-        upsert_review(
-            db,
-            article_id=a.id,
-            commit_hash=commit_hash,
-            reviewer_id=author,
-            scope="pool",
-            scores=body.self_review.model_dump(),
-            contributions=contributions,
-        )
+        # Create or update self-review
+        if body.self_review:
+            contributions = None
+            if body.contributions:
+                contributions = {
+                    aid: c.model_dump() for aid, c in body.contributions.items()
+                }
+            upsert_review(
+                db,
+                article_id=a.id,
+                commit_hash=commit_hash,
+                reviewer_id=author,
+                scope="pool",
+                scores=body.self_review.model_dump(),
+                contributions=contributions,
+            )
 
-    # Compute and cache article score (latest commit's score)
-    score = compute_article_score_for_commit(db, a.id, commit_hash)
-    if score is not None:
-        a.score = score
+        # Compute and cache article score (latest commit's score)
+        score = compute_article_score_for_commit(db, a.id, commit_hash)
+        if score is not None:
+            a.score = score
     db.commit()
 
     return _build_article_detail(db, a.id)

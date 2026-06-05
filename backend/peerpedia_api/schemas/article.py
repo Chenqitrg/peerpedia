@@ -136,6 +136,7 @@ class ArticleUpdate(BaseModel):
     commit_message: Optional[str] = None  # git commit message
     self_review: Optional[FiveDimScoresIn] = None
     contributions: Optional[dict[str, FiveDimScoresIn]] = None
+    publish: bool = False  # True = publish to pool, False = save as draft
 
 
 class SinkExtensionRequest(BaseModel):
