@@ -301,6 +301,53 @@ class TestThreadMessage:
         assert resp.status_code == 201
         assert resp.json()["status"] == "ok"
 
+    def test_reviewer_can_post_to_own_thread(self, client, seeded, auth_header):
+        """The review's reviewer can reply in their own review thread."""
+        body = {
+            "article_id": seeded["article_id"], "commit_hash": "h",
+            "scope": "pool",
+            "scores": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }
+        r = client.post(f"/api/v1/articles/{seeded['article_id']}/reviews", json=body,
+                        headers=auth_header(seeded["reviewer_id"])).json()
+
+        # Reviewer themselves should be able to post in their own thread
+        resp = client.post(
+            f"/api/v1/articles/{seeded['article_id']}/reviews/{r['id']}/messages",
+            json={"content": "更新一下我的评审意见。"},
+            headers=auth_header(seeded["reviewer_id"]),
+        )
+        assert resp.status_code == 201
+
+    def test_bystander_cannot_post_to_thread(self, client, seeded, db_engine, auth_header):
+        """A third party (not author, not reviewer) cannot post in a review thread."""
+        # Create a bystander user
+        from peerpedia_core.storage.db.engine import get_session
+        s = get_session(db_engine)
+        bystander = User(username="bystander", password_hash="", name="旁观者", anonymous_name="anon_bystander", affiliation="NJU")
+        s.add(bystander)
+        s.commit()
+        bystander_id = bystander.id
+        s.close()
+
+        # Create a review (as reviewer)
+        body = {
+            "article_id": seeded["article_id"], "commit_hash": "h",
+            "scope": "pool",
+            "scores": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }
+        r = client.post(f"/api/v1/articles/{seeded['article_id']}/reviews", json=body,
+                        headers=auth_header(seeded["reviewer_id"])).json()
+
+        # Bystander tries to post → should be 403
+        resp = client.post(
+            f"/api/v1/articles/{seeded['article_id']}/reviews/{r['id']}/messages",
+            json={"content": "我也来说两句。"},
+            headers=auth_header(bystander_id),
+        )
+        assert resp.status_code == 403
+        assert "author and reviewer" in resp.json()["detail"].lower()
+
 
 class TestPoolReviewFreeze:
     def test_cannot_update_pool_review_after_publish(self, client, db_engine, auth_header):
