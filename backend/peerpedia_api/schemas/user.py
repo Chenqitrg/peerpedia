@@ -19,6 +19,8 @@ class UserSummary(BaseModel):
     affiliation: str = ""
     expertise: list[str] = []
     avatar_url: Optional[str] = None
+    article_count: int = 0
+    reputation: dict = {}
 
 
 class UserProfile(BaseModel):

@@ -200,6 +200,10 @@ export interface UserSummary {
   name: string
   anonymous_name: string
   affiliation?: string
+  expertise?: string[]
+  avatar_url?: string | null
+  article_count: number
+  reputation: ReputationScores
 }
 
 export interface ReputationScores {

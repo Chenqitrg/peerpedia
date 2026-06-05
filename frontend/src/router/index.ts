@@ -7,6 +7,7 @@ const routes = [
   { path: '/articles/:id/history', component: () => import('../pages/HistoryPage.vue') },
   { path: '/edit', component: () => import('../pages/EditorPage.vue'), meta: { requiresAuth: true } },
   { path: '/edit/:id', component: () => import('../pages/EditorPage.vue'), meta: { requiresAuth: true } },
+  { path: '/schools', component: () => import('../pages/SchoolsPage.vue') },
   { path: '/pool', component: () => import('../pages/PoolPage.vue'), meta: { requiresAuth: true } },
   { path: '/user/:id', component: () => import('../pages/UserPage.vue') },
   { path: '/search', component: () => import('../pages/SearchPage.vue') },

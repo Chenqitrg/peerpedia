@@ -119,6 +119,17 @@ function handleLogout() {
         </router-link>
 
         <router-link
+          to="/schools"
+          class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1
+                 text-xs font-semibold text-ink-muted
+                 hover:text-ink hover:bg-[#21262d] rounded-lg
+                 transition-colors duration-200 no-underline"
+          @click="close"
+        >
+          Schools
+        </router-link>
+
+        <router-link
           to="/pool"
           class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1
                  text-xs font-semibold text-accent
@@ -216,6 +227,7 @@ function handleLogout() {
       </form>
       <template v-if="isLoggedIn">
         <router-link to="/" class="nav-link-mobile" @click="close">Home</router-link>
+        <router-link to="/schools" class="nav-link-mobile" @click="close">Schools</router-link>
         <router-link to="/pool" class="nav-link-mobile" @click="close">Pool</router-link>
         <router-link to="/bookmarks" class="nav-link-mobile" @click="close">Bookmarks</router-link>
         <router-link to="/edit" class="nav-link-mobile" @click="close">New Article</router-link>
