@@ -1,60 +1,65 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import { searchArticles } from '../api/search'
 import { useUserStore } from '../stores/useUserStore'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
-import type { ArticleSummary } from '../api/types'
-import { Search, ArrowLeft } from 'lucide-vue-next'
+import Pagination from '../components/Pagination.vue'
+import type { SearchResult } from '../api/types'
+import { Search } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
 const query = ref('')
-const results = ref<ArticleSummary[]>([])
-const total = ref(0)
-const loading = ref(false)
 const searched = ref(false)
 const currentPage = ref(1)
-const totalPages = ref(1)
 const pageSize = 20
 
-const { toggle: handleToggleBookmark } = useBookmarkToggle(results)
+const { state: result, isLoading: loading, error: rawError, execute: doSearch } = useAsyncState(
+  async () => {
+    if (!query.value.trim()) return null
+    return await searchArticles(query.value)
+  },
+  null as SearchResult | null,
+  { immediate: false }
+)
+
+const results = computed(() => result.value?.articles ?? [])
+const total = computed(() => result.value?.total ?? 0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+
+const error = computed(() => {
+  const e = rawError.value as any
+  return e?.userMessage || ''
+})
+
+const { toggle: handleToggleBookmark } = useBookmarkToggle(computed(() => results.value))
 
 onMounted(() => {
   const q = route.query.q as string
   if (q) {
     query.value = q
-    doSearch(1)
+    searched.value = true
+    doSearch()
   }
 })
 
 watch(() => route.query.q, (newQ) => {
   if (newQ && newQ !== query.value) {
     query.value = newQ as string
-    doSearch(1)
+    searched.value = true
+    doSearch()
   }
 })
 
-async function doSearch(page: number) {
-  if (!query.value.trim()) return
-  loading.value = true
+function executeSearch(page: number) {
+  currentPage.value = page
   searched.value = true
-  try {
-    const data = await searchArticles(query.value)
-    const items = data.articles ?? []
-    results.value = items
-    total.value = data.total ?? items.length
-    totalPages.value = Math.max(1, Math.ceil(total.value / pageSize))
-    currentPage.value = page
-  } catch {
-    results.value = []
-    total.value = 0
-  } finally {
-    loading.value = false
-  }
+  doSearch()
 }
 
 function handleSearch(e: Event) {
@@ -66,7 +71,7 @@ function handleSearch(e: Event) {
 
 function goToPage(page: number) {
   if (page < 1 || page > totalPages.value) return
-  doSearch(page)
+  executeSearch(page)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 </script>
@@ -110,8 +115,14 @@ function goToPage(page: number) {
       </div>
     </div>
 
+    <!-- Error -->
+    <div v-else-if="error" class="card p-8 text-center">
+      <p class="text-ink-muted">{{ error }}</p>
+      <button class="btn-outline mt-4" @click="doSearch()">Retry</button>
+    </div>
+
     <!-- Results -->
-    <div v-else-if="searched" class="space-y-4">
+    <div v-else-if="searched && !error" class="space-y-4">
       <p class="text-sm text-ink-muted mb-4">
         {{ total }} result{{ total !== 1 ? 's' : '' }} for "{{ query }}"
       </p>
@@ -129,43 +140,7 @@ function goToPage(page: number) {
           @toggle-bookmark="handleToggleBookmark"
         />
 
-        <!-- Pagination -->
-        <div
-          v-if="totalPages > 1"
-          class="flex items-center justify-center gap-2 pt-6 pb-4"
-        >
-          <button
-            class="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-mono
-                   text-ink-muted hover:text-ink hover:bg-[#21262d]
-                   disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            :disabled="currentPage <= 1"
-            @click="goToPage(currentPage - 1)"
-            aria-label="Previous page"
-          >
-            &lsaquo;
-          </button>
-          <button
-            v-for="p in totalPages"
-            :key="p"
-            class="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-mono transition-colors duration-200"
-            :class="p === currentPage
-              ? 'bg-accent text-[#0d1117] font-bold'
-              : 'text-ink-muted hover:text-ink hover:bg-[#21262d]'"
-            @click="goToPage(p)"
-          >
-            {{ p }}
-          </button>
-          <button
-            class="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-mono
-                   text-ink-muted hover:text-ink hover:bg-[#21262d]
-                   disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            :disabled="currentPage >= totalPages"
-            @click="goToPage(currentPage + 1)"
-            aria-label="Next page"
-          >
-            &rsaquo;
-          </button>
-        </div>
+        <Pagination :page="currentPage" :totalPages="totalPages" @change="goToPage" />
       </template>
     </div>
 
