@@ -76,10 +76,7 @@ def api_list_articles(
     size: int = 20,
     db: Session = Depends(deps.get_db),
 ):
-    articles = list_articles(db, status=status)
-    # Filter by author if requested
-    if author_id:
-        articles = [a for a in articles if author_id in (a.authors or [])]
+    articles = list_articles(db, status=status, author_id=author_id)
     total = len(articles)
     # Paginate
     start = (page - 1) * size
@@ -115,6 +112,13 @@ def _build_article_detail(db: Session, article_id: str,
     a = get_article(db, article_id)
     if a is None:
         raise HTTPException(status_code=404, detail="Article not found")
+
+    # Lazy-check: trigger auto-publish when someone views the article
+    if a.status == "sedimentation":
+        from peerpedia_core.workflow.sedimentation import publish_ready_articles
+        publish_ready_articles(db)
+        # Refresh after possible status change
+        db.refresh(a)
     # Backfill: if score is None, walk commits newest→oldest for a valid score
     if a.score is None:
         rp = _repo_path(article_id)

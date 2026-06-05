@@ -21,10 +21,13 @@ def get_article(session: Session, article_id: str) -> Article | None:
     return session.get(Article, article_id)
 
 
-def list_articles(session: Session, status: str | None = None) -> list[Article]:
+def list_articles(session: Session, status: str | None = None,
+                  author_id: str | None = None) -> list[Article]:
     q = session.query(Article)
     if status:
         q = q.filter(Article.status == status)
+    if author_id:
+        q = q.filter(Article.authors.contains(author_id))
     return q.order_by(Article.created_at.desc()).all()
 
 
