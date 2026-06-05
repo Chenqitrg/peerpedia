@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   FileText,
 } from 'lucide-vue-next'
+import katex from 'katex'
 
 const route = useRoute()
 const router = useRouter()
@@ -134,6 +135,17 @@ function saveDraft() {
   setTimeout(() => { savedMsg.value = false }, 2000)
 }
 
+function renderMathInHtml(html: string): string {
+  let result = html
+  result = result.replace(/<span class="katex-display">\$\$(.+?)\$\$<\/span>/gs, (_, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false }) } catch { return _ }
+  })
+  result = result.replace(/<span class="katex-inline">\$(.+?)\$<\/span>/gs, (_, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false }) } catch { return _ }
+  })
+  return result
+}
+
 async function handleCompile() {
   if (!content.value.trim()) return
   compiling.value = true
@@ -144,7 +156,7 @@ async function handleCompile() {
       content: content.value,
       format: format.value,
     })
-    previewHtml.value = res.data.output || res.data.content || ''
+    previewHtml.value = renderMathInHtml(res.data.output || res.data.content || '')
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || 'Compile failed'
   } finally {
