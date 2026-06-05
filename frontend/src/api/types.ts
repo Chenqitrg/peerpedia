@@ -83,6 +83,7 @@ export interface ArticleCreatePayload {
   authors: string[]
   self_review: FiveDimScores
   contributions?: AuthorContributions
+  commit_message: string
   title?: string
   abstract?: string
   keywords?: string[]
@@ -93,6 +94,7 @@ export interface ArticleCreatePayload {
 }
 
 export interface ArticleUpdatePayload {
+  commit_message?: string
   title?: string
   abstract?: string
   keywords?: string[]

@@ -56,6 +56,16 @@ def submit_review(article_id: str, body: ReviewCreate,
     article = get_article(db, article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
+    # Freeze pool reviews after article leaves the pool
+    if body.scope.value == "pool" and article.status not in ("sedimentation", "draft"):
+        existing_pool = get_review_by_user_scope(db, article_id, current_user.id,
+                                                  "pool", commit_hash=body.commit_hash)
+        if existing_pool:
+            raise HTTPException(
+                status_code=403,
+                detail="Pool reviews are frozen after the article leaves the sedimentation pool. "
+                       "Submit a new published-scope review instead.",
+            )
     existing = get_review_by_user_scope(db, article_id, current_user.id,
                                         body.scope.value, commit_hash=body.commit_hash)
     if existing:

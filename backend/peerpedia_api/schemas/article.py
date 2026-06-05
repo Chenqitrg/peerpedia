@@ -121,6 +121,7 @@ class ArticleCreate(BaseModel):
     authors: list[str]
     content: str = ""               # article body (markdown or typst)
     format: str = "markdown"        # "markdown" | "typst"
+    commit_message: str = ""        # git commit message (required for submit)
     self_review: FiveDimScoresIn
     contributions: Optional[dict[str, FiveDimScoresIn]] = None
     forked_from: Optional[str] = None
@@ -132,6 +133,7 @@ class ArticleUpdate(BaseModel):
     keywords: Optional[list[str]] = None
     categories: Optional[list[str]] = None
     content: Optional[str] = None
+    commit_message: Optional[str] = None  # git commit message
     self_review: Optional[FiveDimScoresIn] = None
     contributions: Optional[dict[str, FiveDimScoresIn]] = None
 

@@ -180,7 +180,8 @@ def api_create_article(body: ArticleCreate, db: Session = Depends(deps.get_db)):
     rp = init_article_repo(a.id)
     ext = ".typ" if body.format == "typst" else ".md"
     (rp / f"article{ext}").write_text(body.content)
-    commit_hash = commit_article(rp, "Initial submission", body.authors[0],
+    commit_msg = body.commit_message or "Initial submission"
+    commit_hash = commit_article(rp, commit_msg, body.authors[0],
                                  f"{body.authors[0]}@peerpedia", allow_empty=True)
     # Send to sedimentation pool
     a = set_sink_start(db, a.id, params.sink.new_article_default_days)
@@ -220,7 +221,7 @@ def api_update_article(article_id: str, body: ArticleUpdate,
         raise HTTPException(status_code=400, detail="Article repo not found")
 
     author = a.authors[0] if a.authors else "unknown"
-    commit_msg = "Edit article"
+    commit_msg = body.commit_message or "Edit article"
 
     # Write new content if provided
     if body.content is not None:
@@ -231,7 +232,8 @@ def api_update_article(article_id: str, body: ArticleUpdate,
                 ext = e
                 break
         (rp / f"article{ext}").write_text(body.content)
-        commit_msg = f"Edit: content updated"
+        if not body.commit_message:
+            commit_msg = "Edit: content updated"
 
     # Update metadata fields if provided
     if body.title is not None:

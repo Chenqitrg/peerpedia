@@ -37,6 +37,7 @@ const compiling = ref(false)
 
 // Side panel
 const showSelfReview = ref(false)
+const commitMsg = ref('')
 const scores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 })
 const keywords = ref('')
 const categories = ref('')
@@ -160,6 +161,10 @@ async function handleSubmitToPool() {
     errorMsg.value = 'Content is required'
     return
   }
+  if (!commitMsg.value.trim()) {
+    errorMsg.value = 'Commit message is required — summarize your changes'
+    return
+  }
   if (!userStore.viewer) {
     errorMsg.value = 'Please log in first'
     return
@@ -175,6 +180,7 @@ async function handleSubmitToPool() {
       abstract: abstract.value || title.value,
       content: content.value,
       format: format.value,
+      commit_message: commitMsg.value.trim(),
       self_review: { ...scores.value },
       authors: [userStore.viewer.id],
       keywords: keywords.value ? keywords.value.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
@@ -456,6 +462,19 @@ async function handleCompileDownload() {
         <div class="bg-card border border-divider rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in">
           <h3 class="text-lg font-heading font-semibold text-ink mb-1">Self Assessment</h3>
           <p class="text-xs text-ink-muted mb-5">Rate your article before submitting to the pool.</p>
+
+          <!-- Commit message -->
+          <div class="mb-4">
+            <label class="text-xs font-semibold text-ink-muted block mb-1">
+              Commit Message <span class="text-[#d73a49]">*</span>
+            </label>
+            <input
+              v-model="commitMsg"
+              type="text"
+              placeholder="Summarize your changes (required)"
+              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
 
           <!-- 5-dim scores -->
           <div class="space-y-3 mb-5">
