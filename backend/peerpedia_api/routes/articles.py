@@ -11,6 +11,7 @@ from peerpedia_api.helpers import (
     get_commit_hash,
     get_content_preview,
     get_commit_count,
+    get_git_meta,
 )
 from peerpedia_api.schemas.article import (
     ArticleCreate,
@@ -81,17 +82,19 @@ def api_list_articles(
     # Paginate
     start = (page - 1) * size
     paged = articles[start:start + size]
-    summaries = [
-        ArticleSummary(
+    summaries: list[ArticleSummary] = []
+    for a in paged:
+        ghash, gcount = get_git_meta(a.id)
+        summaries.append(ArticleSummary(
             id=a.id,
             title=a.title or "",
             status=a.status,
             authors=resolve_authors(db, a.authors or []),
             content_preview=get_content_preview(a.id),
-            commit_hash=get_commit_hash(a.id),
+            commit_hash=ghash,
             fork_count=a.fork_count,
             forked_from=a.forked_from,
-            commit_count=get_commit_count(a.id),
+            commit_count=gcount,
             score=a.score,
             sink_eta=_compute_sink(a)[0],
             days_remaining=_compute_sink(a)[1],
@@ -99,9 +102,7 @@ def api_list_articles(
             is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
             is_own_article=current_user.id in (a.authors or []) if current_user else False,
             created_at=a.created_at,
-        )
-        for a in paged
-    ]
+        ))
     return {"articles": [s.model_dump() for s in summaries], "total": total,
             "page": page, "size": size}
 
