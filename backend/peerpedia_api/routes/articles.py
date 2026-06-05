@@ -277,9 +277,13 @@ def api_update_article(article_id: str, body: ArticleUpdate,
     commit_hash = commit_article(rp, commit_msg, author,
                                  f"{author}@peerpedia")
 
-    # Re-enter pool with edit default duration
+    # Re-enter pool: first-time publication gets full 7 days, edits get 3
     from peerpedia_core.config.params import params
-    a = set_sink_start(db, article_id, params.sink.edit_article_default_days)
+    if a.status == "draft":
+        sink_days = params.sink.new_article_default_days
+    else:
+        sink_days = params.sink.edit_article_default_days
+    a = set_sink_start(db, article_id, sink_days)
 
     # Create or update self-review
     if body.self_review:
@@ -466,7 +470,11 @@ def api_fork_article(article_id: str, user_id: str, db: Session = Depends(deps.g
     else:
         init_article_repo(fork_id)
 
-    fork = create_article(db, authors=[user_id], status="draft",
+    fork = create_article(db, id=fork_id, title=original.title,
+                          abstract=original.abstract,
+                          keywords=original.keywords,
+                          categories=original.categories,
+                          authors=[user_id], status="draft",
                           forked_from=article_id)
     increment_fork_count(db, article_id)
     return {"id": fork.id, "forked_from": article_id, "status": "draft"}
