@@ -49,6 +49,28 @@ const showPreview = ref(true)
 
 // Split panel resize
 const splitRatio = ref(50)
+const isDragging = ref(false)
+const splitterEl = ref<HTMLElement | null>(null)
+
+function onSplitterMouseDown(e: MouseEvent) {
+  isDragging.value = true
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+  e.preventDefault()
+}
+function onMouseMove(e: MouseEvent) {
+  if (!isDragging.value) return
+  const container = splitterEl.value?.parentElement
+  if (!container) return
+  const rect = container.getBoundingClientRect()
+  const pct = ((e.clientX - rect.left) / rect.width) * 100
+  splitRatio.value = Math.min(80, Math.max(20, pct))
+}
+function onMouseUp() {
+  isDragging.value = false
+  document.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('mouseup', onMouseUp)
+}
 
 const DRAFT_KEY = computed(() => `editor-draft-${editId.value || 'new'}`)
 
@@ -173,10 +195,21 @@ async function handleSubmitToPool() {
   }
 }
 
-function handleDownload(format: 'source' | 'pdf') {
-  // Download via API or backup method
+function handleDownload(dlFormat: 'source' | 'pdf') {
   if (editId.value) {
-    window.open(`/api/v1/articles/${editId.value}/download/${format}`, '_blank')
+    // Saved article: use the download endpoints
+    window.open(`/api/v1/articles/${editId.value}/download/${dlFormat}`, '_blank')
+  } else {
+    // New article: source = download raw content as file
+    const ext = format.value === 'typst' ? '.typ' : '.md'
+    const mimeType = 'text/plain'
+    const blob = new Blob([content.value], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `article${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 }
 </script>
@@ -274,19 +307,29 @@ function handleDownload(format: 'source' | 'pdf') {
           <Play class="w-4 h-4" stroke-width="2" />
         </button>
 
-        <!-- Download buttons -->
-        <template v-if="editId">
-          <button
-            class="flex items-center justify-center w-8 h-8 rounded-lg
-                   text-ink-muted hover:text-ink hover:bg-[#21262d]
-                   transition-colors duration-200"
-            aria-label="Download source"
-            title="Download source"
-            @click="handleDownload('source')"
-          >
-            <FileDown class="w-4 h-4" stroke-width="2" />
-          </button>
-        </template>
+        <!-- Download source button (left side) -->
+        <button
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 text-ink-muted hover:text-ink hover:bg-[#21262d]
+                 transition-colors duration-200"
+          aria-label="Download source"
+          title="Download source"
+          @click="handleDownload('source')"
+        >
+          <FileDown class="w-4 h-4" stroke-width="2" />
+        </button>
+
+        <!-- Download PDF button (right side) -->
+        <button
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 text-ink-muted hover:text-ink hover:bg-[#21262d]
+                 transition-colors duration-200"
+          aria-label="Download PDF"
+          title="Download PDF"
+          @click="handleDownload('pdf')"
+        >
+          <FileText class="w-4 h-4" stroke-width="2" />
+        </button>
 
         <div class="w-px h-5 bg-divider mx-1" />
 
@@ -334,8 +377,10 @@ function handleDownload(format: 'source' | 'pdf') {
       <!-- Draggable divider -->
       <div
         v-if="showPreview"
+        ref="splitterEl"
         class="w-1 bg-divider cursor-col-resize hover:bg-accent/50 transition-colors shrink-0 relative"
-        @mousedown.prevent=""
+        :class="{ 'bg-accent': isDragging }"
+        @mousedown="onSplitterMouseDown"
       />
 
       <!-- Preview area (right) -->

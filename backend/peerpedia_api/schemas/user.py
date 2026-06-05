@@ -23,6 +23,7 @@ class UserSummary(BaseModel):
 
 class UserProfile(BaseModel):
     id: str
+    username: str = ""
     name: str
     anonymous_name: str = ""
     affiliation: str = ""
@@ -37,6 +38,9 @@ class UserProfile(BaseModel):
 
 
 class UserCreate(BaseModel):
+    username: str
+    password: str
+    email: str = ""
     name: str
     affiliation: str = ""
     expertise: list[str] = []

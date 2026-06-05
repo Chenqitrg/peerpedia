@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Eye,
   ChevronRight,
+  FileDown,
+  FileText,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -188,6 +190,24 @@ function handleSinkExtension() {
               <GitFork class="w-3 h-3" stroke-width="2" />
               Fork
             </button>
+
+            <a
+              :href="`/api/v1/articles/${id}/download/source`"
+              aria-label="Download source"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors no-underline"
+            >
+              <FileDown class="w-3 h-3" stroke-width="2" />
+              Source
+            </a>
+
+            <a
+              :href="`/api/v1/articles/${id}/download/pdf`"
+              aria-label="Download PDF"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors no-underline"
+            >
+              <FileText class="w-3 h-3" stroke-width="2" />
+              PDF
+            </a>
 
             <button
               v-if="isOwnArticle && article.status === 'sedimentation'"

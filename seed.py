@@ -47,33 +47,48 @@ def seed(db_url: str, articles_dir: Path):
     print(f"Articles directory: {articles_dir}")
 
     # ── 1. Users ─────────────────────────────────────────────────────────────
+    from peerpedia_api.deps import hash_password
+
+    DEFAULT_PASSWORD = "666666"
     user_defs = [
-        {"name": "Albert Einstein", "anonymous_name": "Physicist42",
+        {"name": "Albert Einstein", "username": "einstein",
+         "anonymous_name": "Physicist42",
          "affiliation": "Princeton", "expertise": ["physics", "relativity"]},
-        {"name": "Marie Curie", "anonymous_name": "RadiantOne",
+        {"name": "Marie Curie", "username": "curie",
+         "anonymous_name": "RadiantOne",
          "affiliation": "Sorbonne", "expertise": ["chemistry", "radioactivity"]},
-        {"name": "Alan Turing", "anonymous_name": "CodeBreaker",
+        {"name": "Alan Turing", "username": "turing",
+         "anonymous_name": "CodeBreaker",
          "affiliation": "Manchester", "expertise": ["computer science", "cryptography"]},
-        {"name": "Ada Lovelace", "anonymous_name": "FirstProgrammer",
+        {"name": "Ada Lovelace", "username": "lovelace",
+         "anonymous_name": "FirstProgrammer",
          "affiliation": "London", "expertise": ["mathematics", "computing"]},
-        {"name": "Richard Feynman", "anonymous_name": "BongoPlayer",
+        {"name": "Richard Feynman", "username": "feynman",
+         "anonymous_name": "BongoPlayer",
          "affiliation": "Caltech", "expertise": ["physics", "quantum mechanics"]},
-        {"name": "Emmy Noether", "anonymous_name": "SymmetrySeeker",
+        {"name": "Emmy Noether", "username": "noether",
+         "anonymous_name": "SymmetrySeeker",
          "affiliation": "Bryn Mawr", "expertise": ["mathematics", "abstract algebra"]},
-        {"name": "Claude Shannon", "anonymous_name": "BitMaster",
+        {"name": "Claude Shannon", "username": "shannon",
+         "anonymous_name": "BitMaster",
          "affiliation": "MIT", "expertise": ["information theory", "electrical engineering"]},
-        {"name": "Rosalind Franklin", "anonymous_name": "DoubleHelix",
+        {"name": "Rosalind Franklin", "username": "franklin",
+         "anonymous_name": "DoubleHelix",
          "affiliation": "King's College", "expertise": ["biology", "crystallography"]},
     ]
 
+    pwd_hash = hash_password(DEFAULT_PASSWORD)
     users = {}
     for u in user_defs:
-        existing = session.query(User).filter(User.name == u["name"]).first()
+        existing = session.query(User).filter(User.username == u["username"]).first()
         if existing:
             users[u["name"]] = existing
-            print(f"  User (existing): {u['name']}")
+            print(f"  User (existing): {u['name']} ({u['username']})")
         else:
             user = User(
+                username=u["username"],
+                password_hash=pwd_hash,
+                email=f"{u['username']}@peerpedia.dev",
                 name=u["name"],
                 anonymous_name=u["anonymous_name"],
                 affiliation=u["affiliation"],
@@ -84,7 +99,9 @@ def seed(db_url: str, articles_dir: Path):
             session.add(user)
             session.commit()
             users[u["name"]] = user
-            print(f"  User (new): {u['name']}")
+            print(f"  User (new): {u['name']} ({u['username']})")
+
+    print(f"\n  Default password for all users: {DEFAULT_PASSWORD}")
 
     # ── 2. Follow relationships ──────────────────────────────────────────────
     follow_pairs = [

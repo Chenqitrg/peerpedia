@@ -27,8 +27,8 @@ def client(db_engine):
 def seeded(db_engine):
     """Create a user, article with an existing review."""
     s = get_session(db_engine)
-    author = User(name="作者", anonymous_name="anon_author", affiliation="PKU")
-    reviewer = User(name="评审人", anonymous_name="星云观察者", affiliation="THU")
+    author = User(username="user1", password_hash="", name="作者", anonymous_name="anon_author", affiliation="PKU")
+    reviewer = User(username="user2", password_hash="", name="评审人", anonymous_name="星云观察者", affiliation="THU")
     s.add_all([author, reviewer])
     s.commit()
 
@@ -86,7 +86,7 @@ class TestReviewSubmit:
         from peerpedia_core.storage.db.engine import get_session
         s = get_session(db_engine)
         from peerpedia_core.storage.db.models import User
-        u = User(name="score_tester", anonymous_name="anon_score", affiliation="PKU")
+        u = User(username="user3", password_hash="", name="score_tester", anonymous_name="anon_score", affiliation="PKU")
         s.add(u)
         s.commit()
         uid = u.id
@@ -112,7 +112,7 @@ class TestReviewSubmit:
         from peerpedia_core.storage.db.engine import get_session
         s = get_session(db_engine)
         from peerpedia_core.storage.db.models import User
-        u = User(name="multi_commit_rv", anonymous_name="anon_mc", affiliation="PKU")
+        u = User(username="user4", password_hash="", name="multi_commit_rv", anonymous_name="anon_mc", affiliation="PKU")
         s.add(u)
         s.commit()
         uid = u.id
@@ -136,7 +136,7 @@ class TestReviewSubmit:
         # Submit a second review for the same commit (different reviewer approach)
         # We need a second user as reviewer
         s2 = get_session(db_engine)
-        rv = User(name="reviewer_2", anonymous_name="anon_rv2", affiliation="THU")
+        rv = User(username="user5", password_hash="", name="reviewer_2", anonymous_name="anon_rv2", affiliation="THU")
         s2.add(rv)
         s2.commit()
         rv_id = rv.id
@@ -187,8 +187,8 @@ class TestReviewSubmit:
         from peerpedia_core.storage.db.engine import get_session
         s = get_session(db_engine)
         from peerpedia_core.storage.db.models import User
-        u = User(name="edge_author", anonymous_name="anon_edge", affiliation="PKU")
-        rv = User(name="edge_reviewer", anonymous_name="anon_edge_rv", affiliation="THU")
+        u = User(username="user6", password_hash="", name="edge_author", anonymous_name="anon_edge", affiliation="PKU")
+        rv = User(username="user7", password_hash="", name="edge_reviewer", anonymous_name="anon_edge_rv", affiliation="THU")
         s.add_all([u, rv])
         s.commit()
         uid = u.id

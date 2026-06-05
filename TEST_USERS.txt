@@ -1,0 +1,10 @@
+Demo Users — password for all: 666666
+=========================================
+Albert Einstein     username: einstein
+Marie Curie         username: curie
+Alan Turing         username: turing
+Ada Lovelace        username: lovelace
+Richard Feynman     username: feynman
+Emmy Noether        username: noether
+Claude Shannon      username: shannon
+Rosalind Franklin   username: franklin

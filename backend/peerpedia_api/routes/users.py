@@ -4,12 +4,14 @@ from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
 from peerpedia_api.schemas.user import UserProfile, UserSummary, UserCreate, UserUpdate
+from peerpedia_api.deps import get_current_user, require_user, hash_password
 from peerpedia_core.storage.db.crud_user import (
     create_user, get_user, list_users,
     follow_user, unfollow_user, is_following,
     get_followers, get_following, get_follower_count, get_following_count,
 )
 from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.models import User
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -25,7 +27,10 @@ def api_list_users(db: Session = Depends(deps.get_db)):
 
 @router.post("", status_code=201, response_model=UserProfile)
 def api_create_user(body: UserCreate, db: Session = Depends(deps.get_db)):
-    u = create_user(db, name=body.name, affiliation=body.affiliation)
+    u = create_user(db, name=body.name, affiliation=body.affiliation,
+                    username=body.username,
+                    password_hash=hash_password(body.password),
+                    email=body.email)
     if body.expertise:
         u.expertise = body.expertise
     if body.avatar_url:
@@ -34,11 +39,13 @@ def api_create_user(body: UserCreate, db: Session = Depends(deps.get_db)):
         u.contact = body.contact
     if body.expertise or body.avatar_url or body.contact:
         db.commit()
-    return UserProfile(id=u.id, name=u.name, anonymous_name=u.anonymous_name,
-                       affiliation=u.affiliation, expertise=u.expertise,
+    return UserProfile(id=u.id, username=u.username or "", name=u.name,
+                       anonymous_name=u.anonymous_name or "",
+                       affiliation=u.affiliation or "",
+                       expertise=u.expertise or [],
                        avatar_url=u.avatar_url, contact=u.contact,
-                       reputation=u.reputation, followers_count=0,
-                       following_count=0, article_count=0,
+                       reputation=u.reputation or {},
+                       followers_count=0, following_count=0, article_count=0,
                        created_at=u.created_at)
 
 
@@ -49,10 +56,12 @@ def api_get_user(user_id: str, db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     articles = [a for a in list_articles(db) if user_id in a.authors]
     return UserProfile(
-        id=u.id, name=u.name, anonymous_name=u.anonymous_name,
-        affiliation=u.affiliation, expertise=u.expertise,
+        id=u.id, username=u.username or "", name=u.name,
+        anonymous_name=u.anonymous_name or "",
+        affiliation=u.affiliation or "",
+        expertise=u.expertise or [],
         avatar_url=u.avatar_url, contact=u.contact,
-        reputation=u.reputation,
+        reputation=u.reputation or {},
         followers_count=get_follower_count(db, user_id),
         following_count=get_following_count(db, user_id),
         article_count=len(articles),
@@ -61,8 +70,12 @@ def api_get_user(user_id: str, db: Session = Depends(deps.get_db)):
 
 
 @router.put("/{user_id}", response_model=UserProfile)
-def api_update_user(user_id: str, body: UserUpdate, db: Session = Depends(deps.get_db)):
-    """Update user profile. Name is immutable; all other fields optional."""
+def api_update_user(user_id: str, body: UserUpdate,
+                    db: Session = Depends(deps.get_db),
+                    current_user: User = Depends(require_user)):
+    """Update user profile. Only self-editable. Name is immutable."""
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Cannot edit another user's profile")
     u = get_user(db, user_id)
     if u is None:
         raise HTTPException(status_code=404, detail="User not found")

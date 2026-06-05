@@ -31,8 +31,8 @@ class TestFeed:
 
     def test_feed_from_followed(self, client, db_engine):
         s = get_session(db_engine)
-        reader = User(name="读者", anonymous_name="a1")
-        writer = User(name="作者", anonymous_name="a2")
+        reader = User(username="user12", password_hash="", name="读者", anonymous_name="a1")
+        writer = User(username="user13", password_hash="", name="作者", anonymous_name="a2")
         s.add_all([reader, writer])
         s.commit()
 
@@ -54,7 +54,7 @@ class TestFeed:
 class TestSearch:
     def test_search_by_keyword(self, client, db_engine):
         s = get_session(db_engine)
-        u = User(name="作者", anonymous_name="a")
+        u = User(username="user14", password_hash="", name="作者", anonymous_name="a")
         s.add(u)
         s.commit()
         # search currently searches on title/abstract — placeholder until full-text index
@@ -112,7 +112,7 @@ class TestCompile:
 class TestCitations:
     def test_empty_citations(self, client, db_engine):
         s = get_session(db_engine)
-        u = User(name="作者", anonymous_name="a")
+        u = User(username="user15", password_hash="", name="作者", anonymous_name="a")
         s.add(u)
         s.commit()
         a = Article(status="published", authors=[u.id])
@@ -128,7 +128,7 @@ class TestCitations:
 
     def test_record_click(self, client, db_engine):
         s = get_session(db_engine)
-        u = User(name="作者", anonymous_name="a")
+        u = User(username="user16", password_hash="", name="作者", anonymous_name="a")
         s.add(u)
         s.commit()
         a1 = Article(status="published", authors=[u.id])
@@ -146,8 +146,8 @@ class TestCitations:
 class TestMerge:
     def test_create_merge_proposal(self, client, db_engine):
         s = get_session(db_engine)
-        author = User(name="原文作者", anonymous_name="a1")
-        forker = User(name="派生者", anonymous_name="a2")
+        author = User(username="user17", password_hash="", name="原文作者", anonymous_name="a1")
+        forker = User(username="user18", password_hash="", name="派生者", anonymous_name="a2")
         s.add_all([author, forker])
         s.commit()
         original = Article(status="published", authors=[author.id])
@@ -166,8 +166,8 @@ class TestMerge:
 
     def test_list_merge_proposals(self, client, db_engine):
         s = get_session(db_engine)
-        author = User(name="原文作者", anonymous_name="a1")
-        forker = User(name="派生者", anonymous_name="a2")
+        author = User(username="user19", password_hash="", name="原文作者", anonymous_name="a1")
+        forker = User(username="user20", password_hash="", name="派生者", anonymous_name="a2")
         s.add_all([author, forker])
         s.commit()
         original = Article(status="published", authors=[author.id])

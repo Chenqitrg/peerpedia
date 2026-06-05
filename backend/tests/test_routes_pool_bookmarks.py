@@ -27,7 +27,7 @@ class TestPool:
     def test_empty_pool(self, client, db_engine):
         # Create a user so we can pass user_id
         s = get_session(db_engine)
-        u = User(name="pool_user", anonymous_name="anon_pool")
+        u = User(username="user8", password_hash="", name="pool_user", anonymous_name="anon_pool")
         s.add(u)
         s.commit()
         uid = u.id
@@ -38,7 +38,7 @@ class TestPool:
 
     def test_pool_with_articles(self, client, db_engine):
         s = get_session(db_engine)
-        u = User(name="测试", anonymous_name="anon")
+        u = User(username="user9", password_hash="", name="测试", anonymous_name="anon")
         s.add(u)
         s.commit()
         from datetime import datetime, timezone
@@ -61,8 +61,8 @@ class TestPool:
 class TestBookmarks:
     def test_bookmark_lifecycle(self, client, db_engine):
         s = get_session(db_engine)
-        u = User(name="读者", anonymous_name="anon")
-        author = User(name="作者", anonymous_name="anon_a")
+        u = User(username="user10", password_hash="", name="读者", anonymous_name="anon")
+        author = User(username="user11", password_hash="", name="作者", anonymous_name="anon_a")
         s.add_all([u, author])
         s.commit()
         a = Article(status="published", authors=[author.id])

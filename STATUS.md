@@ -13,8 +13,8 @@ frontend/ (Vue 3 + Vite, port 5173) → HTTP JSON → backend/ (FastAPI, port 80
 | Layer | Tests | Command |
 |-------|-------|---------|
 | Backend (core + api) | 194 | `.venv/bin/python3 -m pytest core/tests/ backend/tests/` |
-| Frontend | 115 | `cd frontend && npm test` |
-| **Total** | **309** | |
+| Frontend | 116 | `cd frontend && npm test` |
+| **Total** | **310** | |
 
 ## Done
 
@@ -39,12 +39,19 @@ frontend/ (Vue 3 + Vite, port 5173) → HTTP JSON → backend/ (FastAPI, port 80
 - **PDF download endpoint**: GET /articles/{id}/download/pdf (Typst→PDF, Markdown→HTML)
 - **Bookmark toggle API integration**: All 5 pages now call addBookmark/removeBookmark API (was local-only stub)
 - **Design system**: Cold Academic Minimal (9 colors, #0d1117, #7b8c9e accent, EB Garamond/Inter/JetBrains Mono)
+- **Authentication system**: backend (JWT + bcrypt, 3 auth endpoints) + frontend (AuthModal, NavBar auth states, router guards, store)
+- **Article page download buttons**: Source + PDF download on article metadata bar
+- **HomePage welcome state**: unauthenticated visitors see brand landing page with Sign In/Register
+- **EditorPage fixes**: functional splitter drag (20%-80%), separate Source/PDF download buttons always visible
+- **Seed data**: 8 demo users with usernames, password `666666` (memo in TEST_USERS.txt)
+- **need.md refreshed**: all status markers consistent with actual implementation
 
 ## Remaining
 
 | Priority | Task |
 |----------|------|
-| Medium | Integration testing (browser E2E verification) |
+| Medium | `POST /compile-download` endpoint (new article PDF download) |
+| Low | `GET /articles/{id}/has-forked` and `POST /articles/{id}/publish` endpoints not wired in frontend |
 | Deferred | P2P distributed storage |
 | Deferred | AI integration |
 

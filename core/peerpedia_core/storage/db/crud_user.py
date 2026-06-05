@@ -1,5 +1,6 @@
 """User CRUD operations."""
 import secrets
+import uuid
 
 from sqlalchemy.orm import Session
 
@@ -15,13 +16,26 @@ def _generate_anonymous_name() -> str:
     return f"{secrets.choice(adjectives)}{secrets.choice(nouns)}"
 
 
+def _new_username() -> str:
+    """Generate a unique default username."""
+    return f"u_{uuid.uuid4().hex[:12]}"
+
+
 def create_user(
     session: Session,
     name: str,
     affiliation: str = "",
     anonymous_name: str | None = None,
+    username: str | None = None,
+    password_hash: str = "",
+    email: str = "",
 ) -> User:
+    if username is None or username == "":
+        username = _new_username()
     u = User(
+        username=username,
+        password_hash=password_hash,
+        email=email,
         name=name,
         affiliation=affiliation,
         anonymous_name=anonymous_name or _generate_anonymous_name(),
@@ -33,6 +47,10 @@ def create_user(
 
 def get_user(session: Session, user_id: str) -> User | None:
     return session.get(User, user_id)
+
+
+def get_user_by_username(session: Session, username: str) -> User | None:
+    return session.query(User).filter(User.username == username).first()
 
 
 def list_users(session: Session) -> list[User]:

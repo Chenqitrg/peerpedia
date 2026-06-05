@@ -28,7 +28,7 @@ def client(db_engine):
 @pytest.fixture
 def seed_user(db_engine):
     s = get_session(db_engine)
-    u = User(name="测试用户", anonymous_name="anon_test", affiliation="测试大学")
+    u = User(username="user21", password_hash="", name="测试用户", anonymous_name="anon_test", affiliation="测试大学")
     s.add(u)
     s.commit()
     uid = u.id
@@ -325,7 +325,7 @@ class TestPagination:
         from peerpedia_core.storage.db.engine import get_session
         from peerpedia_core.storage.db.models import User, Article
         s = get_session(db_engine)
-        u = User(name="pagination_user", anonymous_name="anon_pag")
+        u = User(username="user22", password_hash="", name="pagination_user", anonymous_name="anon_pag")
         s.add(u)
         s.commit()
         for i in range(5):

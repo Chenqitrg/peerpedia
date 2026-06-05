@@ -8,14 +8,14 @@ import {
   FilePlus,
   Search,
   User,
-  LogIn,
-  LogOut,
+  ChevronDown,
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const userStore = useUserStore()
 const searchQuery = ref('')
 const mobileOpen = ref(false)
+const avatarPopover = ref(false)
 
 const isLoggedIn = computed(() => !!userStore.viewer)
 
@@ -36,14 +36,19 @@ function handleSearch(e: Event) {
   }
 }
 
+function openAuth() {
+  userStore.showAuthModal = true
+}
+
 function goToProfile() {
-  if (userStore.viewer) {
-    router.push(`/user/${userStore.viewer.id}`)
-  } else {
-    // Prompt to create/login user
-    router.push('/')
-  }
-  close()
+  avatarPopover.value = false
+  router.push(`/user/${userStore.viewer!.id}`)
+}
+
+function handleLogout() {
+  avatarPopover.value = false
+  userStore.logout()
+  router.push('/')
 }
 </script>
 
@@ -68,8 +73,9 @@ function goToProfile() {
         <span class="hidden sm:inline">PeerPedia</span>
       </router-link>
 
-      <!-- Search (desktop) -->
+      <!-- Search (desktop) — only when logged in -->
       <form
+        v-if="isLoggedIn"
         class="hidden md:flex items-center flex-1 max-w-md mx-4"
         @submit="handleSearch"
       >
@@ -88,8 +94,8 @@ function goToProfile() {
         </div>
       </form>
 
-      <!-- Actions -->
-      <div class="flex items-center gap-1">
+      <!-- Actions — logged in -->
+      <div v-if="isLoggedIn" class="flex items-center gap-1">
         <router-link
           to="/bookmarks"
           class="flex items-center justify-center w-8 h-8 rounded-lg
@@ -100,16 +106,6 @@ function goToProfile() {
         >
           <Bookmark class="w-4 h-4" stroke-width="2" />
         </router-link>
-
-        <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg
-                 text-ink-muted hover:text-ink hover:bg-[#21262d]
-                 transition-colors duration-200"
-          aria-label="Profile"
-          @click="goToProfile"
-        >
-          <User class="w-4 h-4" stroke-width="2" />
-        </button>
 
         <router-link
           to="/edit"
@@ -133,6 +129,41 @@ function goToProfile() {
           Pool
         </router-link>
 
+        <!-- Avatar + popover -->
+        <div class="relative ml-1">
+          <button
+            class="flex items-center gap-1 px-1.5 py-1 rounded-lg
+                   text-ink-muted hover:text-ink hover:bg-[#21262d]
+                   transition-colors duration-200"
+            @click="avatarPopover = !avatarPopover"
+          >
+            <User class="w-4 h-4" stroke-width="2" />
+            <ChevronDown class="w-3 h-3" stroke-width="2" />
+          </button>
+
+          <!-- Popover -->
+          <div
+            v-if="avatarPopover"
+            class="absolute right-0 top-full mt-2 w-48 bg-card border border-divider rounded-xl shadow-xl py-1 animate-fade-in"
+          >
+            <div class="px-4 py-2 text-sm text-ink border-b border-divider">
+              {{ userStore.viewer?.username || userStore.viewer?.name }}
+            </div>
+            <button
+              class="w-full text-left px-4 py-2 text-sm text-ink-muted hover:text-ink hover:bg-[#21262d] transition-colors"
+              @click="goToProfile"
+            >
+              Profile
+            </button>
+            <button
+              class="w-full text-left px-4 py-2 text-sm text-ink-muted hover:text-ink hover:bg-[#21262d] transition-colors"
+              @click="handleLogout"
+            >
+              Log Out
+            </button>
+          </div>
+        </div>
+
         <!-- Mobile hamburger -->
         <button
           class="md:hidden flex items-center justify-center w-8 h-8 rounded-lg
@@ -150,6 +181,18 @@ function goToProfile() {
           </svg>
         </button>
       </div>
+
+      <!-- Actions — not logged in -->
+      <div v-else class="flex items-center gap-1">
+        <button
+          class="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold
+                 bg-accent text-[#0d1117] rounded-lg
+                 hover:brightness-110 transition-all duration-200"
+          @click="openAuth"
+        >
+          Sign In
+        </button>
+      </div>
     </div>
 
     <!-- Mobile menu -->
@@ -157,7 +200,7 @@ function goToProfile() {
       v-if="mobileOpen"
       class="md:hidden border-t border-divider px-4 py-3 flex flex-col gap-2 animate-slide-up"
     >
-      <form @submit="handleSearch" class="mb-2">
+      <form @submit="handleSearch" class="mb-2" v-if="isLoggedIn">
         <div class="relative w-full">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted pointer-events-none" stroke-width="2" />
           <input
@@ -171,17 +214,14 @@ function goToProfile() {
           />
         </div>
       </form>
-      <router-link to="/" class="nav-link-mobile" @click="close">Home</router-link>
-      <router-link to="/pool" class="nav-link-mobile" @click="close">Pool</router-link>
-      <router-link to="/bookmarks" class="nav-link-mobile" @click="close">Bookmarks</router-link>
-      <router-link to="/edit" class="nav-link-mobile" @click="close">New Article</router-link>
-      <button
-        v-if="userStore.viewer"
-        class="nav-link-mobile text-left"
-        @click="goToProfile"
-      >
-        Profile
-      </button>
+      <template v-if="isLoggedIn">
+        <router-link to="/" class="nav-link-mobile" @click="close">Home</router-link>
+        <router-link to="/pool" class="nav-link-mobile" @click="close">Pool</router-link>
+        <router-link to="/bookmarks" class="nav-link-mobile" @click="close">Bookmarks</router-link>
+        <router-link to="/edit" class="nav-link-mobile" @click="close">New Article</router-link>
+        <button class="nav-link-mobile text-left" @click="handleLogout">Log Out</button>
+      </template>
+      <button v-else class="nav-link-mobile text-left" @click="openAuth">Sign In</button>
     </div>
   </nav>
 </template>

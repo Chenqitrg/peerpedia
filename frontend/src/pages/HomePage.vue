@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useUserStore } from '../stores/useUserStore'
 import { fetchFeed } from '../api/feed'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
 import ArticleCard from '../components/ArticleCard.vue'
 import type { ArticleSummary } from '../api/types'
+import { BookOpen } from 'lucide-vue-next'
 
 const userStore = useUserStore()
+
+const isLoggedIn = computed(() => !!userStore.viewer)
 
 const articles = ref<ArticleSummary[]>([])
 const total = ref(0)
@@ -17,7 +20,12 @@ const error = ref('')
 
 const totalPages = ref(1)
 
+function openAuth() {
+  userStore.showAuthModal = true
+}
+
 async function loadFeed(page: number) {
+  if (!userStore.viewer) return
   loading.value = true
   error.value = ''
   try {
@@ -65,7 +73,38 @@ onMounted(() => {
 
 <template>
   <div class="home-page animate-fade-in">
-    <!-- Page header -->
+    <!-- Welcome state — not logged in -->
+    <div v-if="!isLoggedIn" class="flex flex-col items-center justify-center min-h-[60vh] text-center">
+      <BookOpen class="w-12 h-12 text-accent mb-6" stroke-width="1.5" />
+      <h1 class="text-display-lg font-heading font-bold text-ink mb-3">
+        PeerPedia
+      </h1>
+      <p class="text-lg text-ink-muted mb-2 max-w-md">
+        Decentralized Peer Review
+      </p>
+      <p class="text-sm text-ink-muted/60 mb-8 max-w-md">
+        An academic publishing platform where articles sink or swim by merit alone.
+      </p>
+      <div class="flex items-center gap-3">
+        <button
+          class="px-6 py-2 text-sm font-semibold bg-accent text-[#0d1117] rounded-lg
+                 hover:brightness-110 transition-all duration-200"
+          @click="openAuth"
+        >
+          Sign In
+        </button>
+        <button
+          class="px-6 py-2 text-sm font-semibold text-accent border border-accent/30 rounded-lg
+                 hover:bg-accent/10 transition-all duration-200"
+          @click="openAuth"
+        >
+          Create Account
+        </button>
+      </div>
+    </div>
+
+    <!-- Page header (logged in) -->
+    <template v-if="isLoggedIn">
     <header class="mb-8">
       <h1 class="text-display-md text-ink mb-2">Feed</h1>
       <p class="text-sm text-ink-muted">
@@ -148,5 +187,6 @@ onMounted(() => {
         </button>
       </div>
     </div>
+    </template>
   </div>
 </template>

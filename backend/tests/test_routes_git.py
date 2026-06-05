@@ -29,7 +29,7 @@ def article_with_repo(db_engine):
     """Create user + article with git repo."""
     import tempfile
     s = get_session(db_engine)
-    u = User(name="作者", anonymous_name="anon")
+    u = User(username="user23", password_hash="", name="作者", anonymous_name="anon")
     s.add(u)
     s.commit()
     a = Article(status="published", authors=[u.id])

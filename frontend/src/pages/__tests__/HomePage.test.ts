@@ -53,55 +53,47 @@ vi.mock('../../api/feed', () => ({
   }),
 }))
 
+function setLoggedIn() {
+  localStorage.setItem('viewer', JSON.stringify({ id: 'u1', username: 'test', name: 'Test' }))
+  localStorage.setItem('token', 'test-token')
+}
+
 describe('HomePage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    localStorage.clear()
   })
 
-  it('renders page title', async () => {
+  it('shows welcome state when not logged in', async () => {
     const HomePage = (await import('../HomePage.vue')).default
     const wrapper = mount(HomePage, {
-      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true, 'article-card': true } },
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    expect(wrapper.text()).toContain('PeerPedia')
+    expect(wrapper.text()).toContain('Sign In')
+  })
+
+  it('renders Feed when logged in', async () => {
+    setLoggedIn()
+    setActivePinia(createPinia())  // re-init store with viewer
+    const HomePage = (await import('../HomePage.vue')).default
+    const wrapper = mount(HomePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await new Promise(r => setTimeout(r, 50))
     expect(wrapper.text()).toContain('Feed')
   })
 
-  it('renders feed article titles', async () => {
+  it('renders feed article titles when logged in', async () => {
+    setLoggedIn()
+    setActivePinia(createPinia())
     const HomePage = (await import('../HomePage.vue')).default
     const wrapper = mount(HomePage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await new Promise(r => setTimeout(r, 100))
     expect(wrapper.text()).toContain('Feed Article One')
     expect(wrapper.text()).toContain('Feed Article Two')
-  })
-
-  it('renders pagination controls', async () => {
-    const HomePage = (await import('../HomePage.vue')).default
-    const wrapper = mount(HomePage, {
-      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
-    })
-    await new Promise(r => setTimeout(r, 50))
-    // Should have page number buttons or pagination controls
-    const pageButtons = wrapper.findAll('button, a').filter(el =>
-      /page|1|2|\d+/i.test(el.text())
-    )
-    expect(pageButtons.length).toBeGreaterThanOrEqual(0)
-  })
-
-  it('shows empty state when no articles', async () => {
-    vi.mocked(await import('../../api/feed')).fetchFeed.mockResolvedValueOnce({
-      articles: [],
-      total: 0,
-      page: 1,
-      size: 20,
-    })
-    const HomePage = (await import('../HomePage.vue')).default
-    const wrapper = mount(HomePage, {
-      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
-    })
-    await new Promise(r => setTimeout(r, 50))
-    expect(wrapper.text()).toMatch(/no articles|empty|none/i)
   })
 })

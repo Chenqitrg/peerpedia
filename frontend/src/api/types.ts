@@ -178,6 +178,7 @@ export interface ReviewMessagePayload {
 
 export interface UserProfile {
   id: string
+  username: string
   name: string
   anonymous_name: string
   affiliation?: string
@@ -206,6 +207,9 @@ export interface ReputationScores {
 }
 
 export interface UserCreatePayload {
+  username: string
+  password: string
+  email: string
   name: string
   affiliation?: string
   expertise?: string[]
@@ -291,4 +295,23 @@ export interface CitationClickPayload {
 export interface HasForkedResponse {
   has_forked: boolean
   fork_article_id: string | null
+}
+
+// ===== Auth Types =====
+
+export interface LoginPayload {
+  username: string
+  password: string
+}
+
+export interface RegisterPayload {
+  username: string
+  password: string
+  email: string
+  name: string
+}
+
+export interface AuthResponse {
+  user: UserProfile
+  token: string
 }

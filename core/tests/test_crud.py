@@ -11,7 +11,7 @@ from peerpedia_core.storage.db.models import (
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 def _make_user(session: Session, name: str) -> User:
-    u = User(name=name, affiliation="Test", anonymous_name=f"anon_{name}")
+    u = User(username=f"test_{name}", password_hash="$2b$12$test", name=name, affiliation="Test", anonymous_name=f"anon_{name}")
     session.add(u)
     session.commit()
     return u

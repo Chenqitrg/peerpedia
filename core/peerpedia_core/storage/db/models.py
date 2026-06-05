@@ -73,6 +73,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=_new_id)
+    username = Column(String, unique=True, nullable=False)        # login identifier
+    password_hash = Column(String, nullable=False)                # bcrypt hash
+    email = Column(String, nullable=True)                         # format-validated
     name = Column(String, nullable=False)
     anonymous_name = Column(String, nullable=False, default="")
     affiliation = Column(String, nullable=False, default="")

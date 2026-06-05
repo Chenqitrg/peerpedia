@@ -27,14 +27,14 @@ def client(db_engine):
 
 class TestUserCRUD:
     def test_create_user(self, client):
-        resp = client.post("/api/v1/users", json={"name": "测试用户", "affiliation": "清华"})
+        resp = client.post("/api/v1/users", json={"username": "testuser", "password": "666666", "email": "test@test.com", "name": "测试用户", "affiliation": "清华"})
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "测试用户"
         assert data["anonymous_name"] != ""
 
     def test_get_user(self, client):
-        resp = client.post("/api/v1/users", json={"name": "张三"})
+        resp = client.post("/api/v1/users", json={"username": "zhangsan", "password": "666666", "email": "z@t.com", "name": "张三"})
         uid = resp.json()["id"]
         resp2 = client.get(f"/api/v1/users/{uid}")
         assert resp2.status_code == 200
@@ -46,8 +46,8 @@ class TestUserCRUD:
         assert resp.status_code == 404
 
     def test_list_users(self, client):
-        client.post("/api/v1/users", json={"name": "A"})
-        client.post("/api/v1/users", json={"name": "B"})
+        client.post("/api/v1/users", json={"username": "userA", "password": "666666", "email": "a@t.com", "name": "A"})
+        client.post("/api/v1/users", json={"username": "userB", "password": "666666", "email": "b@t.com", "name": "B"})
         resp = client.get("/api/v1/users")
         assert resp.status_code == 200
         assert len(resp.json()) >= 2
@@ -55,8 +55,8 @@ class TestUserCRUD:
 
 class TestFollow:
     def test_follow_unfollow(self, client):
-        a = client.post("/api/v1/users", json={"name": "A"}).json()
-        b = client.post("/api/v1/users", json={"name": "B"}).json()
+        a = client.post("/api/v1/users", json={"username": "folA", "password": "666666", "email": "a@t.com", "name": "A"}).json()
+        b = client.post("/api/v1/users", json={"username": "folB", "password": "666666", "email": "b@t.com", "name": "B"}).json()
 
         # follow
         resp = client.post(f"/api/v1/users/{b['id']}/follow?follower_id={a['id']}")
@@ -69,8 +69,8 @@ class TestFollow:
         assert resp.json()["following"] is False
 
     def test_followers_list(self, client):
-        a = client.post("/api/v1/users", json={"name": "A"}).json()
-        b = client.post("/api/v1/users", json={"name": "B"}).json()
+        a = client.post("/api/v1/users", json={"username": "folA", "password": "666666", "email": "a@t.com", "name": "A"}).json()
+        b = client.post("/api/v1/users", json={"username": "folB", "password": "666666", "email": "b@t.com", "name": "B"}).json()
         client.post(f"/api/v1/users/{a['id']}/follow?follower_id={b['id']}")
 
         resp = client.get(f"/api/v1/users/{a['id']}/followers")
