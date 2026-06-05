@@ -145,7 +145,8 @@ async function handleCompile() {
       content: content.value,
       format: format.value,
     })
-    previewHtml.value = renderMathInHtml(res.data.output || res.data.content || '')
+    const raw = res.data.output || res.data.content || ''
+    previewHtml.value = format.value === 'markdown' ? renderMathInHtml(raw) : raw
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || 'Compile failed'
   } finally {
