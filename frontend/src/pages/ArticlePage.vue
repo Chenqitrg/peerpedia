@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getArticle, getArticleSource, getHistory, forkArticle } from '../api/articles'
+import { getArticle, getArticleSource, getHistory, forkArticle, extendSink } from '../api/articles'
 import { getReviews as fetchReviews, createReview, postReviewMessage } from '../api/reviews'
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { useStatusMap } from '../composables/useStatusMap'
 import type { ArticleDetail, ReviewOut } from '../api/types'
-import FiveDimForm from '../components/FiveDimForm.vue'
+import ReviewModal from '../components/ReviewModal.vue'
+import StarRating from '../components/StarRating.vue'
 import katex from 'katex'
 import {
   Bookmark,
@@ -20,6 +21,7 @@ import {
   MessageSquare,
   Eye,
   ChevronRight,
+  ChevronDown,
   FileDown,
   FileText,
   Star,
@@ -51,6 +53,7 @@ const reviewScores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 
 const submittingReview = ref(false)
 const reviewFormError = ref('')
 const reviewFormSuccess = ref('')
+const showReviewModal = ref(false)
 
 // User's existing review (for pre-filling if already reviewed)
 const myExistingReview = computed(() => {
@@ -62,17 +65,49 @@ const canUserReview = computed(() => {
   return userStore.viewer && !isOwnArticle.value
 })
 
+// ── Hover-to-edit state ──────────────────────────────────────────────────
+
+const hoveredDim = ref<string | null>(null)
+const reviewComment = ref('')
+
+const scoreDims = [
+  { key: 'originality', label: 'O' },
+  { key: 'rigor', label: 'R' },
+  { key: 'completeness', label: 'C' },
+  { key: 'pedagogy', label: 'P' },
+  { key: 'impact', label: 'I' },
+] as const
+
 // ── Reply state ─────────────────────────────────────────────────────────
 
 const replyTexts = reactive<Record<string, string>>({})
 const sendingReplies = reactive<Record<string, boolean>>({})
+const expandedThreads = reactive(new Set<string>())
 
-// ── Sorted reviews (self-reviews first) ─────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+function isMyReview(review: ReviewOut): boolean {
+  return userStore.viewer != null && review.reviewer_id === userStore.viewer.id
+}
+
+function canReplyInThread(review: ReviewOut): boolean {
+  if (!userStore.viewer) return false
+  return isOwnArticle.value || review.reviewer_id === userStore.viewer.id
+}
+
+// ── Sorted reviews (current user's review first, then self-reviews, then by date) ──
 
 const sortedReviews = computed(() => {
   return [...reviews.value].sort((a, b) => {
+    // Current user's review always first
+    const aIsMine = isMyReview(a)
+    const bIsMine = isMyReview(b)
+    if (aIsMine && !bIsMine) return -1
+    if (!aIsMine && bIsMine) return 1
+    // Then self-reviews
     if (a.is_self_review && !b.is_self_review) return -1
     if (!a.is_self_review && b.is_self_review) return 1
+    // Then by date
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 })
@@ -161,6 +196,20 @@ function toggleBookmark() {
   }
 }
 
+function toggleThread(reviewId: string) {
+  if (expandedThreads.has(reviewId)) {
+    expandedThreads.delete(reviewId)
+  } else {
+    expandedThreads.add(reviewId)
+  }
+}
+
+function isAuthorMessage(msg: any): boolean {
+  if (!article.value) return false
+  const authorIds = article.value.authors.map(a => a.id)
+  return authorIds.includes(msg.author_id)
+}
+
 async function handleSubmitReview() {
   if (!userStore.viewer) return
   submittingReview.value = true
@@ -169,18 +218,42 @@ async function handleSubmitReview() {
   try {
     const history = await getHistory(id)
     const latestHash = history.commits?.[0]?.hash || 'unknown'
-    await createReview(id, {
+    const result = await createReview(id, {
       article_id: id,
       commit_hash: latestHash,
       scope: article.value?.status === 'published' ? 'published' : 'pool',
       scores: { ...reviewScores.value },
     })
+    // Post the initial comment if provided
+    const comment = reviewComment.value.trim()
+    if (comment) {
+      await postReviewMessage(id, result.id, { content: comment })
+      reviewComment.value = ''
+    }
     reviewFormSuccess.value = 'Review submitted'
     await loadReviews()
   } catch (e: any) {
     reviewFormError.value = e.userMessage || 'Failed to submit review'
   } finally {
     submittingReview.value = false
+  }
+}
+
+async function updateSingleScore(reviewId: string, dim: string, value: number) {
+  if (!userStore.viewer) return
+  const review = reviews.value.find(r => r.id === reviewId)
+  if (!review) return
+  const updatedScores = { ...review.scores, [dim]: value }
+  try {
+    await createReview(id, {
+      article_id: id,
+      commit_hash: review.commit_hash,
+      scope: review.scope as 'pool' | 'published',
+      scores: updatedScores,
+    })
+    await loadReviews()
+  } catch {
+    // silently fail for inline score update
   }
 }
 
@@ -218,9 +291,13 @@ async function handleFork() {
   }
 }
 
-function handleSinkExtension() {
-  if (article.value) {
-    article.value.days_remaining = (article.value.days_remaining ?? 0) + 7
+async function handleSinkExtension() {
+  if (!article.value) return
+  try {
+    const result = await extendSink(id, { extra_days: 7 })
+    article.value.days_remaining = result.days_remaining
+  } catch (e) {
+    console.error('Sink extension failed:', e)
   }
 }
 </script>
@@ -402,22 +479,40 @@ function handleSinkExtension() {
         <div v-if="reviewsLoading" class="text-ink-muted text-sm">Loading comments...</div>
 
         <div v-else>
-          <!-- Review submission form (logged-in non-authors only) -->
-          <div v-if="canUserReview" class="border border-divider rounded-lg p-4 mb-6">
-            <h4 class="text-sm font-semibold text-ink mb-3">
-              {{ myExistingReview ? 'Update Your Review' : 'Submit Your Review' }}
-            </h4>
-            <FiveDimForm v-model="reviewScores" />
-            <p v-if="reviewFormError" class="text-xs text-[#d73a49] mt-3">{{ reviewFormError }}</p>
-            <p v-if="reviewFormSuccess" class="text-xs text-green-400 mt-3">{{ reviewFormSuccess }}</p>
-            <button
-              class="mt-3 px-4 py-1.5 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg
-                     hover:brightness-110 transition-all duration-200 disabled:opacity-50"
-              :disabled="submittingReview"
-              @click="handleSubmitReview"
-            >
-              {{ submittingReview ? 'Submitting...' : (myExistingReview ? 'Update Review' : 'Submit Review') }}
-            </button>
+          <!-- Review submission form (logged-in non-author, no review yet) -->
+          <div v-if="canUserReview && !myExistingReview" class="mb-6 p-4 border border-divider rounded-lg">
+            <p class="text-xs text-ink-muted mb-3 font-medium">Write a review</p>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3">
+              <span v-for="dim in scoreDims" :key="dim.key" class="inline-flex items-center gap-1">
+                <span class="text-xs text-ink-muted font-mono w-3 text-right">{{ dim.label }}</span>
+                <StarRating
+                  :modelValue="reviewScores[dim.key]"
+                  size="sm"
+                  @update:modelValue="v => reviewScores[dim.key] = v"
+                />
+              </span>
+            </div>
+            <!-- Comment input -->
+            <textarea
+              v-model="reviewComment"
+              rows="2"
+              placeholder="Write a comment (optional)..."
+              class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-xs
+                     text-ink placeholder:text-ink-muted/50 resize-none
+                     focus:outline-none focus:ring-1 focus:ring-accent mb-3"
+            ></textarea>
+            <div class="flex items-center justify-between">
+              <button
+                class="px-4 py-1.5 text-xs font-semibold bg-accent text-[#0d1117] rounded-md
+                       hover:brightness-110 transition-all duration-200 disabled:opacity-50"
+                :disabled="submittingReview"
+                @click="handleSubmitReview"
+              >
+                {{ submittingReview ? 'Submitting...' : 'Submit Review' }}
+              </button>
+              <p v-if="reviewFormError" class="text-xs text-[#d73a49]">{{ reviewFormError }}</p>
+              <p v-if="reviewFormSuccess" class="text-xs text-green-400">{{ reviewFormSuccess }}</p>
+            </div>
           </div>
 
           <!-- Sign in prompt -->
@@ -429,64 +524,139 @@ function handleSinkExtension() {
           </div>
 
           <!-- No reviews -->
-          <div v-if="sortedReviews.length === 0" class="text-ink-muted text-sm">
+          <div v-if="sortedReviews.length === 0 && !canUserReview" class="text-ink-muted text-sm">
             No reviews yet.
           </div>
 
           <!-- Review list -->
-          <div v-else class="space-y-4">
+          <div v-if="sortedReviews.length > 0" class="space-y-3">
             <div
               v-for="review in sortedReviews"
               :key="review.id"
               class="border rounded-lg p-4"
-              :class="review.is_self_review
+              :class="isMyReview(review)
                 ? 'border-accent/40 border-l-2 border-l-accent'
                 : 'border-divider'"
             >
-              <div class="flex items-center justify-between mb-2">
+              <!-- Header -->
+              <div class="flex items-center justify-between mb-3">
                 <span class="text-sm font-semibold text-ink">
                   {{ review.is_self_review ? 'Author' : review.reviewer_name || review.reviewer_id?.substring(0, 8) }}
                   <span v-if="review.is_self_review" class="text-xs text-ink-muted/60 font-normal ml-1">(self-review)</span>
+                  <span v-if="isMyReview(review) && !review.is_self_review" class="text-xs text-accent/80 font-normal ml-1">(you)</span>
                 </span>
                 <span class="text-xs text-ink-muted">
-                  {{ new Date(review.created_at).toLocaleDateString() }}
+                  {{ new Date(review.created_at).toLocaleString() }}
                 </span>
               </div>
-              <!-- Scores -->
-              <div class="flex items-center gap-3 mb-3 text-xs font-mono">
-                <span class="text-accent">O:{{ review.scores.originality }}</span>
-                <span class="text-ink-muted">R:{{ review.scores.rigor }}</span>
-                <span class="text-ink-muted">C:{{ review.scores.completeness }}</span>
-                <span class="text-ink-muted">P:{{ review.scores.pedagogy }}</span>
-                <span class="text-ink-muted">I:{{ review.scores.impact }}</span>
-              </div>
-              <!-- Thread messages -->
-              <div v-if="review.thread && review.thread.length" class="space-y-2 border-t border-divider pt-3">
-                <div
-                  v-for="msg in review.thread"
-                  :key="msg.created_at"
-                  class="text-sm text-ink-muted pl-3 border-l-2 border-divider"
+
+              <!-- Score row: hover-to-edit for my review, static text for others -->
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs font-mono">
+                <span
+                  v-for="dim in scoreDims"
+                  :key="dim.key"
+                  class="inline-flex items-center gap-0.5"
+                  :class="isMyReview(review) ? 'cursor-default' : ''"
+                  @mouseenter="isMyReview(review) ? hoveredDim = review.id + ':' + dim.key : null"
+                  @mouseleave="hoveredDim = null"
                 >
-                  <span class="text-xs text-ink-muted/60">
-                    {{ (msg as any).author_name || msg.author_id?.substring(0, 8) }}
-                  </span>
-                  <p class="mt-0.5">{{ msg.content }}</p>
+                  <template v-if="hoveredDim === review.id + ':' + dim.key && isMyReview(review)">
+                    <span class="text-ink-muted text-xs">{{ dim.label }}&nbsp;</span>
+                    <StarRating
+                      :modelValue="review.scores[dim.key]"
+                      size="sm"
+                      @update:modelValue="v => updateSingleScore(review.id, dim.key, v)"
+                    />
+                  </template>
+                  <template v-else>
+                    <span :class="dim.key === 'originality' ? 'text-accent font-semibold' : 'text-ink-muted'">
+                      {{ dim.label }}:{{ review.scores[dim.key] }}
+                    </span>
+                  </template>
+                </span>
+              </div>
+
+              <!-- Thread drawer (shown for all reviews that have messages) -->
+              <div v-if="review.thread && review.thread.length">
+                <button
+                  class="flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink transition-colors"
+                  @click="toggleThread(review.id)"
+                >
+                  <ChevronDown
+                    v-if="expandedThreads.has(review.id)"
+                    class="w-3.5 h-3.5 transition-transform duration-200"
+                  />
+                  <ChevronRight
+                    v-else
+                    class="w-3.5 h-3.5 transition-transform duration-200"
+                  />
+                  Thread ({{ review.thread.length }})
+                </button>
+
+                <!-- iMessage-style messages -->
+                <div v-if="expandedThreads.has(review.id)" class="mt-3 space-y-3">
+                  <div
+                    v-for="msg in review.thread"
+                    :key="msg.created_at"
+                    class="flex"
+                    :class="isAuthorMessage(msg) ? 'justify-start' : 'justify-end'"
+                  >
+                    <div
+                      class="max-w-[75%] rounded-xl px-3 py-2 text-sm"
+                      :class="isAuthorMessage(msg)
+                        ? 'bg-[#21262d] text-ink rounded-bl-md'
+                        : 'bg-accent/15 border border-accent/30 text-ink rounded-br-md'"
+                    >
+                      <span class="text-[10px] text-ink-muted/50 block mb-0.5">
+                        {{ (msg as any).author_name || msg.author_id?.substring(0, 8) }}
+                      </span>
+                      <p class="leading-relaxed">{{ msg.content }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Reply input (only author + reviewer can reply) -->
+                  <div v-if="canReplyInThread(review)" class="flex items-center gap-2 pt-1">
+                    <input
+                      v-model="replyTexts[review.id]"
+                      type="text"
+                      :placeholder="sendingReplies[review.id] ? 'Sending...' : 'Reply...'"
+                      class="flex-1 bg-[#0d1117] border border-divider rounded-lg px-3 py-1.5 text-xs
+                             text-ink placeholder:text-ink-muted/50
+                             focus:outline-none focus:ring-1 focus:ring-accent"
+                      @keyup.enter="handleReply(review.id)"
+                    />
+                    <button
+                      class="flex items-center justify-center w-7 h-7 rounded-lg
+                             text-ink-muted hover:text-accent hover:bg-accent/10
+                             transition-colors duration-200"
+                      :disabled="!replyTexts[review.id]?.trim() || sendingReplies[review.id]"
+                      @click="handleReply(review.id)"
+                    >
+                      <Send class="w-3.5 h-3.5" stroke-width="2" />
+                    </button>
+                  </div>
+
+                  <!-- Read-only indicator for bystanders -->
+                  <p v-else-if="userStore.viewer" class="text-[10px] text-ink-muted/40 italic">
+                    Only the author and reviewer can participate in this thread.
+                  </p>
                 </div>
               </div>
-              <!-- Reply input (article author only) -->
-              <div v-if="isOwnArticle" class="border-t border-divider pt-3 mt-3">
-                <div class="flex items-center gap-2">
+
+              <!-- Empty thread: input to start conversation (only on my review) -->
+              <div v-if="isMyReview(review) && (!review.thread || !review.thread.length)" class="mt-2">
+                <div class="flex items-center gap-2 pt-1">
                   <input
                     v-model="replyTexts[review.id]"
                     type="text"
-                    :placeholder="sendingReplies[review.id] ? 'Sending...' : 'Reply...'"
-                    class="flex-1 bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-xs
+                    :placeholder="sendingReplies[review.id] ? 'Sending...' : 'Start a conversation...'"
+                    class="flex-1 bg-[#0d1117] border border-divider rounded-lg px-3 py-1.5 text-xs
                            text-ink placeholder:text-ink-muted/50
                            focus:outline-none focus:ring-1 focus:ring-accent"
                     @keyup.enter="handleReply(review.id)"
                   />
                   <button
-                    class="flex items-center justify-center w-7 h-7 rounded
+                    class="flex items-center justify-center w-7 h-7 rounded-lg
                            text-ink-muted hover:text-accent hover:bg-accent/10
                            transition-colors duration-200"
                     :disabled="!replyTexts[review.id]?.trim() || sendingReplies[review.id]"
@@ -506,5 +676,18 @@ function handleSinkExtension() {
     <div v-else class="card p-12 text-center">
       <p class="text-ink-muted">Article not found.</p>
     </div>
+
+    <!-- Review modal -->
+    <ReviewModal
+      :visible="showReviewModal"
+      :existing-review="!!myExistingReview"
+      :submitting="submittingReview"
+      :error="reviewFormError"
+      :success="reviewFormSuccess"
+      :model-value="reviewScores"
+      @update:model-value="(v) => reviewScores = v"
+      @submit="handleSubmitReview"
+      @close="showReviewModal = false; reviewFormError = ''; reviewFormSuccess = ''"
+    />
   </div>
 </template>
