@@ -2,8 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/useUserStore'
-import { fetchBookmarks, removeBookmark } from '../api/bookmarks'
+import { fetchBookmarks } from '../api/bookmarks'
 import { getArticle } from '../api/articles'
+import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
 import type { ArticleSummary, Bookmark } from '../api/types'
 import { Bookmark as BookmarkIcon, ArrowLeft } from 'lucide-vue-next'
@@ -14,6 +15,8 @@ const userStore = useUserStore()
 const articles = ref<ArticleSummary[]>([])
 const loading = ref(false)
 const error = ref('')
+
+const { remove: handleToggleBookmark } = useBookmarkToggle(articles)
 
 onMounted(() => {
   loadBookmarks()
@@ -36,18 +39,6 @@ async function loadBookmarks() {
     error.value = e.response?.data?.detail || 'Failed to load bookmarks'
   } finally {
     loading.value = false
-  }
-}
-
-async function handleToggleBookmark(articleId: string, currentlyBookmarked: boolean) {
-  if (!userStore.viewer) return
-  try {
-    if (currentlyBookmarked) {
-      await removeBookmark(articleId, userStore.viewer.id)
-      articles.value = articles.value.filter(a => a.id !== articleId)
-    }
-  } catch {
-    // silently fail
   }
 }
 </script>

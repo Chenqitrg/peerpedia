@@ -3,7 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { searchArticles } from '../api/search'
 import { useUserStore } from '../stores/useUserStore'
-import { addBookmark, removeBookmark } from '../api/bookmarks'
+import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
 import type { ArticleSummary } from '../api/types'
 import { Search, ArrowLeft } from 'lucide-vue-next'
@@ -20,6 +20,8 @@ const searched = ref(false)
 const currentPage = ref(1)
 const totalPages = ref(1)
 const pageSize = 20
+
+const { toggle: handleToggleBookmark } = useBookmarkToggle(results)
 
 onMounted(() => {
   const q = route.query.q as string
@@ -66,21 +68,6 @@ function goToPage(page: number) {
   if (page < 1 || page > totalPages.value) return
   doSearch(page)
   window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-async function handleToggleBookmark(articleId: string, currentlyBookmarked: boolean) {
-  if (!userStore.viewer) return
-  try {
-    if (currentlyBookmarked) {
-      await removeBookmark(articleId, userStore.viewer.id)
-    } else {
-      await addBookmark(userStore.viewer.id, articleId)
-    }
-    const article = results.value.find(a => a.id === articleId)
-    if (article) article.is_bookmarked = !currentlyBookmarked
-  } catch {
-    // silently fail for search page
-  }
 }
 </script>
 

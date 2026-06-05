@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { getPool } from '../api/pool'
 import { useUserStore } from '../stores/useUserStore'
-import { addBookmark, removeBookmark } from '../api/bookmarks'
+import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
 import type { ArticleSummary } from '../api/types'
 
@@ -12,6 +12,10 @@ const poolArticles = ref<ArticleSummary[]>([])
 const loading = ref(false)
 const error = ref('')
 
+const { toggle: handleToggleBookmark } = useBookmarkToggle(poolArticles, (msg) => {
+  error.value = msg
+})
+
 onMounted(() => {
   loadPool()
 })
@@ -20,30 +24,13 @@ async function loadPool() {
   loading.value = true
   error.value = ''
   try {
-    const data = await getPool(userStore.viewer?.id)
+    const data = await getPool()
     poolArticles.value = data.articles ?? []
   } catch (e: any) {
     error.value = e.response?.data?.detail || 'Failed to load pool'
     poolArticles.value = []
   } finally {
     loading.value = false
-  }
-}
-
-async function handleToggleBookmark(articleId: string, currentlyBookmarked: boolean) {
-  if (!userStore.viewer) return
-  try {
-    if (currentlyBookmarked) {
-      await removeBookmark(articleId, userStore.viewer.id)
-    } else {
-      await addBookmark(userStore.viewer.id, articleId)
-    }
-    const article = poolArticles.value.find(a => a.id === articleId)
-    if (article) {
-      article.is_bookmarked = !currentlyBookmarked
-    }
-  } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to update bookmark'
   }
 }
 </script>

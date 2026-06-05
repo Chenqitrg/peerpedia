@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getUser, getFollowers, getFollowing } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
-import { addBookmark, removeBookmark } from '../api/bookmarks'
+import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
 import type { UserProfile, ArticleSummary } from '../api/types'
 import {
@@ -30,6 +30,8 @@ const showFollowers = ref(false)
 const showFollowing = ref(false)
 const followers = ref<any[]>([])
 const following = ref<any[]>([])
+
+const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 
 const isSelf = computed(() => {
   return userStore.viewer?.id === id.value
@@ -92,21 +94,6 @@ async function loadFollowing() {
 
 function goToEditProfile() {
   // Will navigate to profile edit page or open inline editor
-}
-
-async function handleToggleBookmark(articleId: string, currentlyBookmarked: boolean) {
-  if (!userStore.viewer) return
-  try {
-    if (currentlyBookmarked) {
-      await removeBookmark(articleId, userStore.viewer.id)
-    } else {
-      await addBookmark(userStore.viewer.id, articleId)
-    }
-    const art = articles.value.find(a => a.id === articleId)
-    if (art) art.is_bookmarked = !currentlyBookmarked
-  } catch {
-    // silently fail
-  }
 }
 </script>
 

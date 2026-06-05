@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '../stores/useUserStore'
 import { fetchFeed } from '../api/feed'
-import { addBookmark, removeBookmark } from '../api/bookmarks'
+import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
 import type { ArticleSummary } from '../api/types'
 import { BookOpen } from 'lucide-vue-next'
@@ -19,6 +19,10 @@ const loading = ref(false)
 const error = ref('')
 
 const totalPages = ref(1)
+
+const { toggle: handleToggleBookmark } = useBookmarkToggle(articles, (msg) => {
+  error.value = msg
+})
 
 function openAuth() {
   userStore.showAuthModal = true
@@ -47,23 +51,6 @@ function goToPage(page: number) {
   if (page < 1 || page > totalPages.value) return
   loadFeed(page)
   window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-async function handleToggleBookmark(articleId: string, currentlyBookmarked: boolean) {
-  if (!userStore.viewer) return
-  try {
-    if (currentlyBookmarked) {
-      await removeBookmark(articleId, userStore.viewer.id)
-    } else {
-      await addBookmark(userStore.viewer.id, articleId)
-    }
-    const article = articles.value.find(a => a.id === articleId)
-    if (article) {
-      article.is_bookmarked = !currentlyBookmarked
-    }
-  } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to update bookmark'
-  }
 }
 
 onMounted(() => {
