@@ -6,6 +6,7 @@ import { getReviews as fetchReviews } from '../api/reviews'
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import type { ArticleDetail, ReviewOut } from '../api/types'
+import katex from 'katex'
 import {
   Bookmark,
   BookmarkCheck,
@@ -70,22 +71,40 @@ onMounted(async () => {
   }
 })
 
+function renderMathInHtml(html: string): string {
+  // Replace katex-display spans with KaTeX rendered output
+  let result = html
+  // Display math: <span class="katex-display">$$...$$</span>
+  result = result.replace(/<span class="katex-display">\$\$(.+?)\$\$<\/span>/gs, (_, tex) => {
+    try {
+      return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false })
+    } catch { return _ }
+  })
+  // Inline math: <span class="katex-inline">$...$</span>
+  result = result.replace(/<span class="katex-inline">\$(.+?)\$<\/span>/gs, (_, tex) => {
+    try {
+      return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false })
+    } catch { return _ }
+  })
+  return result
+}
+
 async function loadCompiledContent() {
   if (!article.value) return
+  let html = ''
   if (article.value.compiled_output) {
-    compiledHtml.value = article.value.compiled_output
-    return
+    html = article.value.compiled_output
+  } else {
+    try {
+      const src = await getArticleSource(id)
+      const result = await compilePreview({ content: src.content, format: src.format })
+      html = result.output
+    } catch {
+      compiledHtml.value = ''
+      return
+    }
   }
-  try {
-    const src = await getArticleSource(id)
-    const result = await compilePreview({
-      content: src.content,
-      format: src.format,
-    })
-    compiledHtml.value = result.output
-  } catch {
-    compiledHtml.value = ''
-  }
+  compiledHtml.value = renderMathInHtml(html)
 }
 
 async function loadReviews() {

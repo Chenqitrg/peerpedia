@@ -79,11 +79,8 @@ onMounted(() => {
       <h1 class="text-display-lg font-heading font-bold text-ink mb-3">
         PeerPedia
       </h1>
-      <p class="text-lg text-ink-muted mb-2 max-w-md">
-        Decentralized Peer Review
-      </p>
-      <p class="text-sm text-ink-muted/60 mb-8 max-w-md">
-        An academic publishing platform where articles sink or swim by merit alone.
+      <p class="text-lg text-ink-muted mb-8 max-w-md">
+        To a better academia
       </p>
       <div class="flex items-center gap-3">
         <button
