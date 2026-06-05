@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getUser, getFollowers, getFollowing } from '../api/users'
 import { getArticles } from '../api/articles'
@@ -37,6 +37,14 @@ const isSelf = computed(() => {
 
 onMounted(async () => {
   await loadUser()
+})
+
+watch(() => route.params.id, () => {
+  showFollowers.value = false
+  showFollowing.value = false
+  followers.value = []
+  following.value = []
+  loadUser()
 })
 
 async function loadUser() {

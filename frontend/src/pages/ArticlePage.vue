@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getArticle, getArticleSource, getHistory, forkArticle } from '../api/articles'
 import { getReviews as fetchReviews } from '../api/reviews'
@@ -63,6 +63,24 @@ onMounted(async () => {
     // Compile article content for body tab
     await loadCompiledContent()
     // Load reviews for comments tab
+    loadReviews()
+  } catch (e) {
+    console.error('Failed to load article:', e)
+  } finally {
+    loading.value = false
+  }
+})
+
+// Reload when navigating to a different article
+watch(() => route.params.id, async (newId) => {
+  if (!newId) return
+  loading.value = true
+  reviews.value = []
+  compiledHtml.value = ''
+  activeTab.value = 'body'
+  try {
+    article.value = await getArticle(newId as string)
+    await loadCompiledContent()
     loadReviews()
   } catch (e) {
     console.error('Failed to load article:', e)
