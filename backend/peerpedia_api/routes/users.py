@@ -19,10 +19,21 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("", response_model=list[UserSummary])
 def api_list_users(db: Session = Depends(deps.get_db)):
+    from peerpedia_core.storage.db.models import Article
     users = list_users(db)
-    return [UserSummary(id=u.id, name=u.name, anonymous_name=u.anonymous_name,
-                        affiliation=u.affiliation, expertise=u.expertise,
-                        avatar_url=u.avatar_url) for u in users]
+    out = []
+    for u in users:
+        article_count = db.query(Article).filter(
+            Article.authors.contains([u.id])
+        ).count()
+        out.append(UserSummary(
+            id=u.id, name=u.name, anonymous_name=u.anonymous_name,
+            affiliation=u.affiliation, expertise=u.expertise,
+            avatar_url=u.avatar_url,
+            article_count=article_count,
+            reputation=u.reputation or {},
+        ))
+    return out
 
 
 @router.post("", status_code=201, response_model=UserProfile)
