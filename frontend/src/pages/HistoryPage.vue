@@ -23,6 +23,7 @@ const selectedHash2 = ref<string | null>(null)
 const diffResult = ref<ArticleDiff | null>(null)
 const diffLoading = ref(false)
 const rollingBack = ref<string | null>(null)
+const rollbackError = ref('')
 
 const { state: history, isLoading: loading, error: rawError, execute: loadHistory } = useAsyncState(
   () => getHistory(id),
@@ -81,7 +82,7 @@ async function handleRollback(hash: string) {
     // Reload history
     await loadHistory()
   } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Rollback failed'
+    rollbackError.value = e.response?.data?.detail || 'Rollback failed'
   } finally {
     rollingBack.value = null
   }
