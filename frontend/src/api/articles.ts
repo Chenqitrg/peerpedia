@@ -31,8 +31,8 @@ export async function getHistory(id: string) {
   return res.data
 }
 
-export async function forkArticle(id: string, userId: string) {
-  const res = await apiClient.post(`/articles/${id}/fork`, null, { params: { user_id: userId } })
+export async function forkArticle(id: string) {
+  const res = await apiClient.post(`/articles/${id}/fork`)
   return res.data
 }
 

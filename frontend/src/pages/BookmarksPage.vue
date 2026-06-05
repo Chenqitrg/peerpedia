@@ -30,7 +30,7 @@ async function loadBookmarks() {
   loading.value = true
   error.value = ''
   try {
-    const bookmarks: Bookmark[] = await fetchBookmarks(userStore.viewer.id)
+    const bookmarks: Bookmark[] = await fetchBookmarks()
     const results = await Promise.all(
       bookmarks.map((b: Bookmark) => getArticle(b.article_id).catch(() => null)),
     )

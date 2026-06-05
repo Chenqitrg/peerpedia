@@ -25,12 +25,12 @@ export async function getFollowing(id: string) {
   return res.data
 }
 
-export async function followUser(id: string, followerId: string) {
-  const res = await apiClient.post(`/users/${id}/follow`, null, { params: { follower_id: followerId } })
+export async function followUser(id: string) {
+  const res = await apiClient.post(`/users/${id}/follow`)
   return res.data
 }
 
-export async function unfollowUser(id: string, followerId: string) {
-  const res = await apiClient.delete(`/users/${id}/follow`, { params: { follower_id: followerId } })
+export async function unfollowUser(id: string) {
+  const res = await apiClient.delete(`/users/${id}/follow`)
   return res.data
 }

@@ -14,24 +14,25 @@ from peerpedia_core.storage.db.crud_article import list_articles
 from peerpedia_core.storage.db.crud_review import get_reviews_for_article
 from peerpedia_core.storage.db.crud_user import get_followers, get_following
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
+from peerpedia_core.storage.db.models import User
 
 router = APIRouter(prefix="/pool", tags=["pool"])
 
 
 @router.get("")
 def get_pool(
-    user_id: str | None = None,
+    current_user: User | None = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     """List sedimentation articles from followed/following users, sorted by remaining time descending."""
     from datetime import datetime, timezone, timedelta
 
     # Build the set of user IDs in the user's follow circle
-    if user_id:
-        follow_circle: set[str] = {user_id}
-        for f in get_followers(db, user_id):
+    if current_user:
+        follow_circle: set[str] = {current_user.id}
+        for f in get_followers(db, current_user.id):
             follow_circle.add(f.id)
-        for f in get_following(db, user_id):
+        for f in get_following(db, current_user.id):
             follow_circle.add(f.id)
     else:
         follow_circle = None
@@ -69,8 +70,8 @@ def get_pool(
             sink_eta=sink_eta,
             days_remaining=days_remaining,
             sink_duration_days=a.sink_duration_days,
-            is_bookmarked=is_bookmarked(db, user_id, a.id) if user_id else False,
-            is_own_article=user_id in (a.authors or []) if user_id else False,
+            is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
+            is_own_article=current_user.id in (a.authors or []) if current_user else False,
             created_at=a.created_at,
         ))
 

@@ -57,21 +57,17 @@ describe('users API', () => {
     expect(result).toHaveLength(1)
   })
 
-  it('followUser calls POST /users/{id}/follow with follower_id param', async () => {
+  it('followUser calls POST /users/{id}/follow', async () => {
     const { followUser } = await import('../users')
     mockClient.post.mockResolvedValue({ data: {} })
-    await followUser('u1', 'u2')
-    expect(mockClient.post).toHaveBeenCalledWith('/users/u1/follow', null, {
-      params: { follower_id: 'u2' },
-    })
+    await followUser('u1')
+    expect(mockClient.post).toHaveBeenCalledWith('/users/u1/follow')
   })
 
-  it('unfollowUser calls DELETE /users/{id}/follow with follower_id param', async () => {
+  it('unfollowUser calls DELETE /users/{id}/follow', async () => {
     const { unfollowUser } = await import('../users')
     mockClient.delete.mockResolvedValue({ data: {} })
-    await unfollowUser('u1', 'u2')
-    expect(mockClient.delete).toHaveBeenCalledWith('/users/u1/follow', {
-      params: { follower_id: 'u2' },
-    })
+    await unfollowUser('u1')
+    expect(mockClient.delete).toHaveBeenCalledWith('/users/u1/follow')
   })
 })

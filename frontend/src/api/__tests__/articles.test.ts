@@ -50,13 +50,11 @@ describe('articles API', () => {
     expect(result).toEqual({ commits: [] })
   })
 
-  it('forkArticle calls POST /articles/{id}/fork with user_id param', async () => {
+  it('forkArticle calls POST /articles/{id}/fork', async () => {
     const { forkArticle } = await import('../articles')
     mockClient.post.mockResolvedValue({ data: { id: 'forked', forked_from: 'abc', status: 'draft' } })
-    const result = await forkArticle('abc', 'user1')
-    expect(mockClient.post).toHaveBeenCalledWith('/articles/abc/fork', null, {
-      params: { user_id: 'user1' },
-    })
+    const result = await forkArticle('abc')
+    expect(mockClient.post).toHaveBeenCalledWith('/articles/abc/fork')
     expect(result).toEqual({ id: 'forked', forked_from: 'abc', status: 'draft' })
   })
 

@@ -32,6 +32,7 @@ from peerpedia_core.storage.db.crud_article import (
 )
 from peerpedia_core.storage.db.crud_review import create_review, upsert_review, get_reviews_for_article
 from peerpedia_core.storage.db.crud_user import get_user
+from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
 from peerpedia_core.storage.git_backend import (
     DEFAULT_ARTICLES_DIR,
@@ -69,7 +70,7 @@ router = APIRouter(prefix="/articles", tags=["articles"])
 def api_list_articles(
     status: str | None = None,
     author_id: str | None = None,
-    user_id: str | None = None,
+    current_user: User | None = Depends(deps.get_current_user),
     page: int = 1,
     size: int = 20,
     db: Session = Depends(deps.get_db),
@@ -97,8 +98,8 @@ def api_list_articles(
             sink_eta=_compute_sink(a)[0],
             days_remaining=_compute_sink(a)[1],
             sink_duration_days=getattr(a, "sink_duration_days", None),
-            is_bookmarked=is_bookmarked(db, user_id, a.id) if user_id else False,
-            is_own_article=user_id in (a.authors or []) if user_id else False,
+            is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
+            is_own_article=current_user.id in (a.authors or []) if current_user else False,
             created_at=a.created_at,
         )
         for a in paged
@@ -107,12 +108,9 @@ def api_list_articles(
             "page": page, "size": size}
 
 
-@router.get("/{article_id}", response_model=ArticleDetail)
-def api_get_article(
-    article_id: str,
-    user_id: str | None = None,
-    db: Session = Depends(deps.get_db),
-):
+def _build_article_detail(db: Session, article_id: str,
+                         current_user: User | None = None) -> ArticleDetail:
+    """Build ArticleDetail from DB. Internal callers pass current_user=None."""
     a = get_article(db, article_id)
     if a is None:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -147,11 +145,20 @@ def api_get_article(
         days_remaining=days_remaining,
         sink_duration_days=getattr(a, "sink_duration_days", None),
         review_count=distinct_reviewers,
-        is_bookmarked=is_bookmarked(db, user_id, a.id) if user_id else False,
-        is_own_article=user_id in (a.authors or []) if user_id else False,
+        is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
+        is_own_article=current_user.id in (a.authors or []) if current_user else False,
         created_at=a.created_at,
         updated_at=a.updated_at,
     )
+
+
+@router.get("/{article_id}", response_model=ArticleDetail)
+def api_get_article(
+    article_id: str,
+    current_user: User | None = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    return _build_article_detail(db, article_id, current_user=current_user)
 
 
 @router.post("", status_code=201, response_model=ArticleDetail)
@@ -197,7 +204,7 @@ def api_create_article(body: ArticleCreate, db: Session = Depends(deps.get_db)):
     if score is not None:
         a.score = score
     db.commit()
-    return api_get_article(a.id, db=db)
+    return _build_article_detail(db, a.id)
 
 
 @router.put("/{article_id}", response_model=ArticleDetail)
@@ -271,16 +278,17 @@ def api_update_article(article_id: str, body: ArticleUpdate,
         a.score = score
     db.commit()
 
-    return api_get_article(a.id, db=db)
+    return _build_article_detail(db, a.id)
 
 
 @router.put("/{article_id}/sink-extension", response_model=ArticleDetail)
 def api_extend_sink(article_id: str, body: SinkExtensionRequest,
-                     db: Session = Depends(deps.get_db)):
+                    current_user: User = Depends(deps.require_user),
+                    db: Session = Depends(deps.get_db)):
     from peerpedia_core.config.params import params
     try:
         a = extend_sink(db, article_id, body.extra_days, params.sink.max_days)
-        return api_get_article(a.id, db=db)
+        return _build_article_detail(db, a.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -288,17 +296,19 @@ def api_extend_sink(article_id: str, body: SinkExtensionRequest,
 # ── Actions ───────────────────────────────────────────────────────────
 
 @router.get("/{article_id}/has-forked")
-def api_has_forked(article_id: str, user_id: str, db: Session = Depends(deps.get_db)):
+def api_has_forked(article_id: str, current_user: User = Depends(deps.require_user),
+                   db: Session = Depends(deps.get_db)):
     """Check if a user has already forked this article."""
     all_articles = list_articles(db)
     for a in all_articles:
-        if a.forked_from == article_id and user_id in (a.authors or []):
+        if a.forked_from == article_id and current_user.id in (a.authors or []):
             return {"has_forked": True, "fork_article_id": a.id}
     return {"has_forked": False, "fork_article_id": None}
 
 
 @router.post("/{article_id}/publish", response_model=ArticleDetail)
-def api_publish_article(article_id: str, db: Session = Depends(deps.get_db)):
+def api_publish_article(article_id: str, current_user: User = Depends(deps.require_user),
+                        db: Session = Depends(deps.get_db)):
     """Explicitly publish a draft article to the sedimentation pool."""
     a = get_article(db, article_id)
     if a is None:
@@ -306,7 +316,7 @@ def api_publish_article(article_id: str, db: Session = Depends(deps.get_db)):
     from peerpedia_core.config.params import params
     a = set_sink_start(db, article_id, params.sink.new_article_default_days)
     a = update_article_status(db, article_id, "sedimentation")
-    return api_get_article(a.id, db=db)
+    return _build_article_detail(db, a.id)
 
 
 # ── Source ─────────────────────────────────────────────────────────────
@@ -417,7 +427,8 @@ def api_get_diff(article_id: str, hash1: str, hash2: str):
 
 
 @router.post("/{article_id}/fork", status_code=201)
-def api_fork_article(article_id: str, user_id: str, db: Session = Depends(deps.get_db)):
+def api_fork_article(article_id: str, current_user: User = Depends(deps.require_user),
+                     db: Session = Depends(deps.get_db)):
     """Fork an article: clone its git repo and create a new Article record."""
     original = get_article(db, article_id)
     if original is None:
@@ -437,14 +448,15 @@ def api_fork_article(article_id: str, user_id: str, db: Session = Depends(deps.g
                           abstract=original.abstract,
                           keywords=original.keywords,
                           categories=original.categories,
-                          authors=[user_id], status="draft",
+                          authors=[current_user.id], status="draft",
                           forked_from=article_id)
     increment_fork_count(db, article_id)
     return {"id": fork.id, "forked_from": article_id, "status": "draft"}
 
 
 @router.post("/{article_id}/rollback/{hash}")
-def api_rollback(article_id: str, hash: str, db: Session = Depends(deps.get_db)):
+def api_rollback(article_id: str, hash: str, current_user: User = Depends(deps.require_user),
+                 db: Session = Depends(deps.get_db)):
     """Rollback to a previous commit (creates a new commit, not force-push)."""
     rp = _repo_path(article_id)
     if not (rp / ".git").is_dir():

@@ -117,15 +117,17 @@ def api_get_following(user_id: str, db: Session = Depends(deps.get_db)):
 
 
 @router.post("/{user_id}/follow", status_code=201)
-def api_follow(user_id: str, follower_id: str, db: Session = Depends(deps.get_db)):
+def api_follow(user_id: str, current_user: User = Depends(require_user),
+               db: Session = Depends(deps.get_db)):
     if get_user(db, user_id) is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if not is_following(db, follower_id, user_id):
-        follow_user(db, follower_id, user_id)
+    if not is_following(db, current_user.id, user_id):
+        follow_user(db, current_user.id, user_id)
     return {"status": "ok", "following": True}
 
 
 @router.delete("/{user_id}/follow")
-def api_unfollow(user_id: str, follower_id: str, db: Session = Depends(deps.get_db)):
-    unfollow_user(db, follower_id, user_id)
+def api_unfollow(user_id: str, current_user: User = Depends(require_user),
+                 db: Session = Depends(deps.get_db)):
+    unfollow_user(db, current_user.id, user_id)
     return {"status": "ok", "following": False}

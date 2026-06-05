@@ -33,7 +33,7 @@ async function loadFeed(page: number) {
   loading.value = true
   error.value = ''
   try {
-    const data = await fetchFeed(userStore.viewer?.id)
+    const data = await fetchFeed()
     const items = data.articles ?? []
     articles.value = items
     total.value = data.total ?? items.length

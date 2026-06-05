@@ -20,9 +20,9 @@ export function useBookmarkToggle(
     if (!userStore.viewer) return
     try {
       if (currentlyBookmarked) {
-        await removeBookmark(articleId, userStore.viewer.id)
+        await removeBookmark(articleId)
       } else {
-        await addBookmark(userStore.viewer.id, articleId)
+        await addBookmark(articleId)
       }
       const article = articles.value.find(a => a.id === articleId)
       if (article) {
@@ -30,7 +30,7 @@ export function useBookmarkToggle(
       }
     } catch (e: any) {
       if (onError) {
-        onError(e.response?.data?.detail || 'Failed to update bookmark')
+        onError(e.userMessage || 'Failed to update bookmark')
       }
     }
   }
@@ -39,14 +39,14 @@ export function useBookmarkToggle(
   async function remove(articleId: string) {
     if (!userStore.viewer) return
     try {
-      await removeBookmark(articleId, userStore.viewer.id)
+      await removeBookmark(articleId)
       const idx = articles.value.findIndex(a => a.id === articleId)
       if (idx !== -1) {
         articles.value.splice(idx, 1)
       }
     } catch (e: any) {
       if (onError) {
-        onError(e.response?.data?.detail || 'Failed to remove bookmark')
+        onError(e.userMessage || 'Failed to remove bookmark')
       }
     }
   }

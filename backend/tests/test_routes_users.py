@@ -54,24 +54,30 @@ class TestUserCRUD:
 
 
 class TestFollow:
-    def test_follow_unfollow(self, client):
+    def test_follow_unfollow(self, client, auth_header):
         a = client.post("/api/v1/users", json={"username": "folA", "password": "666666", "email": "a@t.com", "name": "A"}).json()
         b = client.post("/api/v1/users", json={"username": "folB", "password": "666666", "email": "b@t.com", "name": "B"}).json()
 
-        # follow
-        resp = client.post(f"/api/v1/users/{b['id']}/follow?follower_id={a['id']}")
+        headers_a = auth_header(a["id"])
+
+        # follow: user A follows user B
+        resp = client.post(f"/api/v1/users/{b['id']}/follow", headers=headers_a)
         assert resp.status_code == 201
         assert resp.json()["following"] is True
 
         # unfollow
-        resp = client.delete(f"/api/v1/users/{b['id']}/follow?follower_id={a['id']}")
+        resp = client.delete(f"/api/v1/users/{b['id']}/follow", headers=headers_a)
         assert resp.status_code == 200
         assert resp.json()["following"] is False
 
-    def test_followers_list(self, client):
+    def test_followers_list(self, client, auth_header):
         a = client.post("/api/v1/users", json={"username": "folA", "password": "666666", "email": "a@t.com", "name": "A"}).json()
         b = client.post("/api/v1/users", json={"username": "folB", "password": "666666", "email": "b@t.com", "name": "B"}).json()
-        client.post(f"/api/v1/users/{a['id']}/follow?follower_id={b['id']}")
+
+        headers_b = auth_header(b["id"])
+
+        # user B follows user A
+        client.post(f"/api/v1/users/{a['id']}/follow", headers=headers_b)
 
         resp = client.get(f"/api/v1/users/{a['id']}/followers")
         assert resp.status_code == 200

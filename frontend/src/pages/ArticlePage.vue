@@ -139,7 +139,7 @@ function goToEdit() {
 async function handleFork() {
   if (!userStore.viewer) return
   try {
-    const result = await forkArticle(id, userStore.viewer.id)
+    const result = await forkArticle(id)
     isForked.value = true
     router.push(`/edit/${result.id}`)
   } catch (e) {

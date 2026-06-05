@@ -59,7 +59,7 @@ class TestPool:
 
 
 class TestBookmarks:
-    def test_bookmark_lifecycle(self, client, db_engine):
+    def test_bookmark_lifecycle(self, client, db_engine, auth_header):
         s = get_session(db_engine)
         u = User(username="user10", password_hash="", name="读者", anonymous_name="anon")
         author = User(username="user11", password_hash="", name="作者", anonymous_name="anon_a")
@@ -71,21 +71,23 @@ class TestBookmarks:
         uid, aid = u.id, a.id
         s.close()
 
+        headers = auth_header(uid)
+
         # bookmark
-        resp = client.post(f"/api/v1/bookmarks?user_id={uid}&article_id={aid}")
+        resp = client.post(f"/api/v1/bookmarks?article_id={aid}", headers=headers)
         assert resp.status_code == 201
         assert resp.json()["bookmarked"] is True
 
         # list
-        resp = client.get(f"/api/v1/bookmarks?user_id={uid}")
+        resp = client.get("/api/v1/bookmarks", headers=headers)
         assert resp.status_code == 200
         assert len(resp.json()["bookmarks"]) == 1
 
         # delete
-        resp = client.delete(f"/api/v1/bookmarks/{aid}?user_id={uid}")
+        resp = client.delete(f"/api/v1/bookmarks/{aid}", headers=headers)
         assert resp.status_code == 200
         assert resp.json()["bookmarked"] is False
 
         # list empty
-        resp = client.get(f"/api/v1/bookmarks?user_id={uid}")
+        resp = client.get("/api/v1/bookmarks", headers=headers)
         assert len(resp.json()["bookmarks"]) == 0

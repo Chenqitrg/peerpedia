@@ -13,16 +13,18 @@ from peerpedia_api.schemas.article import ArticleSummary
 from peerpedia_core.storage.db.crud_user import get_following
 from peerpedia_core.storage.db.crud_article import list_articles
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
+from peerpedia_core.storage.db.models import User
 
 router = APIRouter(prefix="/feed", tags=["feed"])
 
 
 @router.get("")
-def get_feed(user_id: str | None = None, db: Session = Depends(deps.get_db)):
+def get_feed(current_user: User | None = Depends(deps.get_current_user),
+             db: Session = Depends(deps.get_db)):
     """Articles from users the viewer follows, newest first."""
     all_articles = list_articles(db)
-    if user_id:
-        following = get_following(db, user_id)
+    if current_user:
+        following = get_following(db, current_user.id)
         followed_ids = [u.id for u in following]
         if followed_ids:
             feed_articles = [a for a in all_articles
@@ -30,7 +32,7 @@ def get_feed(user_id: str | None = None, db: Session = Depends(deps.get_db)):
         else:
             feed_articles = []
     else:
-        # No user_id: return all articles as feed
+        # No logged-in user: return all articles as feed
         feed_articles = list(all_articles)
 
     feed_articles.sort(key=lambda a: a.created_at, reverse=True)
@@ -47,8 +49,8 @@ def get_feed(user_id: str | None = None, db: Session = Depends(deps.get_db)):
             forked_from=a.forked_from,
             commit_count=get_commit_count(a.id),
             score=a.score,
-            is_bookmarked=is_bookmarked(db, user_id, a.id),
-            is_own_article=user_id in (a.authors or []),
+            is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
+            is_own_article=current_user.id in (a.authors or []) if current_user else False,
             created_at=a.created_at,
         )
         for a in feed_articles

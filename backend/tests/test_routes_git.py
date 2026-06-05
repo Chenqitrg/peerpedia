@@ -58,10 +58,10 @@ class TestHistory:
 
 
 class TestFork:
-    def test_fork_creates_article(self, client, article_with_repo, db_engine):
+    def test_fork_creates_article(self, client, article_with_repo, db_engine, auth_header):
         aid = article_with_repo["article_id"]
         uid = article_with_repo["user_id"]
-        resp = client.post(f"/api/v1/articles/{aid}/fork?user_id={uid}")
+        resp = client.post(f"/api/v1/articles/{aid}/fork", headers=auth_header(uid))
         # 201 if git repo exists, 404 if not found
         assert resp.status_code in (201, 404)
 
