@@ -1,49 +1,73 @@
 <script setup lang="ts">
-defineProps<{ modelValue: number }>()
+const props = withDefaults(defineProps<{
+  modelValue: number
+  readonly?: boolean
+  size?: 'sm' | 'md'
+  color?: string
+}>(), { readonly: false, size: 'md', color: '#f0c040' })
+
 const emit = defineEmits<{ 'update:modelValue': [value: number] }>()
 
+const svgClass = props.size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'
+const gapClass = props.size === 'sm' ? 'gap-0' : 'gap-0.5'
+
 function setRating(value: number) {
-  emit('update:modelValue', value)
+  if (!props.readonly) emit('update:modelValue', value)
 }
 </script>
 
 <template>
-  <div class="star-rating flex items-center gap-0.5" role="radiogroup" aria-label="Rating">
-    <button
+  <div
+    class="star-rating inline-flex items-center"
+    :class="gapClass"
+    :style="{ '--star-filled': color, '--star-empty': color + '30' }"
+    role="radiogroup"
+    aria-label="Rating"
+  >
+    <component
       v-for="i in 5"
       :key="i"
-      type="button"
-      class="star-btn"
-      :class="i <= modelValue ? 'star-filled' : 'star-empty'"
+      :is="readonly ? 'span' : 'button'"
+      :type="readonly ? undefined : 'button'"
+      :class="[
+        i <= modelValue ? 'star-filled' : 'star-empty',
+        readonly ? 'star-readonly' : 'star-btn',
+      ]"
       :aria-label="`${i} star${i !== 1 ? 's' : ''}`"
       :aria-checked="i === modelValue"
-      role="radio"
+      :role="readonly ? undefined : 'radio'"
       @click="setRating(i)"
     >
-      <svg class="w-5 h-5" viewBox="0 0 20 20" :fill="i <= modelValue ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
-        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+      <!-- Sharp 5-point star (HeroIcon path, 24x24 viewBox) — no bezier curves -->
+      <svg :class="svgClass" viewBox="0 0 24 24" :fill="i <= modelValue ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>
-    </button>
+    </component>
   </div>
 </template>
 
 <style scoped>
 .star-btn {
-  @apply cursor-pointer p-0.5 rounded transition-all duration-150
+  @apply cursor-pointer p-0 rounded transition-all duration-150
          focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent;
   background: none;
   border: none;
 }
-.star-filled {
-  color: #7b8c9e; /* accent */
+.star-readonly {
+  @apply p-0;
+  background: none;
+  border: none;
 }
-.star-filled:hover {
+.star-filled {
+  color: var(--star-filled, #f0c040);
+}
+.star-btn.star-filled:hover {
   filter: brightness(1.2);
 }
 .star-empty {
-  color: rgba(176, 184, 196, 0.3); /* ink-muted/30 */
+  color: var(--star-empty, rgba(176, 184, 196, 0.3));
 }
-.star-empty:hover {
-  color: #7b8c9e; /* accent */
+.star-btn.star-empty:hover {
+  color: var(--star-filled, #f0c040);
 }
 </style>
