@@ -6,9 +6,10 @@ import { getReviews as fetchReviews, createReview, postReviewMessage } from '../
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { useStatusMap } from '../composables/useStatusMap'
-import type { ArticleDetail, ReviewOut } from '../api/types'
-import ReviewModal from '../components/ReviewModal.vue'
+import type { ArticleDetail, ReviewOut, ThreadMessage } from '../api/types'
 import StarRating from '../components/StarRating.vue'
+import ThreadReplyInput from '../components/ThreadReplyInput.vue'
+import { SCORE_DIMS } from '../api/constants'
 import katex from 'katex'
 import {
   Bookmark,
@@ -24,8 +25,6 @@ import {
   ChevronDown,
   FileDown,
   FileText,
-  Star,
-  Send,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -53,7 +52,6 @@ const reviewScores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 
 const submittingReview = ref(false)
 const reviewFormError = ref('')
 const reviewFormSuccess = ref('')
-const showReviewModal = ref(false)
 
 // User's existing review (for pre-filling if already reviewed)
 const myExistingReview = computed(() => {
@@ -68,19 +66,13 @@ const canUserReview = computed(() => {
 // ── Hover-to-edit state ──────────────────────────────────────────────────
 
 const hoveredDim = ref<string | null>(null)
+const hoverTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const reviewComment = ref('')
-
-const scoreDims = [
-  { key: 'originality', label: 'O' },
-  { key: 'rigor', label: 'R' },
-  { key: 'completeness', label: 'C' },
-  { key: 'pedagogy', label: 'P' },
-  { key: 'impact', label: 'I' },
-] as const
 
 // ── Reply state ─────────────────────────────────────────────────────────
 
 const replyTexts = reactive<Record<string, string>>({})
+const replyErrors = reactive<Record<string, string>>({})
 const sendingReplies = reactive<Record<string, boolean>>({})
 const expandedThreads = reactive(new Set<string>())
 
@@ -95,21 +87,34 @@ function canReplyInThread(review: ReviewOut): boolean {
   return isOwnArticle.value || review.reviewer_id === userStore.viewer.id
 }
 
+function onDimEnter(review: ReviewOut, dimKey: string) {
+  if (!isMyReview(review)) return
+  if (hoverTimer.value) { clearTimeout(hoverTimer.value); hoverTimer.value = null }
+  hoveredDim.value = review.id + ':' + dimKey
+}
+
+function onDimLeave() {
+  hoverTimer.value = setTimeout(() => { hoveredDim.value = null }, 100)
+}
+
 // ── Sorted reviews (current user's review first, then self-reviews, then by date) ──
 
 const sortedReviews = computed(() => {
-  return [...reviews.value].sort((a, b) => {
-    // Current user's review always first
-    const aIsMine = isMyReview(a)
-    const bIsMine = isMyReview(b)
-    if (aIsMine && !bIsMine) return -1
-    if (!aIsMine && bIsMine) return 1
-    // Then self-reviews
-    if (a.is_self_review && !b.is_self_review) return -1
-    if (!a.is_self_review && b.is_self_review) return 1
-    // Then by date
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })
+  return [...reviews.value]
+    .map(r => ({ r, ts: new Date(r.created_at).getTime() }))
+    .sort((a, b) => {
+      // Current user's review always first
+      const aIsMine = isMyReview(a.r)
+      const bIsMine = isMyReview(b.r)
+      if (aIsMine && !bIsMine) return -1
+      if (!aIsMine && bIsMine) return 1
+      // Then self-reviews
+      if (a.r.is_self_review && !b.r.is_self_review) return -1
+      if (!a.r.is_self_review && b.r.is_self_review) return 1
+      // Then by date
+      return b.ts - a.ts
+    })
+    .map(x => x.r)
 })
 
 // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -204,7 +209,7 @@ function toggleThread(reviewId: string) {
   }
 }
 
-function isAuthorMessage(msg: any): boolean {
+function isAuthorMessage(msg: ThreadMessage): boolean {
   if (!article.value) return false
   const authorIds = article.value.authors.map(a => a.id)
   return authorIds.includes(msg.author_id)
@@ -215,25 +220,30 @@ async function handleSubmitReview() {
   submittingReview.value = true
   reviewFormError.value = ''
   reviewFormSuccess.value = ''
+  const comment = reviewComment.value.trim()
+  // Clear comment early to prevent duplicate on retry
+  if (comment) reviewComment.value = ''
   try {
-    const history = await getHistory(id)
-    const latestHash = history.commits?.[0]?.hash || 'unknown'
+    const commitHash = (await getHistory(id)).commits?.[0]?.hash || 'unknown'
     const result = await createReview(id, {
       article_id: id,
-      commit_hash: latestHash,
+      commit_hash: commitHash,
       scope: article.value?.status === 'published' ? 'published' : 'pool',
       scores: { ...reviewScores.value },
     })
-    // Post the initial comment if provided
-    const comment = reviewComment.value.trim()
     if (comment) {
-      await postReviewMessage(id, result.id, { content: comment })
-      reviewComment.value = ''
+      try {
+        await postReviewMessage(id, result.id, { content: comment })
+      } catch {
+        reviewFormError.value = 'Review submitted but comment failed to send. You can reply in the thread.'
+      }
     }
-    reviewFormSuccess.value = 'Review submitted'
+    if (!reviewFormError.value) reviewFormSuccess.value = 'Review submitted'
     await loadReviews()
   } catch (e: any) {
     reviewFormError.value = e.userMessage || 'Failed to submit review'
+    // Restore comment so user can retry
+    if (comment) reviewComment.value = comment
   } finally {
     submittingReview.value = false
   }
@@ -244,6 +254,8 @@ async function updateSingleScore(reviewId: string, dim: string, value: number) {
   const review = reviews.value.find(r => r.id === reviewId)
   if (!review) return
   const updatedScores = { ...review.scores, [dim]: value }
+  // Optimistic update — update local state immediately
+  review.scores = updatedScores
   try {
     await createReview(id, {
       article_id: id,
@@ -251,9 +263,11 @@ async function updateSingleScore(reviewId: string, dim: string, value: number) {
       scope: review.scope as 'pool' | 'published',
       scores: updatedScores,
     })
-    await loadReviews()
   } catch {
-    // silently fail for inline score update
+    // Revert on failure
+    review.scores = { ...review.scores, [dim]: review.scores[dim as keyof typeof review.scores] }
+    reviewFormError.value = 'Failed to update score'
+    setTimeout(() => { reviewFormError.value = '' }, 3000)
   }
 }
 
@@ -261,12 +275,14 @@ async function handleReply(reviewId: string) {
   const text = replyTexts[reviewId]?.trim()
   if (!text) return
   sendingReplies[reviewId] = true
+  replyErrors[reviewId] = ''
   try {
     await postReviewMessage(id, reviewId, { content: text })
     replyTexts[reviewId] = ''
     await loadReviews()
   } catch {
-    // silently fail for reply
+    replyErrors[reviewId] = 'Failed to send'
+    setTimeout(() => { replyErrors[reviewId] = '' }, 3000)
   } finally {
     sendingReplies[reviewId] = false
   }
@@ -483,7 +499,7 @@ async function handleSinkExtension() {
           <div v-if="canUserReview && !myExistingReview" class="mb-6 p-4 border border-divider rounded-lg">
             <p class="text-xs text-ink-muted mb-3 font-medium">Write a review</p>
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3">
-              <span v-for="dim in scoreDims" :key="dim.key" class="inline-flex items-center gap-1">
+              <span v-for="dim in SCORE_DIMS" :key="dim.key" class="inline-flex items-center gap-1">
                 <span class="text-xs text-ink-muted font-mono w-3 text-right">{{ dim.label }}</span>
                 <StarRating
                   :modelValue="reviewScores[dim.key]"
@@ -553,12 +569,12 @@ async function handleSinkExtension() {
               <!-- Score row: hover-to-edit for my review, static text for others -->
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs font-mono">
                 <span
-                  v-for="dim in scoreDims"
+                  v-for="dim in SCORE_DIMS"
                   :key="dim.key"
                   class="inline-flex items-center gap-0.5"
                   :class="isMyReview(review) ? 'cursor-default' : ''"
-                  @mouseenter="isMyReview(review) ? hoveredDim = review.id + ':' + dim.key : null"
-                  @mouseleave="hoveredDim = null"
+                  @mouseenter="onDimEnter(review, dim.key)"
+                  @mouseleave="onDimLeave()"
                 >
                   <template v-if="hoveredDim === review.id + ':' + dim.key && isMyReview(review)">
                     <span class="text-ink-muted text-xs">{{ dim.label }}&nbsp;</span>
@@ -596,8 +612,8 @@ async function handleSinkExtension() {
                 <!-- iMessage-style messages -->
                 <div v-if="expandedThreads.has(review.id)" class="mt-3 space-y-3">
                   <div
-                    v-for="msg in review.thread"
-                    :key="msg.created_at"
+                    v-for="(msg, msgIdx) in review.thread"
+                    :key="msg.author_id + ':' + msg.created_at + ':' + msgIdx"
                     class="flex"
                     :class="isAuthorMessage(msg) ? 'justify-start' : 'justify-end'"
                   >
@@ -615,25 +631,13 @@ async function handleSinkExtension() {
                   </div>
 
                   <!-- Reply input (only author + reviewer can reply) -->
-                  <div v-if="canReplyInThread(review)" class="flex items-center gap-2 pt-1">
-                    <input
+                  <div v-if="canReplyInThread(review)">
+                    <ThreadReplyInput
                       v-model="replyTexts[review.id]"
-                      type="text"
-                      :placeholder="sendingReplies[review.id] ? 'Sending...' : 'Reply...'"
-                      class="flex-1 bg-[#0d1117] border border-divider rounded-lg px-3 py-1.5 text-xs
-                             text-ink placeholder:text-ink-muted/50
-                             focus:outline-none focus:ring-1 focus:ring-accent"
-                      @keyup.enter="handleReply(review.id)"
+                      :disabled="sendingReplies[review.id]"
+                      @send="handleReply(review.id)"
                     />
-                    <button
-                      class="flex items-center justify-center w-7 h-7 rounded-lg
-                             text-ink-muted hover:text-accent hover:bg-accent/10
-                             transition-colors duration-200"
-                      :disabled="!replyTexts[review.id]?.trim() || sendingReplies[review.id]"
-                      @click="handleReply(review.id)"
-                    >
-                      <Send class="w-3.5 h-3.5" stroke-width="2" />
-                    </button>
+                    <p v-if="replyErrors[review.id]" class="text-[10px] text-[#d73a49] mt-1">{{ replyErrors[review.id] }}</p>
                   </div>
 
                   <!-- Read-only indicator for bystanders -->
@@ -645,26 +649,13 @@ async function handleSinkExtension() {
 
               <!-- Empty thread: input to start conversation (only on my review) -->
               <div v-if="isMyReview(review) && (!review.thread || !review.thread.length)" class="mt-2">
-                <div class="flex items-center gap-2 pt-1">
-                  <input
-                    v-model="replyTexts[review.id]"
-                    type="text"
-                    :placeholder="sendingReplies[review.id] ? 'Sending...' : 'Start a conversation...'"
-                    class="flex-1 bg-[#0d1117] border border-divider rounded-lg px-3 py-1.5 text-xs
-                           text-ink placeholder:text-ink-muted/50
-                           focus:outline-none focus:ring-1 focus:ring-accent"
-                    @keyup.enter="handleReply(review.id)"
-                  />
-                  <button
-                    class="flex items-center justify-center w-7 h-7 rounded-lg
-                           text-ink-muted hover:text-accent hover:bg-accent/10
-                           transition-colors duration-200"
-                    :disabled="!replyTexts[review.id]?.trim() || sendingReplies[review.id]"
-                    @click="handleReply(review.id)"
-                  >
-                    <Send class="w-3.5 h-3.5" stroke-width="2" />
-                  </button>
-                </div>
+                <ThreadReplyInput
+                  v-model="replyTexts[review.id]"
+                  placeholder="Start a conversation..."
+                  :disabled="sendingReplies[review.id]"
+                  @send="handleReply(review.id)"
+                />
+                <p v-if="replyErrors[review.id]" class="text-[10px] text-[#d73a49] mt-1">{{ replyErrors[review.id] }}</p>
               </div>
             </div>
           </div>
@@ -677,17 +668,5 @@ async function handleSinkExtension() {
       <p class="text-ink-muted">Article not found.</p>
     </div>
 
-    <!-- Review modal -->
-    <ReviewModal
-      :visible="showReviewModal"
-      :existing-review="!!myExistingReview"
-      :submitting="submittingReview"
-      :error="reviewFormError"
-      :success="reviewFormSuccess"
-      :model-value="reviewScores"
-      @update:model-value="(v) => reviewScores = v"
-      @submit="handleSubmitReview"
-      @close="showReviewModal = false; reviewFormError = ''; reviewFormSuccess = ''"
-    />
   </div>
 </template>

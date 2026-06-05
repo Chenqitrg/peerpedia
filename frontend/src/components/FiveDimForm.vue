@@ -1,37 +1,30 @@
 <script setup lang="ts">
 import StarRating from './StarRating.vue'
+import { SCORE_DIMS, type ScoreDimKey } from '../api/constants'
 
 const props = defineProps<{
   modelValue: { originality: number; rigor: number; completeness: number; pedagogy: number; impact: number }
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: typeof props.modelValue] }>()
 
-const dimensions = ['originality', 'rigor', 'completeness', 'pedagogy', 'impact'] as const
-
-function updateDimension(dim: typeof dimensions[number], value: number) {
+function updateDimension(dim: ScoreDimKey, value: number) {
   emit('update:modelValue', { ...props.modelValue, [dim]: value })
 }
 </script>
 
 <template>
-  <fieldset class="five-dim-form space-y-4">
-    <legend class="label mb-4">Five-Dimension Review</legend>
+  <fieldset class="five-dim-form space-y-0.5">
     <div
-      v-for="dim in dimensions"
-      :key="dim"
-      class="dimension-row flex items-center justify-between gap-4 py-2 px-3 rounded-lg hover:bg-[#21262d] transition-colors duration-150"
+      v-for="dim in SCORE_DIMS"
+      :key="dim.key"
+      class="flex items-center gap-2 py-0.5 rounded hover:bg-[#21262d] transition-colors duration-150"
     >
-      <span class="dimension-label text-sm font-semibold text-ink min-w-[110px]">
-        {{ dim.charAt(0).toUpperCase() + dim.slice(1) }}
-      </span>
+      <span class="text-xs text-ink-muted w-20 shrink-0">{{ dim.fullLabel }}</span>
       <StarRating
-        class="dimension-rating"
-        :modelValue="modelValue[dim]"
-        @update:modelValue="(v: number) => updateDimension(dim, v)"
+        size="sm"
+        :modelValue="modelValue[dim.key]"
+        @update:modelValue="(v: number) => updateDimension(dim.key, v)"
       />
-      <span class="text-sm font-bold text-accent w-6 text-right">
-        {{ modelValue[dim] || 0 }}
-      </span>
     </div>
   </fieldset>
 </template>
