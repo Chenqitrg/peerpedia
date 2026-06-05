@@ -7,16 +7,14 @@ export const useArticleStore = defineStore('article', () => {
   const articles = ref<any[]>([])
   const total = ref(0)
   const currentArticle = ref<any>(null)
-  const loading = ref(false)
 
   async function fetchArticles(params?: ArticleListParams) {
-    loading.value = true
     try {
       const data = await getArticles(params)
       articles.value = data.articles ?? data
       total.value = data.total ?? 0
-    } finally {
-      loading.value = false
+    } catch {
+      // errors surface to caller via useAsyncState
     }
   }
 
@@ -44,7 +42,6 @@ export const useArticleStore = defineStore('article', () => {
     articles,
     total,
     currentArticle,
-    loading,
     fetchArticles,
     fetchArticle,
     createArticle: createArticleAction,
