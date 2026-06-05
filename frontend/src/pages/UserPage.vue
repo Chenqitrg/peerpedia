@@ -48,11 +48,8 @@ const isSelf = computed(() => userStore.viewer?.id === id.value)
 
 async function loadArticles() {
   try {
-    const artData = await getArticles({ status: undefined, page: 1, size: 50 })
-    const allArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
-    articles.value = allArticles.filter((a: any) =>
-      a.authors?.some((au: any) => au.id === id.value),
-    )
+    const artData = await getArticles({ author_id: id.value, page: 1, size: 50 })
+    articles.value = Array.isArray(artData) ? artData : (artData.articles ?? [])
   } catch { /* ignore */ }
 }
 
