@@ -199,11 +199,15 @@ peerpedia/
 │       ├── storage/           # Git backend + SQLAlchemy ORM
 │       ├── workflow/          # Scoring, reputation, sedimentation
 │       └── config/            # Parameters and settings
-├── design/                    # Design documents
-│   ├── brainstorm.md          # Full brainstorming history
-│   └── outline.md             # Feature outline
-├── frontend/need.md           # Requirements specification (Chinese)
-└── seed.py                    # Demo data seeder
+├── design/
+│   ├── brainstorm.md              # Product vision brainstorm (source of truth)
+│   └── self-test-checklist.md     # Manual QA test script
+├── docs/
+│   └── DESIGN.md                  # Consolidated design doc (architecture, features, API)
+├── frontend/
+│   ├── need.md                    # Requirements specification (Chinese)
+│   └── comment_need.md            # Review UI requirements (Chinese)
+└── seed.py                        # Demo data seeder
 ```
 
 ---
