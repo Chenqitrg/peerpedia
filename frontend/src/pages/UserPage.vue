@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import { getUser, getFollowers, getFollowing } from '../api/users'
 import { getArticles } from '../api/articles'
@@ -23,22 +24,41 @@ const userStore = useUserStore()
 
 const id = computed(() => route.params.id as string)
 
-const user = ref<UserProfile | null>(null)
-const articles = ref<ArticleSummary[]>([])
-const loading = ref(true)
 const showFollowers = ref(false)
 const showFollowing = ref(false)
 const followers = ref<any[]>([])
 const following = ref<any[]>([])
 
+const { state: user, isLoading: loading, error: rawError, execute: loadUser } = useAsyncState(
+  () => getUser(id.value),
+  null as UserProfile | null,
+  { immediate: false }
+)
+
+const articles = ref<ArticleSummary[]>([])
+
+const error = computed(() => {
+  const e = rawError.value as any
+  return e?.userMessage || ''
+})
+
 const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 
-const isSelf = computed(() => {
-  return userStore.viewer?.id === id.value
-})
+const isSelf = computed(() => userStore.viewer?.id === id.value)
+
+async function loadArticles() {
+  try {
+    const artData = await getArticles({ status: undefined, page: 1, size: 50 })
+    const allArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
+    articles.value = allArticles.filter((a: any) =>
+      a.authors?.some((au: any) => au.id === id.value),
+    )
+  } catch { /* ignore */ }
+}
 
 onMounted(async () => {
   await loadUser()
+  await loadArticles()
 })
 
 watch(() => route.params.id, () => {
@@ -47,24 +67,8 @@ watch(() => route.params.id, () => {
   followers.value = []
   following.value = []
   loadUser()
+  loadArticles()
 })
-
-async function loadUser() {
-  loading.value = true
-  try {
-    user.value = await getUser(id.value)
-    // Load articles by this author
-    const artData = await getArticles({ status: undefined, page: 1, size: 50 })
-    const allArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
-    articles.value = allArticles.filter((a: any) =>
-      a.authors?.some((au: any) => au.id === id.value),
-    )
-  } catch (e) {
-    console.error('Failed to load user:', e)
-  } finally {
-    loading.value = false
-  }
-}
 
 async function loadFollowers() {
   if (followers.value.length) {
@@ -92,9 +96,6 @@ async function loadFollowing() {
   }
 }
 
-function goToEditProfile() {
-  // Will navigate to profile edit page or open inline editor
-}
 </script>
 
 <template>
@@ -176,11 +177,12 @@ function goToEditProfile() {
             </div>
           </div>
 
-          <!-- Edit profile button (self only) -->
+          <!-- Edit profile button (self only) — coming soon -->
           <button
             v-if="isSelf"
-            class="btn-outline btn-sm shrink-0"
-            @click="goToEditProfile"
+            class="btn-outline btn-sm shrink-0 opacity-50 cursor-not-allowed"
+            disabled
+            title="Coming soon"
           >
             <Edit class="w-3.5 h-3.5" stroke-width="2" />
             Edit Profile

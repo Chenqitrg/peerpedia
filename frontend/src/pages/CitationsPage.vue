@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import { getCitations } from '../api/articles'
 import type { CitationGraph } from '../api/types'
@@ -7,27 +8,20 @@ import { ArrowLeft, ExternalLink, BookOpen } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
-
 const id = route.params.id as string
-const citationGraph = ref<CitationGraph | null>(null)
-const loading = ref(true)
-const error = ref('')
 
-onMounted(async () => {
-  await loadCitations()
+const { state: citationGraph, isLoading: loading, error: rawError, execute: loadCitations } = useAsyncState(
+  () => getCitations(id),
+  null as CitationGraph | null,
+  { immediate: false }
+)
+
+const error = computed(() => {
+  const e = rawError.value as any
+  return e?.userMessage || e?.response?.data?.detail || ''
 })
 
-async function loadCitations() {
-  loading.value = true
-  error.value = ''
-  try {
-    citationGraph.value = await getCitations(id)
-  } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to load citations'
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(() => loadCitations())
 
 function goBack() {
   router.push(`/articles/${id}`)

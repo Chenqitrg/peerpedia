@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { getUsers } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
@@ -9,17 +10,24 @@ import { Users, UserPlus, UserCheck } from 'lucide-vue-next'
 
 const router = useRouter()
 const userStore = useUserStore()
-const users = ref<UserSummary[]>([])
-const loading = ref(true)
 const following = ref<Set<string>>(new Set())
 
-onMounted(async () => {
-  try {
-    users.value = await getUsers()
-    // Sort by article count descending
-    users.value.sort((a, b) => b.article_count - a.article_count)
-  } catch { /* empty */ } finally { loading.value = false }
+const { state: users, isLoading: loading, error: rawError, execute } = useAsyncState(
+  async () => {
+    const list = await getUsers()
+    list.sort((a, b) => b.article_count - a.article_count)
+    return list
+  },
+  [] as UserSummary[],
+  { immediate: false }
+)
+
+const error = computed(() => {
+  const e = rawError.value as any
+  return e?.userMessage || ''
 })
+
+onMounted(() => execute())
 
 async function toggleFollow(u: UserSummary) {
   if (!userStore.viewer) return
@@ -53,6 +61,12 @@ function goToUser(id: string) {
     <!-- Loading -->
     <div v-if="loading" class="space-y-3 animate-pulse">
       <div v-for="i in 5" :key="i" class="skeleton h-16 w-full rounded-lg" />
+    </div>
+
+    <!-- Error -->
+    <div v-else-if="error" class="card p-8 text-center">
+      <p class="text-ink-muted">{{ error }}</p>
+      <button class="btn-outline mt-4" @click="execute()">Retry</button>
     </div>
 
     <!-- User list -->

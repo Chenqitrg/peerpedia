@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import { getHistory, getDiff, rollbackArticle } from '../api/articles'
-import type { CommitInfo, ArticleDiff } from '../api/types'
+import type { CommitInfo, ArticleDiff, ArticleHistory } from '../api/types'
 import {
   GitCommitHorizontal,
   GitBranch,
@@ -17,35 +18,27 @@ const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
 
-const commits = ref<CommitInfo[]>([])
-const loading = ref(true)
-const error = ref('')
 const selectedHash1 = ref<string | null>(null)
 const selectedHash2 = ref<string | null>(null)
 const diffResult = ref<ArticleDiff | null>(null)
 const diffLoading = ref(false)
 const rollingBack = ref<string | null>(null)
 
-const sortedCommits = computed(() => {
-  return [...commits.value].reverse()
+const { state: history, isLoading: loading, error: rawError, execute: loadHistory } = useAsyncState(
+  () => getHistory(id),
+  null as ArticleHistory | null,
+  { immediate: false }
+)
+
+const commits = computed(() => history.value?.commits ?? [])
+const error = computed(() => {
+  const e = rawError.value as any
+  return e?.userMessage || e?.response?.data?.detail || ''
 })
 
-onMounted(async () => {
-  await loadHistory()
-})
+const sortedCommits = computed(() => [...commits.value].reverse())
 
-async function loadHistory() {
-  loading.value = true
-  error.value = ''
-  try {
-    const data = await getHistory(id)
-    commits.value = data.commits ?? []
-  } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to load history'
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(() => loadHistory())
 
 function toggleCommitSelect(hash: string) {
   if (!selectedHash1.value) {
@@ -128,7 +121,7 @@ function goBack() {
     <!-- Error -->
     <div v-else-if="error" class="card p-8 text-center">
       <p class="text-ink-muted">{{ error }}</p>
-      <button class="btn-outline mt-4" @click="loadHistory">Retry</button>
+      <button class="btn-outline mt-4" @click="loadHistory()">Retry</button>
     </div>
 
     <template v-else>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/useUserStore'
 import { fetchBookmarks } from '../api/bookmarks'
@@ -13,34 +14,29 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const articles = ref<ArticleSummary[]>([])
-const loading = ref(false)
-const error = ref('')
 
-const { remove: handleToggleBookmark } = useBookmarkToggle(articles)
-
-onMounted(() => {
-  loadBookmarks()
-})
-
-async function loadBookmarks() {
-  if (!userStore.viewer) {
-    error.value = 'Please log in to view bookmarks'
-    return
-  }
-  loading.value = true
-  error.value = ''
-  try {
+const { state: _, isLoading: loading, error: rawError, execute: loadBookmarks } = useAsyncState(
+  async () => {
+    if (!userStore.viewer) throw new Error('Please log in to view bookmarks')
     const bookmarks: Bookmark[] = await fetchBookmarks()
     const results = await Promise.all(
       bookmarks.map((b: Bookmark) => getArticle(b.article_id).catch(() => null)),
     )
     articles.value = results.filter((r): r is ArticleSummary => r !== null)
-  } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to load bookmarks'
-  } finally {
-    loading.value = false
-  }
-}
+    return articles.value
+  },
+  null,
+  { immediate: false }
+)
+
+const error = computed(() => {
+  const e = rawError.value as any
+  return e?.userMessage || e?.message || ''
+})
+
+const { remove: handleToggleBookmark } = useBookmarkToggle(articles)
+
+onMounted(() => loadBookmarks())
 </script>
 
 <template>

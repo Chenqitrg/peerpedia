@@ -1,38 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useAsyncState } from '@vueuse/core'
 import { getPool } from '../api/pool'
-import { useUserStore } from '../stores/useUserStore'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import ArticleCard from '../components/ArticleCard.vue'
-import type { ArticleSummary } from '../api/types'
+import type { PoolResponse } from '../api/types'
 
-const userStore = useUserStore()
+const { state: pool, isLoading: loading, error: rawError, execute: loadPool } = useAsyncState(
+  () => getPool(),
+  null as PoolResponse | null,
+  { immediate: false }
+)
 
-const poolArticles = ref<ArticleSummary[]>([])
-const loading = ref(false)
-const error = ref('')
+const poolArticles = computed(() => pool.value?.articles ?? [])
 
-const { toggle: handleToggleBookmark } = useBookmarkToggle(poolArticles, (msg) => {
-  error.value = msg
+const error = computed(() => {
+  const e = rawError.value as any
+  return e?.userMessage || e?.response?.data?.detail || ''
 })
 
-onMounted(() => {
-  loadPool()
-})
+const { toggle: handleToggleBookmark } = useBookmarkToggle(
+  computed(() => poolArticles.value),
+  (_msg: string) => {}
+)
 
-async function loadPool() {
-  loading.value = true
-  error.value = ''
-  try {
-    const data = await getPool()
-    poolArticles.value = data.articles ?? []
-  } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to load pool'
-    poolArticles.value = []
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(() => loadPool())
 </script>
 
 <template>
@@ -57,7 +49,7 @@ async function loadPool() {
     <!-- Error -->
     <div v-else-if="error" class="card p-8 text-center">
       <p class="text-ink-muted">{{ error }}</p>
-      <button class="btn-outline mt-4" @click="loadPool">Retry</button>
+      <button class="btn-outline mt-4" @click="loadPool()">Retry</button>
     </div>
 
     <!-- Empty -->
