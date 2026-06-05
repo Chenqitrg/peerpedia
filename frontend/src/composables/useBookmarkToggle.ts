@@ -18,17 +18,20 @@ export function useBookmarkToggle(
 
   async function toggle(articleId: string, currentlyBookmarked: boolean) {
     if (!userStore.viewer) return
+    const article = articles.value.find(a => a.id === articleId)
+    if (!article) return
+
+    const previous = article.is_bookmarked
+    article.is_bookmarked = !currentlyBookmarked
+
     try {
       if (currentlyBookmarked) {
         await removeBookmark(articleId)
       } else {
         await addBookmark(articleId)
       }
-      const article = articles.value.find(a => a.id === articleId)
-      if (article) {
-        article.is_bookmarked = !currentlyBookmarked
-      }
     } catch (e: any) {
+      article.is_bookmarked = previous
       if (onError) {
         onError(e.userMessage || 'Failed to update bookmark')
       }

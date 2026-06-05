@@ -36,6 +36,7 @@ const reviews = ref<ReviewOut[]>([])
 const compiledHtml = ref('')
 const reviewsLoading = ref(false)
 const loading = ref(true)
+const errorMessage = ref('')
 const activeTab = ref<'body' | 'comments'>('body')
 const isForked = ref(false)
 
@@ -124,8 +125,13 @@ onMounted(async () => {
     article.value = await getArticle(id)
     await loadCompiledContent()
     loadReviews()
-  } catch (e) {
-    console.error('Failed to load article:', e)
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 404) {
+      errorMessage.value = 'Article not found.'
+    } else {
+      errorMessage.value = e.userMessage || 'Failed to load article. Is the server running?'
+    }
   } finally {
     loading.value = false
   }
@@ -665,7 +671,8 @@ async function handleSinkExtension() {
 
     <!-- Error state -->
     <div v-else class="card p-12 text-center">
-      <p class="text-ink-muted">Article not found.</p>
+      <p class="text-ink-muted">{{ errorMessage || 'Article not found.' }}</p>
+      <button v-if="errorMessage && !errorMessage.includes('not found')" class="btn-outline mt-4" @click="loadArticle()">Retry</button>
     </div>
 
   </div>
