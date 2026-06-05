@@ -6,6 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
+from peerpedia_api.helpers import (
+    resolve_authors,
+    get_commit_hash,
+    get_content_preview,
+    get_commit_count,
+)
 from peerpedia_api.schemas.article import (
     ArticleCreate,
     ArticleDetail,
@@ -42,49 +48,6 @@ from peerpedia_core.workflow.scoring import compute_article_score_for_commit
 
 def _repo_path(article_id: str) -> Path:
     return DEFAULT_ARTICLES_DIR / article_id
-
-
-def _resolve_authors(db: Session, author_ids: list[str]) -> list[AuthorInfo]:
-    """Resolve a list of author user IDs to AuthorInfo objects."""
-    result: list[AuthorInfo] = []
-    for uid in author_ids:
-        u = get_user(db, uid)
-        if u:
-            result.append(AuthorInfo(
-                id=u.id, name=u.name, anonymous_name=u.anonymous_name,
-                affiliation=u.affiliation, expertise=u.expertise,
-            ))
-        else:
-            result.append(AuthorInfo(id=uid, name="unknown"))
-    return result
-
-
-def _get_commit_hash(article_id: str) -> str:
-    """Get HEAD commit hash for an article, or empty string."""
-    rp = _repo_path(article_id)
-    if not (rp / ".git").is_dir():
-        return ""
-    commits = get_commit_history(rp, max_count=1)
-    return commits[0]["hash"][:8] if commits else ""
-
-
-def _get_content_preview(article_id: str, max_chars: int = 200) -> str:
-    """Get first ~max_chars characters of article source content."""
-    rp = _repo_path(article_id)
-    for ext in [".md", ".typ"]:
-        f = rp / f"article{ext}"
-        if f.exists():
-            text = f.read_text()
-            return text[:max_chars] + ("..." if len(text) > max_chars else "")
-    return ""
-
-
-def _get_commit_count(article_id: str) -> int:
-    """Get total number of commits for an article."""
-    rp = _repo_path(article_id)
-    if not (rp / ".git").is_dir():
-        return 0
-    return len(get_commit_history(rp))
 
 
 def _compute_sink(a) -> tuple[datetime | None, int | None]:
@@ -124,12 +87,12 @@ def api_list_articles(
             id=a.id,
             title=a.title or "",
             status=a.status,
-            authors=_resolve_authors(db, a.authors or []),
-            content_preview=_get_content_preview(a.id),
-            commit_hash=_get_commit_hash(a.id),
+            authors=resolve_authors(db, a.authors or []),
+            content_preview=get_content_preview(a.id),
+            commit_hash=get_commit_hash(a.id),
             fork_count=a.fork_count,
             forked_from=a.forked_from,
-            commit_count=_get_commit_count(a.id),
+            commit_count=get_commit_count(a.id),
             score=a.score,
             sink_eta=_compute_sink(a)[0],
             days_remaining=_compute_sink(a)[1],
@@ -167,7 +130,7 @@ def api_get_article(
     reviews = get_reviews_for_article(db, article_id)
     sink_eta, days_remaining = _compute_sink(a)
     distinct_reviewers = len({(r.reviewer_id, r.scope) for r in reviews})
-    authors = _resolve_authors(db, a.authors or [])
+    authors = resolve_authors(db, a.authors or [])
     return ArticleDetail(
         id=a.id,
         title=a.title or "",
@@ -175,7 +138,7 @@ def api_get_article(
         authors=authors,
         fork_count=a.fork_count,
         forked_from=a.forked_from,
-        commit_count=_get_commit_count(a.id),
+        commit_count=get_commit_count(a.id),
         compiled_format=a.compiled_format,
         compiled_output=a.compiled_output,
         compiled_pages=a.compiled_pages,
