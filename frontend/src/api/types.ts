@@ -163,10 +163,10 @@ export interface ReviewOut {
   updated_at: string
 }
 
+/** reviewer_id is set server-side from JWT — do not send */
 export interface ReviewCreatePayload {
   article_id: string
   commit_hash: string
-  reviewer_id: string
   scope: 'pool' | 'published'
   scores: FiveDimScores
   contributions?: AuthorContributions

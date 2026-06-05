@@ -25,7 +25,7 @@ describe('reviews API', () => {
 
   it('createReview calls POST /articles/{id}/reviews with body', async () => {
     const { createReview } = await import('../reviews')
-    const body = { article_id: 'abc', commit_hash: 'h1', reviewer_id: 'u1', scope: 'full', scores: { originality: 5, rigor: 4, completeness: 3, pedagogy: 5, impact: 4 } }
+    const body = { article_id: 'abc', commit_hash: 'h1', scope: 'pool' as const, scores: { originality: 5, rigor: 4, completeness: 3, pedagogy: 5, impact: 4 } }
     mockClient.post.mockResolvedValue({ data: { id: 'r2', ...body } })
     const result = await createReview('abc', body)
     expect(mockClient.post).toHaveBeenCalledWith('/articles/abc/reviews', body)

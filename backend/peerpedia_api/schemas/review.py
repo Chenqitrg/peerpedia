@@ -24,13 +24,15 @@ class ThreadMessageOut(BaseModel):
     content: str
     created_at: datetime
 
+    model_config = {"extra": "allow"}
+
 
 class ReviewCreate(BaseModel):
     article_id: str
     commit_hash: str
     scope: ReviewScope
     scores: dict  # FiveDimScores as dict, validated below
-    contributions: Optional[dict[str, dict]] = None  # author_id → 5-dim ratios
+    contributions: Optional[dict[str, dict[str, float]]] = None  # author_id → 5-dim ratios
 
     @model_validator(mode="after")
     def validate_five_dims(self):
@@ -63,10 +65,10 @@ class ReviewOut(BaseModel):
     article_id: str
     commit_hash: str
     reviewer_id: str
-    scope: str
-    scores: dict
-    contributions: Optional[dict] = None  # author_id → 5-dim ratios (self-reviews only)
-    thread: list[dict]
+    scope: ReviewScope
+    scores: dict  # FiveDimScores: {originality, rigor, completeness, pedagogy, impact} each 0-5
+    contributions: Optional[dict[str, dict[str, float]]] = None  # author_id → 5-dim ratios
+    thread: list[ThreadMessageOut] = []
     reviewer_name: str
     is_self_review: bool = False
     created_at: datetime

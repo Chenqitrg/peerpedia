@@ -91,8 +91,28 @@ frontend/ (Vue 3 + Vite, port 5173)  →  HTTP JSON  →  backend/ (FastAPI, por
 **评审（Review）：**
 - 唯一约束：`(article_id, reviewer_id, scope, commit_hash)` — 每人每 commit 每 scope 一条
 - scope：`"pool"`（池内匿名）或 `"published"`（实名）
-- 包含 5 维评分 + 评论线程 + 自评标记
-- ⚠️ 需要新增 `contributions` 字段（见 §4.4）✅ 已实现
+- `reviewer_id` 由服务端从 JWT 提取，客户端不传 ✅
+- 包含 5 维评分 + 评论线程 + 自评标记 ✅
+- Thread 消息存储在 Review 的 `thread` 字段（JSON 数组），每条消息含 `author_id`、`content`、`created_at` ✅
+- Thread 回复权限：文章作者 + 该评审的评审人可回复，旁观者只读 ✅
+
+**ReviewOut 数据形状（前后端一致）：**
+```typescript
+{
+  id: string
+  article_id: string
+  commit_hash: string
+  reviewer_id: string        // 服务端从 JWT 设置
+  scope: "pool" | "published"
+  scores: { originality: number, rigor: number, completeness: number, pedagogy: number, impact: number }
+  contributions?: { [authorId: string]: FiveDimScores } | null  // 仅自评
+  thread: { author_id: string, content: string, created_at: string }[]
+  reviewer_name: string      // 根据 scope 解析实名/匿名
+  is_self_review: boolean
+  created_at: string
+  updated_at: string
+}
+```
 
 **用户（User）：**
 - `username`：唯一登录标识 ✅
