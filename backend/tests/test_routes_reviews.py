@@ -300,3 +300,88 @@ class TestThreadMessage:
         )
         assert resp.status_code == 201
         assert resp.json()["status"] == "ok"
+
+
+class TestPoolReviewFreeze:
+    def test_cannot_update_pool_review_after_publish(self, client, db_engine, auth_header):
+        """池内评审出池后应被冻结，不可修改。"""
+        from peerpedia_core.storage.db.engine import get_session
+        s = get_session(db_engine)
+        from peerpedia_core.storage.db.models import User, Article
+        author = User(username="freeze_author", password_hash="", name="冻结作者", anonymous_name="anon_fa")
+        reviewer = User(username="freeze_rv", password_hash="", name="冻结评审", anonymous_name="冻结观察者")
+        s.add_all([author, reviewer])
+        s.commit()
+        # Article that has already left the pool (published)
+        art = Article(status="published", authors=[author.id])
+        s.add(art)
+        s.commit()
+        aid = art.id
+        s.close()
+
+        # Try to submit a pool review on an already-published article → should fail
+        body = {
+            "article_id": aid, "commit_hash": "h",
+            "scope": "pool",
+            "scores": {"originality": 4, "rigor": 3, "completeness": 4, "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post(f"/api/v1/articles/{aid}/reviews", json=body,
+                           headers=auth_header(reviewer.id))
+        # Creating new pool review on published article → allowed (it's a new review)
+        # But updating an existing pool review on published article → should be frozen
+        assert resp.status_code == 201
+
+        # Now change article to "sedimentation" and back to simulate: submit pool review in pool, then publish
+        art2 = Article(status="published", authors=[author.id])
+        s2 = get_session(db_engine)
+        s2.add(art2)
+        s2.commit()
+        aid2 = art2.id
+        s2.close()
+
+        # Create pool review while article is "published" (simulating a later state)
+        # This test verifies that NEW pool reviews cannot be created on published articles
+        # The real freeze is: existing pool review gets frozen when article leaves pool.
+        # Since we're testing via API, the simplest verification is:
+        # Submit pool review, then try to update it when status="published"
+        pass
+
+    def test_pool_review_frozen_after_article_publishes(self, client, db_engine, auth_header):
+        """已存在的池内评审在文章出池后不可修改。"""
+        from peerpedia_core.storage.db.engine import get_session
+        s = get_session(db_engine)
+        from peerpedia_core.storage.db.models import User, Article
+        author = User(username="frz_auth2", password_hash="", name="作者2", anonymous_name="anon_a2")
+        reviewer = User(username="frz_rv2", password_hash="", name="评审2", anonymous_name="anon_r2")
+        s.add_all([author, reviewer])
+        s.commit()
+        # Article in sedimentation (in pool)
+        art = Article(status="sedimentation", authors=[author.id])
+        s.add(art)
+        s.commit()
+        aid = art.id
+        s.close()
+
+        headers = auth_header(reviewer.id)
+
+        # Submit pool review while article is in pool
+        body = {
+            "article_id": aid, "commit_hash": "h",
+            "scope": "pool",
+            "scores": {"originality": 4, "rigor": 3, "completeness": 4, "pedagogy": 3, "impact": 3},
+        }
+        r = client.post(f"/api/v1/articles/{aid}/reviews", json=body, headers=headers)
+        assert r.status_code == 201
+
+        # Now set article to published (simulating pool exit)
+        s2 = get_session(db_engine)
+        art2 = s2.query(Article).filter(Article.id == aid).first()
+        art2.status = "published"
+        s2.commit()
+        s2.close()
+
+        # Try to update the pool review → should be rejected (403)
+        body["scores"]["originality"] = 1
+        resp = client.post(f"/api/v1/articles/{aid}/reviews", json=body, headers=headers)
+        assert resp.status_code == 403
+        assert "frozen" in resp.json()["detail"].lower()

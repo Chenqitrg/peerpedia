@@ -173,7 +173,7 @@ function goBack() {
               </p>
               <div class="flex items-center gap-3 text-xs text-ink-muted mt-1">
                 <span>{{ commit.author }}</span>
-                <span>{{ new Date(commit.timestamp).toLocaleDateString() }}</span>
+                <span>{{ new Date(commit.timestamp).toLocaleString() }}</span>
               </div>
 
               <!-- Score badge -->

@@ -47,7 +47,7 @@ const { statusLabel, statusClass } = useStatusMap(() => article.value?.status ??
 
 // ── Review submission form ─────────────────────────────────────────────
 
-const reviewScores = reactive({ originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 })
+const reviewScores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 })
 const submittingReview = ref(false)
 const reviewFormError = ref('')
 const reviewFormSuccess = ref('')
@@ -173,7 +173,7 @@ async function handleSubmitReview() {
       article_id: id,
       commit_hash: latestHash,
       scope: article.value?.status === 'published' ? 'published' : 'pool',
-      scores: { ...reviewScores },
+      scores: { ...reviewScores.value },
     })
     reviewFormSuccess.value = 'Review submitted'
     await loadReviews()
