@@ -672,7 +672,6 @@ async function handleSinkExtension() {
     <!-- Error state -->
     <div v-else class="card p-12 text-center">
       <p class="text-ink-muted">{{ errorMessage || 'Article not found.' }}</p>
-      <button v-if="errorMessage && !errorMessage.includes('not found')" class="btn-outline mt-4" @click="loadArticle()">Retry</button>
     </div>
 
   </div>

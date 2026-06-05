@@ -54,7 +54,7 @@ function goBack() {
 
     <div v-else-if="error" class="card p-8 text-center">
       <p class="text-ink-muted">{{ error }}</p>
-      <button class="btn-outline mt-4" @click="loadCitations">Retry</button>
+      <button class="btn-outline mt-4" @click="() => loadCitations()">Retry</button>
     </div>
 
     <template v-else-if="citationGraph">

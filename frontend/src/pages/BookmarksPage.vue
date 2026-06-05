@@ -56,7 +56,7 @@ onMounted(() => loadBookmarks())
     <!-- Error -->
     <div v-else-if="error" class="card p-8 text-center">
       <p class="text-ink-muted">{{ error }}</p>
-      <button v-if="error !== 'Please log in to view bookmarks'" class="btn-outline mt-4" @click="loadBookmarks">
+      <button v-if="error !== 'Please log in to view bookmarks'" class="btn-outline mt-4" @click="() => loadBookmarks()">
         Retry
       </button>
       <router-link v-else to="/" class="btn-primary mt-4 no-underline inline-block">

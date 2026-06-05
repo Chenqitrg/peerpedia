@@ -15,7 +15,7 @@ const following = ref<Set<string>>(new Set())
 const { state: users, isLoading: loading, error: rawError, execute } = useAsyncState(
   async () => {
     const list = await getUsers()
-    list.sort((a, b) => b.article_count - a.article_count)
+    list.sort((a: UserSummary, b: UserSummary) => b.article_count - a.article_count)
     return list
   },
   [] as UserSummary[],
