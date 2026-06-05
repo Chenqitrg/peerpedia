@@ -2,10 +2,10 @@
 import { Send } from 'lucide-vue-next'
 
 const props = withDefaults(defineProps<{
-  modelValue: string
+  modelValue?: string
   placeholder?: string
   disabled?: boolean
-}>(), { placeholder: 'Reply...', disabled: false })
+}>(), { modelValue: '', placeholder: 'Reply...', disabled: false })
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
