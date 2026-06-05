@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getArticle, getHistory, forkArticle } from '../api/articles'
+import { getArticle, getArticleSource, getHistory, forkArticle } from '../api/articles'
+import { getReviews as fetchReviews } from '../api/reviews'
+import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
-import type { ArticleDetail } from '../api/types'
+import type { ArticleDetail, ReviewOut } from '../api/types'
 import {
   Bookmark,
   BookmarkCheck,
@@ -17,6 +19,7 @@ import {
   ChevronRight,
   FileDown,
   FileText,
+  Star,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -24,6 +27,9 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const article = ref<ArticleDetail | null>(null)
+const reviews = ref<ReviewOut[]>([])
+const compiledHtml = ref('')
+const reviewsLoading = ref(false)
 const loading = ref(true)
 const activeTab = ref<'body' | 'comments'>('body')
 const isForked = ref(false)
@@ -53,6 +59,10 @@ const statusClass = computed(() => {
 onMounted(async () => {
   try {
     article.value = await getArticle(id)
+    // Compile article content for body tab
+    await loadCompiledContent()
+    // Load reviews for comments tab
+    loadReviews()
   } catch (e) {
     console.error('Failed to load article:', e)
   } finally {
@@ -60,8 +70,36 @@ onMounted(async () => {
   }
 })
 
+async function loadCompiledContent() {
+  if (!article.value) return
+  if (article.value.compiled_output) {
+    compiledHtml.value = article.value.compiled_output
+    return
+  }
+  try {
+    const src = await getArticleSource(id)
+    const result = await compilePreview({
+      content: src.content,
+      format: src.format,
+    })
+    compiledHtml.value = result.output
+  } catch {
+    compiledHtml.value = ''
+  }
+}
+
+async function loadReviews() {
+  reviewsLoading.value = true
+  try {
+    reviews.value = await fetchReviews(id)
+  } catch {
+    reviews.value = []
+  } finally {
+    reviewsLoading.value = false
+  }
+}
+
 function toggleBookmark() {
-  // Will be handled via bookmark API
   if (article.value) {
     article.value.is_bookmarked = !article.value.is_bookmarked
   }
@@ -87,7 +125,6 @@ async function handleFork() {
 }
 
 function handleSinkExtension() {
-  // Will call PUT /articles/{id}/sink-extension
   if (article.value) {
     article.value.days_remaining = (article.value.days_remaining ?? 0) + 7
   }
@@ -258,9 +295,9 @@ function handleSinkExtension() {
       <!-- Tab content -->
       <div v-if="activeTab === 'body'" class="card p-6">
         <div
-          v-if="article.compiled_output"
+          v-if="compiledHtml"
           class="prose-custom max-w-none"
-          v-html="article.compiled_output"
+          v-html="compiledHtml"
         />
         <p v-else class="text-ink-muted text-sm">
           No compiled content available.
@@ -268,9 +305,46 @@ function handleSinkExtension() {
       </div>
 
       <div v-else class="card p-6">
-        <p class="text-ink-muted text-sm">
-          Comments and reviews will be displayed here.
-        </p>
+        <div v-if="reviewsLoading" class="text-ink-muted text-sm">Loading comments...</div>
+        <div v-else-if="reviews.length === 0" class="text-ink-muted text-sm">
+          No reviews yet.
+        </div>
+        <div v-else class="space-y-4">
+          <div
+            v-for="review in reviews"
+            :key="review.id"
+            class="border border-divider rounded-lg p-4"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-semibold text-ink">
+                {{ review.reviewer_name || review.reviewer_id?.substring(0, 8) }}
+              </span>
+              <span class="text-xs text-ink-muted">
+                {{ new Date(review.created_at).toLocaleDateString() }}
+              </span>
+            </div>
+            <!-- Scores -->
+            <div class="flex items-center gap-3 mb-3 text-xs font-mono">
+              <span class="text-accent">O:{{ review.scores.originality }}</span>
+              <span class="text-ink-muted">R:{{ review.scores.rigor }}</span>
+              <span class="text-ink-muted">C:{{ review.scores.completeness }}</span>
+              <span class="text-ink-muted">P:{{ review.scores.pedagogy }}</span>
+              <span class="text-ink-muted">I:{{ review.scores.impact }}</span>
+              <span v-if="review.is_self_review" class="text-xs text-ink-muted/60 ml-auto">self-review</span>
+            </div>
+            <!-- Thread messages -->
+            <div v-if="review.thread && review.thread.length" class="space-y-2 border-t border-divider pt-3">
+              <div
+                v-for="msg in review.thread"
+                :key="msg.created_at"
+                class="text-sm text-ink-muted pl-3 border-l-2 border-divider"
+              >
+                <span class="text-xs text-ink-muted/60">{{ msg.author_id?.substring(0, 8) }}</span>
+                <p class="mt-0.5">{{ msg.content }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
 

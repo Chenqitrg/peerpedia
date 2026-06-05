@@ -16,6 +16,11 @@ export async function getArticle(id: string) {
   return res.data
 }
 
+export async function getArticleSource(id: string): Promise<{ content: string; format: string }> {
+  const res = await apiClient.get(`/articles/${id}/source`)
+  return res.data
+}
+
 export async function createArticle(body: Record<string, unknown>) {
   const res = await apiClient.post('/articles', body)
   return res.data

@@ -221,7 +221,7 @@ frontend/ (Vue 3 + Vite, port 5173)  →  HTTP JSON  →  backend/ (FastAPI, por
 - 用户头像
 - 用户名 + 匿名名（仅本人可见自己的匿名名）
 - 4 维声誉雷达图（professionalism, objectivity, collaboration, pedagogy）
-- 粉丝数 / 关注数（数字），点击展开粉丝列表和关注列表
+- 粉丝数 / 关注数（数字），点击展开列表，列表中每人可点击跳转到用户页
 - 联系方式（邮箱/网站等）
 - 机构
 - **编辑资料按钮**（仅本人可见）→ 可修改匿名名、头像、联系方式、机构、专业领域；用户名不可修改
