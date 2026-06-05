@@ -211,6 +211,7 @@ class TestHistoryWithScores:
             "content": "# V2\n\nEdited.",
             "self_review": {"originality": 5, "rigor": 4, "completeness": 5,
                             "pedagogy": 4, "impact": 4},
+            "publish": True,
         }
         client.put(f"/api/v1/articles/{article_id}", json=edit_body)
 

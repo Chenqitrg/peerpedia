@@ -102,6 +102,7 @@ export interface ArticleUpdatePayload {
   content?: string
   self_review?: FiveDimScores
   contributions?: AuthorContributions
+  publish?: boolean
 }
 
 export interface SinkExtensionPayload {

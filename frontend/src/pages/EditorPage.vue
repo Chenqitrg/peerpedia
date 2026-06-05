@@ -154,6 +154,34 @@ async function handleCompile() {
   }
 }
 
+async function handleSaveDraft() {
+  // Save to localStorage for recovery
+  saveDraft()
+  if (!userStore.viewer) return
+  if (!editId.value) return  // can't save unsaved article to backend
+  if (!commitMsg.value.trim()) {
+    errorMsg.value = 'Commit message is required'
+    return
+  }
+  submitting.value = true
+  errorMsg.value = ''
+  successMsg.value = ''
+  try {
+    await articleStore.updateArticle(editId.value, {
+      title: title.value,
+      content: content.value,
+      commit_message: commitMsg.value.trim(),
+      publish: false,
+    })
+    savedMsg.value = true
+    setTimeout(() => { savedMsg.value = false }, 2000)
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || 'Save failed'
+  } finally {
+    submitting.value = false
+  }
+}
+
 function handlePublish() {
   showSelfReview.value = true
 }
@@ -185,6 +213,7 @@ async function handleSubmitToPool() {
       commit_message: commitMsg.value.trim(),
       self_review: { ...scores.value },
       authors: [userStore.viewer.id],
+      publish: true,
       keywords: keywords.value ? keywords.value.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
       categories: categories.value ? categories.value.split(',').map((c: string) => c.trim()).filter(Boolean) : [],
     }
@@ -285,7 +314,8 @@ async function handleCompileDownload() {
                    transition-colors duration-200"
             aria-label="Save draft"
             title="Save draft"
-            @click="saveDraft"
+            :disabled="submitting"
+            @click="handleSaveDraft"
           >
             <Save class="w-4 h-4" stroke-width="2" />
           </button>
