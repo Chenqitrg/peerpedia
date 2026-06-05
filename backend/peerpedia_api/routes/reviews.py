@@ -95,10 +95,22 @@ def submit_review(article_id: str, body: ReviewCreate,
 def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCreate,
                          current_user: User = Depends(deps.require_user),
                          db: Session = Depends(deps.get_db)):
-    """Post a message in a review thread. Sender is extracted from JWT."""
+    """Post a message in a review thread. Only the article author and the review's
+    reviewer can participate; bystanders get 403."""
     r = get_review(db, review_id)
     if r is None or r.article_id != article_id:
         raise HTTPException(status_code=404, detail="Review not found")
+
+    # Permission: only article authors + the review's reviewer can reply
+    article = get_article(db, article_id)
+    is_author = article is not None and current_user.id in article.authors
+    is_reviewer = r.reviewer_id == current_user.id
+    if not (is_author or is_reviewer):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the article author and reviewer can participate in this thread",
+        )
+
     from peerpedia_core.types.messages import ThreadMessage
     msg = ThreadMessage(author_id=current_user.id, content=body.content)
     add_thread_message(db, review_id, msg.to_dict())
