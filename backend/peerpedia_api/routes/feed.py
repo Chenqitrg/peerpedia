@@ -28,7 +28,8 @@ def get_feed(current_user: User | None = Depends(deps.get_current_user),
         followed_ids = [u.id for u in following]
         if followed_ids:
             feed_articles = [a for a in all_articles
-                             if any(aid in followed_ids for aid in (a.authors or []))]
+                             if any(aid in followed_ids for aid in (a.authors or []))
+                             and a.status in ("sedimentation", "published")]
         else:
             feed_articles = []
     else:
