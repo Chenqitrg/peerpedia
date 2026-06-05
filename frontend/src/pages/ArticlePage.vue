@@ -5,6 +5,7 @@ import { getArticle, getArticleSource, getHistory, forkArticle } from '../api/ar
 import { getReviews as fetchReviews } from '../api/reviews'
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
+import { useStatusMap } from '../composables/useStatusMap'
 import type { ArticleDetail, ReviewOut } from '../api/types'
 import katex from 'katex'
 import {
@@ -40,22 +41,7 @@ const id = route.params.id as string
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 const isBookmarked = computed(() => article.value?.is_bookmarked ?? false)
 
-const statusLabel = computed(() => {
-  switch (article.value?.status) {
-    case 'published': return 'Published'
-    case 'sedimentation': return 'In Pool'
-    case 'draft': return 'Draft'
-    default: return article.value?.status ?? ''
-  }
-})
-
-const statusClass = computed(() => {
-  switch (article.value?.status) {
-    case 'published': return 'badge-published'
-    case 'sedimentation': return 'badge-sedimentation'
-    default: return 'badge-draft'
-  }
-})
+const { statusLabel, statusClass } = useStatusMap(() => article.value?.status ?? '')
 
 onMounted(async () => {
   try {
@@ -115,7 +101,7 @@ async function loadCompiledContent() {
   } else {
     try {
       const src = await getArticleSource(id)
-      const result = await compilePreview({ content: src.content, format: src.format })
+      const result = await compilePreview({ content: src.content, format: src.format as 'markdown' | 'typst' })
       html = result.output
     } catch {
       compiledHtml.value = ''

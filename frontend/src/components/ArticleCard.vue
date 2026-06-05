@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useStatusMap } from '../composables/useStatusMap'
 import type { ArticleSummary } from '../api/types'
 import {
   FileText,
@@ -30,22 +31,7 @@ const progressPercent = computed(() => {
   return Math.round((elapsed / a.sink_duration_days) * 100)
 })
 
-const statusLabel = computed(() => {
-  switch (props.article.status) {
-    case 'published': return 'Published'
-    case 'sedimentation': return 'In Pool'
-    case 'draft': return 'Draft'
-    default: return props.article.status
-  }
-})
-
-const statusClass = computed(() => {
-  switch (props.article.status) {
-    case 'published': return 'badge-published'
-    case 'sedimentation': return 'badge-sedimentation'
-    default: return 'badge-draft'
-  }
-})
+const { statusLabel, statusClass } = useStatusMap(() => props.article.status)
 
 const authorNames = computed(() => {
   return props.article.authors?.map((a: any) => a.name) ?? []
