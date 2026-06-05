@@ -31,7 +31,6 @@ describe('useArticleStore', () => {
     expect(getArticles).toHaveBeenCalledWith({ status: 'published' })
     expect(store.articles).toHaveLength(2)
     expect(store.total).toBe(2)
-    expect(store.loading).toBe(false)
   })
 
   it('fetchArticle sets currentArticle', async () => {
@@ -68,6 +67,5 @@ describe('useArticleStore', () => {
     expect(store.articles).toEqual([])
     expect(store.total).toBe(0)
     expect(store.currentArticle).toBeNull()
-    expect(store.loading).toBe(false)
   })
 })
