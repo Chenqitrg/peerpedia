@@ -46,6 +46,7 @@ frontend/ (Vue 3 + Vite, port 5173) → HTTP JSON → backend/ (FastAPI, port 80
 - **Seed data**: 8 demo users with usernames, password `666666` (memo in TEST_USERS.txt)
 - **need.md refreshed**: all status markers consistent with actual implementation
 - **Review UI redesign**: sharp StarRating stars (gold, HeroIcon path), hover-to-edit scores on own review, Thread dropdowns on all reviews (iMessage style), reply gate (author + reviewer only), review form with comment input, empty thread state
+- **Schools page**: global user directory at `/schools` — avatar, affiliation, article count, reputation, expertise tags, follow button. UserSummary expanded with article_count + reputation
 
 ## Remaining
 

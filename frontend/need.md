@@ -58,7 +58,7 @@ frontend/ (Vue 3 + Vite, port 5173)  →  HTTP JSON  →  backend/ (FastAPI, por
 | GET | `/articles/{id}/download/source` | ✅ 下载源码文件 |
 | GET | `/articles/{id}/download/pdf` | ✅ 下载 PDF/HTML（Typst→PDF, Markdown→HTML） |
 | POST | `/compile-download` | 🟡 编译当前编辑器内容并下载（新建文章时用） |
-| GET | `/users` | ✅ 用户列表 |
+| GET | `/users` | ✅ 用户列表（含 article_count + reputation） |
 | POST | `/users` | ✅ 创建用户 |
 | GET | `/users/{id}` | ✅ 用户详情 |
 | PUT | `/users/{id}` | ✅ 编辑资料 🔒（仅本人） |
@@ -121,6 +121,25 @@ frontend/ (Vue 3 + Vite, port 5173)  →  HTTP JSON  →  backend/ (FastAPI, por
 - 4 维声誉（professionalism, objectivity, collaboration, pedagogy）
 - 匿名名（池内显示）+ 实名（已发表后显示）
 - `avatar_url`、`contact` 字段 ✅
+
+**UserSummary 数据形状（GET /users 返回）：**
+```typescript
+{
+  id: string
+  name: string
+  anonymous_name: string
+  affiliation?: string
+  expertise: string[]
+  avatar_url?: string | null
+  article_count: number        // 文章数量（按作者列表匹配）
+  reputation: {                // 4 维声誉分数，空对象表示无数据
+    professionalism: number
+    objectivity: number
+    collaboration: number
+    pedagogy: number
+  }
+}
+```
 
 ---
 
@@ -534,6 +553,7 @@ class ArticleSummary(BaseModel):
 | `/articles/:id/history` | 文章历史页 | 无 | GitHub 风格 commit 图 |
 | `/articles/:id/citations` | 引用页 | 无 | 独立页面 |
 | `/users/:id` | 用户页 | 无 | 用户资料 + 文章列表 |
+| `/schools` | 用户目录 | 无 | 所有用户列表（按文章数排序），新用户发现关注对象 |
 | `/pool` | 沉淀池 | 🔒 | 关注圈文章池 |
 | `/search?q=` | 搜索结果 | 无 | 文章列表 |
 | `/bookmarks` | 收藏夹 | 🔒 | 文章列表 |
