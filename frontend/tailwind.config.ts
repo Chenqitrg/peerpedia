@@ -8,70 +8,42 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          DEFAULT: '#7C3AED',
-          50: '#F5F3FF',
-          100: '#EDE9FE',
-          200: '#DDD6FE',
-          300: '#C4B5FD',
-          400: '#A78BFA',
-          500: '#8B5CF6',
-          600: '#7C3AED',
-          700: '#6D28D9',
-          800: '#5B21B6',
-          900: '#4C1D95',
-          950: '#2E1065',
-        },
-        accent: {
-          DEFAULT: '#06B6D4',
-          50: '#ECFEFF',
-          100: '#CFFAFE',
-          200: '#A5F3FC',
-          300: '#67E8F9',
-          400: '#22D3EE',
-          500: '#06B6D4',
-          600: '#0891B2',
-          700: '#0E7490',
-          800: '#155E75',
-          900: '#164E63',
-          950: '#083344',
-        },
-        surface: {
-          DEFAULT: '#FAF5FF',
-          50: '#FDFBFF',
-          100: '#FAF5FF',
-          200: '#F3E8FF',
-          300: '#E9D5FF',
-        },
+        // Page background
+        page: '#0d1117',
+        // Card/panel background
+        card: '#161b22',
+        // Divider/border
+        divider: '#21262d',
+        // Text colors
         ink: {
-          DEFAULT: '#1E1B4B',
-          muted: '#475569',
-          subtle: '#94A3B8',
-          inverse: '#F8FAFC',
+          DEFAULT: '#b0b8c4',
+          muted: '#6e7681',
         },
-        star: {
-          DEFAULT: '#F59E0B',
-          empty: '#D1D5DB',
+        // Accent - steel blue-gray
+        accent: {
+          DEFAULT: '#7b8c9e',
+          hover: '#8f9fae',
         },
-        success: '#10B981',
-        warning: '#F59E0B',
-        danger: '#EF4444',
+        // Functional
+        success: '#5c7c6e',
+        neutral: '#6e7b8c',
       },
       fontFamily: {
-        heading: ['Crimson Pro', 'Georgia', 'serif'],
-        body: ['Atkinson Hyperlegible', 'system-ui', 'sans-serif'],
+        heading: ['EB Garamond', 'Georgia', 'serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {
-        'display': ['3.5rem', { lineHeight: '1.1', fontWeight: '700', letterSpacing: '-0.02em' }],
-        'display-md': ['2.5rem', { lineHeight: '1.2', fontWeight: '700', letterSpacing: '-0.01em' }],
+        'display': ['2.5rem', { lineHeight: '1.15', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'display-md': ['1.75rem', { lineHeight: '1.2', fontWeight: '700', letterSpacing: '-0.01em' }],
       },
       borderRadius: {
         'card': '0.5rem',
       },
       boxShadow: {
-        'card': '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
-        'card-hover': '0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05)',
-        'navbar': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        'card': '0 1px 3px 0 rgb(0 0 0 / 0.3)',
+        'card-hover': '0 4px 6px -1px rgb(0 0 0 / 0.4)',
+        'navbar': '0 1px 2px 0 rgb(0 0 0 / 0.3)',
       },
       maxWidth: {
         'content': '72rem',

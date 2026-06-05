@@ -16,7 +16,7 @@ def list_bookmarks(user_id: str, db: Session = Depends(deps.get_db)):
     articles = get_bookmarks_for_user(db, user_id)
     return {
         "bookmarks": [
-            {"article_id": a.id, "title": getattr(a, "title", ""),
+            {"article_id": a.id, "title": a.title or "",
              "authors": a.authors, "status": a.status,
              "created_at": a.created_at.isoformat()}
             for a in articles

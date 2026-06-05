@@ -8,55 +8,107 @@ export interface FiveDimScores {
   impact: number
 }
 
+/** Per-author 5-dim contribution ratios. Each dimension sums to 1.0 across all authors. */
+export interface AuthorContributions {
+  [authorId: string]: FiveDimScores
+}
+
+// ===== Pagination =====
+
+export interface PaginationParams {
+  page?: number
+  size?: number
+}
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+}
+
 // ===== Article Types =====
 
 export interface ArticleSummary {
-  id: number
+  id: string
   title: string
-  status: string
+  status: 'draft' | 'sedimentation' | 'published'
   authors: AuthorInfo[]
+  content_preview: string
+  commit_hash: string
+  fork_count: number
+  forked_from: string | null
+  commit_count: number
   score: FiveDimScores | null
-  review_count: number
+  sink_eta: string | null
+  days_remaining: number | null
+  sink_duration_days: number | null
+  is_bookmarked: boolean
+  is_own_article: boolean
   created_at: string
   updated_at: string
 }
 
 export interface ArticleDetail {
-  id: number
+  id: string
   title: string
-  status: string
+  status: 'draft' | 'sedimentation' | 'published'
   authors: AuthorInfo[]
   fork_count: number
-  forked_from: number | null
+  forked_from: string | null
+  commit_count: number
   compiled_format: string | null
   compiled_output: string | null
   compiled_pages: number | null
   score: FiveDimScores | null
   sink_eta: string | null
   days_remaining: number | null
+  sink_duration_days: number | null
   review_count: number
+  is_bookmarked: boolean
+  is_own_article: boolean
   created_at: string
   updated_at: string
 }
 
 export interface AuthorInfo {
-  id: number
+  id: string
   name: string
   anonymous_name: string
   affiliation?: string
+  expertise?: string[]
 }
 
 export interface ArticleCreatePayload {
-  authors: number[]
+  authors: string[]
   self_review: FiveDimScores
+  contributions?: AuthorContributions
   title?: string
   abstract?: string
   keywords?: string[]
   categories?: string[]
+  content?: string
+  format?: 'markdown' | 'typst'
+  forked_from?: string
+}
+
+export interface ArticleUpdatePayload {
+  title?: string
+  abstract?: string
+  keywords?: string[]
+  categories?: string[]
+  content?: string
+  self_review?: FiveDimScores
+  contributions?: AuthorContributions
 }
 
 export interface SinkExtensionPayload {
   extra_days: number
+}
+
+export interface ArticleSource {
+  content: string
+  format: 'markdown' | 'typst'
 }
 
 export interface ArticleHistory {
@@ -65,9 +117,11 @@ export interface ArticleHistory {
 
 export interface CommitInfo {
   hash: string
+  parents: string[]
   author: string
   message: string
   timestamp: string
+  score?: FiveDimScores | null
 }
 
 export interface ArticleDiff {
@@ -76,29 +130,30 @@ export interface ArticleDiff {
 }
 
 export interface MergeProposal {
-  id: number
-  article_id: number
-  fork_article_id: number
-  proposer_id: number
-  status: string
+  id: string
+  article_id: string
+  fork_article_id: string
+  proposer_id: string
+  status: 'open' | 'accepted' | 'rejected'
   created_at: string
 }
 
 // ===== Review Types =====
 
 export interface ThreadMessage {
-  author_id: number
+  author_id: string
   content: string
   created_at: string
 }
 
 export interface ReviewOut {
-  id: number
-  article_id: number
+  id: string
+  article_id: string
   commit_hash: string
-  reviewer_id: number
+  reviewer_id: string
   scope: 'pool' | 'published'
   scores: FiveDimScores
+  contributions?: AuthorContributions | null
   thread: ThreadMessage[]
   reviewer_name: string
   is_self_review: boolean
@@ -107,11 +162,12 @@ export interface ReviewOut {
 }
 
 export interface ReviewCreatePayload {
-  article_id: number
+  article_id: string
   commit_hash: string
-  reviewer_id: number
+  reviewer_id: string
   scope: 'pool' | 'published'
   scores: FiveDimScores
+  contributions?: AuthorContributions
 }
 
 export interface ReviewMessagePayload {
@@ -121,11 +177,13 @@ export interface ReviewMessagePayload {
 // ===== User Types =====
 
 export interface UserProfile {
-  id: number
+  id: string
   name: string
   anonymous_name: string
   affiliation?: string
   expertise: string[]
+  avatar_url?: string | null
+  contact?: string | null
   reputation: ReputationScores
   followers_count: number
   following_count: number
@@ -134,7 +192,7 @@ export interface UserProfile {
 }
 
 export interface UserSummary {
-  id: number
+  id: string
   name: string
   anonymous_name: string
   affiliation?: string
@@ -151,32 +209,42 @@ export interface UserCreatePayload {
   name: string
   affiliation?: string
   expertise?: string[]
+  avatar_url?: string
+  contact?: string
+}
+
+export interface UserUpdatePayload {
+  anonymous_name?: string
+  affiliation?: string
+  expertise?: string[]
+  avatar_url?: string
+  contact?: string
 }
 
 // ===== Pool Types =====
 
 export interface PoolResponse {
   articles: ArticleSummary[]
+  total: number
 }
 
 // ===== Bookmark Types =====
 
 export interface Bookmark {
-  id: number
-  user_id: number
-  article_id: number
+  id: string
+  user_id: string
+  article_id: string
   created_at: string
 }
 
 // ===== Feed Types =====
 
-export interface FeedItem {
-  type: string
-  article_id: number
-  title: string
-  action: string
-  user_name: string
-  timestamp: string
+/** Feed items are article summaries from followed users, sorted by recency. */
+export interface FeedResponse {
+  articles: ArticleSummary[]
+  total: number
+  page?: number
+  size?: number
 }
 
 // ===== Search Types =====
@@ -201,14 +269,26 @@ export interface CompilePreviewResponse {
 
 // ===== Citation Types =====
 
-export interface Citation {
-  id: number
-  from_article_id: number
-  to_article_id: number
-  count: number
+export interface CitationEdge {
+  article_id: string
+  title: string
+  forward_prob: number
+  backward_prob: number
+}
+
+export interface CitationGraph {
+  cites: CitationEdge[]
+  cited_by: CitationEdge[]
 }
 
 export interface CitationClickPayload {
-  from_article_id: number
-  to_article_id: number
+  from_article_id: string
+  to_article_id: string
+}
+
+// ===== Fork Check =====
+
+export interface HasForkedResponse {
+  has_forked: boolean
+  fork_article_id: string | null
 }

@@ -1,111 +1,278 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { getUser } from '../api/users'
-import type { UserProfile } from '../api/types'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getUser, getFollowers, getFollowing } from '../api/users'
+import { getArticles } from '../api/articles'
+import { useUserStore } from '../stores/useUserStore'
+import { addBookmark, removeBookmark } from '../api/bookmarks'
+import ArticleCard from '../components/ArticleCard.vue'
+import type { UserProfile, ArticleSummary } from '../api/types'
+import {
+  Users,
+  BookOpen,
+  MapPin,
+  Mail,
+  Edit,
+  ExternalLink,
+  Star,
+} from 'lucide-vue-next'
 
 const route = useRoute()
-const id = route.params.id as string
+const router = useRouter()
+const userStore = useUserStore()
+
+const id = computed(() => route.params.id as string)
+
 const user = ref<UserProfile | null>(null)
-const loading = ref(false)
+const articles = ref<ArticleSummary[]>([])
+const loading = ref(true)
+const showFollowers = ref(false)
+const showFollowing = ref(false)
+const followers = ref<any[]>([])
+const following = ref<any[]>([])
+
+const isSelf = computed(() => {
+  return userStore.viewer?.id === id.value
+})
 
 onMounted(async () => {
+  await loadUser()
+})
+
+async function loadUser() {
   loading.value = true
   try {
-    user.value = await getUser(id)
+    user.value = await getUser(id.value)
+    // Load articles by this author
+    const artData = await getArticles({ status: undefined, page: 1, size: 50 })
+    const allArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
+    articles.value = allArticles.filter((a: any) =>
+      a.authors?.some((au: any) => au.id === id.value),
+    )
+  } catch (e) {
+    console.error('Failed to load user:', e)
   } finally {
     loading.value = false
   }
-})
+}
+
+async function loadFollowers() {
+  if (followers.value.length) {
+    showFollowers.value = !showFollowers.value
+    return
+  }
+  try {
+    followers.value = await getFollowers(id.value)
+    showFollowers.value = true
+  } catch (e) {
+    console.error('Failed to load followers:', e)
+  }
+}
+
+async function loadFollowing() {
+  if (following.value.length) {
+    showFollowing.value = !showFollowing.value
+    return
+  }
+  try {
+    following.value = await getFollowing(id.value)
+    showFollowing.value = true
+  } catch (e) {
+    console.error('Failed to load following:', e)
+  }
+}
+
+function goToEditProfile() {
+  // Will navigate to profile edit page or open inline editor
+}
+
+async function handleToggleBookmark(articleId: string, currentlyBookmarked: boolean) {
+  if (!userStore.viewer) return
+  try {
+    if (currentlyBookmarked) {
+      await removeBookmark(articleId, userStore.viewer.id)
+    } else {
+      await addBookmark(userStore.viewer.id, articleId)
+    }
+    const art = articles.value.find(a => a.id === articleId)
+    if (art) art.is_bookmarked = !currentlyBookmarked
+  } catch {
+    // silently fail
+  }
+}
 </script>
 
 <template>
-  <div class="user-page max-w-content animate-fade-in">
+  <div class="user-page animate-fade-in">
     <!-- Loading -->
     <div v-if="loading" class="space-y-4 animate-pulse">
-      <div class="flex items-center gap-4 mb-6">
-        <div class="skeleton w-20 h-20 rounded-full" />
+      <div class="flex items-start gap-4 mb-6">
+        <div class="skeleton w-16 h-16 rounded-full shrink-0" />
         <div class="space-y-2 flex-1">
           <div class="skeleton h-7 w-1/3" />
           <div class="skeleton h-4 w-1/4" />
+          <div class="skeleton h-4 w-1/5" />
         </div>
       </div>
     </div>
 
-    <!-- Profile -->
-    <div v-else-if="user">
-      <!-- Header -->
-      <section class="flex flex-col sm:flex-row items-start gap-6 mb-10">
-        <!-- Avatar -->
-        <div class="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-          <span class="text-2xl font-heading font-bold text-primary-600">
-            {{ (user.name || '?')[0].toUpperCase() }}
-          </span>
-        </div>
-
-        <div class="flex-1 min-w-0">
-          <h1 class="text-display-md text-ink mb-1">{{ user.name }}</h1>
-          <p v-if="user.affiliation" class="text-ink-muted mb-3">
-            {{ user.affiliation }}
-          </p>
-
-          <!-- Stats -->
-          <div class="flex flex-wrap gap-4 text-sm">
-            <span class="flex items-center gap-1.5 text-ink-muted">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-              </svg>
-              {{ user.article_count ?? 0 }} articles
-            </span>
-            <span class="flex items-center gap-1.5 text-ink-muted">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-              </svg>
-              {{ user.followers_count ?? 0 }} followers
-            </span>
-            <span class="flex items-center gap-1.5 text-ink-muted">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-              </svg>
-              {{ user.following_count ?? 0 }} following
+    <template v-else-if="user">
+      <!-- Profile header -->
+      <div class="bg-card border border-divider rounded-lg p-6 mb-6">
+        <div class="flex flex-col sm:flex-row items-start gap-5">
+          <!-- Avatar -->
+          <div class="w-16 h-16 rounded-full bg-[#21262d] flex items-center justify-center shrink-0 border border-divider overflow-hidden">
+            <img
+              v-if="user.avatar_url"
+              :src="user.avatar_url"
+              :alt="user.name"
+              class="w-full h-full object-cover"
+            />
+            <span v-else class="text-xl font-heading font-bold text-ink-muted">
+              {{ (user.name || '?')[0].toUpperCase() }}
             </span>
           </div>
+
+          <div class="flex-1 min-w-0">
+            <!-- Name -->
+            <h1 class="text-display-md font-heading font-bold text-ink mb-0.5">
+              {{ user.name }}
+            </h1>
+
+            <!-- Anonymous name (only visible to self) -->
+            <p v-if="isSelf" class="text-xs text-ink-muted mb-2">
+              Anonymous name: <span class="font-mono text-ink">{{ user.anonymous_name }}</span>
+            </p>
+
+            <!-- Affiliation & Contact -->
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted mb-3">
+              <span v-if="user.affiliation" class="flex items-center gap-1">
+                <MapPin class="w-3 h-3" stroke-width="2" />
+                {{ user.affiliation }}
+              </span>
+              <span v-if="user.contact" class="flex items-center gap-1">
+                <Mail class="w-3 h-3" stroke-width="2" />
+                {{ user.contact }}
+              </span>
+              <span class="flex items-center gap-1">
+                <BookOpen class="w-3 h-3" stroke-width="2" />
+                {{ user.article_count }} articles
+              </span>
+            </div>
+
+            <!-- Stats row -->
+            <div class="flex items-center gap-4 text-sm">
+              <button
+                class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors"
+                @click="loadFollowers"
+              >
+                <Users class="w-3.5 h-3.5" stroke-width="2" />
+                <span class="font-semibold">{{ user.followers_count }}</span>
+                <span>followers</span>
+              </button>
+              <button
+                class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors"
+                @click="loadFollowing"
+              >
+                <Users class="w-3.5 h-3.5" stroke-width="2" />
+                <span class="font-semibold">{{ user.following_count }}</span>
+                <span>following</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Edit profile button (self only) -->
+          <button
+            v-if="isSelf"
+            class="btn-outline btn-sm shrink-0"
+            @click="goToEditProfile"
+          >
+            <Edit class="w-3.5 h-3.5" stroke-width="2" />
+            Edit Profile
+          </button>
         </div>
 
-        <button class="btn-outline shrink-0">Follow</button>
-      </section>
-
-      <!-- Expertise -->
-      <section v-if="user.expertise?.length" class="mb-8">
-        <h2 class="text-lg font-heading font-semibold text-ink mb-3">Expertise</h2>
-        <div class="flex flex-wrap gap-2">
+        <!-- Expertise -->
+        <div v-if="user.expertise?.length" class="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-divider">
           <span
             v-for="exp in user.expertise"
             :key="exp"
-            class="badge bg-primary-100 text-primary-700"
+            class="px-2.5 py-0.5 text-xs text-ink-muted bg-[#21262d] rounded-full"
           >
             {{ exp }}
           </span>
         </div>
-      </section>
 
-      <!-- Reputation -->
-      <section v-if="user.reputation" class="card p-6">
-        <h2 class="text-lg font-heading font-semibold text-ink mb-4">Reputation</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-          <div v-for="[key, val] in Object.entries(user.reputation)" :key="key" class="space-y-1">
-            <div class="text-2xl font-bold text-primary-600">{{ val }}</div>
-            <div class="text-xs text-ink-muted capitalize">{{ key }}</div>
+        <!-- Followers/Following expandable lists -->
+        <div v-if="showFollowers && followers.length" class="mt-3 pt-3 border-t border-divider">
+          <p class="text-xs text-ink-muted mb-2">Followers</p>
+          <div class="flex flex-wrap gap-2">
+            <router-link
+              v-for="f in followers"
+              :key="f.id"
+              :to="`/user/${f.id}`"
+              class="text-xs text-accent hover:text-accent-hover no-underline"
+            >
+              {{ f.name }}
+            </router-link>
           </div>
         </div>
-      </section>
-    </div>
+        <div v-if="showFollowing && following.length" class="mt-3 pt-3 border-t border-divider">
+          <p class="text-xs text-ink-muted mb-2">Following</p>
+          <div class="flex flex-wrap gap-2">
+            <router-link
+              v-for="f in following"
+              :key="f.id"
+              :to="`/user/${f.id}`"
+              class="text-xs text-accent hover:text-accent-hover no-underline"
+            >
+              {{ f.name }}
+            </router-link>
+          </div>
+        </div>
+
+        <!-- Reputation -->
+        <div v-if="user.reputation" class="mt-4 pt-4 border-t border-divider">
+          <div class="flex items-center gap-1 text-xs text-ink-muted mb-3">
+            <Star class="w-3 h-3" stroke-width="2" />
+            <span class="font-semibold">Reputation</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div
+              v-for="(value, key) in user.reputation"
+              :key="key"
+              class="text-center bg-[#0d1117] rounded-lg p-2.5 border border-divider"
+            >
+              <div class="text-lg font-bold text-accent font-mono">{{ value }}</div>
+              <div class="text-xs text-ink-muted capitalize">{{ key }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Articles section -->
+      <div>
+        <h2 class="text-lg font-heading font-semibold text-ink mb-4">
+          Articles
+        </h2>
+
+        <div v-if="articles.length === 0" class="card p-8 text-center">
+          <p class="text-ink-muted text-sm">No articles yet.</p>
+        </div>
+
+        <div v-else class="space-y-4">
+          <ArticleCard
+            v-for="article in articles"
+            :key="article.id"
+            :article="article"
+            @toggle-bookmark="handleToggleBookmark"
+          />
+        </div>
+      </div>
+    </template>
 
     <!-- Error state -->
     <div v-else class="card p-12 text-center">
-      <svg class="w-16 h-16 text-ink-subtle mx-auto mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
       <p class="text-ink-muted">User not found.</p>
     </div>
   </div>

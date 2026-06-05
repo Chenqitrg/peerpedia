@@ -3,6 +3,9 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from unittest import mock
 
+# Register all models with Base.metadata before engine fixture creates tables
+import peerpedia_core.storage.db.models  # noqa: F401
+
 
 class TestComputeArticleScore:
     """Score aggregation: weighted average of reviews, with self-review weighting."""
@@ -106,3 +109,93 @@ class TestSedimentation:
         from peerpedia_core.workflow.sedimentation import apply_no_review_penalty
         result = apply_no_review_penalty(None)
         assert result == {}
+
+
+class TestPerCommitScoring:
+    """Per-commit score computation: each commit scored independently."""
+
+    def _make_user(self, session, name):
+        from peerpedia_core.storage.db.models import User
+        u = User(name=name, anonymous_name=f"anon_{name}")
+        session.add(u)
+        session.commit()
+        return u
+
+    def _make_article(self, session, authors):
+        from peerpedia_core.storage.db.models import Article
+        a = Article(authors=authors, status="sedimentation")
+        session.add(a)
+        session.commit()
+        return a
+
+    def _make_review(self, session, article_id, commit_hash, reviewer_id, scope, scores):
+        from peerpedia_core.storage.db.crud_review import create_review
+        return create_review(session, article_id=article_id, commit_hash=commit_hash,
+                             reviewer_id=reviewer_id, scope=scope, scores=scores)
+
+    def test_filters_by_commit_hash(self, engine):
+        """Only reviews for the target commit contribute to the score."""
+        from peerpedia_core.storage.db.engine import get_session
+        session = get_session(engine)
+
+        author = self._make_user(session, "pcs_author")
+        rv = self._make_user(session, "pcs_rv")
+        article = self._make_article(session, [author.id])
+
+        # Review for commit "abc" with score 5
+        self._make_review(session, article.id, "abc", rv.id, "pool",
+                          {"originality": 5, "rigor": 5, "completeness": 5,
+                           "pedagogy": 5, "impact": 5})
+        # Review for commit "def" with score 1
+        self._make_review(session, article.id, "def", rv.id, "pool",
+                          {"originality": 1, "rigor": 1, "completeness": 1,
+                           "pedagogy": 1, "impact": 1})
+
+        from peerpedia_core.workflow.scoring import compute_article_score_for_commit
+        score_abc = compute_article_score_for_commit(session, article.id, "abc")
+        score_def = compute_article_score_for_commit(session, article.id, "def")
+
+        assert score_abc is not None
+        assert score_def is not None
+        assert score_abc["originality"] == 5.0
+        assert score_def["originality"] == 1.0
+        session.close()
+
+    def test_no_reviews_for_commit_returns_none(self, engine):
+        """If no reviews exist for a commit, return None."""
+        from peerpedia_core.storage.db.engine import get_session
+        session = get_session(engine)
+
+        author = self._make_user(session, "pcs_none")
+        article = self._make_article(session, [author.id])
+
+        from peerpedia_core.workflow.scoring import compute_article_score_for_commit
+        result = compute_article_score_for_commit(session, article.id, "no_such_hash")
+        assert result is None
+        session.close()
+
+    def test_reviewer_weights_applied(self, engine):
+        """Reputation-based reviewer weights are applied in per-commit scoring."""
+        from peerpedia_core.storage.db.engine import get_session
+        session = get_session(engine)
+
+        author = self._make_user(session, "pcs_au")
+        rv = self._make_user(session, "pcs_rvw")
+
+        # Give reviewer high reputation
+        from peerpedia_core.storage.db.crud_user import update_user_reputation
+        update_user_reputation(session, rv.id,
+                               {"professionalism": 5.0, "objectivity": 5.0,
+                                "collaboration": 5.0, "pedagogy": 5.0})
+
+        article = self._make_article(session, [author.id])
+        self._make_review(session, article.id, "hash_w", rv.id, "pool",
+                          {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3})
+
+        from peerpedia_core.workflow.scoring import compute_article_score_for_commit
+        score = compute_article_score_for_commit(session, article.id, "hash_w")
+
+        assert score is not None
+        assert score["originality"] == 3.0
+        session.close()

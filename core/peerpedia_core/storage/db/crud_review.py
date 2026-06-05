@@ -11,6 +11,7 @@ def create_review(
     reviewer_id: str,
     scope: str,
     scores: dict,
+    contributions: dict | None = None,
 ) -> Review:
     r = Review(
         article_id=article_id,
@@ -18,6 +19,7 @@ def create_review(
         reviewer_id=reviewer_id,
         scope=scope,
         scores=scores,
+        contributions=contributions,
     )
     session.add(r)
     session.commit()
@@ -38,17 +40,20 @@ def get_reviews_for_article(session: Session, article_id: str) -> list[Review]:
 
 
 def get_review_by_user_scope(
-    session: Session, article_id: str, reviewer_id: str, scope: str
+    session: Session, article_id: str, reviewer_id: str, scope: str,
+    commit_hash: str | None = None,
 ) -> Review | None:
-    return (
+    q = (
         session.query(Review)
         .filter(
             Review.article_id == article_id,
             Review.reviewer_id == reviewer_id,
             Review.scope == scope,
         )
-        .first()
     )
+    if commit_hash is not None:
+        q = q.filter(Review.commit_hash == commit_hash)
+    return q.first()
 
 
 def upsert_review(
@@ -58,15 +63,19 @@ def upsert_review(
     reviewer_id: str,
     scope: str,
     scores: dict,
+    contributions: dict | None = None,
 ) -> Review:
-    """Create or update a review for the given (article, reviewer, scope)."""
-    existing = get_review_by_user_scope(session, article_id, reviewer_id, scope)
+    """Create or update a review for the given (article, reviewer, scope, commit_hash)."""
+    existing = get_review_by_user_scope(session, article_id, reviewer_id, scope,
+                                        commit_hash=commit_hash)
     if existing:
-        existing.commit_hash = commit_hash
         existing.scores = scores
+        if contributions is not None:
+            existing.contributions = contributions
         session.commit()
         return existing
-    return create_review(session, article_id, commit_hash, reviewer_id, scope, scores)
+    return create_review(session, article_id, commit_hash, reviewer_id, scope,
+                         scores, contributions=contributions)
 
 
 def update_review_scores(session: Session, review_id: str, scores: dict) -> Review:

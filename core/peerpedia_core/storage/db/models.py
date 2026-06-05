@@ -28,6 +28,10 @@ class Article(Base):
     __tablename__ = "articles"
 
     id = Column(String, primary_key=True, default=_new_id)
+    title = Column(String, nullable=False, default="")
+    abstract = Column(String, nullable=True)
+    keywords = Column(JSONList, nullable=True)
+    categories = Column(JSONList, nullable=True)
     status = Column(String, nullable=False, default="draft")  # draft|sedimentation|published
     score = Column(JSONDict, nullable=True)                    # FiveDimScores as dict
     compiled_format = Column(String, nullable=True)            # "html" | "svg"
@@ -48,7 +52,7 @@ class Article(Base):
 class Review(Base):
     __tablename__ = "reviews"
     __table_args__ = (
-        UniqueConstraint("article_id", "reviewer_id", "scope", name="uq_review_article_reviewer_scope"),
+        UniqueConstraint("article_id", "reviewer_id", "scope", "commit_hash", name="uq_review_article_reviewer_scope_commit"),
     )
 
     id = Column(String, primary_key=True, default=_new_id)
@@ -57,6 +61,7 @@ class Review(Base):
     reviewer_id = Column(String, ForeignKey("users.id"), nullable=False)
     scope = Column(String, nullable=False)                  # "pool" | "published"
     scores = Column(JSONDict, nullable=False)               # FiveDimScores as dict
+    contributions = Column(JSONDict, nullable=True)          # author_id → 5-dim ratios
     thread = Column(JSONList, nullable=False, default=list) # list[dict] of ThreadMessage
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
@@ -72,6 +77,8 @@ class User(Base):
     anonymous_name = Column(String, nullable=False, default="")
     affiliation = Column(String, nullable=False, default="")
     expertise = Column(JSONList, nullable=False, default=list)
+    avatar_url = Column(String, nullable=True)
+    contact = Column(String, nullable=True)
     reputation = Column(JSONDict, nullable=False, default=dict)  # ReputationScores as dict
     created_at = Column(DateTime, nullable=False, default=_utcnow)
 

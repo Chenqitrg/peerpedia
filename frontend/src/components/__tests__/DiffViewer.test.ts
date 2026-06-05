@@ -111,4 +111,44 @@ describe('DiffViewer', () => {
     await wrapper.vm.$nextTick()
     expect(wrapper.text()).toContain('Select two different commits to compare')
   })
+
+  it('shows score in commit label when score is present', async () => {
+    const commits = [
+      {
+        hash: 'abc1234def',
+        author: 'Alice',
+        message: 'Initial commit',
+        timestamp: '2024-01-01',
+        score: { originality: 4, rigor: 3, completeness: 4, pedagogy: 3, impact: 4 },
+      },
+      {
+        hash: 'def5678abc',
+        author: 'Bob',
+        message: 'Second commit',
+        timestamp: '2024-01-02',
+        // No score
+      },
+    ]
+    mockedApi.getHistory.mockResolvedValue({ commits })
+    mockedApi.getDiff.mockResolvedValue({
+      diff_text: '--- a/file.md\n+++ b/file.md\n@@ -1 +1 @@\n-old\n+new\n',
+      files: ['file.md'],
+    })
+    const wrapper = mount(DiffViewer, { props: { articleId: '42' } })
+    // Wait for history fetch
+    await new Promise(process.nextTick)
+    await wrapper.vm.$nextTick()
+    // Wait for diff fetch
+    await new Promise(process.nextTick)
+    await wrapper.vm.$nextTick()
+
+    // First commit has score: avg of (4+3+4+3+4)/5 = 3.6
+    expect(wrapper.text()).toContain('[3.6]')
+    // Commit with no score should appear without brackets
+    const allOptions = wrapper.findAll('option')
+    const labels = allOptions.map(o => o.text())
+    const withScore = labels.filter(l => l.includes('[3.6]'))
+    // Appears in both selectors (base + head)
+    expect(withScore.length).toBe(2)
+  })
 })

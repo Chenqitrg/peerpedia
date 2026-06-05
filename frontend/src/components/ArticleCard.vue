@@ -1,63 +1,223 @@
 <script setup lang="ts">
-defineProps<{
-  article: {
-    id: string
-    title: string
-    status: string
-    authors: string[]
-    score?: { originality: number; rigor: number; completeness: number; pedagogy: number; impact: number } | null
-    fork_count?: number
-    review_count?: number
-  }
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import type { ArticleSummary } from '../api/types'
+import {
+  FileText,
+  Users,
+  GitCommitHorizontal,
+  Bookmark,
+  BookmarkCheck,
+  History,
+  Edit,
+  GitFork,
+} from 'lucide-vue-next'
+
+const props = defineProps<{
+  article: ArticleSummary
 }>()
 
-function statusBadge(status: string): string {
-  switch (status) {
+const emit = defineEmits<{
+  (e: 'toggleBookmark', articleId: string, currentlyBookmarked: boolean): void
+}>()
+
+const router = useRouter()
+
+const progressPercent = computed(() => {
+  const a = props.article
+  if (a.status !== 'sedimentation' || !a.sink_duration_days || a.sink_duration_days === 0) return 0
+  const elapsed = a.sink_duration_days - (a.days_remaining ?? 0)
+  return Math.round((elapsed / a.sink_duration_days) * 100)
+})
+
+const statusLabel = computed(() => {
+  switch (props.article.status) {
+    case 'published': return 'Published'
+    case 'sedimentation': return 'In Pool'
+    case 'draft': return 'Draft'
+    default: return props.article.status
+  }
+})
+
+const statusClass = computed(() => {
+  switch (props.article.status) {
     case 'published': return 'badge-published'
-    case 'review':
-    case 'in_review': return 'badge-review'
+    case 'sedimentation': return 'badge-sedimentation'
     default: return 'badge-draft'
   }
+})
+
+const authorNames = computed(() => {
+  return props.article.authors?.map((a: any) => a.name) ?? []
+})
+
+function handleBookmarkClick() {
+  emit('toggleBookmark', props.article.id, props.article.is_bookmarked)
+}
+
+function goToEdit() {
+  router.push(`/edit/${props.article.id}`)
+}
+
+function goToHistory() {
+  router.push(`/articles/${props.article.id}/history`)
+}
+
+function goToFork() {
+  router.push(`/edit/${props.article.id}?fork=true`)
 }
 </script>
 
 <template>
-  <article class="card-interactive p-5 animate-fade-in">
-    <router-link
-      :to="`/article/${article.id}`"
-      class="no-underline hover:no-underline"
-    >
-      <h3 class="text-lg font-heading font-semibold text-ink mb-2 line-clamp-2">
-        {{ article.title || 'Untitled' }}
-      </h3>
-    </router-link>
+  <article
+    class="card p-5 hover:border-accent/30 transition-colors duration-200 animate-fade-in"
+  >
+    <!-- Title row -->
+    <div class="flex items-start gap-2 mb-2">
+      <FileText class="w-4 h-4 text-ink-muted mt-1 shrink-0" stroke-width="2" />
+      <router-link
+        :to="`/articles/${article.id}`"
+        class="no-underline hover:no-underline flex-1 min-w-0"
+      >
+        <h3 class="text-lg font-heading font-semibold text-ink leading-tight line-clamp-2 hover:underline decoration-accent/30 underline-offset-2">
+          {{ article.title || 'Untitled' }}
+        </h3>
+      </router-link>
+    </div>
 
-    <p class="text-sm text-ink-muted mb-3">
-      {{ article.authors.join(', ') }}
+    <!-- Authors row with badges -->
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <div class="flex items-center gap-1.5 text-sm text-ink-muted min-w-0 flex-1">
+        <Users class="w-3.5 h-3.5 shrink-0" stroke-width="2" />
+        <span class="truncate">
+          <template v-for="(author, idx) in article.authors" :key="author.id">
+            <router-link
+              :to="`/user/${author.id}`"
+              class="text-ink-muted hover:text-accent transition-colors no-underline"
+            >
+              {{ author.name }}
+            </router-link>
+            <span v-if="idx < article.authors.length - 1">, </span>
+          </template>
+        </span>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Forked badge -->
+        <span
+          v-if="article.forked_from"
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-neutral bg-neutral/10 rounded"
+        >
+          <GitFork class="w-3 h-3" stroke-width="2" />
+          fork
+        </span>
+        <!-- Version badge -->
+        <span
+          v-if="article.commit_count > 1"
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-ink-muted bg-[#21262d] rounded"
+        >
+          v{{ article.commit_count }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Content preview -->
+    <p class="text-sm text-ink-muted/80 leading-relaxed mb-3 line-clamp-2">
+      {{ article.content_preview || 'No preview available.' }}
     </p>
 
-    <div class="flex items-center gap-3">
-      <span :class="statusBadge(article.status)">{{ article.status }}</span>
+    <!-- Sink progress bar (only for sedimentation) -->
+    <div
+      v-if="article.status === 'sedimentation' && article.days_remaining != null"
+      class="mb-3"
+    >
+      <div class="flex items-center gap-2 mb-1.5">
+        <div class="flex-1 h-1.5 bg-divider rounded-full overflow-hidden">
+          <div
+            class="h-full bg-neutral rounded-full transition-all duration-500"
+            :style="{ width: `${progressPercent}%` }"
+          />
+        </div>
+        <span class="text-xs text-ink-muted whitespace-nowrap font-mono">
+          {{ article.days_remaining }}d remaining
+        </span>
+      </div>
+    </div>
 
-      <div v-if="article.score" class="flex items-center gap-3 text-xs text-ink-muted ml-auto">
-        <span v-if="article.score" class="flex items-center gap-3">
-          <span>O:{{ article.score.originality }}</span>
+    <!-- Footer: scores, hash, actions -->
+    <div class="flex items-center justify-between gap-4 pt-3 border-t border-divider">
+      <!-- Scores -->
+      <div class="flex items-center gap-2 text-xs font-mono text-ink-muted">
+        <template v-if="article.score">
+          <span class="text-accent font-semibold">O:{{ article.score.originality }}</span>
           <span>R:{{ article.score.rigor }}</span>
           <span>C:{{ article.score.completeness }}</span>
           <span>P:{{ article.score.pedagogy }}</span>
           <span>I:{{ article.score.impact }}</span>
+        </template>
+        <span v-if="!article.score" class="text-ink-muted">No scores yet</span>
+      </div>
+
+      <!-- Right side -->
+      <div class="flex items-center gap-0.5">
+        <!-- Commit hash -->
+        <span
+          v-if="article.commit_hash"
+          class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-ink-muted bg-[#21262d] rounded mr-1"
+        >
+          <GitCommitHorizontal class="w-3 h-3" stroke-width="2" />
+          {{ article.commit_hash.substring(0, 7) }}
         </span>
-        <span v-if="article.review_count != null" class="flex items-center gap-1">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          {{ article.review_count }}
-        </span>
-        <span v-if="article.fork_count != null" class="flex items-center gap-1">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-          </svg>
-          {{ article.fork_count }}
+
+        <!-- Actions -->
+        <button
+          class="flex items-center justify-center w-7 h-7 rounded
+                 text-ink-muted hover:text-accent hover:bg-accent/10
+                 transition-colors duration-200"
+          :aria-label="article.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'"
+          :title="article.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'"
+          @click="handleBookmarkClick"
+        >
+          <BookmarkCheck v-if="article.is_bookmarked" class="w-3.5 h-3.5 text-accent" stroke-width="2" />
+          <Bookmark v-else class="w-3.5 h-3.5" stroke-width="2" />
+        </button>
+
+        <router-link
+          :to="`/articles/${article.id}/history`"
+          class="flex items-center justify-center w-7 h-7 rounded
+                 text-ink-muted hover:text-accent hover:bg-accent/10
+                 transition-colors duration-200"
+          aria-label="History"
+          title="History"
+        >
+          <History class="w-3.5 h-3.5" stroke-width="2" />
+        </router-link>
+
+        <button
+          v-if="article.is_own_article"
+          class="flex items-center justify-center w-7 h-7 rounded
+                 text-ink-muted hover:text-accent hover:bg-accent/10
+                 transition-colors duration-200"
+          aria-label="Edit"
+          title="Edit article"
+          @click="goToEdit"
+        >
+          <Edit class="w-3.5 h-3.5" stroke-width="2" />
+        </button>
+
+        <button
+          class="flex items-center justify-center w-7 h-7 rounded
+                 text-ink-muted hover:text-accent hover:bg-accent/10
+                 transition-colors duration-200"
+          aria-label="Fork"
+          title="Fork article"
+          @click="goToFork"
+        >
+          <GitFork class="w-3.5 h-3.5" stroke-width="2" />
+        </button>
+
+        <!-- Status badge -->
+        <span :class="`${statusClass} ml-2 text-xs`">
+          {{ statusLabel }}
         </span>
       </div>
     </div>

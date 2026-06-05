@@ -24,8 +24,15 @@ def client(db_engine):
 
 
 class TestPool:
-    def test_empty_pool(self, client):
-        resp = client.get("/api/v1/pool")
+    def test_empty_pool(self, client, db_engine):
+        # Create a user so we can pass user_id
+        s = get_session(db_engine)
+        u = User(name="pool_user", anonymous_name="anon_pool")
+        s.add(u)
+        s.commit()
+        uid = u.id
+        s.close()
+        resp = client.get(f"/api/v1/pool?user_id={uid}")
         assert resp.status_code == 200
         assert resp.json()["articles"] == []
 
@@ -40,11 +47,13 @@ class TestPool:
                     sink_duration_days=7)
         s.add(a)
         s.commit()
+        uid = u.id
         s.close()
 
-        resp = client.get("/api/v1/pool")
+        resp = client.get(f"/api/v1/pool?user_id={uid}")
         assert resp.status_code == 200
         data = resp.json()
+        # Author is in their own follow circle (self)
         assert len(data["articles"]) == 1
         assert data["articles"][0]["days_remaining"] >= 0
 

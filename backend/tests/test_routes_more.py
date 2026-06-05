@@ -65,7 +65,7 @@ class TestSearch:
 
         resp = client.get("/api/v1/search?q=test")
         assert resp.status_code == 200
-        assert "results" in resp.json()
+        assert "articles" in resp.json()
 
 
 class TestCompile:
@@ -77,7 +77,7 @@ class TestCompile:
         assert resp.status_code == 200
         data = resp.json()
         assert data["format"] == "html"
-        assert "<h1>" in data["content"]
+        assert "<h1>" in data["output"]
 
     def test_compile_unsupported_format(self, client):
         resp = client.post("/api/v1/compile-preview", json={
@@ -106,7 +106,7 @@ class TestCompile:
             assert resp.status_code == 200
             data = resp.json()
             assert data["format"] == "svg"
-            assert "<svg" in data["content"]
+            assert "<svg" in data["output"]
 
 
 class TestCitations:

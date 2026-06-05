@@ -12,9 +12,9 @@ frontend/ (Vue 3 + Vite, port 5173) → HTTP JSON → backend/ (FastAPI, port 80
 
 | Layer | Tests | Command |
 |-------|-------|---------|
-| Backend (core + api) | 173 | `.venv/bin/python3 -m pytest core/tests/ backend/tests/` |
-| Frontend | 66 | `cd frontend && npm test` |
-| **Total** | **239** | |
+| Backend (core + api) | 194 | `.venv/bin/python3 -m pytest core/tests/ backend/tests/` |
+| Frontend | 115 | `cd frontend && npm test` |
+| **Total** | **309** | |
 
 ## Done
 
@@ -33,13 +33,20 @@ frontend/ (Vue 3 + Vite, port 5173) → HTTP JSON → backend/ (FastAPI, port 80
 - **Reputation mechanism**: compute_author_reputation, get_reviewer_weight, recalculate_all_reputations; 14 tests; wired into review submission
 - **Bookmarks UI**: tabs (Latest/Favorites) on HomePage; bookmark fetch + article display
 - **CSS audit**: 13 design system issues fixed (hardcoded colors → semantic tokens, max-w-content, etc.)
+- **Per-commit independent scoring**: compute_article_score_for_commit filters reviews by commit_hash, UniqueConstraint updated
+- **API contract alignment**: 18 gaps resolved between backend schemas and frontend types (ArticleSummary expansion, author resolution, bookmark status, etc.)
+- **9 frontend pages**: Home, Editor, Article, User, Pool, History, Search, Bookmarks, Citations
+- **PDF download endpoint**: GET /articles/{id}/download/pdf (Typst→PDF, Markdown→HTML)
+- **Bookmark toggle API integration**: All 5 pages now call addBookmark/removeBookmark API (was local-only stub)
+- **Design system**: Cold Academic Minimal (9 colors, #0d1117, #7b8c9e accent, EB Garamond/Inter/JetBrains Mono)
 
 ## Remaining
 
 | Priority | Task |
 |----------|------|
-| Medium | Per-commit independent scoring |
+| Medium | Integration testing (browser E2E verification) |
 | Deferred | P2P distributed storage |
+| Deferred | AI integration |
 
 ## Quick start
 

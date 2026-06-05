@@ -21,6 +21,8 @@ def _clamp(v: float) -> float:
     return max(0.0, min(5.0, v))
 
 
+# ── Shared score / author types ────────────────────────────────────────────
+
 class FiveDimScoresOut(BaseModel):
     originality: float = 0.0
     rigor: float = 0.0
@@ -36,7 +38,7 @@ class FiveDimScoresOut(BaseModel):
 
 
 class FiveDimScoresIn(BaseModel):
-    """Five-dimension scores input (1.0-5.0 each)."""
+    """Five-dimension scores input (0.0-5.0 each)."""
     originality: float
     rigor: float
     completeness: float
@@ -52,34 +54,61 @@ class FiveDimScoresIn(BaseModel):
         return self
 
 
+class AuthorInfo(BaseModel):
+    """Resolved author information for API responses."""
+    id: str
+    name: str
+    anonymous_name: str = ""
+    affiliation: str = ""
+    expertise: list[str] = []
+
+
+class AuthorContributions(BaseModel):
+    """Per-author 5-dim contribution ratios. Keys are author IDs."""
+    pass  # typed as dict[str, FiveDimScoresIn] in practice
+
+
 # ── Output schemas ───────────────────────────────────────────────────────
 
 class ArticleSummary(BaseModel):
     id: str
     title: str = ""
     status: ArticleStatus
-    authors: list[str] = []
+    authors: list[AuthorInfo] = []
+    content_preview: str = ""
+    commit_hash: str = ""
     fork_count: int = 0
-    created_at: datetime
+    forked_from: Optional[str] = None
+    commit_count: int = 1
     score: Optional[dict] = None
+    sink_eta: Optional[datetime] = None
+    days_remaining: Optional[int] = None
+    sink_duration_days: Optional[int] = None
+    is_bookmarked: bool = False
+    is_own_article: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ArticleDetail(BaseModel):
     id: str
     title: str = ""
     status: ArticleStatus
-    authors: list[str] = []
+    authors: list[AuthorInfo] = []
     fork_count: int = 0
     forked_from: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    commit_count: int = 1
     compiled_format: Optional[str] = None
     compiled_output: Optional[str] = None
     compiled_pages: Optional[list[str]] = None
     score: Optional[dict] = None
     sink_eta: Optional[datetime] = None
     days_remaining: Optional[int] = None
+    sink_duration_days: Optional[int] = None
     review_count: int = 0
+    is_bookmarked: bool = False
+    is_own_article: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ── Input schemas ────────────────────────────────────────────────────────
@@ -93,6 +122,7 @@ class ArticleCreate(BaseModel):
     content: str = ""               # article body (markdown or typst)
     format: str = "markdown"        # "markdown" | "typst"
     self_review: FiveDimScoresIn
+    contributions: Optional[dict[str, FiveDimScoresIn]] = None
     forked_from: Optional[str] = None
 
 
@@ -103,7 +133,15 @@ class ArticleUpdate(BaseModel):
     categories: Optional[list[str]] = None
     content: Optional[str] = None
     self_review: Optional[FiveDimScoresIn] = None
+    contributions: Optional[dict[str, FiveDimScoresIn]] = None
 
 
 class SinkExtensionRequest(BaseModel):
     extra_days: int = Field(ge=1, le=180)
+
+
+# ── Source / download ────────────────────────────────────────────────────
+
+class ArticleSourceResponse(BaseModel):
+    content: str
+    format: str  # "markdown" | "typst"

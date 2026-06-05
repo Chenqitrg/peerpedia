@@ -208,6 +208,66 @@ class TestReviewCRUD:
         assert updated.scores["originality"] == 5
         session.close()
 
+    def test_review_different_commits_ok(self, engine):
+        """Same (article, reviewer, scope) with different commit_hashes should succeed."""
+        from peerpedia_core.storage.db.crud_review import create_review
+        session = get_session(engine)
+        rv = _make_user(session, "rv_multi")
+        author = _make_user(session, "au_multi")
+        article = _make_article(session, authors=[author.id])
+        r1 = create_review(session, article_id=article.id, commit_hash="commit_1",
+                           reviewer_id=rv.id, scope="pool", scores=_default_scores())
+        r2 = create_review(session, article_id=article.id, commit_hash="commit_2",
+                           reviewer_id=rv.id, scope="pool", scores={
+                               "originality": 5, "rigor": 5, "completeness": 5,
+                               "pedagogy": 5, "impact": 5,
+                           })
+        assert r1.id != r2.id
+        assert r1.commit_hash == "commit_1"
+        assert r2.commit_hash == "commit_2"
+        session.close()
+
+    def test_duplicate_same_commit_fails(self, engine):
+        """Same (article, reviewer, scope, commit_hash) must raise integrity error."""
+        from peerpedia_core.storage.db.crud_review import create_review
+        import sqlalchemy
+        session = get_session(engine)
+        rv = _make_user(session, "rv_dup")
+        author = _make_user(session, "au_dup")
+        article = _make_article(session, authors=[author.id])
+        create_review(session, article_id=article.id, commit_hash="same_hash",
+                      reviewer_id=rv.id, scope="pool", scores=_default_scores())
+        with pytest.raises((sqlalchemy.exc.IntegrityError, Exception)):
+            create_review(session, article_id=article.id, commit_hash="same_hash",
+                          reviewer_id=rv.id, scope="pool", scores={
+                              "originality": 1, "rigor": 1, "completeness": 1,
+                              "pedagogy": 1, "impact": 1,
+                          })
+        session.close()
+
+    def test_get_by_user_scope_with_commit(self, engine):
+        """get_review_by_user_scope with commit_hash filters correctly."""
+        from peerpedia_core.storage.db.crud_review import (
+            create_review, get_review_by_user_scope,
+        )
+        session = get_session(engine)
+        rv = _make_user(session, "rv_filt")
+        author = _make_user(session, "au_filt")
+        article = _make_article(session, authors=[author.id])
+        create_review(session, article_id=article.id, commit_hash="h1",
+                      reviewer_id=rv.id, scope="pool", scores=_default_scores())
+        create_review(session, article_id=article.id, commit_hash="h2",
+                      reviewer_id=rv.id, scope="pool", scores={
+                          "originality": 5, "rigor": 5, "completeness": 5,
+                          "pedagogy": 5, "impact": 5,
+                      })
+        found = get_review_by_user_scope(session, article.id, rv.id, "pool",
+                                         commit_hash="h2")
+        assert found is not None
+        assert found.commit_hash == "h2"
+        assert found.scores["originality"] == 5
+        session.close()
+
     def test_add_thread_message(self, engine):
         from peerpedia_core.storage.db.crud_review import (
             create_review, add_thread_message,

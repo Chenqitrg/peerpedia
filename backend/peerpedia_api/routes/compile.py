@@ -33,7 +33,7 @@ def compile_preview(body: CompileRequest):
                 html = result.html_content or ""
                 if result.output_path:
                     html = Path(result.output_path).read_text()
-                return {"format": "html", "content": html, "pages": None}
+                return {"format": "html", "output": html, "pages": None}
             except HTTPException:
                 raise
             except Exception as e:
@@ -54,7 +54,7 @@ def compile_preview(body: CompileRequest):
                 svg_content = result.html_content or ""
                 if not svg_content and result.output_path:
                     svg_content = Path(result.output_path).read_text()
-                return {"format": "svg", "content": svg_content, "pages": None}
+                return {"format": "svg", "output": svg_content, "pages": None}
             except HTTPException:
                 raise
             except Exception as e:

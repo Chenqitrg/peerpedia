@@ -9,8 +9,10 @@ from peerpedia_api import deps
 from peerpedia_api.schemas.article import (
     ArticleCreate,
     ArticleDetail,
+    ArticleSourceResponse,
     ArticleSummary,
     ArticleUpdate,
+    AuthorInfo,
     SinkExtensionRequest,
 )
 from peerpedia_core.storage.db.crud_article import (
@@ -23,6 +25,8 @@ from peerpedia_core.storage.db.crud_article import (
     increment_fork_count,
 )
 from peerpedia_core.storage.db.crud_review import create_review, upsert_review, get_reviews_for_article
+from peerpedia_core.storage.db.crud_user import get_user
+from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
 from peerpedia_core.storage.git_backend import (
     DEFAULT_ARTICLES_DIR,
     init_article_repo,
@@ -31,6 +35,56 @@ from peerpedia_core.storage.git_backend import (
     get_diff,
     get_diff_between,
 )
+from peerpedia_core.workflow.scoring import compute_article_score_for_commit
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────
+
+def _repo_path(article_id: str) -> Path:
+    return DEFAULT_ARTICLES_DIR / article_id
+
+
+def _resolve_authors(db: Session, author_ids: list[str]) -> list[AuthorInfo]:
+    """Resolve a list of author user IDs to AuthorInfo objects."""
+    result: list[AuthorInfo] = []
+    for uid in author_ids:
+        u = get_user(db, uid)
+        if u:
+            result.append(AuthorInfo(
+                id=u.id, name=u.name, anonymous_name=u.anonymous_name,
+                affiliation=u.affiliation, expertise=u.expertise,
+            ))
+        else:
+            result.append(AuthorInfo(id=uid, name="unknown"))
+    return result
+
+
+def _get_commit_hash(article_id: str) -> str:
+    """Get HEAD commit hash for an article, or empty string."""
+    rp = _repo_path(article_id)
+    if not (rp / ".git").is_dir():
+        return ""
+    commits = get_commit_history(rp, max_count=1)
+    return commits[0]["hash"][:8] if commits else ""
+
+
+def _get_content_preview(article_id: str, max_chars: int = 200) -> str:
+    """Get first ~max_chars characters of article source content."""
+    rp = _repo_path(article_id)
+    for ext in [".md", ".typ"]:
+        f = rp / f"article{ext}"
+        if f.exists():
+            text = f.read_text()
+            return text[:max_chars] + ("..." if len(text) > max_chars else "")
+    return ""
+
+
+def _get_commit_count(article_id: str) -> int:
+    """Get total number of commits for an article."""
+    rp = _repo_path(article_id)
+    if not (rp / ".git").is_dir():
+        return 0
+    return len(get_commit_history(rp))
 
 
 def _compute_sink(a) -> tuple[datetime | None, int | None]:
@@ -49,46 +103,91 @@ router = APIRouter(prefix="/articles", tags=["articles"])
 
 
 @router.get("", response_model=dict)
-def api_list_articles(status: str | None = None, db: Session = Depends(deps.get_db)):
+def api_list_articles(
+    status: str | None = None,
+    author_id: str | None = None,
+    user_id: str | None = None,
+    page: int = 1,
+    size: int = 20,
+    db: Session = Depends(deps.get_db),
+):
     articles = list_articles(db, status=status)
+    # Filter by author if requested
+    if author_id:
+        articles = [a for a in articles if author_id in (a.authors or [])]
+    total = len(articles)
+    # Paginate
+    start = (page - 1) * size
+    paged = articles[start:start + size]
     summaries = [
         ArticleSummary(
             id=a.id,
-            title=getattr(a, "title", ""),
+            title=a.title or "",
             status=a.status,
-            authors=a.authors,
+            authors=_resolve_authors(db, a.authors or []),
+            content_preview=_get_content_preview(a.id),
+            commit_hash=_get_commit_hash(a.id),
             fork_count=a.fork_count,
-            created_at=a.created_at,
+            forked_from=a.forked_from,
+            commit_count=_get_commit_count(a.id),
             score=a.score,
+            sink_eta=_compute_sink(a)[0],
+            days_remaining=_compute_sink(a)[1],
+            sink_duration_days=getattr(a, "sink_duration_days", None),
+            is_bookmarked=is_bookmarked(db, user_id, a.id) if user_id else False,
+            is_own_article=user_id in (a.authors or []) if user_id else False,
+            created_at=a.created_at,
         )
-        for a in articles
+        for a in paged
     ]
-    return {"articles": [s.model_dump() for s in summaries], "total": len(summaries)}
+    return {"articles": [s.model_dump() for s in summaries], "total": total,
+            "page": page, "size": size}
 
 
 @router.get("/{article_id}", response_model=ArticleDetail)
-def api_get_article(article_id: str, db: Session = Depends(deps.get_db)):
+def api_get_article(
+    article_id: str,
+    user_id: str | None = None,
+    db: Session = Depends(deps.get_db),
+):
     a = get_article(db, article_id)
     if a is None:
         raise HTTPException(status_code=404, detail="Article not found")
+    # Backfill: if score is None, walk commits newest→oldest for a valid score
+    if a.score is None:
+        rp = _repo_path(article_id)
+        if (rp / ".git").is_dir():
+            for commit in get_commit_history(rp):
+                score = compute_article_score_for_commit(db, article_id,
+                                                         commit["hash"])
+                if score is not None:
+                    a.score = score
+                    db.commit()
+                    break
     reviews = get_reviews_for_article(db, article_id)
     sink_eta, days_remaining = _compute_sink(a)
+    distinct_reviewers = len({(r.reviewer_id, r.scope) for r in reviews})
+    authors = _resolve_authors(db, a.authors or [])
     return ArticleDetail(
         id=a.id,
-        title=getattr(a, "title", ""),
+        title=a.title or "",
         status=a.status,
-        authors=a.authors,
+        authors=authors,
         fork_count=a.fork_count,
         forked_from=a.forked_from,
-        created_at=a.created_at,
-        updated_at=a.updated_at,
+        commit_count=_get_commit_count(a.id),
         compiled_format=a.compiled_format,
         compiled_output=a.compiled_output,
         compiled_pages=a.compiled_pages,
         score=a.score,
         sink_eta=sink_eta,
         days_remaining=days_remaining,
-        review_count=len(reviews),
+        sink_duration_days=getattr(a, "sink_duration_days", None),
+        review_count=distinct_reviewers,
+        is_bookmarked=is_bookmarked(db, user_id, a.id) if user_id else False,
+        is_own_article=user_id in (a.authors or []) if user_id else False,
+        created_at=a.created_at,
+        updated_at=a.updated_at,
     )
 
 
@@ -100,6 +199,10 @@ def api_create_article(body: ArticleCreate, db: Session = Depends(deps.get_db)):
         db,
         authors=body.authors,
         status="draft",
+        title=body.title,
+        abstract=body.abstract,
+        keywords=body.keywords,
+        categories=body.categories,
         forked_from=body.forked_from,
     )
     # Init git repo and commit content
@@ -112,6 +215,11 @@ def api_create_article(body: ArticleCreate, db: Session = Depends(deps.get_db)):
     from peerpedia_core.config.params import params
     a = set_sink_start(db, a.id, params.sink.new_article_default_days)
     # Create self-review tied to this commit
+    contributions = None
+    if body.contributions:
+        contributions = {
+            aid: c.model_dump() for aid, c in body.contributions.items()
+        }
     create_review(
         db,
         article_id=a.id,
@@ -119,8 +227,14 @@ def api_create_article(body: ArticleCreate, db: Session = Depends(deps.get_db)):
         reviewer_id=body.authors[0],
         scope="pool",
         scores=body.self_review.model_dump(),
+        contributions=contributions,
     )
-    return api_get_article(a.id, db)
+    # Compute and cache article score (latest commit's score)
+    score = compute_article_score_for_commit(db, a.id, commit_hash)
+    if score is not None:
+        a.score = score
+    db.commit()
+    return api_get_article(a.id, db=db)
 
 
 @router.put("/{article_id}", response_model=ArticleDetail)
@@ -149,6 +263,16 @@ def api_update_article(article_id: str, body: ArticleUpdate,
         (rp / f"article{ext}").write_text(body.content)
         commit_msg = f"Edit: content updated"
 
+    # Update metadata fields if provided
+    if body.title is not None:
+        a.title = body.title
+    if body.abstract is not None:
+        a.abstract = body.abstract
+    if body.keywords is not None:
+        a.keywords = body.keywords
+    if body.categories is not None:
+        a.categories = body.categories
+
     # Commit
     commit_hash = commit_article(rp, commit_msg, author,
                                  f"{author}@peerpedia")
@@ -159,6 +283,11 @@ def api_update_article(article_id: str, body: ArticleUpdate,
 
     # Create or update self-review
     if body.self_review:
+        contributions = None
+        if body.contributions:
+            contributions = {
+                aid: c.model_dump() for aid, c in body.contributions.items()
+            }
         upsert_review(
             db,
             article_id=a.id,
@@ -166,9 +295,16 @@ def api_update_article(article_id: str, body: ArticleUpdate,
             reviewer_id=author,
             scope="pool",
             scores=body.self_review.model_dump(),
+            contributions=contributions,
         )
 
-    return api_get_article(a.id, db)
+    # Compute and cache article score (latest commit's score)
+    score = compute_article_score_for_commit(db, a.id, commit_hash)
+    if score is not None:
+        a.score = score
+    db.commit()
+
+    return api_get_article(a.id, db=db)
 
 
 @router.put("/{article_id}/sink-extension", response_model=ArticleDetail)
@@ -177,23 +313,128 @@ def api_extend_sink(article_id: str, body: SinkExtensionRequest,
     from peerpedia_core.config.params import params
     try:
         a = extend_sink(db, article_id, body.extra_days, params.sink.max_days)
-        return api_get_article(a.id, db)
+        return api_get_article(a.id, db=db)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
+# ── Actions ───────────────────────────────────────────────────────────
+
+@router.get("/{article_id}/has-forked")
+def api_has_forked(article_id: str, user_id: str, db: Session = Depends(deps.get_db)):
+    """Check if a user has already forked this article."""
+    all_articles = list_articles(db)
+    for a in all_articles:
+        if a.forked_from == article_id and user_id in (a.authors or []):
+            return {"has_forked": True, "fork_article_id": a.id}
+    return {"has_forked": False, "fork_article_id": None}
+
+
+@router.post("/{article_id}/publish", response_model=ArticleDetail)
+def api_publish_article(article_id: str, db: Session = Depends(deps.get_db)):
+    """Explicitly publish a draft article to the sedimentation pool."""
+    a = get_article(db, article_id)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    from peerpedia_core.config.params import params
+    a = set_sink_start(db, article_id, params.sink.new_article_default_days)
+    a = update_article_status(db, article_id, "sedimentation")
+    return api_get_article(a.id, db=db)
+
+
+# ── Source ─────────────────────────────────────────────────────────────
+
+@router.get("/{article_id}/source", response_model=ArticleSourceResponse)
+def api_get_source(article_id: str):
+    rp = _repo_path(article_id)
+    for ext in [".md", ".typ"]:
+        f = rp / f"article{ext}"
+        if f.exists():
+            fmt = "markdown" if ext == ".md" else "typst"
+            return ArticleSourceResponse(content=f.read_text(), format=fmt)
+    raise HTTPException(status_code=404, detail="Source file not found")
+
+
+@router.get("/{article_id}/download/source")
+def api_download_source(article_id: str):
+    from fastapi.responses import PlainTextResponse
+    rp = _repo_path(article_id)
+    for ext in [".md", ".typ"]:
+        f = rp / f"article{ext}"
+        if f.exists():
+            return PlainTextResponse(
+                content=f.read_text(),
+                media_type="text/plain",
+                headers={"Content-Disposition": f"attachment; filename=article{ext}"},
+            )
+    raise HTTPException(status_code=404, detail="Source file not found")
+
+
+@router.get("/{article_id}/download/pdf")
+def api_download_pdf(article_id: str):
+    """Compile article to PDF and return as downloadable file."""
+    import tempfile
+
+    from fastapi.responses import FileResponse, PlainTextResponse
+
+    rp = _repo_path(article_id)
+    # Find source file
+    for ext in [".typ", ".md"]:
+        f = rp / f"article{ext}"
+        if f.exists():
+            if ext == ".typ":
+                # Typst → PDF via compiler
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_dir = Path(tmp)
+                    out_dir = tmp_dir / "out"
+                    out_dir.mkdir()
+                    from peerpedia_core.storage.compiler import TypstBackend
+                    result = TypstBackend().compile(f, out_dir, fmt="pdf")
+                    if not result.success:
+                        raise HTTPException(
+                            status_code=500,
+                            detail=result.error or "PDF compilation failed",
+                        )
+                    return FileResponse(
+                        result.output_path,
+                        media_type="application/pdf",
+                        filename=f"{article_id}.pdf",
+                    )
+            else:
+                # Markdown → HTML download
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_dir = Path(tmp)
+                    out_dir = tmp_dir / "out"
+                    out_dir.mkdir()
+                    from peerpedia_core.storage.compiler import MarkdownBackend
+                    result = MarkdownBackend().compile(f, out_dir)
+                    html = result.html_content or ""
+                    if not html and result.output_path:
+                        html = Path(result.output_path).read_text()
+                    return PlainTextResponse(
+                        content=html,
+                        media_type="text/html",
+                        headers={
+                            "Content-Disposition":
+                                f"attachment; filename={article_id}.html",
+                        },
+                    )
+    raise HTTPException(status_code=404, detail="Source file not found")
+
+
 # ── Git-backed routes ──────────────────────────────────────────────────
 
-def _repo_path(article_id: str) -> Path:
-    return DEFAULT_ARTICLES_DIR / article_id
-
-
 @router.get("/{article_id}/history")
-def api_get_history(article_id: str):
+def api_get_history(article_id: str, db: Session = Depends(deps.get_db)):
     rp = _repo_path(article_id)
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=404, detail="Article repo not found")
-    return {"commits": get_commit_history(rp)}
+    commits = get_commit_history(rp)
+    # Attach per-commit scores
+    for commit in commits:
+        commit["score"] = compute_article_score_for_commit(db, article_id,
+                                                           commit["hash"])
+    return {"commits": commits}
 
 
 @router.get("/{article_id}/diff/{hash1}/{hash2}")
@@ -248,12 +489,19 @@ def api_rollback(article_id: str, hash: str, db: Session = Depends(deps.get_db))
     # Create self-review for the rollback commit
     article = get_article(db, article_id)
     if article:
-        set_sink_start(db, article_id, 3)  # edit default
         from peerpedia_core.config.params import params
-        from peerpedia_core.storage.db.crud_review import create_review
+        set_sink_start(db, article_id, params.sink.edit_article_default_days)
+        # Use neutral mid-scale scores — rollback is a system action, not an assessment
+        neutral = 3.0
         create_review(db, article_id=article_id, commit_hash=new_hash,
                       reviewer_id=article.authors[0] if article.authors else "system",
-                      scope="pool", scores={"originality": 0, "rigor": 0, "completeness": 0,
-                                             "pedagogy": 0, "impact": 0})
+                      scope="pool", scores={"originality": neutral, "rigor": neutral,
+                                             "completeness": neutral,
+                                             "pedagogy": neutral, "impact": neutral})
+        # Compute and cache article score for the rollback commit
+        score = compute_article_score_for_commit(db, article_id, new_hash)
+        if score is not None:
+            article.score = score
+            db.commit()
 
     return {"commit_hash": new_hash, "message": f"Rollback to {hash[:8]}"}

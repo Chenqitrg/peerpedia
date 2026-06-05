@@ -24,8 +24,10 @@ class TestFiveDimScoresSchema:
 class TestArticleSummary:
     def test_valid_article_summary(self):
         from peerpedia_api.schemas.article import ArticleSummary
+        from peerpedia_api.schemas.article import AuthorInfo
         a = ArticleSummary(
-            id="abc123", status="published", authors=["u1"],
+            id="abc123", status="published",
+            authors=[AuthorInfo(id="u1", name="Alice", anonymous_name="anon_alice")],
             fork_count=5, created_at=datetime.now(timezone.utc),
         )
         d = a.model_dump()
@@ -35,16 +37,19 @@ class TestArticleSummary:
     def test_rejects_invalid_status(self):
         from peerpedia_api.schemas.article import ArticleSummary
         with pytest.raises(ValidationError):
-            ArticleSummary(id="x", status="invalid", authors=["u1"],
+            from peerpedia_api.schemas.article import AuthorInfo
+            ArticleSummary(id="x", status="invalid",
+                           authors=[AuthorInfo(id="u1", name="A")],
                            fork_count=0, created_at=datetime.now(timezone.utc))
 
 
 class TestArticleDetail:
     def test_detail_includes_all_fields(self):
-        from peerpedia_api.schemas.article import ArticleDetail
+        from peerpedia_api.schemas.article import ArticleDetail, AuthorInfo
         now = datetime.now(timezone.utc)
         a = ArticleDetail(
-            id="a1", status="published", authors=["u1"],
+            id="a1", status="published",
+            authors=[AuthorInfo(id="u1", name="Alice", anonymous_name="anon_alice")],
             fork_count=0, created_at=now, updated_at=now,
             compiled_format="html", compiled_output="<h1>Hi</h1>",
             compiled_pages=None,

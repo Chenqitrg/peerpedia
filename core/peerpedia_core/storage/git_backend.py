@@ -79,6 +79,7 @@ def get_commit_history(
     for c in repo.iter_commits(max_count=max_count):
         commits.append({
             "hash": c.hexsha,
+            "parents": [p.hexsha for p in c.parents],
             "message": c.message.strip(),
             "author": str(c.author),
             "timestamp": c.committed_datetime.isoformat(),

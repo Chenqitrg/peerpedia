@@ -84,7 +84,13 @@ const diffHtml = computed(() => {
 function commitLabel(c: CommitInfo): string {
   const short = c.hash.substring(0, 7)
   const msg = c.message.length > 50 ? c.message.substring(0, 50) + '...' : c.message
-  return `${short} — ${msg}`
+  let label = `${short} — ${msg}`
+  if (c.score) {
+    const avg = (c.score.originality + c.score.rigor + c.score.completeness +
+                 c.score.pedagogy + c.score.impact) / 5
+    label += ` [${avg.toFixed(1)}]`
+  }
+  return label
 }
 </script>
 

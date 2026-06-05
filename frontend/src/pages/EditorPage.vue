@@ -1,10 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
-import FiveDimForm from '../components/FiveDimForm.vue'
 import { apiClient } from '../api/client'
+import {
+  Bookmark,
+  BookmarkCheck,
+  Eye,
+  EyeOff,
+  FileDown,
+  Play,
+  Save,
+  Send,
+  SlidersHorizontal,
+  FileText,
+} from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,38 +25,89 @@ const userStore = useUserStore()
 const editId = computed(() => route.params.id as string | undefined)
 const isEdit = computed(() => !!editId.value)
 
+// Editor state
 const title = ref('')
-const abstract = ref('')
 const content = ref('')
 const format = ref<'markdown' | 'typst'>('markdown')
-const scores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 })
-const submitting = ref(false)
 const previewHtml = ref('')
 const previewLoading = ref(false)
+const compiling = ref(false)
+
+// Side panel
+const showSelfReview = ref(false)
+const scores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 })
+const keywords = ref('')
+const categories = ref('')
+const abstract = ref('')
+
+// UI state
+const submitting = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
+const savedMsg = ref(false)
+const showPreview = ref(true)
 
-onMounted(async () => {
+// Split panel resize
+const splitRatio = ref(50)
+
+const DRAFT_KEY = computed(() => `editor-draft-${editId.value || 'new'}`)
+
+onMounted(() => {
   if (isEdit.value) {
+    loadExistingArticle()
+  } else {
+    restoreDraft()
+  }
+})
+
+async function loadExistingArticle() {
+  try {
     await articleStore.fetchArticle(editId.value!)
     const a = articleStore.currentArticle
     if (a) {
       title.value = a.title || ''
-      // Load content from git history's latest file
-      try {
-        const hist = await import('../api/articles').then(m => m.getHistory(editId.value!))
-        if (hist.commits?.length) {
-          // Content is fetched via compile endpoint or direct git read
-          // For now set placeholder; real content needs a GET /articles/{id}/content endpoint
-        }
-      } catch { /* content load is best-effort for now */ }
+    }
+  } catch (e: any) {
+    errorMsg.value = 'Failed to load article'
+  }
+}
+
+function restoreDraft() {
+  const saved = localStorage.getItem(DRAFT_KEY.value)
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      title.value = parsed.title || ''
+      content.value = parsed.content || ''
+      format.value = parsed.format || 'markdown'
+      scores.value = parsed.scores || { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 }
+      keywords.value = parsed.keywords || ''
+      categories.value = parsed.categories || ''
+      abstract.value = parsed.abstract || ''
+    } catch {
+      // ignore corrupt draft
     }
   }
-})
+}
 
-async function handlePreview() {
+function saveDraft() {
+  const draft = {
+    title: title.value,
+    content: content.value,
+    format: format.value,
+    scores: scores.value,
+    keywords: keywords.value,
+    categories: categories.value,
+    abstract: abstract.value,
+  }
+  localStorage.setItem(DRAFT_KEY.value, JSON.stringify(draft))
+  savedMsg.value = true
+  setTimeout(() => { savedMsg.value = false }, 2000)
+}
+
+async function handleCompile() {
   if (!content.value.trim()) return
-  previewLoading.value = true
+  compiling.value = true
   previewHtml.value = ''
   errorMsg.value = ''
   try {
@@ -53,15 +115,19 @@ async function handlePreview() {
       content: content.value,
       format: format.value,
     })
-    previewHtml.value = res.data.content || res.data.output || ''
+    previewHtml.value = res.data.output || res.data.content || ''
   } catch (e: any) {
-    errorMsg.value = e.response?.data?.detail || 'Preview failed'
+    errorMsg.value = e.response?.data?.detail || 'Compile failed'
   } finally {
-    previewLoading.value = false
+    compiling.value = false
   }
 }
 
-async function handleSubmit() {
+function handlePublish() {
+  showSelfReview.value = true
+}
+
+async function handleSubmitToPool() {
   if (!content.value.trim()) {
     errorMsg.value = 'Content is required'
     return
@@ -78,153 +144,309 @@ async function handleSubmit() {
   try {
     const body: Record<string, unknown> = {
       title: title.value,
-      abstract: abstract.value,
+      abstract: abstract.value || title.value,
       content: content.value,
       format: format.value,
       self_review: { ...scores.value },
       authors: [userStore.viewer.id],
+      keywords: keywords.value ? keywords.value.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
+      categories: categories.value ? categories.value.split(',').map((c: string) => c.trim()).filter(Boolean) : [],
     }
 
+    let result: any
     if (isEdit.value) {
-      await articleStore.updateArticle(editId.value!, body)
+      result = await articleStore.updateArticle(editId.value!, body)
       successMsg.value = 'Article updated and submitted to pool!'
     } else {
-      const result = await articleStore.createArticle(body)
+      result = await articleStore.createArticle(body)
       successMsg.value = 'Article created and submitted to pool!'
-      // Navigate to the new article
+      localStorage.removeItem(DRAFT_KEY.value)
       setTimeout(() => {
-        router.push(`/article/${result.id}`)
-      }, 1000)
+        router.push(`/articles/${result.id}`)
+      }, 1500)
     }
+    showSelfReview.value = false
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || 'Submission failed'
   } finally {
     submitting.value = false
   }
 }
+
+function handleDownload(format: 'source' | 'pdf') {
+  // Download via API or backup method
+  if (editId.value) {
+    window.open(`/api/v1/articles/${editId.value}/download/${format}`, '_blank')
+  }
+}
 </script>
 
 <template>
-  <div class="editor-page max-w-content animate-fade-in">
-    <header class="mb-8">
-      <h1 class="text-display-md text-ink mb-2">
-        {{ isEdit ? 'Edit Article' : 'Create Article' }}
-      </h1>
-      <p class="text-ink-muted">Write, review, and publish your scholarly work.</p>
-    </header>
-
-    <!-- Messages -->
-    <div v-if="errorMsg" class="card bg-danger/10 border border-danger/20 p-4 mb-6 text-danger text-sm">
-      {{ errorMsg }}
-    </div>
-    <div v-if="successMsg" class="card bg-success/10 border border-success/20 p-4 mb-6 text-success text-sm">
-      {{ successMsg }}
-    </div>
-
-    <div class="space-y-6">
-      <!-- Title -->
-      <div>
-        <label for="editor-title" class="label">Title</label>
+  <div class="editor-page flex flex-col h-[calc(100vh-6rem)] animate-fade-in">
+    <!-- Top toolbar -->
+    <div class="flex items-center justify-between px-4 py-2 bg-card border border-divider rounded-t-lg mb-0">
+      <div class="flex items-center gap-3 flex-1 min-w-0">
+        <!-- Title input (editable only on create) -->
         <input
-          id="editor-title"
+          v-if="!isEdit"
           v-model="title"
           type="text"
-          class="input text-lg"
-          placeholder="Enter article title..."
+          placeholder="Article title..."
+          class="flex-1 min-w-0 bg-transparent border-none text-base font-heading font-semibold text-ink
+                 placeholder:text-ink-muted/50 focus:outline-none"
         />
+        <span
+          v-else
+          class="text-base font-heading font-semibold text-ink truncate"
+        >
+          {{ title || 'Untitled' }}
+        </span>
       </div>
 
-      <!-- Format toggle -->
-      <div>
-        <label class="label">Format</label>
-        <div class="flex gap-2">
+      <div class="flex items-center gap-1.5 shrink-0">
+        <!-- Draft save -->
+        <div class="relative">
           <button
-            :class="format === 'markdown' ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'"
+            class="flex items-center justify-center w-8 h-8 rounded-lg
+                   text-ink-muted hover:text-ink hover:bg-[#21262d]
+                   transition-colors duration-200"
+            aria-label="Save draft"
+            title="Save draft"
+            @click="saveDraft"
+          >
+            <Save class="w-4 h-4" stroke-width="2" />
+          </button>
+          <span
+            v-if="savedMsg"
+            class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-success whitespace-nowrap"
+          >
+            Saved
+          </span>
+        </div>
+
+        <!-- Format toggle -->
+        <div class="flex items-center bg-[#0d1117] border border-divider rounded-lg overflow-hidden ml-1">
+          <button
+            class="px-2.5 py-1 text-xs font-mono transition-colors"
+            :class="format === 'markdown'
+              ? 'bg-accent text-[#0d1117] font-semibold'
+              : 'text-ink-muted hover:text-ink'"
             @click="format = 'markdown'"
           >
-            Markdown
+            MD
           </button>
           <button
-            :class="format === 'typst' ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'"
+            class="px-2.5 py-1 text-xs font-mono transition-colors"
+            :class="format === 'typst'
+              ? 'bg-accent text-[#0d1117] font-semibold'
+              : 'text-ink-muted hover:text-ink'"
             @click="format = 'typst'"
           >
             Typst
           </button>
         </div>
-      </div>
 
-      <!-- Abstract -->
-      <div>
-        <label for="editor-abstract" class="label">Abstract</label>
-        <textarea
-          id="editor-abstract"
-          v-model="abstract"
-          rows="4"
-          class="input font-mono text-sm"
-          placeholder="Write a brief abstract..."
-        />
-      </div>
+        <div class="w-px h-5 bg-divider mx-1" />
 
-      <!-- Content editor -->
-      <div>
-        <label for="editor-content" class="label">Content ({{ format }})</label>
-        <textarea
-          id="editor-content"
-          v-model="content"
-          rows="20"
-          class="input font-mono text-sm"
-          :placeholder="format === 'markdown' ? '# Heading\n\nWrite your article in Markdown...' : '= Heading\n\nWrite your article in Typst...'"
-        />
-      </div>
-
-      <!-- Self-review -->
-      <div class="card p-5">
-        <h3 class="text-lg font-heading font-semibold text-ink mb-3">Self-Review</h3>
-        <p class="text-sm text-ink-muted mb-4">
-          Rate your own article across five dimensions (1–5). This helps seed the review pool.
-        </p>
-        <FiveDimForm v-model="scores" />
-      </div>
-
-      <!-- Preview -->
-      <div v-if="previewHtml" class="card p-5">
-        <h3 class="text-lg font-heading font-semibold text-ink mb-3">Preview</h3>
-        <div class="prose-custom border rounded-lg p-4 bg-white" v-html="previewHtml" />
-      </div>
-
-      <!-- Actions -->
-      <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
+        <!-- Toggle preview -->
         <button
-          class="btn-primary"
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 text-ink-muted hover:text-ink hover:bg-[#21262d]
+                 transition-colors duration-200"
+          :aria-label="showPreview ? 'Hide preview' : 'Show preview'"
+          :title="showPreview ? 'Hide preview' : 'Show preview'"
+          @click="showPreview = !showPreview"
+        >
+          <Eye v-if="showPreview" class="w-4 h-4" stroke-width="2" />
+          <EyeOff v-else class="w-4 h-4" stroke-width="2" />
+        </button>
+
+        <!-- Compile -->
+        <button
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 text-ink-muted hover:text-accent hover:bg-accent/10
+                 transition-colors duration-200"
+          aria-label="Compile"
+          title="Compile"
+          :disabled="compiling || !content.trim()"
+          @click="handleCompile"
+        >
+          <Play class="w-4 h-4" stroke-width="2" />
+        </button>
+
+        <!-- Download buttons -->
+        <template v-if="editId">
+          <button
+            class="flex items-center justify-center w-8 h-8 rounded-lg
+                   text-ink-muted hover:text-ink hover:bg-[#21262d]
+                   transition-colors duration-200"
+            aria-label="Download source"
+            title="Download source"
+            @click="handleDownload('source')"
+          >
+            <FileDown class="w-4 h-4" stroke-width="2" />
+          </button>
+        </template>
+
+        <div class="w-px h-5 bg-divider mx-1" />
+
+        <!-- Publish button -->
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
+                 bg-accent text-[#0d1117] rounded-lg
+                 hover:brightness-110 transition-all duration-200"
           :disabled="submitting"
-          @click="handleSubmit"
+          @click="handlePublish"
         >
-          <svg v-if="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          {{ submitting ? 'Submitting...' : (isEdit ? 'Submit Edit to Pool' : 'Publish to Pool') }}
+          <Send class="w-3.5 h-3.5" stroke-width="2" />
+          {{ isEdit ? 'Submit' : 'Publish' }}
         </button>
-        <button
-          class="btn-outline"
-          :disabled="previewLoading || !content.trim()"
-          @click="handlePreview"
-        >
-          <svg v-if="previewLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          {{ previewLoading ? 'Compiling...' : 'Preview' }}
-        </button>
-        <button class="btn-ghost" @click="router.back()">Cancel</button>
       </div>
     </div>
+
+    <!-- Messages -->
+    <div v-if="errorMsg" class="px-4 py-2 text-xs text-ink-muted bg-card border-x border-divider">
+      {{ errorMsg }}
+    </div>
+    <div v-if="successMsg" class="px-4 py-2 text-xs text-success bg-card border-x border-divider">
+      {{ successMsg }}
+    </div>
+
+    <!-- Split editor/preview -->
+    <div class="flex flex-1 border-x border-divider overflow-hidden">
+      <!-- Editor area (left) -->
+      <div
+        class="flex flex-col"
+        :style="{ width: showPreview ? `${splitRatio}%` : '100%' }"
+      >
+        <textarea
+          v-model="content"
+          class="flex-1 w-full bg-[#0d1117] text-ink font-mono text-sm leading-relaxed
+                 p-4 resize-none border-none focus:outline-none
+                 placeholder:text-ink-muted/30"
+          :placeholder="format === 'markdown'
+            ? '# Title\n\nWrite your article in Markdown...'
+            : '= Title\n\nWrite your article in Typst...'"
+          spellcheck="false"
+        />
+      </div>
+
+      <!-- Draggable divider -->
+      <div
+        v-if="showPreview"
+        class="w-1 bg-divider cursor-col-resize hover:bg-accent/50 transition-colors shrink-0 relative"
+        @mousedown.prevent=""
+      />
+
+      <!-- Preview area (right) -->
+      <div
+        v-if="showPreview"
+        class="flex flex-col overflow-hidden"
+        :style="{ width: `${100 - splitRatio}%` }"
+      >
+        <div class="flex-1 overflow-y-auto bg-[#0d1117] p-4">
+          <div v-if="compiling" class="flex items-center justify-center h-full text-ink-muted text-sm">
+            Compiling...
+          </div>
+          <div
+            v-else-if="previewHtml"
+            class="prose-custom max-w-none"
+            v-html="previewHtml"
+          />
+          <div
+            v-else
+            class="flex items-center justify-center h-full text-ink-muted/40 text-xs"
+          >
+            Click <Play class="w-3 h-3 inline mx-1" stroke-width="2" /> to compile preview
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="flex items-center justify-between px-4 py-1.5 bg-card border border-divider rounded-b-lg text-xs text-ink-muted">
+      <span>{{ format.toUpperCase() }}</span>
+      <span>{{ content.length }} characters</span>
+    </div>
+
+    <!-- Self-review panel (slide-in) -->
+    <Transition name="slide-up">
+      <div
+        v-if="showSelfReview"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+        @click.self="showSelfReview = false"
+      >
+        <div class="bg-card border border-divider rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in">
+          <h3 class="text-lg font-heading font-semibold text-ink mb-1">Self Assessment</h3>
+          <p class="text-xs text-ink-muted mb-5">Rate your article before submitting to the pool.</p>
+
+          <!-- 5-dim scores -->
+          <div class="space-y-3 mb-5">
+            <label class="text-xs font-semibold text-ink-muted">Scores (1-5)</label>
+            <div class="grid grid-cols-5 gap-2">
+              <div v-for="(_, key) in scores" :key="key" class="text-center">
+                <div class="text-xs text-ink-muted mb-1 capitalize">{{ key.substring(0, 4) }}</div>
+                <select
+                  v-model="(scores as any)[key]"
+                  class="w-full bg-[#0d1117] border border-divider rounded text-center text-sm text-ink py-1.5 focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Keywords -->
+          <div class="mb-3">
+            <label class="text-xs font-semibold text-ink-muted block mb-1">Keywords</label>
+            <input
+              v-model="keywords"
+              type="text"
+              placeholder="e.g. quantum, computing, algorithms"
+              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+
+          <!-- Categories -->
+          <div class="mb-3">
+            <label class="text-xs font-semibold text-ink-muted block mb-1">Categories</label>
+            <input
+              v-model="categories"
+              type="text"
+              placeholder="e.g. cs.AI, math.NT"
+              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+
+          <!-- Abstract -->
+          <div class="mb-5">
+            <label class="text-xs font-semibold text-ink-muted block mb-1">Abstract</label>
+            <textarea
+              v-model="abstract"
+              rows="3"
+              placeholder="Brief summary of your article..."
+              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+            />
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-3">
+            <button
+              class="btn-outline flex-1"
+              @click="showSelfReview = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="btn-primary flex-1"
+              :disabled="submitting"
+              @click="handleSubmitToPool"
+            >
+              {{ submitting ? 'Submitting...' : 'Publish to Pool' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>

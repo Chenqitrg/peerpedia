@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Crimson+Pro:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,16 +8,16 @@
 @layer base {
   html {
     @apply scroll-smooth antialiased;
-    font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
   }
 
   body {
-    @apply bg-surface text-ink;
+    @apply bg-page text-ink;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Crimson Pro', Georgia, serif;
-    @apply font-semibold tracking-tight;
+    font-family: 'EB Garamond', Georgia, serif;
+    @apply font-semibold tracking-tight text-ink;
   }
 
   h1 { @apply text-display md:text-display; }
@@ -26,12 +26,12 @@
   h4 { @apply text-xl; }
 
   a {
-    @apply text-primary-600 hover:text-primary-700 transition-colors duration-200;
+    @apply text-accent hover:text-accent-hover transition-colors duration-200;
   }
 
   /* Focus ring for keyboard navigation */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-primary-500 rounded;
+    @apply outline-2 outline-offset-2 outline-accent rounded;
   }
 
   /* Reduced motion */
@@ -48,7 +48,7 @@
 @layer components {
   /* Card */
   .card {
-    @apply bg-white border border-gray-200 rounded-card shadow-card
+    @apply bg-card border border-divider rounded-card shadow-card
            transition-shadow duration-200;
   }
   .card-interactive {
@@ -60,24 +60,20 @@
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
            text-sm font-semibold rounded-lg
            transition-all duration-200
-           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500
+           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-primary-600 text-white
-           hover:bg-primary-700 active:bg-primary-800;
-  }
-  .btn-accent {
-    @apply btn bg-accent-500 text-white
-           hover:bg-accent-600 active:bg-accent-700;
+    @apply btn bg-accent text-[#0d1117] font-bold
+           hover:bg-accent-hover active:brightness-90;
   }
   .btn-outline {
-    @apply btn border-2 border-primary-600 text-primary-600 bg-transparent
-           hover:bg-primary-50 active:bg-primary-100;
+    @apply btn border border-accent text-accent bg-transparent
+           hover:bg-accent/10 active:bg-accent/20;
   }
   .btn-ghost {
-    @apply btn text-ink-muted hover:text-ink hover:bg-gray-100
-           active:bg-gray-200;
+    @apply btn text-ink-muted hover:text-ink hover:bg-[#21262d]
+           active:bg-[#30363d];
   }
   .btn-sm {
     @apply text-xs px-3 py-1.5;
@@ -88,10 +84,10 @@
 
   /* Form inputs */
   .input {
-    @apply w-full px-3 py-2.5 text-sm rounded-lg border border-gray-300
-           bg-white text-ink
-           placeholder:text-ink-subtle
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+    @apply w-full px-3 py-2.5 text-sm rounded-lg border border-divider
+           bg-card text-ink
+           placeholder:text-ink-muted
+           focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent
            transition-colors duration-200;
   }
   .label {
@@ -103,18 +99,21 @@
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
   .badge-draft {
-    @apply badge bg-gray-100 text-gray-700;
+    @apply badge bg-[#21262d] text-[#6e7681];
   }
   .badge-review {
-    @apply badge bg-accent-100 text-accent-700;
+    @apply badge bg-neutral/20 text-neutral;
   }
   .badge-published {
-    @apply badge bg-success/10 text-success;
+    @apply badge bg-success/20 text-success;
+  }
+  .badge-sedimentation {
+    @apply badge bg-neutral/20 text-neutral;
   }
 
   /* Skeleton loading */
   .skeleton {
-    @apply bg-gray-200 rounded animate-skeleton;
+    @apply bg-[#21262d] rounded animate-skeleton;
   }
 
   /* Prose for rendered markdown */
@@ -133,19 +132,19 @@
   .prose-custom ul { @apply list-disc; }
   .prose-custom ol { @apply list-decimal; }
   .prose-custom blockquote {
-    @apply border-l-4 border-primary-300 pl-4 my-4 italic text-ink-muted;
+    @apply border-l-4 border-accent/30 pl-4 my-4 italic text-ink-muted;
   }
   .prose-custom code {
-    @apply bg-gray-100 text-primary-700 px-1.5 py-0.5 rounded text-sm font-mono;
+    @apply bg-[#21262d] text-ink px-1.5 py-0.5 rounded text-sm font-mono;
   }
   .prose-custom pre {
-    @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4;
+    @apply bg-[#0d1117] text-ink p-4 rounded-lg overflow-x-auto my-4 border border-divider;
   }
   .prose-custom pre code {
     @apply bg-transparent text-inherit px-0 py-0;
   }
   .prose-custom a {
-    @apply text-primary-600 underline hover:text-primary-700;
+    @apply text-accent underline hover:text-accent-hover;
   }
   .prose-custom img {
     @apply rounded-lg max-w-full my-4;
@@ -154,9 +153,9 @@
     @apply w-full border-collapse my-4;
   }
   .prose-custom th, .prose-custom td {
-    @apply border border-gray-200 px-3 py-2 text-left;
+    @apply border border-divider px-3 py-2 text-left;
   }
   .prose-custom th {
-    @apply bg-gray-50 font-semibold;
+    @apply bg-[#161b22] font-semibold;
   }
 }

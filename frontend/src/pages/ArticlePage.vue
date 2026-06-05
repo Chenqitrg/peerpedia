@@ -1,23 +1,93 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { useArticleStore } from '../stores/useArticleStore'
-import DiffViewer from '../components/DiffViewer.vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getArticle, getHistory, forkArticle } from '../api/articles'
+import { useUserStore } from '../stores/useUserStore'
+import type { ArticleDetail } from '../api/types'
+import {
+  Bookmark,
+  BookmarkCheck,
+  History,
+  Edit,
+  GitFork,
+  GitMerge,
+  Clock,
+  MessageSquare,
+  Eye,
+  ChevronRight,
+} from 'lucide-vue-next'
 
 const route = useRoute()
-const store = useArticleStore()
+const router = useRouter()
+const userStore = useUserStore()
+
+const article = ref<ArticleDetail | null>(null)
+const loading = ref(true)
+const activeTab = ref<'body' | 'comments'>('body')
+const isForked = ref(false)
+
 const id = route.params.id as string
 
-onMounted(() => {
-  store.fetchArticle(id)
+const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
+const isBookmarked = computed(() => article.value?.is_bookmarked ?? false)
+
+const statusLabel = computed(() => {
+  switch (article.value?.status) {
+    case 'published': return 'Published'
+    case 'sedimentation': return 'In Pool'
+    case 'draft': return 'Draft'
+    default: return article.value?.status ?? ''
+  }
 })
 
-function statusBadge(status: string): string {
-  switch (status) {
+const statusClass = computed(() => {
+  switch (article.value?.status) {
     case 'published': return 'badge-published'
-    case 'review':
-    case 'in_review': return 'badge-review'
+    case 'sedimentation': return 'badge-sedimentation'
     default: return 'badge-draft'
+  }
+})
+
+onMounted(async () => {
+  try {
+    article.value = await getArticle(id)
+  } catch (e) {
+    console.error('Failed to load article:', e)
+  } finally {
+    loading.value = false
+  }
+})
+
+function toggleBookmark() {
+  // Will be handled via bookmark API
+  if (article.value) {
+    article.value.is_bookmarked = !article.value.is_bookmarked
+  }
+}
+
+function goToHistory() {
+  router.push(`/articles/${id}/history`)
+}
+
+function goToEdit() {
+  router.push(`/edit/${id}`)
+}
+
+async function handleFork() {
+  if (!userStore.viewer) return
+  try {
+    const result = await forkArticle(id, userStore.viewer.id)
+    isForked.value = true
+    router.push(`/edit/${result.id}`)
+  } catch (e) {
+    console.error('Fork failed:', e)
+  }
+}
+
+function handleSinkExtension() {
+  // Will call PUT /articles/{id}/sink-extension
+  if (article.value) {
+    article.value.days_remaining = (article.value.days_remaining ?? 0) + 7
   }
 }
 </script>
@@ -25,67 +95,168 @@ function statusBadge(status: string): string {
 <template>
   <div class="article-page animate-fade-in">
     <!-- Loading -->
-    <div v-if="!store.currentArticle" class="space-y-4 animate-pulse">
-      <div class="skeleton h-10 w-3/4 mb-2" />
-      <div class="skeleton h-5 w-1/3 mb-4" />
-      <div class="skeleton h-4 w-full mb-2" />
-      <div class="skeleton h-4 w-full mb-2" />
-      <div class="skeleton h-4 w-2/3" />
+    <div v-if="loading" class="space-y-4 animate-pulse">
+      <div class="skeleton h-8 w-3/4 mb-2" />
+      <div class="skeleton h-5 w-1/2 mb-4" />
+      <div class="skeleton h-3 w-full mb-2" />
+      <div class="skeleton h-3 w-full" />
     </div>
 
-    <!-- Article content -->
-    <article v-else class="max-w-content">
-      <!-- Header -->
-      <header class="mb-8">
-        <div class="flex items-center gap-2 mb-3">
-          <span :class="statusBadge(store.currentArticle.status)">
-            {{ store.currentArticle.status }}
-          </span>
+    <template v-else-if="article">
+      <!-- Google Scholar-style narrow top bar -->
+      <div class="bg-card border border-divider rounded-lg p-4 mb-6">
+        <!-- Status & bookmark row -->
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span :class="statusClass">{{ statusLabel }}</span>
+            <span v-if="article.forked_from" class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-neutral bg-neutral/10 rounded">
+              <GitFork class="w-3 h-3" stroke-width="2" />
+              fork
+            </span>
+          </div>
+          <button
+            class="flex items-center justify-center w-7 h-7 rounded
+                   text-ink-muted hover:text-accent hover:bg-accent/10
+                   transition-colors duration-200"
+            :aria-label="isBookmarked ? 'Remove bookmark' : 'Add bookmark'"
+            :title="isBookmarked ? 'Remove bookmark' : 'Add bookmark'"
+            @click="toggleBookmark"
+          >
+            <BookmarkCheck v-if="isBookmarked" class="w-4 h-4 text-accent" stroke-width="2" />
+            <Bookmark v-else class="w-4 h-4" stroke-width="2" />
+          </button>
         </div>
 
-        <h1 class="text-display-md md:text-display text-ink mb-4">
-          {{ store.currentArticle.title || 'Untitled' }}
+        <!-- Title -->
+        <h1 class="text-display-md font-heading font-bold text-ink mb-3 leading-tight">
+          {{ article.title || 'Untitled' }}
         </h1>
 
-        <div class="flex flex-wrap items-center gap-3 text-sm text-ink-muted">
-          <span v-if="store.currentArticle.authors?.length" class="flex items-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            {{ store.currentArticle.authors.map((a: any) => a.name).join(', ') }}
-          </span>
-          <span class="text-ink-subtle">·</span>
-          <span>{{ store.currentArticle.review_count ?? 0 }} reviews</span>
-          <span class="text-ink-subtle">·</span>
-          <span>{{ store.currentArticle.fork_count ?? 0 }} forks</span>
+        <!-- Authors -->
+        <div class="flex flex-wrap items-center gap-1.5 mb-3">
+          <template v-for="(author, idx) in article.authors" :key="author.id">
+            <router-link
+              :to="`/user/${author.id}`"
+              class="text-sm text-accent hover:text-accent-hover hover:underline no-underline"
+            >
+              {{ author.name }}
+            </router-link>
+            <span v-if="idx < article.authors.length - 1" class="text-ink-muted">,</span>
+          </template>
         </div>
-      </header>
 
-      <!-- Scores section -->
-      <section v-if="store.currentArticle.score" class="card p-6 mb-8">
-        <h2 class="text-lg font-heading font-semibold text-ink mb-4">Review Scores</h2>
-        <div class="grid grid-cols-5 gap-4 text-center">
-          <div v-for="[key, val] in Object.entries(store.currentArticle.score)" :key="key" class="space-y-1">
-            <div class="text-2xl font-bold text-primary-600">{{ val }}</div>
-            <div class="text-xs text-ink-muted capitalize">{{ key }}</div>
+        <!-- Metadata + actions row -->
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-muted">
+          <span class="flex items-center gap-1">
+            <GitFork class="w-3 h-3" stroke-width="2" />
+            {{ article.fork_count }} forks
+          </span>
+          <span class="flex items-center gap-1">
+            <MessageSquare class="w-3 h-3" stroke-width="2" />
+            {{ article.review_count }} reviews
+          </span>
+          <span v-if="article.days_remaining != null" class="flex items-center gap-1">
+            <Clock class="w-3 h-3" stroke-width="2" />
+            {{ article.days_remaining }}d remaining in pool
+          </span>
+
+          <div class="flex-1" />
+
+          <!-- Action buttons -->
+          <div class="flex items-center gap-1">
+            <button
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
+              @click="goToHistory"
+            >
+              <History class="w-3 h-3" stroke-width="2" />
+              History
+            </button>
+
+            <button
+              v-if="isOwnArticle"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
+              @click="goToEdit"
+            >
+              <Edit class="w-3 h-3" stroke-width="2" />
+              Edit
+            </button>
+
+            <button
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
+              @click="handleFork"
+            >
+              <GitFork class="w-3 h-3" stroke-width="2" />
+              Fork
+            </button>
+
+            <button
+              v-if="isOwnArticle && article.status === 'sedimentation'"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
+              @click="handleSinkExtension"
+            >
+              <Clock class="w-3 h-3" stroke-width="2" />
+              Extend
+            </button>
           </div>
         </div>
-      </section>
 
-      <!-- Article body placeholder -->
-      <section class="card p-6 mb-8">
-        <h2 class="text-lg font-heading font-semibold text-ink mb-4">Abstract</h2>
-        <div class="prose-custom">
-          <p class="text-ink-muted">
-            {{ store.currentArticle.compiled_output || 'No abstract available.' }}
-          </p>
+        <!-- Scores row -->
+        <div v-if="article.score" class="flex items-center gap-3 mt-3 pt-3 border-t border-divider">
+          <span class="text-xs text-ink-muted font-semibold">Scores</span>
+          <span class="text-xs font-mono text-accent font-semibold">O:{{ article.score.originality }}</span>
+          <span class="text-xs font-mono text-ink-muted">R:{{ article.score.rigor }}</span>
+          <span class="text-xs font-mono text-ink-muted">C:{{ article.score.completeness }}</span>
+          <span class="text-xs font-mono text-ink-muted">P:{{ article.score.pedagogy }}</span>
+          <span class="text-xs font-mono text-ink-muted">I:{{ article.score.impact }}</span>
         </div>
-      </section>
+      </div>
 
-      <!-- History / Diff section -->
-      <section class="mt-12">
-        <DiffViewer :article-id="id" />
-      </section>
-    </article>
+      <!-- Tab switcher -->
+      <div class="flex items-center border-b border-divider mb-6">
+        <button
+          class="px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-[1px]"
+          :class="activeTab === 'body'
+            ? 'text-accent border-accent'
+            : 'text-ink-muted border-transparent hover:text-ink'"
+          @click="activeTab = 'body'"
+        >
+          <Eye class="w-3.5 h-3.5 inline mr-1.5" stroke-width="2" />
+          Body
+        </button>
+        <button
+          class="px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-[1px]"
+          :class="activeTab === 'comments'
+            ? 'text-accent border-accent'
+            : 'text-ink-muted border-transparent hover:text-ink'"
+          @click="activeTab = 'comments'"
+        >
+          <MessageSquare class="w-3.5 h-3.5 inline mr-1.5" stroke-width="2" />
+          Comments ({{ article.review_count }})
+        </button>
+      </div>
+
+      <!-- Tab content -->
+      <div v-if="activeTab === 'body'" class="card p-6">
+        <div
+          v-if="article.compiled_output"
+          class="prose-custom max-w-none"
+          v-html="article.compiled_output"
+        />
+        <p v-else class="text-ink-muted text-sm">
+          No compiled content available.
+        </p>
+      </div>
+
+      <div v-else class="card p-6">
+        <p class="text-ink-muted text-sm">
+          Comments and reviews will be displayed here.
+        </p>
+      </div>
+    </template>
+
+    <!-- Error state -->
+    <div v-else class="card p-12 text-center">
+      <p class="text-ink-muted">Article not found.</p>
+    </div>
   </div>
 </template>

@@ -1,4 +1,6 @@
 """Score aggregation — weighted average of reviews."""
+from sqlalchemy.orm import Session
+
 from peerpedia_core.config.params import params
 from peerpedia_core.types.scores import FiveDimScores
 
@@ -55,3 +57,44 @@ def compute_article_score(
         result[dim] = round(total / count, 2) if count > 0 else 0.0
 
     return result
+
+
+def compute_article_score_for_commit(
+    session: Session,
+    article_id: str,
+    commit_hash: str,
+) -> dict | None:
+    """Compute the score for a specific commit from reviews written against it.
+
+    Filters all reviews for *article_id* to only those whose ``commit_hash``
+    matches *commit_hash*, builds reviewer reputation weights, then delegates
+    to :func:`compute_article_score`.
+
+    Returns ``None`` if no reviews exist for the given commit.
+    """
+    from peerpedia_core.storage.db.crud_article import get_article
+    from peerpedia_core.storage.db.crud_review import get_reviews_for_article
+    from peerpedia_core.workflow.reputation import get_reviewer_weight
+
+    article = get_article(session, article_id)
+    if article is None:
+        return None
+
+    all_reviews = get_reviews_for_article(session, article_id)
+    commit_reviews = [r for r in all_reviews if r.commit_hash == commit_hash]
+    if not commit_reviews:
+        return None
+
+    authors = article.authors or []
+    review_dicts: list[dict] = []
+    reviewer_weights: dict[str, float] = {}
+
+    for r in commit_reviews:
+        review_dicts.append({
+            "scores": r.scores,
+            "is_self": r.reviewer_id in authors,
+            "reviewer_id": r.reviewer_id,
+        })
+        reviewer_weights[r.reviewer_id] = get_reviewer_weight(session, r.reviewer_id)
+
+    return compute_article_score(review_dicts, reviewer_weights)

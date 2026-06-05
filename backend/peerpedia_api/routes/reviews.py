@@ -12,6 +12,8 @@ from peerpedia_core.storage.db.crud_review import (
 )
 from peerpedia_core.storage.db.crud_article import get_article
 from peerpedia_core.storage.db.crud_user import get_user
+from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
+from peerpedia_core.workflow.scoring import compute_article_score_for_commit
 
 router = APIRouter(prefix="/articles/{article_id}/reviews", tags=["reviews"])
 
@@ -24,6 +26,7 @@ def _build_review_out(r, db: Session, article_authors: list[str]) -> ReviewOut:
     return ReviewOut(
         id=r.id, article_id=r.article_id, commit_hash=r.commit_hash,
         reviewer_id=r.reviewer_id, scope=r.scope, scores=r.scores,
+        contributions=r.contributions,
         thread=r.thread, reviewer_name=reviewer_name,
         is_self_review=r.reviewer_id in article_authors,
         created_at=r.created_at, updated_at=r.updated_at,
@@ -44,13 +47,24 @@ def submit_review(article_id: str, body: ReviewCreate, db: Session = Depends(dep
     article = get_article(db, article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
-    existing = get_review_by_user_scope(db, article_id, body.reviewer_id, body.scope.value)
+    existing = get_review_by_user_scope(db, article_id, body.reviewer_id,
+                                        body.scope.value, commit_hash=body.commit_hash)
     if existing:
         r = update_review_scores(db, existing.id, body.scores)
     else:
         r = create_review(db, article_id=article_id, commit_hash=body.commit_hash,
                            reviewer_id=body.reviewer_id, scope=body.scope.value,
                            scores=body.scores)
+    # Compute per-commit score and cache latest commit's score on the article
+    rp = DEFAULT_ARTICLES_DIR / article_id
+    if (rp / ".git").is_dir():
+        commits = get_commit_history(rp)
+        if commits:
+            score = compute_article_score_for_commit(db, article_id,
+                                                     commits[0]["hash"])
+            if score is not None:
+                article.score = score
+                db.commit()
     # Update reputation for all authors of the reviewed article
     from peerpedia_core.workflow.reputation import compute_author_reputation
     for author_id in article.authors:
