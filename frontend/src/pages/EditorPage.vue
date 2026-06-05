@@ -22,6 +22,8 @@ const router = useRouter()
 const articleStore = useArticleStore()
 const userStore = useUserStore()
 
+import { getArticleSource } from '../api/articles'
+
 const editId = computed(() => route.params.id as string | undefined)
 const isEdit = computed(() => !!editId.value)
 
@@ -89,6 +91,10 @@ async function loadExistingArticle() {
     if (a) {
       title.value = a.title || ''
     }
+    // Load source content from git repo (needed for forks and editing existing articles)
+    const src = await getArticleSource(editId.value!)
+    content.value = src.content
+    format.value = src.format as 'markdown' | 'typst'
   } catch (e: any) {
     errorMsg.value = 'Failed to load article'
   }
@@ -199,17 +205,43 @@ function handleDownload(dlFormat: 'source' | 'pdf') {
   if (editId.value) {
     // Saved article: use the download endpoints
     window.open(`/api/v1/articles/${editId.value}/download/${dlFormat}`, '_blank')
+  } else if (dlFormat === 'pdf') {
+    // New article PDF: call compile-download endpoint
+    handleCompileDownload()
   } else {
-    // New article: source = download raw content as file
+    // New article source: download raw content as file
     const ext = format.value === 'typst' ? '.typ' : '.md'
-    const mimeType = 'text/plain'
-    const blob = new Blob([content.value], { type: mimeType })
+    const blob = new Blob([content.value], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = `article${ext}`
     a.click()
     URL.revokeObjectURL(url)
+  }
+}
+
+async function handleCompileDownload() {
+  if (!content.value.trim()) {
+    errorMsg.value = 'Nothing to download — editor is empty'
+    return
+  }
+  try {
+    const res = await apiClient.post('/compile-download', {
+      content: content.value,
+      format: format.value,
+    }, { responseType: 'blob' })
+    const blob = new Blob([res.data], { type: res.headers['content-type'] as string })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = format.value === 'typst' ? 'article.pdf' : 'article.html'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    errorMsg.value = 'Compile download failed'
   }
 }
 </script>

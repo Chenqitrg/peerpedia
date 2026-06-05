@@ -13,6 +13,34 @@ const displayName = ref('')
 const error = ref('')
 const loading = ref(false)
 
+function extractError(e: any, fallback: string): string {
+  // No response at all — network error / server down
+  if (!e.response) {
+    if (e.code === 'ERR_NETWORK' || e.message?.includes('Network Error')) {
+      return 'Cannot reach server. Is the backend running on port 8080?'
+    }
+    return e.message || fallback
+  }
+
+  const status = e.response.status
+  const detail = e.response.data?.detail
+
+  // FastAPI 422 validation error: detail is an array of {loc, msg}
+  if (status === 422 && Array.isArray(detail)) {
+    const msgs = detail.map((d: any) => {
+      const field = d.loc?.slice(1).join('.') || 'unknown'
+      return `${field}: ${d.msg}`
+    })
+    return msgs.join('; ')
+  }
+
+  // Standard error with string detail
+  if (typeof detail === 'string') return detail
+
+  // Fallback with status code
+  return `${fallback} (HTTP ${status})`
+}
+
 function switchTab(t: 'login' | 'register') {
   tab.value = t
   error.value = ''
@@ -20,12 +48,16 @@ function switchTab(t: 'login' | 'register') {
 
 async function handleLogin() {
   error.value = ''
+  if (!username.value.trim() || !password.value.trim()) {
+    error.value = 'Please enter both username and password'
+    return
+  }
   loading.value = true
   try {
     await userStore.login(username.value, password.value)
     close()
   } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Login failed'
+    error.value = extractError(e, 'Login failed')
   } finally {
     loading.value = false
   }
@@ -33,12 +65,28 @@ async function handleLogin() {
 
 async function handleRegister() {
   error.value = ''
+  if (!username.value.trim() || !password.value.trim()) {
+    error.value = 'Username and password are required'
+    return
+  }
+  if (password.value.length < 6) {
+    error.value = 'Password must be at least 6 characters'
+    return
+  }
+  if (!email.value.trim() || !email.value.includes('@')) {
+    error.value = 'Please enter a valid email address'
+    return
+  }
+  if (!displayName.value.trim()) {
+    error.value = 'Display name is required'
+    return
+  }
   loading.value = true
   try {
     await userStore.register(username.value, password.value, email.value, displayName.value)
     close()
   } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Registration failed'
+    error.value = extractError(e, 'Registration failed')
   } finally {
     loading.value = false
   }

@@ -3,7 +3,9 @@ import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+import io
 
 router = APIRouter(tags=["compile"])
 
@@ -55,6 +57,69 @@ def compile_preview(body: CompileRequest):
                 if not svg_content and result.output_path:
                     svg_content = Path(result.output_path).read_text()
                 return {"format": "svg", "output": svg_content, "pages": None}
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {body.format}")
+
+
+@router.post("/compile-download")
+def compile_download(body: CompileRequest):
+    """Compile raw content and return as downloadable file.
+
+    Markdown → HTML file download, Typst → PDF file download.
+    """
+    format_lower = body.format.lower()
+    if format_lower == "markdown":
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            src = tmp_dir / "article.md"
+            src.write_text(body.content)
+            out_dir = tmp_dir / "out"
+            out_dir.mkdir()
+            try:
+                from peerpedia_core.storage.compiler import MarkdownBackend
+                backend = MarkdownBackend()
+                result = backend.compile(src, out_dir)
+                if not result.success:
+                    raise HTTPException(status_code=500, detail=result.error)
+                html = result.html_content or ""
+                if result.output_path:
+                    html = Path(result.output_path).read_text()
+                html_bytes = html.encode("utf-8")
+                return StreamingResponse(
+                    io.BytesIO(html_bytes),
+                    media_type="text/html",
+                    headers={"Content-Disposition": "attachment; filename=article.html"},
+                )
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+    elif format_lower == "typst":
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            src = tmp_dir / "article.typ"
+            src.write_text(body.content)
+            out_dir = tmp_dir / "out"
+            out_dir.mkdir()
+            try:
+                from peerpedia_core.storage.compiler import TypstBackend
+                backend = TypstBackend()
+                result = backend.compile(src, out_dir, fmt="pdf")
+                if not result.success:
+                    raise HTTPException(status_code=500, detail=result.error)
+                pdf_path = result.output_path
+                if not pdf_path or not Path(pdf_path).exists():
+                    raise HTTPException(status_code=500, detail="PDF output not found")
+                pdf_bytes = Path(pdf_path).read_bytes()
+                return StreamingResponse(
+                    io.BytesIO(pdf_bytes),
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": "attachment; filename=article.pdf"},
+                )
             except HTTPException:
                 raise
             except Exception as e:
