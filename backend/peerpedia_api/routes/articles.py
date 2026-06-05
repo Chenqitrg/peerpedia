@@ -43,6 +43,7 @@ from peerpedia_core.storage.git_backend import (
     get_diff_between,
 )
 from peerpedia_core.workflow.scoring import compute_article_score_for_commit
+from peerpedia_core.config.params import params
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -182,7 +183,6 @@ def api_create_article(body: ArticleCreate, db: Session = Depends(deps.get_db)):
     commit_hash = commit_article(rp, "Initial submission", body.authors[0],
                                  f"{body.authors[0]}@peerpedia", allow_empty=True)
     # Send to sedimentation pool
-    from peerpedia_core.config.params import params
     a = set_sink_start(db, a.id, params.sink.new_article_default_days)
     # Create self-review tied to this commit
     contributions = None
@@ -248,7 +248,6 @@ def api_update_article(article_id: str, body: ArticleUpdate,
                                  f"{author}@peerpedia")
 
     # Re-enter pool: first-time publication gets full 7 days, edits get 3
-    from peerpedia_core.config.params import params
     if a.status == "draft":
         sink_days = params.sink.new_article_default_days
     else:
@@ -285,7 +284,6 @@ def api_update_article(article_id: str, body: ArticleUpdate,
 def api_extend_sink(article_id: str, body: SinkExtensionRequest,
                     current_user: User = Depends(deps.require_user),
                     db: Session = Depends(deps.get_db)):
-    from peerpedia_core.config.params import params
     try:
         a = extend_sink(db, article_id, body.extra_days, params.sink.max_days)
         return _build_article_detail(db, a.id)
@@ -313,7 +311,6 @@ def api_publish_article(article_id: str, current_user: User = Depends(deps.requi
     a = get_article(db, article_id)
     if a is None:
         raise HTTPException(status_code=404, detail="Article not found")
-    from peerpedia_core.config.params import params
     a = set_sink_start(db, article_id, params.sink.new_article_default_days)
     a = update_article_status(db, article_id, "sedimentation")
     return _build_article_detail(db, a.id)
@@ -472,7 +469,6 @@ def api_rollback(article_id: str, hash: str, current_user: User = Depends(deps.r
     # Create self-review for the rollback commit
     article = get_article(db, article_id)
     if article:
-        from peerpedia_core.config.params import params
         set_sink_start(db, article_id, params.sink.edit_article_default_days)
         # Use neutral mid-scale scores — rollback is a system action, not an assessment
         neutral = 3.0
