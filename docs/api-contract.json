@@ -1696,7 +1696,7 @@
                     "feed"
                 ],
                 "summary": "Get Feed",
-                "description": "Articles from users the viewer follows, newest first.",
+                "description": "Articles from users the viewer follows, newest first. Only sedimentation and published articles are included; drafts are excluded.",
                 "operationId": "get_feed_api_v1_feed_get",
                 "parameters": [
                     {

@@ -154,7 +154,7 @@ frontend/ (Vue 3 + Vite, port 5173)  →  HTTP JSON  →  backend/ (FastAPI, por
 - **不显示**：搜索、书签、沉淀池、新建文章
 
 **已登录状态**：
-- 当前 Feed 实现（关注人的文章列表）
+- 当前 Feed 实现（关注人的文章列表，仅显示 sedimentation 和 published，不显示 draft）
 - 工具栏完整显示：Logo + 搜索 + 书签 + 头像（点击弹出小弹窗：用户名 + Logout）+ 新建 + 沉淀池
 - 分页加载，使用页码
 
