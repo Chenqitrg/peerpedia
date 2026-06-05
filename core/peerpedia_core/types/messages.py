@@ -12,6 +12,7 @@ class ThreadMessage:
 
     author_id: str
     content: str
+    author_name: str = ""  # resolved at post time; stored for display
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self):
@@ -24,5 +25,6 @@ class ThreadMessage:
         return {
             "author_id": self.author_id,
             "content": self.content,
+            "author_name": self.author_name,
             "created_at": self.created_at.isoformat(),
         }

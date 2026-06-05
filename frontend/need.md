@@ -106,7 +106,7 @@ frontend/ (Vue 3 + Vite, port 5173)  →  HTTP JSON  →  backend/ (FastAPI, por
   scope: "pool" | "published"
   scores: { originality: number, rigor: number, completeness: number, pedagogy: number, impact: number }
   contributions?: { [authorId: string]: FiveDimScores } | null  // 仅自评
-  thread: { author_id: string, content: string, created_at: string }[]
+  thread: { author_id: string, author_name: string, content: string, created_at: string }[]
   reviewer_name: string      // 根据 scope 解析实名/匿名
   is_self_review: boolean
   created_at: string

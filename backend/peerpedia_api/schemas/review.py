@@ -22,6 +22,7 @@ class ThreadMessageCreate(BaseModel):
 class ThreadMessageOut(BaseModel):
     author_id: str
     content: str
+    author_name: str = ""  # resolved at post time; empty for pre-existing messages
     created_at: datetime
 
     model_config = {"extra": "allow"}

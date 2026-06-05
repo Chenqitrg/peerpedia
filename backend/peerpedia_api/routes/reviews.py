@@ -112,6 +112,7 @@ def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCrea
         )
 
     from peerpedia_core.types.messages import ThreadMessage
-    msg = ThreadMessage(author_id=current_user.id, content=body.content)
+    msg = ThreadMessage(author_id=current_user.id, content=body.content,
+                        author_name=current_user.name)
     add_thread_message(db, review_id, msg.to_dict())
     return {"status": "ok", "message": msg.to_dict()}

@@ -145,6 +145,7 @@ export interface MergeProposal {
 export interface ThreadMessage {
   author_id: string
   content: string
+  author_name: string  // resolved at post time; empty string for pre-existing messages
   created_at: string
 }
 
