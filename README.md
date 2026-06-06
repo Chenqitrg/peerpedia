@@ -1,8 +1,32 @@
 # PeerPedia · 知诸网
 
-**An interconnected note-taking platform — where ideas link, evolve, and are judged on merit.**
+**Peer review as infrastructure. An open protocol for how knowledge is filtered, not a platform for how it's sold.**
 
-> 🚧 **Early-stage, vibe-coded, and looking for contributors.** This project was built with Claude Code + DeepSeek V4. Many features work, many are rough, and many are still missing. If you care about open knowledge and want to help shape it, [jump in](#contributing). We need designers, engineers, writers, and thinkers.
+---
+
+## The Problem
+
+Academia runs on a broken loop:
+
+```
+Scholar writes paper   →  free labor
+Scholar submits to publisher  →  gives away copyright for free
+Scholar reviews for publisher  →  free labor
+University buys journal back  →  millions of dollars per year
+Scholar reads own paper  →  paywalled
+```
+
+The scholar writes. The scholar reviews. The scholar pays. The publisher owns the envelope.
+
+arXiv solved **distribution**. But it didn't solve **filtering** — the problem of deciding what's worth reading. Today, filtering is still peer review, and peer review is still owned by publishers who understand nothing about the science. They just run the mailing list.
+
+**Why can't peer review itself be infrastructure?** Not a service run by a company. A protocol. Like TCP/IP, but for knowledge filtering. Anyone can build on it. No one owns it.
+
+That's what PeerPedia is trying to build.
+
+---
+
+> 🚧 **Early-stage, vibe-coded, and looking for contributors.** Built with Claude Code + DeepSeek V4. Many things work, many are rough, many are missing entirely. The hardest problem is not the code — it's bootstrapping a user base and network effect. If you care about open knowledge, [join us](#contributing). We need designers, engineers, writers, and thinkers.
 
 ---
 
