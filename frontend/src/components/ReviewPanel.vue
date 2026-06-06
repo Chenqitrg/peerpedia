@@ -27,7 +27,6 @@ defineProps<{
   submittingReview: boolean
   reviewFormError: string
   reviewFormSuccess: string
-  hoveredDim: string | null
   expandedThreads: Set<string>
   replyTexts: Record<string, string>
   replyErrors: Record<string, string>
@@ -41,8 +40,6 @@ const emit = defineEmits<{
   'update-score': [reviewId: string, dim: string, value: number]
   'send-reply': [reviewId: string]
   'toggle-thread': [reviewId: string]
-  'dim-enter': [review: ReviewOut, dimKey: string]
-  'dim-leave': []
   'sign-in': []
 }>()
 </script>
@@ -120,33 +117,13 @@ const emit = defineEmits<{
             <span class="text-xs text-ink-muted">{{ new Date(review.created_at).toLocaleString() }}</span>
           </div>
 
-          <!-- Scores: hover-to-edit for own review, ScoreBadges for others -->
-          <template v-if="review.reviewer_id === viewerId">
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs">
-              <span
-                v-for="dim in SCORE_DIMS"
-                :key="dim.key"
-                class="inline-flex items-center cursor-default"
-                @mouseenter="emit('dim-enter', review, dim.key)"
-                @mouseleave="emit('dim-leave')"
-              >
-                <template v-if="hoveredDim === review.id + ':' + dim.key">
-                  <span class="text-ink-muted mr-0.5">{{ dim.fullLabel }}</span>
-                  <StarRating
-                    :modelValue="review.scores[dim.key]"
-                    size="sm"
-                    @update:modelValue="v => emit('update-score', review.id, dim.key, v)"
-                  />
-                </template>
-                <template v-else>
-                  <span :class="dim.key === 'originality' ? 'text-accent font-semibold' : 'text-ink-muted'">
-                    {{ dim.label }}:{{ review.scores[dim.key] }}
-                  </span>
-                </template>
-              </span>
-            </div>
-          </template>
-          <ScoreBadges v-else :score="review.scores" class="mb-3" />
+          <!-- Scores: editable for own review, read-only for others -->
+          <ScoreBadges
+            :score="review.scores"
+            :editable="review.reviewer_id === viewerId"
+            class="mb-3"
+            @update-score="(dimKey: string, value: number) => emit('update-score', review.id, dimKey, value)"
+          />
 
           <!-- Thread drawer (has messages) -->
           <div v-if="review.thread && review.thread.length">
