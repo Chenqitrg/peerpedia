@@ -18,6 +18,7 @@ import { useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import AuthModal from './components/AuthModal.vue'
 import { useUserStore } from './stores/useUserStore'
+import { loadString, remove } from './composables/useLocalStorage'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -28,8 +29,8 @@ const isEditorPage = computed(() => route.path.startsWith('/edit'))
 onMounted(async () => {
   await userStore.restoreSession()
   // Check if we should show auth modal (set by router guard)
-  if (localStorage.getItem('showAuthModal') === 'true') {
-    localStorage.removeItem('showAuthModal')
+  if (loadString('showAuthModal') === 'true') {
+    remove('showAuthModal')
     userStore.showAuthModal = true
   }
 })

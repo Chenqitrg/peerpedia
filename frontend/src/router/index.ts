@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { loadJSON, saveString } from '../composables/useLocalStorage'
 
 const routes = [
   { path: '/', component: () => import('../pages/HomePage.vue') },
@@ -22,10 +23,10 @@ const router = createRouter({ history: createWebHistory(), routes })
 router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresAuth) {
     // Check localStorage directly to avoid circular store dependency
-    const viewer = localStorage.getItem('viewer')
+    const viewer = loadJSON('viewer')
     if (!viewer) {
-      localStorage.setItem('intendedRoute', to.fullPath)
-      localStorage.setItem('showAuthModal', 'true')
+      saveString('intendedRoute', to.fullPath)
+      saveString('showAuthModal', 'true')
       next('/')
       return
     }

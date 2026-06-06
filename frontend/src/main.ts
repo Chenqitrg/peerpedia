@@ -6,8 +6,9 @@ import { router } from './router'
 import App from './App.vue'
 import enUS from './locales/en-US.json'
 import zhCN from './locales/zh-CN.json'
+import { loadString } from './composables/useLocalStorage'
 
-const savedLocale = localStorage.getItem('locale') || 'zh-CN'
+const savedLocale = loadString('locale', 'zh-CN')
 
 const i18n = createI18n({
   legacy: false,

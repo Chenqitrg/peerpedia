@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { loadString } from '../composables/useLocalStorage'
 
 export const apiClient = axios.create({
   baseURL: 'http://localhost:8080/api/v1',
@@ -7,7 +8,7 @@ export const apiClient = axios.create({
 // ── Request interceptor: attach Bearer token ───────────────────────────
 
 apiClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
+  const token = loadString('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
+import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
 import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
@@ -90,7 +91,7 @@ const totalContribution = computed(() =>
 // Draft persistence — Tauri IPC when available, REST + localStorage fallback.
 const draftPersistence = useDraftPersistence()
 const currentDraftId = ref<string | undefined>(
-  editId.value as string | undefined || localStorage.getItem(DRAFT_ID_KEY.value) || undefined
+  editId.value as string | undefined || loadString(DRAFT_ID_KEY.value) || undefined
 )
 
 onMounted(() => {
@@ -119,7 +120,7 @@ async function loadExistingArticle() {
 
 async function restoreDraft() {
   // Restore the Tauri draft ID from localStorage (persisted across refreshes).
-  const savedId = localStorage.getItem(DRAFT_ID_KEY.value)
+  const savedId = loadString(DRAFT_ID_KEY.value)
   if (savedId) currentDraftId.value = savedId
 
   // Only restore if we have a real draft ID (not a new document).
@@ -150,7 +151,7 @@ async function saveDraft() {
   if (result && result.id) {
     currentDraftId.value = result.id
     // Persist the Tauri draft ID so it survives page refresh.
-    localStorage.setItem(DRAFT_ID_KEY.value, result.id)
+    saveString(DRAFT_ID_KEY.value, result.id)
   }
 
   // Also save to localStorage as offline backup (works in both modes).
@@ -163,7 +164,7 @@ async function saveDraft() {
     categories: categories.value,
     abstract: abstract.value,
   }
-  localStorage.setItem(DRAFT_KEY.value, JSON.stringify(draft))
+  saveJSON(DRAFT_KEY.value, draft)
   savedMsg.value = true
   setTimeout(() => { savedMsg.value = false }, 2000)
 }
@@ -263,7 +264,7 @@ async function handleSubmitToPool() {
     } else {
       result = await articleStore.createArticle(body)
       successMsg.value = 'Article created and submitted to pool!'
-      localStorage.removeItem(DRAFT_KEY.value)
+      remove(DRAFT_KEY.value)
       setTimeout(() => {
         router.push(`/articles/${result.id}`)
       }, 1500)
