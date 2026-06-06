@@ -2,14 +2,15 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { login as apiLogin, register as apiRegister, getMe } from '../api/auth'
 import { useTauri } from '../composables/useTauri'
+import { loadString, loadJSON, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import type { UserProfile } from '../api/types'
 import type { Account, AccountSummary } from '../composables/useTauri'
 
 export const useUserStore = defineStore('user', () => {
-  const storedToken = localStorage.getItem('token')
-  const storedViewer = localStorage.getItem('viewer')
+  const storedToken = loadString('token')
+  const storedViewer = loadJSON<UserProfile>('viewer')
 
-  const viewer = ref<UserProfile | null>(storedViewer ? JSON.parse(storedViewer) : null)
+  const viewer = ref<UserProfile | null>(storedViewer)
   const token = ref<string | null>(storedToken)
   const showAuthModal = ref(false)
   const intendedRoute = ref<string | null>(null)
@@ -61,7 +62,7 @@ export const useUserStore = defineStore('user', () => {
       created_at: new Date().toISOString(),
     }
     viewer.value = profile
-    localStorage.setItem('viewer', JSON.stringify(profile))
+    saveJSON('viewer', profile)
   }
 
   async function registerLocal(username: string, password: string, email: string, name: string) {
@@ -83,7 +84,7 @@ export const useUserStore = defineStore('user', () => {
       created_at: new Date().toISOString(),
     }
     viewer.value = profile
-    localStorage.setItem('viewer', JSON.stringify(profile))
+    saveJSON('viewer', profile)
   }
 
   // ── Actions (original web auth — unchanged) ─────────────────────────
@@ -91,16 +92,16 @@ export const useUserStore = defineStore('user', () => {
   function _persist(user: UserProfile, t: string) {
     viewer.value = user
     token.value = t
-    localStorage.setItem('viewer', JSON.stringify(user))
-    localStorage.setItem('token', t)
+    saveJSON('viewer', user)
+    saveString('token', t)
   }
 
   function clear() {
     viewer.value = null
     token.value = null
     localAccount.value = null
-    localStorage.removeItem('viewer')
-    localStorage.removeItem('token')
+    remove('viewer')
+    remove('token')
   }
 
   async function login(username: string, password: string) {
@@ -134,7 +135,7 @@ export const useUserStore = defineStore('user', () => {
     try {
       const { user } = await getMe(t)
       viewer.value = user
-      localStorage.setItem('viewer', JSON.stringify(user))
+      saveJSON('viewer', user)
     } catch {
       clear()
     }

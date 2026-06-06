@@ -76,7 +76,7 @@ peerpedia/
 │   ├── src/
 │   │   ├── api/                # Axios API modules + types.ts
 │   │   ├── components/         # 14 components (SelfReviewPanel, ReviewPanel, etc.)
-│   │   ├── composables/        # useTauri, useDraftPersistence, useBookmarkToggle, useStatusMap
+│   │   ├── composables/        # useLocalStorage, useTauri, useDraftPersistence, useBookmarkToggle, useStatusMap, useAsyncResource
 │   │   ├── pages/              # 11 pages
 │   │   ├── router/             # Vue Router + auth guards
 │   │   ├── stores/             # Pinia (user, article, pool, review)
@@ -346,8 +346,8 @@ Overleaf-inspired split-pane layout. **Full-width** (breaks global max-w-content
 **Review card:**
 - Shows reviewer name (anonymous/real/Author), scores, timestamp
 - Own review pinned to top (accent left border + "(you)" label)
-- Hover scores → expand to editable stars, mouse-out restores numbers
-- Score changes take effect immediately (optimistic update)
+- Hover scores → ScoreBadges expands to editable stars (`editable` prop), mouse-out restores numbers
+- Score changes take effect immediately (optimistic update via Pinia store)
 
 **Thread discussions:**
 - Thread dropdown under each review (Chevron expand/collapse)
@@ -376,7 +376,7 @@ Citation DAG: References (this article cites) + Cited by (articles citing this).
 
 ### 5.9 Search `/search?q=`
 
-Full-text search with category and sort filters. ArticleCard list. Empty/loading/error states handled.
+Full-text search with SQL-level filtering: category (JSON column LIKE), title (ILIKE), content (compiled_output ILIKE + source file fallback), sort (newest/score), pagination (LIMIT/OFFSET with accurate COUNT). ArticleCard list. Empty/loading/error states handled.
 
 ### 5.10 Schools `/schools`
 
@@ -517,10 +517,10 @@ Route guard: unauthenticated access to 🔒 routes → redirect to home + AuthMo
 ## 9. Testing
 
 ```bash
-# Backend 156 tests
+# Backend 166 tests
 .venv/bin/python -m pytest backend/ -q
 
-# Frontend 108 tests
+# Frontend 172 tests
 cd frontend && npx vitest run
 ```
 

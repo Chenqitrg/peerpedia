@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { saveString } from '../composables/useLocalStorage'
 import {
   Bookmark,
   Waypoints,
@@ -42,7 +43,7 @@ const connectionStatus = computed(() => {
 
 function toggleLocale() {
   locale.value = locale.value === 'zh-CN' ? 'en-US' : 'zh-CN'
-  localStorage.setItem('locale', locale.value)
+  saveString('locale', locale.value)
 }
 
 function toggle() {

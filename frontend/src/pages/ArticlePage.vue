@@ -70,10 +70,8 @@ const canUserReview = computed(() => {
   return userStore.viewer && !isOwnArticle.value
 })
 
-// ── Hover-to-edit state ──────────────────────────────────────────────────
+// ── Review comment state ─────────────────────────────────────────────────
 
-const hoveredDim = ref<string | null>(null)
-const hoverTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const reviewComment = ref('')
 
 // ── Reply state ─────────────────────────────────────────────────────────
@@ -87,16 +85,6 @@ const expandedThreads = reactive(new Set<string>())
 
 function isMyReview(review: ReviewOut): boolean {
   return userStore.viewer != null && review.reviewer_id === userStore.viewer.id
-}
-
-function onDimEnter(review: ReviewOut, dimKey: string) {
-  if (!isMyReview(review)) return
-  if (hoverTimer.value) { clearTimeout(hoverTimer.value); hoverTimer.value = null }
-  hoveredDim.value = review.id + ':' + dimKey
-}
-
-function onDimLeave() {
-  hoverTimer.value = setTimeout(() => { hoveredDim.value = null }, 100)
 }
 
 // ── Sorted reviews (current user's review first, then self-reviews, then by date) ──
@@ -493,7 +481,6 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
           :submitting-review="submittingReview"
           :review-form-error="reviewFormError"
           :review-form-success="reviewFormSuccess"
-          :hovered-dim="hoveredDim"
           :expanded-threads="expandedThreads"
           :reply-texts="replyTexts"
           :reply-errors="replyErrors"
@@ -502,8 +489,6 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
           @update-score="updateSingleScore"
           @send-reply="handleReply"
           @toggle-thread="toggleThread"
-          @dim-enter="onDimEnter"
-          @dim-leave="onDimLeave"
           @sign-in="userStore.showAuthModal = true"
         />
       </div>

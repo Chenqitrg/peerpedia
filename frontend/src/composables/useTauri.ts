@@ -8,21 +8,22 @@
 // to { error: string } so the caller always gets a uniform shape.
 
 import { computed } from 'vue'
+import { loadString, loadJSON, saveString, saveJSON, remove } from './useLocalStorage'
 
 // ── Dev mock activation (module-level, runs once on import) ────────────
 
 if (typeof window !== 'undefined') {
   const q = new URLSearchParams(window.location.search)
   if (q.has('tauri')) {
-    if (q.get('tauri') === '0') localStorage.removeItem('peerpedia_dev_tauri')
-    else localStorage.setItem('peerpedia_dev_tauri', '1')
+    if (q.get('tauri') === '0') remove('peerpedia_dev_tauri')
+    else saveString('peerpedia_dev_tauri', '1')
   }
 }
 
 function isDevMockActive(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    return localStorage.getItem('peerpedia_dev_tauri') === '1'
+    return loadString('peerpedia_dev_tauri') === '1'
   } catch {
     return false
   }
@@ -35,15 +36,10 @@ interface MockDraft { id: string; account_id: string; title: string; content: st
 interface MockCacheEntry { id: string; json: string; cached_at: string }
 
 function _load<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
+  return loadJSON<T>(key) ?? fallback
 }
 function _save<T>(key: string, val: T) {
-  try { localStorage.setItem(key, JSON.stringify(val)) } catch { /* noop */ }
+  saveJSON(key, val)
 }
 
 const _draftsKey = '_t_drafts', _cacheKey = '_t_cache', _acctsKey = '_t_accts'
