@@ -10,7 +10,7 @@ import SkeletonCard from '../components/SkeletonCard.vue'
 import ErrorState from '../components/ErrorState.vue'
 import Pagination from '../components/Pagination.vue'
 import type { FeedResponse } from '../api/types'
-import { BookOpen } from 'lucide-vue-next'
+import { Waypoints } from 'lucide-vue-next'
 
 const userStore = useUserStore()
 const { t } = useI18n()
@@ -56,7 +56,7 @@ watch(isLoggedIn, (loggedIn) => {
   <div class="home-page animate-fade-in">
     <!-- Welcome state — not logged in -->
     <div v-if="!isLoggedIn" class="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <BookOpen class="w-12 h-12 text-accent mb-6" stroke-width="1.5" />
+      <Waypoints class="w-12 h-12 text-accent mb-6" stroke-width="1.5" />
       <h1 class="text-display-lg font-heading font-bold text-ink mb-3">
         {{ t('nav.brand') }}
       </h1>
