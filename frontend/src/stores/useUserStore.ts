@@ -38,8 +38,9 @@ export const useUserStore = defineStore('user', () => {
     if (!result) throw new Error('Tauri unavailable')
     if ('error' in result) throw new Error(result.error)
     localAccount.value = result as Account
-    // Create a minimal viewer profile from the local account.
-    viewer.value = {
+    // Create a minimal viewer profile and persist to localStorage
+    // so the router guard recognizes the user as authenticated.
+    const profile = {
       id: (result as Account).id,
       username: (result as Account).username,
       name: (result as Account).username,
@@ -52,6 +53,8 @@ export const useUserStore = defineStore('user', () => {
       article_count: 0,
       created_at: new Date().toISOString(),
     }
+    viewer.value = profile
+    localStorage.setItem('viewer', JSON.stringify(profile))
   }
 
   async function registerLocal(username: string, password: string, email: string, name: string) {
@@ -59,7 +62,7 @@ export const useUserStore = defineStore('user', () => {
     if (!result) throw new Error('Tauri unavailable')
     if ('error' in result) throw new Error(result.error)
     localAccount.value = result as Account
-    viewer.value = {
+    const profile = {
       id: (result as Account).id,
       username: (result as Account).username,
       name: (result as Account).username,
@@ -72,6 +75,8 @@ export const useUserStore = defineStore('user', () => {
       article_count: 0,
       created_at: new Date().toISOString(),
     }
+    viewer.value = profile
+    localStorage.setItem('viewer', JSON.stringify(profile))
   }
 
   // ── Actions (original web auth — unchanged) ─────────────────────────
