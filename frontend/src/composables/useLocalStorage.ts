@@ -5,11 +5,24 @@
 // All functions catch and return fallback on any error (quota exceeded,
 // disabled in private browsing, corrupt JSON, etc.) — never throws.
 
-const LS = typeof window !== 'undefined' ? window.localStorage : null
+function getLS(): Storage | null {
+  if (typeof window === 'undefined') return null
+  // In test environments (jsdom), globalThis.localStorage may be a mock
+  // installed by test-setup. Prefer globalThis for test compatibility.
+  try {
+    const ls = (globalThis as { localStorage?: Storage }).localStorage
+    if (ls) return ls
+  } catch { /* globalThis access denied */ }
+  try {
+    return window.localStorage
+  } catch { /* private browsing blocks access */ }
+  return null
+}
 
 // ── String ───────────────────────────────────────────────────────────────
 
 export function loadString(key: string, fallback?: string): string | null {
+  const LS = getLS()
   if (!LS) return fallback ?? null
   try {
     const v = LS.getItem(key)
@@ -20,6 +33,7 @@ export function loadString(key: string, fallback?: string): string | null {
 }
 
 export function saveString(key: string, value: string): void {
+  const LS = getLS()
   if (!LS) return
   try { LS.setItem(key, value) } catch { /* quota or private browsing */ }
 }
@@ -27,6 +41,7 @@ export function saveString(key: string, value: string): void {
 // ── JSON ─────────────────────────────────────────────────────────────────
 
 export function loadJSON<T>(key: string, fallback?: T): T | null {
+  const LS = getLS()
   if (!LS) return fallback ?? null
   try {
     const raw = LS.getItem(key)
@@ -38,6 +53,7 @@ export function loadJSON<T>(key: string, fallback?: T): T | null {
 }
 
 export function saveJSON(key: string, value: unknown): void {
+  const LS = getLS()
   if (!LS) return
   try { LS.setItem(key, JSON.stringify(value)) } catch { /* quota */ }
 }
@@ -45,6 +61,7 @@ export function saveJSON(key: string, value: unknown): void {
 // ── Remove ───────────────────────────────────────────────────────────────
 
 export function remove(key: string): void {
+  const LS = getLS()
   if (!LS) return
   try { LS.removeItem(key) } catch { /* disabled */ }
 }
