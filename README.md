@@ -2,7 +2,7 @@
 
 **An interconnected note-taking platform — where ideas link, evolve, and are judged on merit.**
 
-PeerPedia combines Git-backed version control with community review and scoring. Think: a knowledge graph meets collaborative notebook, with reputation-weighted peer assessment.
+> 🚧 **Early-stage, vibe-coded, and looking for contributors.** This project was built with Claude Code + DeepSeek V4. Many features work, many are rough, and many are still missing. If you care about open knowledge and want to help shape it, [jump in](#contributing). We need designers, engineers, writers, and thinkers.
 
 ---
 
@@ -212,20 +212,51 @@ npm test -- --run
 
 ## Contributing
 
-PeerPedia is in active development. Contributions welcome!
+**We need you.** Seriously. This project has ambition far beyond its current resources.
 
-**Before contributing:**
+### What we're missing
+
+- **UI/UX polish** — many screens work but don't feel great yet
+- **Accessibility** — keyboard nav, screen readers, focus management
+- **Performance** — bundle size, lazy loading, API response caching
+- **Testing** — coverage is decent but far from comprehensive
+- **Mobile** — it works but wasn't designed for small screens
+- **Error handling** — edge cases abound, graceful degradation is spotty
+- **Deployment** — no Docker, no CI/CD pipeline, no production guide
+- **Security audit** — JWT works but hasn't been externally reviewed
+- **Documentation** — DESIGN.md exists but needs more detail
+- **i18n** — Chinese/English translations need refinement
+
+### How to start
+
 1. Read `docs/DESIGN.md` for design philosophy
 2. Check `CLAUDE.md` for development conventions
-3. Follow TDD: write failing test → implement → refactor
+3. Pick an issue or propose something you care about
+4. Follow TDD: write failing test → implement → refactor
+
+No contribution is too small. Fix a typo. Translate a string. Write a test. Every bit helps.
 
 ---
 
 ## Vision
 
-> A world where knowledge connects freely — every idea can link to, build upon, and refine every other idea. Quality emerges from community consensus, not gatekeepers. Every contributor earns recognition proportional to their impact.
+The long game: **replace academic publishers and break the monopoly of prestige.**
 
-PeerPedia is an experiment in whether interconnected, community-governed knowledge can outperform the siloed platforms we've relied on for decades.
+Today, a handful of publishers control what counts as knowledge. They charge universities millions for access to research their own faculty produced. They gatekeep careers through journal prestige rather than merit. And they've held this position for 300 years because there was no alternative infrastructure.
+
+PeerPedia is that alternative. Not next year. Not in five years. But the pieces are on the table:
+
+- **Git-native articles** replace publisher versioning
+- **Community scoring** replaces editorial gatekeeping
+- **Anonymous review** eliminates prestige bias
+- **Reputation** replaces impact factors
+- **Free and open** replaces paywalls
+
+We're a long way from that. Right now we need help making the basics solid. But every pull request moves the needle.
+
+> A world where knowledge connects freely — every idea can link to, build upon, and refine every other idea. Quality emerges from community consensus, not gatekeepers. Every contributor earns recognition proportional to their impact. No one profits from locking knowledge behind walls.
+
+*"走向更好的学术 — To a better academia."*
 
 ---
 
