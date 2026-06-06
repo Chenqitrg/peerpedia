@@ -553,31 +553,33 @@ async function handleSinkExtension() {
                 </span>
               </div>
 
-              <!-- Score row: hover-to-edit for my review, static text for others -->
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-sm">
-                <span
-                  v-for="dim in SCORE_DIMS"
-                  :key="dim.key"
-                  class="inline-flex items-center gap-0.5"
-                  :class="isMyReview(review) ? 'cursor-default' : ''"
-                  @mouseenter="onDimEnter(review, dim.key)"
-                  @mouseleave="onDimLeave()"
-                >
-                  <template v-if="hoveredDim === review.id + ':' + dim.key && isMyReview(review)">
-                    <span class="text-ink-muted text-xs">{{ dim.label }}&nbsp;</span>
-                    <StarRating
-                      :modelValue="review.scores[dim.key]"
-                      size="sm"
-                      @update:modelValue="v => updateSingleScore(review.id, dim.key, v)"
-                    />
-                  </template>
-                  <template v-else>
-                    <span :class="dim.key === 'originality' ? 'text-accent font-semibold' : 'text-ink-muted'">
-                      {{ dim.label }}:{{ review.scores[dim.key] }}
-                    </span>
-                  </template>
-                </span>
-              </div>
+              <!-- Score row: hover-to-edit for my review, ScoreBadges for others -->
+              <template v-if="isMyReview(review)">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs">
+                  <span
+                    v-for="dim in SCORE_DIMS"
+                    :key="dim.key"
+                    class="inline-flex items-center cursor-default"
+                    @mouseenter="onDimEnter(review, dim.key)"
+                    @mouseleave="onDimLeave()"
+                  >
+                    <template v-if="hoveredDim === review.id + ':' + dim.key">
+                      <span class="text-ink-muted mr-0.5">{{ dim.fullLabel }}</span>
+                      <StarRating
+                        :modelValue="review.scores[dim.key]"
+                        size="sm"
+                        @update:modelValue="v => updateSingleScore(review.id, dim.key, v)"
+                      />
+                    </template>
+                    <template v-else>
+                      <span :class="dim.key === 'originality' ? 'text-accent font-semibold' : 'text-ink-muted'">
+                        {{ dim.label }}:{{ review.scores[dim.key] }}
+                      </span>
+                    </template>
+                  </span>
+                </div>
+              </template>
+              <ScoreBadges v-else :score="review.scores" class="mb-3" />
 
               <!-- Thread drawer (shown for all reviews that have messages) -->
               <div v-if="review.thread && review.thread.length">
