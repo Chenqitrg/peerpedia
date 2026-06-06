@@ -77,7 +77,7 @@ function handleLogout() {
         @click="close"
       >
         <BookOpen class="w-4 h-4 text-accent" stroke-width="2" />
-        <span class="hidden sm:inline">{{ t('nav.brand') }}</span>
+        <span class="hidden sm:inline brand-logo">{{ t('nav.brand') }}</span>
       </router-link>
 
       <!-- Search (desktop) — only when logged in -->
@@ -263,5 +263,14 @@ function handleLogout() {
          hover:text-ink hover:bg-[#21262d] rounded-lg
          transition-colors duration-200
          no-underline;
+}
+
+.brand-logo {
+  background: linear-gradient(135deg, #58a6ff 0%, #8b5cf6 50%, #58a6ff 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  letter-spacing: 0.05em;
 }
 </style>
