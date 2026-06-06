@@ -53,7 +53,8 @@
     "noArticles": "还没有文章",
     "editProfile": "编辑资料",
     "comingSoon": "即将推出",
-    "reputation": "信誉"
+    "reputation": "信誉",
+    "forks": "次复刻"
   },
   "card": {
     "addBookmark": "添加收藏",
@@ -112,7 +113,9 @@
     "commentPlaceholder": "写评论（可选）...",
     "reviewSubmitted": "评审已提交",
     "reviewFailedComment": "评审已提交，但评论发送失败。你可以在讨论中回复。",
-    "extend": "延长时间"
+    "extend": "延长时间",
+    "reviews": "条评论",
+    "scores": "评分"
   },
   "history": {
     "parent": "父提交",
