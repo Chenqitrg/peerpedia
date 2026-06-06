@@ -7,6 +7,12 @@
 - Some features may seem to be redundant, but may be a plan. Always make sure if you try to simplify it
 - Updates always follow README -> API contract -> test -> code.
 
+## All files that should read first
+
+- README.md: a file for current stage and outlook
+- docs/DESIGN.en.md: a file that can reconstruct this project
+- docs/api-contract.json: API contract
+
 ## Session discipline
 
 **After every code change**, clear all caches before verifying:

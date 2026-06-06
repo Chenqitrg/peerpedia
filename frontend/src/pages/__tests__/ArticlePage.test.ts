@@ -53,13 +53,49 @@ vi.mock('../../api/articles', () => ({
     created_at: '2026-05-01T00:00:00Z',
     updated_at: '2026-06-05T00:00:00Z',
   }),
-  getHistory: vi.fn().mockResolvedValue({ commits: [] }),
+  getArticleSource: vi.fn().mockResolvedValue({ content: '# Test', format: 'markdown' }),
+  getHistory: vi.fn().mockResolvedValue({ commits: [{ hash: 'abc123' }] }),
   forkArticle: vi.fn().mockResolvedValue({ id: 'forked-1' }),
   extendSink: vi.fn().mockResolvedValue({}),
   createMergeProposal: mockCreateMergeProposal,
   getMergeProposals: mockGetMergeProposals,
   acceptMergeProposal: vi.fn().mockResolvedValue({}),
   rejectMergeProposal: vi.fn().mockResolvedValue({}),
+}))
+
+const mockCreateReview = vi.fn().mockResolvedValue({
+  id: 'review-1',
+  article_id: 'test-article-1',
+  reviewer_id: 'u1',
+  commit_hash: 'abc123',
+  scope: 'pool',
+  scores: { originality: 3, rigor: 4, completeness: 3, pedagogy: 3, impact: 3 },
+  is_self_review: false,
+  reviewer_name: 'Alice Chen',
+  thread: [],
+  created_at: '2026-06-01T00:00:00Z',
+})
+
+const mockGetReviews = vi.fn().mockResolvedValue([
+  {
+    id: 'review-1',
+    article_id: 'test-article-1',
+    reviewer_id: 'u1',
+    commit_hash: 'abc123',
+    scope: 'pool',
+    scores: { originality: 3, rigor: 4, completeness: 3, pedagogy: 3, impact: 3 },
+    is_self_review: false,
+    reviewer_name: 'Alice Chen',
+    reviewer_id_name: 'u1',
+    thread: [],
+    created_at: '2026-06-01T00:00:00Z',
+  },
+])
+
+vi.mock('../../api/reviews', () => ({
+  getReviews: (...args: any[]) => mockGetReviews(...args),
+  createReview: (...args: any[]) => mockCreateReview(...args),
+  postReviewMessage: vi.fn().mockResolvedValue({}),
 }))
 
 describe('ArticlePage', () => {
@@ -210,5 +246,90 @@ describe('ArticlePage', () => {
       fork_article_id: 'fork-article-1',
       proposer_id: 'u1',
     })
+  })
+
+  it('reverts score to old value when API update fails', async () => {
+    mockCreateReview.mockRejectedValueOnce(new Error('Network error'))
+
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+
+    // Set viewer so the review is recognized as "my review"
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen' } as any
+
+    // Switch to Comments tab to trigger review load
+    const buttons = wrapper.findAll('button')
+    for (let i = 0; i < buttons.length; i++) {
+      if (buttons[i].text().includes('Comments')) {
+        await buttons[i].trigger('click')
+        break
+      }
+    }
+    await new Promise(r => setTimeout(r, 50))
+
+    // The mock review has originality: 3
+    const vm = wrapper.vm as any
+    const store = vm.reviewStore
+    expect(store).toBeDefined()
+    expect(store.reviews.length).toBeGreaterThan(0)
+    const review = store.reviews.find((r: any) => r.reviewer_id === 'u1')
+    expect(review).toBeDefined()
+    expect(review.scores.originality).toBe(3)
+
+    // Call updateSingleScore to change originality from 3 → 5 (API will reject)
+    await vm.updateSingleScore('review-1', 'originality', 5)
+
+    // After API rejection, score should revert to 3, not stay at 5
+    expect(review.scores.originality).toBe(3)
+  })
+
+  it('shows merge error message when merge proposal fails', async () => {
+    const articlesMod = await import('../../api/articles')
+    const getArticle = articlesMod.getArticle as ReturnType<typeof vi.fn>
+    getArticle.mockResolvedValueOnce({
+      id: 'fork-article-1',
+      title: 'My Improvements',
+      status: 'draft',
+      authors: [{ id: 'u1', name: 'Alice Chen', anonymous_name: 'anon1' }],
+      fork_count: 0,
+      forked_from: 'parent-article-1',
+      commit_count: 1,
+      compiled_format: 'html',
+      compiled_output: '<p>Improved version...</p>',
+      compiled_pages: 5,
+      score: { originality: 4, rigor: 4, completeness: 3, pedagogy: 3, impact: 3 },
+      sink_eta: null,
+      days_remaining: null,
+      sink_duration_days: 30,
+      review_count: 0,
+      is_bookmarked: false,
+      is_own_article: true,
+      created_at: '2026-06-05T00:00:00Z',
+      updated_at: '2026-06-06T00:00:00Z',
+    })
+    mockCreateMergeProposal.mockRejectedValueOnce(new Error('Merge failed'))
+
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen' } as any
+
+    const mergeBtn = wrapper.find('button[aria-label="Propose merge"]')
+    expect(mergeBtn.exists()).toBe(true)
+    await mergeBtn.trigger('click')
+    await new Promise(r => setTimeout(r, 50))
+
+    // Should show error message to user
+    expect(wrapper.text()).toMatch(/Merge proposal failed|merge.*failed/i)
   })
 })

@@ -43,9 +43,11 @@ def search(
     q: str = Query(default=""),
     category: str = Query(default=""),
     sort: str = Query(default=""),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(deps.get_db),
 ):
-    """Search articles by title and source content, with optional filters."""
+    """Search articles by title and source content, with optional filters and pagination."""
     articles_q = db.query(Article).filter(
         Article.status.in_(["published", "sedimentation"])
     )
@@ -72,6 +74,8 @@ def search(
 
         results.append(a)
 
+    total = len(results)
+
     # Sort
     if sort_lower in VALID_SORTS:
         if sort_lower == "newest":
@@ -79,8 +83,9 @@ def search(
         elif sort_lower == "score":
             results.sort(key=_avg_score, reverse=True)
 
-    # Limit
-    results = results[:20]
+    # Paginate — apply offset/limit AFTER filtering and sorting
+    offset = (page - 1) * size
+    results = results[offset : offset + size]
 
     summaries = []
     for a in results:
@@ -102,7 +107,9 @@ def search(
 
     return {
         "articles": summaries,
-        "total": len(summaries),
+        "total": total,
+        "page": page,
+        "size": size,
         "query": q,
         "category": category,
         "sort": sort,

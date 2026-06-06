@@ -2,11 +2,12 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getArticles, getArticle, createArticle, updateArticle } from '../api/articles'
 import type { ArticleListParams } from '../api/articles'
+import type { ArticleDetail, ArticleSummary, ArticleCreatePayload, ArticleUpdatePayload } from '../api/types'
 
 export const useArticleStore = defineStore('article', () => {
-  const articles = ref<any[]>([])
+  const articles = ref<ArticleSummary[]>([])
   const total = ref(0)
-  const currentArticle = ref<any>(null)
+  const currentArticle = ref<ArticleDetail | null>(null)
 
   async function fetchArticles(params?: ArticleListParams) {
     try {
@@ -22,17 +23,17 @@ export const useArticleStore = defineStore('article', () => {
     currentArticle.value = await getArticle(id)
   }
 
-  async function createArticleAction(body: Record<string, unknown>) {
+  async function createArticleAction(body: ArticleCreatePayload) {
     const newArticle = await createArticle(body)
-    articles.value.push(newArticle)
+    articles.value.push(newArticle as ArticleSummary)
     return newArticle
   }
 
-  async function updateArticleAction(id: string, body: Record<string, unknown>) {
+  async function updateArticleAction(id: string, body: ArticleUpdatePayload) {
     const updated = await updateArticle(id, body)
     // Update in list if present
-    const idx = articles.value.findIndex((a: any) => a.id === id)
-    if (idx !== -1) articles.value[idx] = updated
+    const idx = articles.value.findIndex(a => a.id === id)
+    if (idx !== -1) articles.value[idx] = updated as ArticleSummary
     // Update current article if it's the same
     if (currentArticle.value?.id === id) currentArticle.value = updated
     return updated

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/open-tauri/main/.schemas/desktop-schema.json",
+  "productName": "PeerPedia",
+  "version": "0.1.0",
+  "identifier": "org.peerpedia.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "PeerPedia · 知诸网",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}

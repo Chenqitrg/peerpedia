@@ -27,17 +27,25 @@ const { t } = useI18n()
 
 const id = computed(() => route.params.id as string)
 
-const articles = ref<ArticleSummary[]>([])
+// In local mode (Tauri or dev mock), use the local account data for own profile.
+const isSelf = computed(() => userStore.viewer?.id === id.value)
+const localProfile = computed(() => {
+  if ((userStore.isTauriMode || userStore.isDevMock) && isSelf.value && userStore.viewer) return userStore.viewer
+  return null
+})
 
 const { data: user, loading, error, execute: loadUser } = useAsyncResource(
-  () => getUser(id.value),
+  () => {
+    if (localProfile.value) return Promise.resolve(localProfile.value)
+    return getUser(id.value)
+  },
   null as UserProfile | null,
   { immediate: true },
 )
 
-const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
+const articles = ref<ArticleSummary[]>([])
 
-const isSelf = computed(() => userStore.viewer?.id === id.value)
+const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 
 const isFollowing = ref(false)
 const followLoading = ref(false)

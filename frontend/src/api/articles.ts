@@ -1,4 +1,5 @@
 import apiClient from './client'
+import type { ArticleCreatePayload, ArticleUpdatePayload } from './types'
 
 export interface ArticleListParams {
   status?: string
@@ -22,7 +23,7 @@ export async function getArticleSource(id: string): Promise<{ content: string; f
   return res.data
 }
 
-export async function createArticle(body: Record<string, unknown>) {
+export async function createArticle(body: ArticleCreatePayload) {
   const res = await apiClient.post('/articles', body)
   return res.data
 }
@@ -47,7 +48,7 @@ export async function rollbackArticle(id: string, hash: string) {
   return res.data
 }
 
-export async function updateArticle(id: string, body: Record<string, unknown>) {
+export async function updateArticle(id: string, body: ArticleUpdatePayload) {
   const res = await apiClient.put(`/articles/${id}`, body)
   return res.data
 }

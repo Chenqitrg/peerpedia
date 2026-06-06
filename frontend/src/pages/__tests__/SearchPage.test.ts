@@ -30,6 +30,8 @@ const { mockPush, mockSearchArticles } = vi.hoisted(() => ({
   }),
 }))
 
+const mockRouteQuery = { q: 'quantum' } as Record<string, string>
+
 const RouterLinkStub = {
   props: ['to'],
   template: '<a :href="to"><slot /></a>',
@@ -37,7 +39,7 @@ const RouterLinkStub = {
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
-  useRoute: () => ({ query: { q: 'quantum' } }),
+  useRoute: () => ({ query: mockRouteQuery }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
@@ -48,6 +50,12 @@ vi.mock('../../api/search', () => ({
 describe('SearchPage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // Reset route query between tests to avoid cross-test pollution
+    mockRouteQuery.q = 'quantum'
+    delete mockRouteQuery.category
+    delete mockRouteQuery.sort
+    mockSearchArticles.mockClear()
+    mockPush.mockClear()
   })
 
   it('renders search page with heading', async () => {
@@ -115,5 +123,69 @@ describe('SearchPage', () => {
     const selects = wrapper.findAll('select')
     // At least one select is rendered (sort + category)
     expect(selects.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('restores category from URL query param on mount', async () => {
+    // Set category in route query before mounting
+    mockRouteQuery.q = ''
+    mockRouteQuery.category = 'physics'
+    mockRouteQuery.sort = ''
+    mockSearchArticles.mockClear()
+
+    const SearchPage = (await import('../SearchPage.vue')).default
+    const wrapper = mount(SearchPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    // Category should be restored and search should have been triggered
+    // The searchArticles should have been called with category='physics'
+    expect(mockSearchArticles).toHaveBeenCalled()
+    const callArgs = mockSearchArticles.mock.calls[0]?.[0]
+    expect(callArgs?.category).toBe('physics')
+  })
+
+  it('restores sort from URL query param on mount', async () => {
+    mockRouteQuery.q = 'test'
+    mockRouteQuery.category = ''
+    mockRouteQuery.sort = 'newest'
+    mockSearchArticles.mockClear()
+
+    const SearchPage = (await import('../SearchPage.vue')).default
+    const wrapper = mount(SearchPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    expect(mockSearchArticles).toHaveBeenCalled()
+    const callArgs = mockSearchArticles.mock.calls[0]?.[0]
+    expect(callArgs?.sort).toBe('newest')
+  })
+
+  it('enables submit button when category is selected even with empty query', async () => {
+    mockRouteQuery.q = ''
+    delete mockRouteQuery.category
+    delete mockRouteQuery.sort
+    mockSearchArticles.mockClear()
+
+    const SearchPage = (await import('../SearchPage.vue')).default
+    const wrapper = mount(SearchPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    // Find the category select and pick an option
+    const selects = wrapper.findAll('select')
+    // The first select should be category
+    const categorySelect = selects.length >= 2 ? selects[0] : selects[selects.length - 1]
+    await categorySelect.setValue('physics')
+    await flushPromises()
+
+    // Submit button should now be enabled (not disabled when category is set)
+    const submitBtn = wrapper.find('button[type="submit"]')
+    expect(submitBtn.exists()).toBe(true)
+    // Button should not be disabled when a category is selected
+    const disabledAttr = submitBtn.attributes('disabled')
+    expect(disabledAttr).toBeUndefined()
   })
 })
