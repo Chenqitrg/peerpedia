@@ -9,7 +9,7 @@ import { followUser, unfollowUser } from '../api/users'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
-import { Users, UserPlus, UserCheck } from 'lucide-vue-next'
+import { Users, UserPlus, UserCheck, Landmark } from 'lucide-vue-next'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -47,11 +47,11 @@ function goToUser(id: string) {
     <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center gap-3 mb-2">
-        <Users class="w-6 h-6 text-accent" stroke-width="2" />
-        <h1 class="text-display-md font-heading font-bold text-ink">Schools</h1>
+        <Landmark class="w-6 h-6 text-accent" stroke-width="1.5" />
+        <h1 class="text-display-md font-heading font-bold text-ink">{{ t('nav.schools') }}</h1>
       </div>
       <p class="text-sm text-ink-muted">
-        Discover researchers. Follow people whose work you find interesting.
+        {{ t('schools.subtitle') }}
       </p>
     </div>
 

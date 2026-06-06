@@ -13,6 +13,9 @@
     "createAccount": "注册",
     "toggleMenu": "切换导航菜单"
   },
+  "schools": {
+    "subtitle": "发现研究者，关注你感兴趣的学术工作。"
+  },
   "home": {
     "tagline": "走向更好的学术",
     "feed": "动态",
