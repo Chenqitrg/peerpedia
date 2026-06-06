@@ -45,3 +45,4 @@ frontend/dist/
 # Build caches
 .vite/
 backend/.vite/
+frontend/src-tauri/target/
