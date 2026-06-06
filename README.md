@@ -220,11 +220,15 @@ Higher reputation → greater voting weight in the pool.
 - JWT authentication (register, login, session restore)
 - User profiles with compact ReputationBadges (P/O/C/R)
 - Follow/unfollow, activity feed, bookmarks
-- Full-text search with category/sort filters
+- Full-text search with category/sort filters and pagination
 - Thread-based review discussions（含多轮双作者对话）
-- Chinese/English bilingual UI (vue-i18n, 80+ keys)
+- Merge proposals for forked articles
+- Contribution slider in publish panel（per-author allocation）
+- Chinese/English bilingual UI (vue-i18n, 90+ keys)
 - LXGW WenKai calligraphic brand font + Noto Serif SC headings
-- Waypoints constellation icon as brand mark
+- Waypoints constellation icon as brand mark + Tauri app icon
+- Client-side Markdown compilation (marked + KaTeX, no server round-trip)
+- CI pipeline: 11 jobs across Python, TypeScript, Rust
 
 ---
 
@@ -235,12 +239,12 @@ peerpedia/
 ├── frontend/                  # Vue 3 SPA + Tauri
 │   ├── src/
 │   │   ├── api/               # Axios API modules
-│   │   ├── components/        # Reusable components
-│   │   ├── composables/       # Shared logic（含 useTauri）
+│   │   ├── components/        # 14 components (SelfReviewPanel, ReviewPanel, etc.)
+│   │   ├── composables/       # Shared logic (useTauri, useDraftPersistence, etc.)
 │   │   ├── locales/           # i18n (zh-CN, en-US)
 │   │   ├── pages/             # Route pages（含 LoginPage）
 │   │   ├── router/            # Vue Router + auth guards
-│   │   └── stores/            # Pinia state（含 useUserStore localAccount 层）
+│   │   └── stores/            # Pinia (user, article, pool, review)
 │   └── src-tauri/             # Tauri Rust backend
 │       └── src/
 │           ├── main.rs        # Tauri entry
@@ -267,15 +271,20 @@ peerpedia/
 ## Testing
 
 ```bash
-# Backend
-cd backend
-source ../.venv/bin/activate
-python -m pytest tests/ -q
+# Backend (157 tests)
+source .venv/bin/activate
+python -m pytest backend/tests/ -q
 
-# Frontend
+# Frontend (145 tests, 26 test files)
 cd frontend
-npm test -- --run
+npx vitest run
+
+# Rust (Tauri backend — requires Rust toolchain)
+cd frontend/src-tauri
+cargo test
 ```
+
+**CI Pipeline:** 11 jobs across 3 languages. Every PR must pass pytest, vitest, ruff, clippy, vue-tsc, rustfmt, and a build smoke test. See `.github/workflows/ci.yml`.
 
 ---
 
