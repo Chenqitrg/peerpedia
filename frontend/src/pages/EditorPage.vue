@@ -491,25 +491,25 @@ async function handleCompileDownload() {
         @click.self="showSelfReview = false"
       >
         <div class="bg-card border border-divider rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in">
-          <h3 class="text-lg font-heading font-semibold text-ink mb-1">Self Assessment</h3>
-          <p class="text-xs text-ink-muted mb-5">Rate your article before submitting to the pool.</p>
+          <h3 class="text-lg font-heading font-semibold text-ink mb-1">{{ t('editor.selfAssessment') }}</h3>
+          <p class="text-xs text-ink-muted mb-5">{{ t('editor.selfAssessmentHint') }}</p>
 
           <!-- Commit message -->
           <div class="mb-4">
             <label class="text-xs font-semibold text-ink-muted block mb-1">
-              Commit Message <span class="text-[#d73a49]">*</span>
+              {{ t('editor.commitMessage') }} <span class="text-[#d73a49]">*</span>
             </label>
             <input
               v-model="commitMsg"
               type="text"
-              placeholder="Summarize your changes (required)"
+              :placeholder="t('editor.commitMessagePlaceholder')"
               class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
 
           <!-- 5-dim scores -->
           <div class="space-y-3 mb-5">
-            <label class="text-xs font-semibold text-ink-muted">Scores (1-5)</label>
+            <label class="text-xs font-semibold text-ink-muted">{{ t('editor.scores1to5') }}</label>
             <div class="grid grid-cols-5 gap-2">
               <div v-for="(_, key) in scores" :key="key" class="text-center">
                 <div class="text-xs text-ink-muted mb-1 capitalize">{{ key.substring(0, 4) }}</div>
@@ -525,33 +525,33 @@ async function handleCompileDownload() {
 
           <!-- Keywords -->
           <div class="mb-3">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">Keywords</label>
+            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.keywords') }}</label>
             <input
               v-model="keywords"
               type="text"
-              placeholder="e.g. quantum, computing, algorithms"
+              :placeholder="t('editor.keywordsPlaceholder')"
               class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
 
           <!-- Categories -->
           <div class="mb-3">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">Categories</label>
+            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.categories') }}</label>
             <input
               v-model="categories"
               type="text"
-              placeholder="e.g. cs.AI, math.NT"
+              :placeholder="t('editor.categoriesPlaceholder')"
               class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
 
           <!-- Abstract -->
           <div class="mb-5">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">Abstract</label>
+            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.abstract') }}</label>
             <textarea
               v-model="abstract"
               rows="3"
-              placeholder="Brief summary of your article..."
+              :placeholder="t('editor.abstractPlaceholder2')"
               class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
             />
           </div>
@@ -562,14 +562,14 @@ async function handleCompileDownload() {
               class="btn-outline flex-1"
               @click="showSelfReview = false"
             >
-              Cancel
+              {{ t('editor.cancel') }}
             </button>
             <button
               class="btn-primary flex-1"
               :disabled="submitting"
               @click="handleSubmitToPool"
             >
-              {{ submitting ? 'Submitting...' : 'Publish to Pool' }}
+              {{ submitting ? t('editor.submitting') : t('editor.publishToPool') }}
             </button>
           </div>
         </div>

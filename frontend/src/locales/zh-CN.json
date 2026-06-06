@@ -83,7 +83,21 @@
     "preview": "预览",
     "markdown": "Markdown",
     "typst": "Typst",
-    "download": "下载 PDF"
+    "download": "下载 PDF",
+    "selfAssessment": "自我评估",
+    "selfAssessmentHint": "提交到沉淀池前，请先为文章自评打分。",
+    "commitMessage": "提交信息",
+    "commitMessagePlaceholder": "简述你的修改（必填）",
+    "scores1to5": "评分 (1-5)",
+    "keywords": "关键词",
+    "keywordsPlaceholder": "如：量子, 计算, 算法",
+    "categories": "分类",
+    "categoriesPlaceholder": "如：cs.AI, math.NT",
+    "abstract": "摘要",
+    "abstractPlaceholder2": "文章简要概述...",
+    "cancel": "取消",
+    "submitting": "提交中...",
+    "publishToPool": "发布至沉淀池"
   },
   "auth": {
     "signIn": "登录",

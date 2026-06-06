@@ -83,7 +83,21 @@
     "preview": "Preview",
     "markdown": "Markdown",
     "typst": "Typst",
-    "download": "Download PDF"
+    "download": "Download PDF",
+    "selfAssessment": "Self Assessment",
+    "selfAssessmentHint": "Rate your article before submitting to the pool.",
+    "commitMessage": "Commit Message",
+    "commitMessagePlaceholder": "Summarize your changes (required)",
+    "scores1to5": "Scores (1-5)",
+    "keywords": "Keywords",
+    "keywordsPlaceholder": "e.g. quantum, computing, algorithms",
+    "categories": "Categories",
+    "categoriesPlaceholder": "e.g. cs.AI, math.NT",
+    "abstract": "Abstract",
+    "abstractPlaceholder2": "Brief summary of your article...",
+    "cancel": "Cancel",
+    "submitting": "Submitting...",
+    "publishToPool": "Publish to Pool"
   },
   "auth": {
     "signIn": "Sign In",
