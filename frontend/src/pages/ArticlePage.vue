@@ -245,6 +245,7 @@ async function updateSingleScore(reviewId: string, dim: string, value: number) {
   if (!userStore.viewer) return
   const review = reviews.value.find(r => r.id === reviewId)
   if (!review) return
+  const oldValue = review.scores[dim as keyof typeof review.scores]
   const updatedScores = { ...review.scores, [dim]: value }
   // Optimistic update — update local state immediately
   review.scores = updatedScores
@@ -256,8 +257,8 @@ async function updateSingleScore(reviewId: string, dim: string, value: number) {
       scores: updatedScores,
     })
   } catch {
-    // Revert on failure
-    review.scores = { ...review.scores, [dim]: review.scores[dim as keyof typeof review.scores] }
+    // Revert on failure — use saved oldValue, not the already-mutated current value
+    review.scores = { ...review.scores, [dim]: oldValue }
     reviewFormError.value = 'Failed to update score'
     setTimeout(() => { reviewFormError.value = '' }, 3000)
   }
@@ -329,6 +330,8 @@ async function handleMerge() {
     mergeSubmitting.value = false
   }
 }
+
+defineExpose({ updateSingleScore, reviews, mergeError })
 </script>
 
 <template>
@@ -465,6 +468,7 @@ async function handleMerge() {
               <GitMerge class="w-3 h-3" stroke-width="2" />
               {{ mergeSubmitting ? 'Proposing...' : 'Merge' }}
             </button>
+            <span v-if="mergeError" class="text-[10px] text-[#d73a49] ml-2">{{ mergeError }}</span>
           </div>
         </div>
 

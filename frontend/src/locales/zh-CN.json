@@ -101,7 +101,17 @@
     "abstractPlaceholder2": "文章简要概述...",
     "cancel": "取消",
     "submitting": "提交中...",
-    "publishToPool": "发布至沉淀池"
+    "publishToPool": "发布至沉淀池",
+    "contribution": "贡献度",
+    "contributionMustTotal100": "贡献度总和必须为 100%。当前："
+  },
+  "search": {
+    "category": "分类",
+    "sort": "排序",
+    "all": "全部",
+    "relevance": "相关性",
+    "newest": "最新",
+    "score": "最高评分"
   },
   "auth": {
     "signIn": "登录",

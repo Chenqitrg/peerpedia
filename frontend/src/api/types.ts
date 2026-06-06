@@ -265,6 +265,8 @@ export interface SearchResult {
   articles: ArticleSummary[]
   total: number
   query: string
+  page?: number
+  size?: number
 }
 
 // ===== Compile Preview Types =====

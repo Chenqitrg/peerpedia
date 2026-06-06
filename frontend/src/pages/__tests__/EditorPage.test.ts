@@ -109,4 +109,35 @@ describe('EditorPage', () => {
     // Modal should now be visible with contribution section
     expect(wrapper.text()).toMatch(/contribution|Contribution|slider/i)
   })
+
+  it('preserves contribution slider values when publish modal is reopened', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const pinia = setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+
+    const vm = wrapper.vm as any
+
+    // Open publish modal — contributions initialized to { u1: 100 }
+    await vm.handlePublish()
+    expect(vm.contributions).toEqual({ u1: 100 })
+
+    // User adjusts contribution from 100% → 50%
+    vm.contributions['u1'] = 50
+    expect(vm.contributions['u1']).toBe(50)
+
+    // Close modal
+    vm.showSelfReview = false
+
+    // Reopen — contributions should still be { u1: 50 }, not reset to { u1: 100 }
+    await vm.handlePublish()
+    expect(vm.contributions['u1']).toBe(50)
+    expect(vm.contributions).toEqual({ u1: 50 })
+  })
 })

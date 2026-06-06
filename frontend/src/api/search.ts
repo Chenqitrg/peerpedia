@@ -5,6 +5,8 @@ export interface SearchParams {
   q?: string
   category?: string
   sort?: string
+  page?: number
+  size?: number
 }
 
 export async function searchArticles(params: SearchParams): Promise<SearchResult> {

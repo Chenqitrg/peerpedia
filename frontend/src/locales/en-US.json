@@ -43,7 +43,13 @@
     "searching": "Searching...",
     "results": "result(s)",
     "noResults": "No results found",
-    "placeholder": "Enter a search term to find articles."
+    "placeholder": "Enter a search term to find articles.",
+    "category": "Category",
+    "sort": "Sort",
+    "all": "All",
+    "relevance": "Relevance",
+    "newest": "Newest",
+    "score": "Highest Score"
   },
   "common": {
     "retry": "Retry",

@@ -34,6 +34,8 @@ const { data: result, loading, error, execute: doSearch } = useAsyncResource(
       q: query.value.trim(),
       category: category.value,
       sort: sort.value,
+      page: currentPage.value,
+      size: pageSize,
     })
   },
   null as SearchResult | null,
@@ -48,20 +50,37 @@ const { toggle: handleToggleBookmark } = useBookmarkToggle(results)
 
 onMounted(() => {
   const q = route.query.q as string
-  if (q) {
-    query.value = q
+  const cat = route.query.category as string
+  const s = route.query.sort as string
+  if (q) query.value = q
+  if (cat) category.value = cat
+  if (s) sort.value = s
+  // Trigger search if any filter param is present
+  if (q || cat) {
     searched.value = true
     doSearch()
   }
 })
 
-watch(() => route.query.q, (newQ) => {
-  if (newQ && newQ !== query.value) {
-    query.value = newQ as string
-    searched.value = true
-    doSearch()
-  }
-})
+// Watch all query params to support browser back/forward navigation
+watch(
+  () => ({ q: route.query.q, category: route.query.category, sort: route.query.sort }),
+  (params) => {
+    const q = (params.q as string) || ''
+    const cat = (params.category as string) || ''
+    const s = (params.sort as string) || ''
+    // Only update if values actually changed to avoid infinite loops
+    if (q !== query.value || cat !== category.value || s !== sort.value) {
+      query.value = q
+      category.value = cat
+      sort.value = s
+      if (q || cat) {
+        searched.value = true
+        doSearch()
+      }
+    }
+  },
+)
 
 function executeSearch(page: number) {
   currentPage.value = page
@@ -85,6 +104,8 @@ function goToPage(page: number) {
   executeSearch(page)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
+
+defineExpose({ query, category, sort, doSearch })
 </script>
 
 <template>
@@ -111,7 +132,7 @@ function goToPage(page: number) {
         class="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold
                bg-accent text-[#0d1117] rounded-lg
                hover:brightness-110 transition-all duration-200"
-        :disabled="loading || !query.trim()"
+        :disabled="loading || (!query.trim() && !category)"
       >
         {{ loading ? t('search.searching') : t('search.title') }}
       </button>
@@ -120,30 +141,30 @@ function goToPage(page: number) {
     <!-- Filters -->
     <div class="flex flex-wrap items-center gap-3 mb-6">
       <label class="flex items-center gap-1.5 text-xs text-ink-muted">
-        <span>Category</span>
+        <span>{{ t('search.category') }}</span>
         <select
           v-model="category"
           class="bg-card border border-divider rounded px-2 py-1 text-xs text-ink
                  focus:outline-none focus:ring-1 focus:ring-accent"
           @change="executeSearch(1)"
         >
-          <option value="">All</option>
+          <option value="">{{ t('search.all') }}</option>
           <option v-for="cat in CATEGORIES" :key="cat" :value="cat">
             {{ cat.charAt(0).toUpperCase() + cat.slice(1) }}
           </option>
         </select>
       </label>
       <label class="flex items-center gap-1.5 text-xs text-ink-muted">
-        <span>Sort</span>
+        <span>{{ t('search.sort') }}</span>
         <select
           v-model="sort"
           class="bg-card border border-divider rounded px-2 py-1 text-xs text-ink
                  focus:outline-none focus:ring-1 focus:ring-accent"
           @change="executeSearch(1)"
         >
-          <option value="">Relevance</option>
-          <option value="newest">Newest</option>
-          <option value="score">Highest Score</option>
+          <option value="">{{ t('search.relevance') }}</option>
+          <option value="newest">{{ t('search.newest') }}</option>
+          <option value="score">{{ t('search.score') }}</option>
         </select>
       </label>
     </div>
