@@ -11,7 +11,8 @@ import ArticleCard from '../components/ArticleCard.vue'
 import ReputationBadges from '../components/ReputationBadges.vue'
 import type { UserProfile, ArticleSummary } from '../api/types'
 import {
-  Users,
+  UsersRound,
+  UserCheck,
   BookOpen,
   MapPin,
   Mail,
@@ -144,7 +145,7 @@ watch(() => route.params.id, () => {
                 :to="`/user/${user.id}/followers`"
                 class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors no-underline"
               >
-                <Users class="w-3.5 h-3.5" stroke-width="2" />
+                <UsersRound class="w-3.5 h-3.5" stroke-width="2" />
                 <span class="font-semibold">{{ user.followers_count }}</span>
                 <span>{{ t('common.followers') }}</span>
               </router-link>
@@ -152,7 +153,7 @@ watch(() => route.params.id, () => {
                 :to="`/user/${user.id}/following`"
                 class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors no-underline"
               >
-                <Users class="w-3.5 h-3.5" stroke-width="2" />
+                <UserCheck class="w-3.5 h-3.5" stroke-width="2" />
                 <span class="font-semibold">{{ user.following_count }}</span>
                 <span>{{ t('common.following') }}</span>
               </router-link>

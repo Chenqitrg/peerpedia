@@ -6,7 +6,7 @@ import { getFollowers, getFollowing } from '../api/users'
 import UserCard from '../components/UserCard.vue'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft, UsersRound, UserCheck } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,7 +48,11 @@ watch([userId, isFollowers], load, { immediate: true })
       {{ t('common.backToHome') }}
     </button>
 
-    <h1 class="text-display-md text-ink mb-2">{{ title }}</h1>
+    <h1 class="text-display-md text-ink mb-2 flex items-center gap-2">
+      <UsersRound v-if="isFollowers" class="w-5 h-5 text-accent" stroke-width="1.5" />
+      <UserCheck v-else class="w-5 h-5 text-accent" stroke-width="1.5" />
+      {{ title }}
+    </h1>
     <p class="text-sm text-ink-muted mb-6">
       {{ t('common.articles') }}
     </p>
