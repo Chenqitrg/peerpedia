@@ -164,8 +164,8 @@ watch(() => route.params.id, () => {
             v-if="!isSelf && userStore.viewer"
             class="btn-sm shrink-0 transition-colors duration-200"
             :class="isFollowing
-              ? 'btn-outline'
-              : 'bg-accent text-[#0d1117] hover:brightness-110'"
+              ? 'btn-outline rounded-xl'
+              : 'bg-accent text-[#0d1117] hover:brightness-110 rounded-xl'"
             :disabled="followLoading"
             @click="handleFollow"
           >
