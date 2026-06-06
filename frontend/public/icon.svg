@@ -7,10 +7,10 @@
     <path d="m18.586 13.414-5.172 5.172"/>
     <!-- Horizontal center line -->
     <path d="M6 12h12"/>
-    <!-- Nodes (filled circles) -->
-    <circle cx="12" cy="20" r="2.5" fill="#c8dae6" stroke="none"/>
-    <circle cx="12" cy="4"  r="2.5" fill="#c8dae6" stroke="none"/>
-    <circle cx="20" cy="12" r="2.5" fill="#c8dae6" stroke="none"/>
-    <circle cx="4"  cy="12" r="2.5" fill="#c8dae6" stroke="none"/>
+    <!-- Nodes (hollow circles, inheriting stroke + fill=none from group) -->
+    <circle cx="12" cy="20" r="2.5"/>
+    <circle cx="12" cy="4"  r="2.5"/>
+    <circle cx="20" cy="12" r="2.5"/>
+    <circle cx="4"  cy="12" r="2.5"/>
   </g>
 </svg>
