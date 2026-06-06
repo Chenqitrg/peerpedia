@@ -14,19 +14,26 @@ export const useUserStore = defineStore('user', () => {
   const showAuthModal = ref(false)
   const intendedRoute = ref<string | null>(null)
 
-  // ── Local account layer (Tauri only) ─────────────────────────────────
+  // ── Local account layer (Tauri or dev mock) ──────────────────────────
 
   const localAccount = ref<Account | null>(null)
   const localAccounts = ref<AccountSummary[]>([])
   const isTauriMode = ref(false)
+  const isDevMock = ref(false)
 
   const tauri = useTauri()
 
-  // Detect Tauri mode on store initialization.
+  // Detect Tauri / dev mock mode on store initialization.
   isTauriMode.value = tauri.isTauri.value
+  isDevMock.value = tauri.isDevMock.value
+
+  // Local mode: real Tauri desktop app OR browser dev mock.
+  function isLocalMode() {
+    return isTauriMode.value || isDevMock.value
+  }
 
   async function loadLocalAccounts() {
-    if (!isTauriMode.value) return
+    if (!isLocalMode()) return
     const result = await tauri.listAccounts()
     if (result && Array.isArray(result)) {
       localAccounts.value = result
@@ -47,7 +54,7 @@ export const useUserStore = defineStore('user', () => {
       anonymous_name: '',
       affiliation: '',
       expertise: [],
-      reputation: {},
+      reputation: { professionalism: 0, objectivity: 0, collaboration: 0, pedagogy: 0 },
       followers_count: 0,
       following_count: 0,
       article_count: 0,
@@ -69,7 +76,7 @@ export const useUserStore = defineStore('user', () => {
       anonymous_name: '',
       affiliation: '',
       expertise: [],
-      reputation: {},
+      reputation: { professionalism: 0, objectivity: 0, collaboration: 0, pedagogy: 0 },
       followers_count: 0,
       following_count: 0,
       article_count: 0,
@@ -97,8 +104,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function login(username: string, password: string) {
-    // In Tauri mode, prefer local login if the account exists locally.
-    if (isTauriMode.value) {
+    if (isLocalMode()) {
       return loginLocal(username, password)
     }
     const { user, token: t } = await apiLogin({ username, password })
@@ -106,7 +112,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function register(username: string, password: string, email: string, name: string) {
-    if (isTauriMode.value) {
+    if (isLocalMode()) {
       return registerLocal(username, password, email, name)
     }
     const { user, token: t } = await apiRegister({ username, password, email, name })
@@ -119,8 +125,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function restoreSession() {
-    // In Tauri mode, try local account list.
-    if (isTauriMode.value) {
+    if (isLocalMode()) {
       await loadLocalAccounts()
       return
     }
@@ -145,6 +150,7 @@ export const useUserStore = defineStore('user', () => {
     localAccount,
     localAccounts,
     isTauriMode,
+    isDevMock,
     login,
     register,
     loginLocal,

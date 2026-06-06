@@ -33,9 +33,9 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 const isLoggedIn = computed(() => !!userStore.viewer)
 
-// Connection status: Tauri=local, Web=online/offline
+// Connection status: Tauri/dev-mock=local, Web=online/offline
 const connectionStatus = computed(() => {
-  if (tauri.isTauri.value) return 'local'
+  if (tauri.isTauri.value || tauri.isDevMock.value) return 'local'
   if (userStore.viewer) return 'online'
   return 'offline'
 })

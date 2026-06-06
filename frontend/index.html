@@ -9,67 +9,6 @@
   </head>
   <body>
     <div id="app"></div>
-    <!-- Dev-only: enable Tauri UI in browser. Visit /?tauri to activate, /?tauri=0 to disable. -->
-    <script>
-      (() => {
-        const q = new URLSearchParams(window.location.search)
-        if (q.has('tauri')) {
-          if (q.get('tauri') === '0') localStorage.removeItem('peerpedia_dev_tauri')
-          else localStorage.setItem('peerpedia_dev_tauri', '1')
-        }
-        if (localStorage.getItem('peerpedia_dev_tauri') !== '1') return
-
-        // Mock accounts/drafts storage
-        const store = {
-          accounts: JSON.parse(localStorage.getItem('_t_accts') || '[]'),
-          drafts: JSON.parse(localStorage.getItem('_t_drafts') || '[]'),
-          cache: JSON.parse(localStorage.getItem('_t_cache') || '{}'),
-        }
-        function save(k) { localStorage.setItem(k, JSON.stringify(store[k.replace('_t_','')])) }
-
-        window.__TAURI__ = { core: { invoke: async (cmd, args) => {
-          const a = (args && args.params) || {}
-          switch (cmd) {
-            case 'create_account': {
-              if (store.accounts.find(x => x.username === a.username))
-                return { code: 'DUPLICATE', message: 'Username exists' }
-              const acct = { id: crypto.randomUUID(), username: a.username, password: a.password }
-              store.accounts.push(acct); save('_t_accts')
-              return { id: acct.id, username: acct.username }
-            }
-            case 'login': {
-              const acct = store.accounts.find(x => x.username === a.username)
-              if (!acct) return { code: 'NOT_FOUND', message: 'User not found' }
-              if (acct.password !== a.password) return { code: 'AUTH_FAILED', message: 'Incorrect password' }
-              return { id: acct.id, username: acct.username }
-            }
-            case 'list_accounts':
-              return store.accounts.map(x => ({ id: x.id, username: x.username }))
-            case 'save_draft': {
-              const id = a.id || crypto.randomUUID()
-              const draft = { id, account_id: a.account_id, title: a.title || '', content: a.content || '', format: a.format || 'markdown', updated_at: new Date().toISOString() }
-              const idx = store.drafts.findIndex(x => x.id === id)
-              if (idx >= 0) store.drafts[idx] = draft; else store.drafts.push(draft)
-              save('_t_drafts'); return draft
-            }
-            case 'list_drafts':
-              return store.drafts.filter(x => x.account_id === a.account_id).sort((x,y) => y.updated_at.localeCompare(x.updated_at)).map(x => ({ id: x.id, title: x.title, updated_at: x.updated_at }))
-            case 'get_draft': {
-              const d = store.drafts.find(x => x.id === a.id)
-              return d || { code: 'NOT_FOUND', message: 'Draft not found' }
-            }
-            case 'delete_draft':
-              store.drafts = store.drafts.filter(x => x.id !== a.id); save('_t_drafts'); return { ok: true }
-            case 'cache_article':
-              store.cache[a.id] = { id: a.id, json: a.article_json, cached_at: new Date().toISOString() }; save('_t_cache'); return { ok: true }
-            case 'get_cached_article':
-              return store.cache[a.id] || null
-            default: return { ok: true }
-          }
-        }}}
-        document.title = '[TAURI DEV] ' + document.title.replace('[TAURI DEV] ', '')
-      })()
-    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

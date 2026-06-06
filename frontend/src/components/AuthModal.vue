@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { X } from 'lucide-vue-next'
@@ -14,6 +14,8 @@ const email = ref('')
 const displayName = ref('')
 const error = ref('')
 const loading = ref(false)
+
+const isLocal = computed(() => userStore.isTauriMode || userStore.isDevMock)
 
 function switchTab(t: 'login' | 'register') {
   tab.value = t
@@ -47,8 +49,8 @@ async function handleRegister() {
     error.value = 'Password must be at least 6 characters'
     return
   }
-  // Email required in Web mode, optional in Tauri mode.
-  if (!userStore.isTauriMode) {
+  // Email required in Web mode, optional in local mode.
+  if (!isLocal.value) {
     if (!email.value.trim() || !email.value.includes('@')) {
       error.value = 'Please enter a valid email address'
       return
@@ -149,15 +151,15 @@ function close() {
           <input
             v-model="email"
             type="email"
-            :placeholder="userStore.isTauriMode ? 'Email (optional)' : t('auth.email')"
-            :required="!userStore.isTauriMode"
+            :placeholder="isLocal ? 'Email (optional)' : t('auth.email')"
+            :required="!isLocal"
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <input
             v-model="displayName"
             type="text"
-            :placeholder="userStore.isTauriMode ? 'Display name (optional)' : t('auth.name')"
-            :required="!userStore.isTauriMode"
+            :placeholder="isLocal ? 'Display name (optional)' : t('auth.name')"
+            :required="!isLocal"
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <input
