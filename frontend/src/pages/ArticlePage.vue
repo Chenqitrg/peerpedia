@@ -437,7 +437,7 @@ async function handleSinkExtension() {
         </div>
 
         <!-- Scores row -->
-        <div v-if="article.score" class="flex items-center gap-3 mt-3 pt-3 border-t border-divider">
+        <div class="flex items-center gap-3 mt-3 pt-3 border-t border-divider">
           <ScoreBadges :score="article.score" :highlight-first="true" :show-label="true" />
         </div>
       </div>
