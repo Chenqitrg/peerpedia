@@ -213,7 +213,7 @@ Higher reputation → greater voting weight in the pool.
 
 ### Web（Phase 2+ — 社区）
 
-- 5D scoring (O/R/C/P/I) with hover-to-expand ScoreBadges
+- 5D scoring (O/R/C/P/I) with hover-to-edit ScoreBadges
 - Sedimentation pool with configurable timers
 - Article forking + merge proposals
 - Citation graph (references + citations, click-to-navigate)
@@ -229,6 +229,7 @@ Higher reputation → greater voting weight in the pool.
 - Waypoints constellation icon as brand mark + Tauri app icon
 - Client-side Markdown compilation (marked + KaTeX, no server round-trip)
 - CI pipeline: 11 jobs across Python, TypeScript, Rust
+- Typed localStorage abstraction (`useLocalStorage`) — centralized I/O for 8 consumers
 
 ---
 
@@ -240,7 +241,7 @@ peerpedia/
 │   ├── src/
 │   │   ├── api/               # Axios API modules
 │   │   ├── components/        # 14 components (SelfReviewPanel, ReviewPanel, etc.)
-│   │   ├── composables/       # Shared logic (useTauri, useDraftPersistence, etc.)
+│   │   ├── composables/       # Shared logic (useLocalStorage, useTauri, useDraftPersistence, useBookmarkToggle, useStatusMap, useAsyncResource)
 │   │   ├── locales/           # i18n (zh-CN, en-US)
 │   │   ├── pages/             # Route pages（含 LoginPage）
 │   │   ├── router/            # Vue Router + auth guards
@@ -271,11 +272,11 @@ peerpedia/
 ## Testing
 
 ```bash
-# Backend (157 tests)
+# Backend (166 tests)
 source .venv/bin/activate
 python -m pytest backend/tests/ -q
 
-# Frontend (145 tests, 26 test files)
+# Frontend (172 tests, 28 test files)
 cd frontend
 npx vitest run
 
