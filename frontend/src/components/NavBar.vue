@@ -234,6 +234,17 @@ function handleLogout() {
 
       <!-- Actions — not logged in -->
       <div v-else class="flex items-center gap-1">
+        <!-- Language toggle -->
+        <button
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 text-xs font-semibold
+                 text-ink-muted hover:text-ink hover:bg-[#21262d]
+                 transition-colors duration-200"
+          :aria-label="locale === 'zh-CN' ? 'Switch to English' : '切换到中文'"
+          @click="toggleLocale"
+        >
+          {{ locale === 'zh-CN' ? 'EN' : '中' }}
+        </button>
         <button
           class="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold
                  bg-accent text-[#0d1117] rounded-lg
