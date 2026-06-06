@@ -594,7 +594,7 @@ async function handleSinkExtension() {
                     v-else
                     class="w-3.5 h-3.5 transition-transform duration-200"
                   />
-                  Thread ({{ review.thread.length }})
+                  {{ t('article.thread') }} ({{ review.thread.length }})
                 </button>
 
                 <!-- iMessage-style messages -->

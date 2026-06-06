@@ -114,6 +114,7 @@
     "reviewSubmitted": "Review submitted",
     "reviewFailedComment": "Review submitted but comment failed to send. You can reply in the thread.",
     "extend": "Extend",
+    "thread": "Discussion",
     "reviews": "reviews",
     "scores": "Scores"
   },
