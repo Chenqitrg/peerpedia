@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7b8c9e"/>
+      <stop offset="100%" stop-color="#9db5c9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Constellation lines -->
+  <g stroke="url(#accent)" stroke-width="3" stroke-linecap="round" opacity="0.4">
+    <!-- Outer ring connections -->
+    <line x1="160" y1="140" x2="256" y2="100"/>
+    <line x1="256" y1="100" x2="352" y2="140"/>
+    <line x1="352" y1="140" x2="400" y2="256"/>
+    <line x1="400" y1="256" x2="352" y2="372"/>
+    <line x1="352" y1="372" x2="256" y2="412"/>
+    <line x1="256" y1="412" x2="160" y2="372"/>
+    <line x1="160" y1="372" x2="112" y2="256"/>
+    <line x1="112" y1="256" x2="160" y2="140"/>
+    <!-- Inner cross connections -->
+    <line x1="160" y1="140" x2="352" y2="372"/>
+    <line x1="352" y1="140" x2="160" y2="372"/>
+    <line x1="256" y1="100" x2="256" y2="412"/>
+    <line x1="112" y1="256" x2="400" y2="256"/>
+  </g>
+
+  <!-- Nodes -->
+  <g fill="#9db5c9">
+    <!-- Center node (largest) -->
+    <circle cx="256" cy="256" r="16"/>
+    <!-- Cardinal nodes -->
+    <circle cx="256" cy="100" r="12"/>
+    <circle cx="400" cy="256" r="12"/>
+    <circle cx="256" cy="412" r="12"/>
+    <circle cx="112" cy="256" r="12"/>
+    <!-- Diagonal nodes -->
+    <circle cx="160" cy="140" r="10"/>
+    <circle cx="352" cy="140" r="10"/>
+    <circle cx="352" cy="372" r="10"/>
+    <circle cx="160" cy="372" r="10"/>
+  </g>
+
+  <!-- Center node inner glow -->
+  <circle cx="256" cy="256" r="8" fill="#c8dae6" opacity="0.6"/>
+</svg>
