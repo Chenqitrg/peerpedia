@@ -7,11 +7,9 @@ import { getReviews as fetchReviews, createReview, postReviewMessage } from '../
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
-import type { ArticleDetail, ReviewOut, ThreadMessage } from '../api/types'
-import StarRating from '../components/StarRating.vue'
+import type { ArticleDetail, ReviewOut } from '../api/types'
+import ReviewPanel from '../components/ReviewPanel.vue'
 import ScoreBadges from '../components/ScoreBadges.vue'
-import ThreadReplyInput from '../components/ThreadReplyInput.vue'
-import { SCORE_DIMS } from '../api/constants'
 import { renderMathInHtml } from '../utils/math'
 import {
   Bookmark,
@@ -23,8 +21,6 @@ import {
   Clock,
   MessageSquare,
   Eye,
-  ChevronRight,
-  ChevronDown,
   FileDown,
   FileText,
 } from 'lucide-vue-next'
@@ -47,6 +43,7 @@ const id = route.params.id as string
 
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 const isBookmarked = computed(() => article.value?.is_bookmarked ?? false)
+const articleAuthorIds = computed(() => article.value?.authors.map(a => a.id) ?? [])
 
 const statusLabel = useStatusLabel(() => article.value?.status ?? '')
 const statusClass = computed(() => getStatusInfo(article.value?.status ?? '').class)
@@ -85,11 +82,6 @@ const expandedThreads = reactive(new Set<string>())
 
 function isMyReview(review: ReviewOut): boolean {
   return userStore.viewer != null && review.reviewer_id === userStore.viewer.id
-}
-
-function canReplyInThread(review: ReviewOut): boolean {
-  if (!userStore.viewer) return false
-  return isOwnArticle.value || review.reviewer_id === userStore.viewer.id
 }
 
 function onDimEnter(review: ReviewOut, dimKey: string) {
@@ -199,12 +191,6 @@ function toggleThread(reviewId: string) {
   } else {
     expandedThreads.add(reviewId)
   }
-}
-
-function isAuthorMessage(msg: ThreadMessage): boolean {
-  if (!article.value) return false
-  const authorIds = article.value.authors.map(a => a.id)
-  return authorIds.includes(msg.author_id)
 }
 
 async function handleSubmitReview() {
@@ -515,176 +501,32 @@ defineExpose({ updateSingleScore, reviews, mergeError })
       </div>
 
       <div v-else class="card p-6">
-        <div v-if="reviewsLoading" class="text-ink-muted text-sm">Loading comments...</div>
-
-        <div v-else>
-          <!-- Review submission form (logged-in non-author, no review yet) -->
-          <div v-if="canUserReview && !myExistingReview" class="mb-6 p-4 border border-divider rounded-lg">
-            <p class="text-xs text-ink-muted mb-3 font-medium">Write a review</p>
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3">
-              <span v-for="dim in SCORE_DIMS" :key="dim.key" class="inline-flex items-center gap-1">
-                <span class="text-xs text-ink-muted font-mono w-3 text-right">{{ dim.label }}</span>
-                <StarRating
-                  :modelValue="reviewScores[dim.key]"
-                  size="sm"
-                  @update:modelValue="v => reviewScores[dim.key] = v"
-                />
-              </span>
-            </div>
-            <!-- Comment input -->
-            <textarea
-              v-model="reviewComment"
-              rows="2"
-              :placeholder="t('article.commentPlaceholder')"
-              class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-xs
-                     text-ink placeholder:text-ink-muted/50 resize-none
-                     focus:outline-none focus:ring-1 focus:ring-accent mb-3"
-            ></textarea>
-            <div class="flex items-center justify-between">
-              <button
-                class="px-4 py-1.5 text-xs font-semibold bg-accent text-[#0d1117] rounded-md
-                       hover:brightness-110 transition-all duration-200 disabled:opacity-50"
-                :disabled="submittingReview"
-                @click="handleSubmitReview"
-              >
-                {{ submittingReview ? 'Submitting...' : 'Submit Review' }}
-              </button>
-              <p v-if="reviewFormError" class="text-xs text-[#d73a49]">{{ reviewFormError }}</p>
-              <p v-if="reviewFormSuccess" class="text-xs text-green-400">{{ reviewFormSuccess }}</p>
-            </div>
-          </div>
-
-          <!-- Sign in prompt -->
-          <div v-if="!userStore.viewer" class="text-xs text-ink-muted/60 mb-4">
-            <button class="text-accent hover:underline" @click="userStore.showAuthModal = true">
-              Sign in
-            </button>
-            to submit a review.
-          </div>
-
-          <!-- No reviews -->
-          <div v-if="sortedReviews.length === 0 && !canUserReview" class="text-ink-muted text-sm">
-            No reviews yet.
-          </div>
-
-          <!-- Review list -->
-          <div v-if="sortedReviews.length > 0" class="space-y-3">
-            <div
-              v-for="review in sortedReviews"
-              :key="review.id"
-              class="border rounded-lg p-4"
-              :class="isMyReview(review)
-                ? 'border-accent/40 border-l-2 border-l-accent'
-                : 'border-divider'"
-            >
-              <!-- Header -->
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-sm font-semibold text-ink">
-                  {{ review.is_self_review ? 'Author' : review.reviewer_name || review.reviewer_id?.substring(0, 8) }}
-                  <span v-if="review.is_self_review" class="text-xs text-ink-muted/60 font-normal ml-1">(self-review)</span>
-                  <span v-if="isMyReview(review) && !review.is_self_review" class="text-xs text-accent/80 font-normal ml-1">(you)</span>
-                </span>
-                <span class="text-xs text-ink-muted">
-                  {{ new Date(review.created_at).toLocaleString() }}
-                </span>
-              </div>
-
-              <!-- Score row: hover-to-edit for my review, ScoreBadges for others -->
-              <template v-if="isMyReview(review)">
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs">
-                  <span
-                    v-for="dim in SCORE_DIMS"
-                    :key="dim.key"
-                    class="inline-flex items-center cursor-default"
-                    @mouseenter="onDimEnter(review, dim.key)"
-                    @mouseleave="onDimLeave()"
-                  >
-                    <template v-if="hoveredDim === review.id + ':' + dim.key">
-                      <span class="text-ink-muted mr-0.5">{{ dim.fullLabel }}</span>
-                      <StarRating
-                        :modelValue="review.scores[dim.key]"
-                        size="sm"
-                        @update:modelValue="v => updateSingleScore(review.id, dim.key, v)"
-                      />
-                    </template>
-                    <template v-else>
-                      <span :class="dim.key === 'originality' ? 'text-accent font-semibold' : 'text-ink-muted'">
-                        {{ dim.label }}:{{ review.scores[dim.key] }}
-                      </span>
-                    </template>
-                  </span>
-                </div>
-              </template>
-              <ScoreBadges v-else :score="review.scores" class="mb-3" />
-
-              <!-- Thread drawer (shown for all reviews that have messages) -->
-              <div v-if="review.thread && review.thread.length">
-                <button
-                  class="flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink transition-colors"
-                  @click="toggleThread(review.id)"
-                >
-                  <ChevronDown
-                    v-if="expandedThreads.has(review.id)"
-                    class="w-3.5 h-3.5 transition-transform duration-200"
-                  />
-                  <ChevronRight
-                    v-else
-                    class="w-3.5 h-3.5 transition-transform duration-200"
-                  />
-                  {{ t('article.thread') }} ({{ review.thread.length }})
-                </button>
-
-                <!-- iMessage-style messages -->
-                <div v-if="expandedThreads.has(review.id)" class="mt-3 space-y-3">
-                  <div
-                    v-for="(msg, msgIdx) in review.thread"
-                    :key="msg.author_id + ':' + msg.created_at + ':' + msgIdx"
-                    class="flex"
-                    :class="isAuthorMessage(msg) ? 'justify-start' : 'justify-end'"
-                  >
-                    <div
-                      class="max-w-[75%] rounded-xl px-3 py-2 text-sm"
-                      :class="isAuthorMessage(msg)
-                        ? 'bg-[#21262d] text-ink rounded-bl-md'
-                        : 'bg-accent/15 border border-accent/30 text-ink rounded-br-md'"
-                    >
-                      <span class="text-[10px] text-ink-muted/50 block mb-0.5">
-                        {{ new Date(msg.created_at).toLocaleString() }}
-                      </span>
-                      <p class="leading-relaxed">{{ msg.content }}</p>
-                    </div>
-                  </div>
-
-                  <!-- Reply input (only author + reviewer can reply) -->
-                  <div v-if="canReplyInThread(review)">
-                    <ThreadReplyInput
-                      v-model="replyTexts[review.id]"
-                      :disabled="sendingReplies[review.id]"
-                      @send="handleReply(review.id)"
-                    />
-                    <p v-if="replyErrors[review.id]" class="text-[10px] text-[#d73a49] mt-1">{{ replyErrors[review.id] }}</p>
-                  </div>
-
-                  <!-- Read-only indicator for bystanders -->
-                  <p v-else-if="userStore.viewer" class="text-[10px] text-ink-muted/40 italic">
-                    {{ t('article.threadRestricted') }}
-                  </p>
-                </div>
-              </div>
-
-              <!-- Empty thread: input to start conversation (only on my review) -->
-              <div v-if="isMyReview(review) && (!review.thread || !review.thread.length)" class="mt-2">
-                <ThreadReplyInput
-                  v-model="replyTexts[review.id]"
-                  placeholder="Start a conversation..."
-                  :disabled="sendingReplies[review.id]"
-                  @send="handleReply(review.id)"
-                />
-                <p v-if="replyErrors[review.id]" class="text-[10px] text-[#d73a49] mt-1">{{ replyErrors[review.id] }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ReviewPanel
+          v-model:review-scores="reviewScores"
+          v-model:review-comment="reviewComment"
+          :sorted-reviews="sortedReviews"
+          :reviews-loading="reviewsLoading"
+          :can-user-review="canUserReview"
+          :my-existing-review="myExistingReview"
+          :is-own-article="isOwnArticle"
+          :viewer-id="userStore.viewer?.id ?? null"
+          :article-author-ids="articleAuthorIds"
+          :submitting-review="submittingReview"
+          :review-form-error="reviewFormError"
+          :review-form-success="reviewFormSuccess"
+          :hovered-dim="hoveredDim"
+          :expanded-threads="expandedThreads"
+          :reply-texts="replyTexts"
+          :reply-errors="replyErrors"
+          :sending-replies="sendingReplies"
+          @submit-review="handleSubmitReview"
+          @update-score="updateSingleScore"
+          @send-reply="handleReply"
+          @toggle-thread="toggleThread"
+          @dim-enter="onDimEnter"
+          @dim-leave="onDimLeave"
+          @sign-in="userStore.showAuthModal = true"
+        />
       </div>
     </template>
 
