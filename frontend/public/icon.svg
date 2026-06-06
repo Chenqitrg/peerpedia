@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <!-- Lucide Waypoints icon, scaled 21x to ~500px, centered -->
   <g transform="translate(4, 4) scale(21)"
-     stroke="#9db5c9" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+     stroke="#9db5c9" stroke-width="1.2" stroke-linecap="butt" stroke-linejoin="round">
     <!-- Diagonal connections -->
     <path d="m10.586 5.414-5.172 5.172"/>
     <path d="m18.586 13.414-5.172 5.172"/>
