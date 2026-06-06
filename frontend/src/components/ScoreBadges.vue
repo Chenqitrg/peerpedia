@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 defineProps<{
   score: { originality: number; rigor: number; completeness: number; pedagogy: number; impact: number } | null
   highlightFirst?: boolean
+  showLabel?: boolean
 }>()
 
 const DIMS = [
@@ -15,6 +20,7 @@ const DIMS = [
 
 <template>
   <span v-if="score" class="inline-flex items-center gap-x-2.5 text-xs leading-none">
+    <span v-if="showLabel" class="text-ink-muted font-semibold">{{ t('article.scores') }}</span>
     <span
       v-for="(dim, idx) in DIMS"
       :key="dim.key"
