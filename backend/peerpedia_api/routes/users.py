@@ -115,16 +115,36 @@ def api_update_user(user_id: str, body: UserUpdate,
 
 @router.get("/{user_id}/followers", response_model=list[UserSummary])
 def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
+    from peerpedia_core.storage.db.models import Article
     users = get_followers(db, user_id)
-    return [UserSummary(id=u.id, name=u.name, affiliation=u.affiliation,
-                        expertise=u.expertise) for u in users]
+    out = []
+    for u in users:
+        article_count = db.query(Article).filter(
+            Article.authors.contains([u.id])
+        ).count()
+        out.append(UserSummary(
+            id=u.id, name=u.name, affiliation=u.affiliation,
+            expertise=u.expertise,
+            article_count=article_count, reputation=u.reputation or {},
+        ))
+    return out
 
 
 @router.get("/{user_id}/following", response_model=list[UserSummary])
 def api_get_following(user_id: str, db: Session = Depends(deps.get_db)):
+    from peerpedia_core.storage.db.models import Article
     users = get_following(db, user_id)
-    return [UserSummary(id=u.id, name=u.name, affiliation=u.affiliation,
-                        expertise=u.expertise) for u in users]
+    out = []
+    for u in users:
+        article_count = db.query(Article).filter(
+            Article.authors.contains([u.id])
+        ).count()
+        out.append(UserSummary(
+            id=u.id, name=u.name, affiliation=u.affiliation,
+            expertise=u.expertise,
+            article_count=article_count, reputation=u.reputation or {},
+        ))
+    return out
 
 
 @router.post("/{user_id}/follow", status_code=201)

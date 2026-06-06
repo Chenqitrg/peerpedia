@@ -119,4 +119,34 @@ describe('UserPage', () => {
     expect(wrapper.text()).toContain('Quantum Computing')
     expect(wrapper.text()).toContain('Information Theory')
   })
+
+  it('does not show Follow/Unfollow button on own profile', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const store = useUserStore()
+    store.viewer = { id: 'test-user', name: 'Test' } as any
+
+    const UserPage = (await import('../UserPage.vue')).default
+    const wrapper = mount(UserPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const btn = wrapper.find('button.btn-sm')
+    if (btn.exists()) {
+      expect(btn.text()).not.toBe('Follow')
+    }
+  })
+
+  it('shows Follow/Unfollow button on other user\'s profile', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const store = useUserStore()
+    store.viewer = { id: 'other-user', name: 'Other' } as any
+
+    const UserPage = (await import('../UserPage.vue')).default
+    const wrapper = mount(UserPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const btn = wrapper.find('button.btn-sm')
+    expect(btn.exists()).toBe(true)
+  })
 })

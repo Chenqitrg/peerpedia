@@ -84,3 +84,20 @@ class TestFollow:
         followers = resp.json()
         assert len(followers) == 1
         assert followers[0]["id"] == b["id"]
+        assert followers[0]["article_count"] >= 0, "followers should include article_count"
+        assert isinstance(followers[0]["reputation"], dict), "followers should include reputation dict"
+
+    def test_following_list_includes_reputation_and_article_count(self, client, auth_header):
+        a = client.post("/api/v1/users", json={"username": "folC", "password": "666666", "email": "c@t.com", "name": "C"}).json()
+        b = client.post("/api/v1/users", json={"username": "folD", "password": "666666", "email": "d@t.com", "name": "D"}).json()
+
+        headers_a = auth_header(a["id"])
+        client.post(f"/api/v1/users/{b['id']}/follow", headers=headers_a)
+
+        resp = client.get(f"/api/v1/users/{a['id']}/following")
+        assert resp.status_code == 200
+        following = resp.json()
+        assert len(following) == 1
+        assert following[0]["id"] == b["id"]
+        assert "article_count" in following[0], "following list should include article_count"
+        assert "reputation" in following[0], "following list should include reputation"
