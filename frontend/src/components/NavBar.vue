@@ -110,6 +110,17 @@ function handleLogout() {
         </div>
       </form>
 
+      <!-- Connection status dot — always visible regardless of auth state -->
+      <span
+        class="inline-block w-2 h-2 rounded-full flex-shrink-0"
+        :class="{
+          'bg-green-500': connectionStatus === 'online',
+          'bg-gray-500': connectionStatus === 'offline',
+          'bg-gray-400': connectionStatus === 'local',
+        }"
+        :title="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
+      />
+
       <!-- Actions — logged in -->
       <div v-if="isLoggedIn" class="flex items-center gap-1">
         <!-- Language toggle -->
@@ -167,17 +178,6 @@ function handleLogout() {
         >
           {{ t('nav.pool') }}
         </router-link>
-
-        <!-- Connection status dot -->
-        <span
-          class="inline-block w-2 h-2 rounded-full flex-shrink-0"
-          :class="{
-            'bg-green-500': connectionStatus === 'online',
-            'bg-gray-500': connectionStatus === 'offline',
-            'bg-gray-400': connectionStatus === 'local',
-          }"
-          :title="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
-        />
 
         <!-- Avatar + popover -->
         <div class="relative ml-1">
