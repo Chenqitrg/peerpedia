@@ -19,7 +19,7 @@ function updateDimension(dim: ScoreDimKey, value: number) {
       :key="dim.key"
       class="flex items-center gap-2 py-0.5 rounded hover:bg-[#21262d] transition-colors duration-150"
     >
-      <span class="text-xs text-ink-muted w-20 shrink-0">{{ dim.fullLabel }}</span>
+      <span class="dimension-label text-xs text-ink-muted w-20 shrink-0">{{ dim.fullLabel }}</span>
       <StarRating
         size="sm"
         :modelValue="modelValue[dim.key]"

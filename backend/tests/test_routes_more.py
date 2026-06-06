@@ -330,3 +330,51 @@ class TestMerge:
         assert len(data["articles"]) >= 2
         # Highest score first
         assert data["articles"][0]["id"] == high.id
+
+    def test_search_pagination_page_and_size(self, client, db_engine):
+        """Pagination: page and size params control which results are returned."""
+        s = get_session(db_engine)
+        u = User(username="user29", password_hash="", name="分页测试", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        # Create 5 articles with distinct titles for pagination testing
+        articles = []
+        for i in range(5):
+            a = Article(status="published", authors=[u.id],
+                         title=f"Page Article {i+1}")
+            articles.append(a)
+        s.add_all(articles)
+        s.commit()
+        # Collect IDs in creation order (oldest first since no created_at override)
+        ids = [a.id for a in articles]
+        s.close()
+
+        # Page 1, size 2 → returns first 2 articles, total=5
+        resp = client.get("/api/v1/search?page=1&size=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 5
+        assert len(data["articles"]) == 2
+        assert data["page"] == 1
+        assert data["size"] == 2
+
+        # Page 2, size 2 → returns next 2, different from page 1
+        resp = client.get("/api/v1/search?page=2&size=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["articles"]) == 2
+        page1_ids = {a["id"] for a in client.get("/api/v1/search?page=1&size=2").json()["articles"]}
+        page2_ids = {a["id"] for a in data["articles"]}
+        assert page1_ids != page2_ids, "Page 1 and Page 2 should return different results"
+
+        # Page 3, size 2 → returns last article (total=5, so page 3 has 1 item)
+        resp = client.get("/api/v1/search?page=3&size=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["articles"]) == 1
+
+        # Default size (no size param → defaults to 20)
+        resp = client.get("/api/v1/search")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["size"] == 20

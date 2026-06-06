@@ -93,7 +93,7 @@ Phase 2+（社区 — Web）
 | Storage (Desktop) | SQLite + Git repositories（本地） |
 | Storage (Web) | SQLite + Git repositories（服务器） |
 | Auth | JWT (Web) / bcrypt + SQLite (Desktop) |
-| Compilation | Typst CLI, Python Markdown |
+| Compilation | Markdown: client-side (marked + KaTeX). Typst: Tauri sidecar CLI (Slice 2) |
 | Math | KaTeX |
 
 ---
@@ -207,7 +207,8 @@ Higher reputation → greater voting weight in the pool.
 - Local Git version control（fork, history, diff）
 - SQLite-based drafts and article cache
 - Local account system（bcrypt, no server needed）
-- Typst → PDF compilation, Markdown → HTML
+- Markdown live preview (client-side marked + KaTeX)
+- Typst → PDF via Tauri sidecar (Slice 2, on-going)
 - 5MB install, 30MB RAM
 
 ### Web（Phase 2+ — 社区）

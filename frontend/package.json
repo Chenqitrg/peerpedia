@@ -7,20 +7,24 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
     "@vueuse/core": "^14.3.0",
     "axios": "^1.17.0",
     "diff2html": "^3.4.56",
     "katex": "^0.17.0",
     "lucide-vue-next": "^1.0.0",
+    "marked": "^18.0.5",
     "pinia": "^2.3.1",
     "vue": "^3.4.0",
     "vue-i18n": "^11.4.5",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "@vue/test-utils": "^2.4.11",
     "autoprefixer": "^10.5.0",

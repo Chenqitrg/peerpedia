@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
+import { useTauri } from '../composables/useTauri'
 import {
   Bookmark,
   Waypoints,
@@ -14,12 +15,30 @@ import {
 
 const router = useRouter()
 const userStore = useUserStore()
+const tauri = useTauri()
 const { t, locale } = useI18n()
 const searchQuery = ref('')
 const mobileOpen = ref(false)
 const avatarPopover = ref(false)
+const avatarRef = ref<HTMLElement | null>(null)
+
+// Close popover on outside click.
+function onDocClick(e: MouseEvent) {
+  if (avatarRef.value && !avatarRef.value.contains(e.target as Node)) {
+    avatarPopover.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onDocClick))
+onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 const isLoggedIn = computed(() => !!userStore.viewer)
+
+// Connection status: Tauri/dev-mock=local, Web=online/offline
+const connectionStatus = computed(() => {
+  if (tauri.isTauri.value || tauri.isDevMock.value) return 'local'
+  if (userStore.viewer) return 'online'
+  return 'offline'
+})
 
 function toggleLocale() {
   locale.value = locale.value === 'zh-CN' ? 'en-US' : 'zh-CN'
@@ -101,6 +120,17 @@ function handleLogout() {
         </div>
       </form>
 
+      <!-- Connection status dot — always visible regardless of auth state -->
+      <span
+        class="inline-block w-2 h-2 rounded-full flex-shrink-0"
+        :class="{
+          'bg-green-500': connectionStatus === 'online',
+          'bg-gray-500': connectionStatus === 'offline',
+          'bg-gray-400': connectionStatus === 'local',
+        }"
+        :title="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
+      />
+
       <!-- Actions — logged in -->
       <div v-if="isLoggedIn" class="flex items-center gap-1">
         <!-- Language toggle -->
@@ -159,8 +189,8 @@ function handleLogout() {
           {{ t('nav.pool') }}
         </router-link>
 
-        <!-- Avatar + popover -->
-        <div class="relative ml-1">
+        <!-- Avatar + popover (ref on container includes both button and dropdown) -->
+        <div ref="avatarRef" class="relative ml-1">
           <button
             class="flex items-center gap-1 px-1.5 py-1 rounded-lg
                    text-ink-muted hover:text-ink hover:bg-[#21262d]
@@ -214,6 +244,17 @@ function handleLogout() {
 
       <!-- Actions — not logged in -->
       <div v-else class="flex items-center gap-1">
+        <!-- Language toggle -->
+        <button
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 text-xs font-semibold
+                 text-ink-muted hover:text-ink hover:bg-[#21262d]
+                 transition-colors duration-200"
+          :aria-label="locale === 'zh-CN' ? 'Switch to English' : '切换到中文'"
+          @click="toggleLocale"
+        >
+          {{ locale === 'zh-CN' ? 'EN' : '中' }}
+        </button>
         <button
           class="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold
                  bg-accent text-[#0d1117] rounded-lg

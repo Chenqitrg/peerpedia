@@ -4,7 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
-import { compilePreview, compileDownload } from '../api/compile'
+import { useDraftPersistence } from '../composables/useDraftPersistence'
+import { parseMarkdown } from '../utils/markdown'
+import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
   Bookmark,
   BookmarkCheck,
@@ -14,10 +16,9 @@ import {
   Play,
   Save,
   Send,
-  SlidersHorizontal,
   FileText,
 } from 'lucide-vue-next'
-import { renderMathInHtml } from '../utils/math'
+
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +27,7 @@ const userStore = useUserStore()
 const { t } = useI18n()
 
 import { getArticleSource } from '../api/articles'
+import type { ArticleCreatePayload, ArticleUpdatePayload } from '../api/types'
 
 const editId = computed(() => route.params.id as string | undefined)
 const isEdit = computed(() => !!editId.value)
@@ -80,8 +82,15 @@ function onMouseUp() {
 }
 
 const DRAFT_KEY = computed(() => `editor-draft-${editId.value || 'new'}`)
+const DRAFT_ID_KEY = computed(() => `editor-draft-id-${editId.value || 'new'}`)
 const totalContribution = computed(() =>
   Object.values(contributions.value).reduce((sum, v) => sum + v, 0)
+)
+
+// Draft persistence — Tauri IPC when available, REST + localStorage fallback.
+const draftPersistence = useDraftPersistence()
+const currentDraftId = ref<string | undefined>(
+  editId.value as string | undefined || localStorage.getItem(DRAFT_ID_KEY.value) || undefined
 )
 
 onMounted(() => {
@@ -108,14 +117,30 @@ async function loadExistingArticle() {
   }
 }
 
-function restoreDraft() {
+async function restoreDraft() {
+  // Restore the Tauri draft ID from localStorage (persisted across refreshes).
+  const savedId = localStorage.getItem(DRAFT_ID_KEY.value)
+  if (savedId) currentDraftId.value = savedId
+
+  // Try Tauri persistence first with the real draft ID.
+  const accountId = userStore.viewer?.id || 'local'
+  const lookupId = currentDraftId.value || DRAFT_KEY.value
+  const result = await draftPersistence.load(lookupId)
+
+  if (result && result.content !== undefined) {
+    title.value = result.title || ''
+    content.value = result.content || ''
+    format.value = (result.format as 'markdown' | 'typst') || 'markdown'
+  }
+
+  // Also try localStorage as backup.
   const saved = localStorage.getItem(DRAFT_KEY.value)
   if (saved) {
     try {
       const parsed = JSON.parse(saved)
-      title.value = parsed.title || ''
-      content.value = parsed.content || ''
-      format.value = parsed.format || 'markdown'
+      if (!title.value) title.value = parsed.title || ''
+      if (!content.value) content.value = parsed.content || ''
+      if (!format.value || format.value === 'markdown') format.value = parsed.format || 'markdown'
       scores.value = parsed.scores || { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 }
       keywords.value = parsed.keywords || ''
       categories.value = parsed.categories || ''
@@ -126,7 +151,24 @@ function restoreDraft() {
   }
 }
 
-function saveDraft() {
+async function saveDraft() {
+  const accountId = userStore.viewer?.id || 'local'
+
+  // Persist via Tauri or REST (handled by useDraftPersistence).
+  const result = await draftPersistence.save(
+    accountId,
+    title.value,
+    content.value,
+    format.value,
+    currentDraftId.value,
+  )
+  if (result && result.id) {
+    currentDraftId.value = result.id
+    // Persist the Tauri draft ID so it survives page refresh.
+    localStorage.setItem(DRAFT_ID_KEY.value, result.id)
+  }
+
+  // Also save to localStorage as offline backup (works in both modes).
   const draft = {
     title: title.value,
     content: content.value,
@@ -147,22 +189,22 @@ async function handleCompile() {
   previewHtml.value = ''
   errorMsg.value = ''
   try {
-    const data = await compilePreview({
-      content: content.value,
-      format: format.value,
-    })
-    const raw = data.output || ''
-    previewHtml.value = format.value === 'markdown' ? renderMathInHtml(raw) : raw
+    if (format.value === 'markdown') {
+      previewHtml.value = parseMarkdown(content.value)
+    } else {
+      // Typst: requires Tauri sidecar (Slice 2) for local compilation.
+      // Web: on-going — no browser-native Typst→HTML path yet.
+      previewHtml.value = '<p class="text-ink-muted text-sm">Typst preview available in Tauri desktop (Slice 2). Write in Markdown for live preview.</p>'
+    }
   } catch (e: any) {
-    errorMsg.value = e.response?.data?.detail || 'Compile failed'
+    errorMsg.value = e.message || 'Compile failed'
   } finally {
     compiling.value = false
   }
 }
 
 async function handleSaveDraft() {
-  // Save to localStorage for recovery
-  saveDraft()
+  await saveDraft()
   if (!userStore.viewer) return
   if (!editId.value) return  // can't save unsaved article to backend
   if (!commitMsg.value.trim()) {
@@ -189,8 +231,9 @@ async function handleSaveDraft() {
 }
 
 function handlePublish() {
-  if (userStore.viewer) {
-    contributions.value = { [userStore.viewer.id]: 100 }
+  if (userStore.viewer && !(userStore.viewer.id in contributions.value)) {
+    // Only initialize contributions if not already set — preserves user adjustments
+    contributions.value = { ...contributions.value, [userStore.viewer.id]: 100 }
   }
   showSelfReview.value = true
 }
@@ -214,7 +257,7 @@ async function handleSubmitToPool() {
   successMsg.value = ''
 
   try {
-    const body: Record<string, unknown> = {
+    const body: ArticleCreatePayload | ArticleUpdatePayload = {
       title: title.value,
       abstract: abstract.value || title.value,
       content: content.value,
@@ -228,7 +271,7 @@ async function handleSubmitToPool() {
       contributions: { ...contributions.value },
     }
 
-    let result: any
+    let result: { id: string }
     if (isEdit.value) {
       result = await articleStore.updateArticle(editId.value!, body)
       successMsg.value = 'Article updated and submitted to pool!'
@@ -273,21 +316,26 @@ async function handleCompileDownload() {
     errorMsg.value = 'Nothing to download — editor is empty'
     return
   }
-  try {
-    const res = await compileDownload(content.value, format.value)
-    const blob = new Blob([res.data], { type: res.headers['content-type'] as string })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = format.value === 'typst' ? 'article.pdf' : 'article.html'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch (e: any) {
-    errorMsg.value = 'Compile download failed'
+  if (format.value === 'markdown') {
+    // Render markdown to HTML and open in a new window for browser print → PDF.
+    const html = parseMarkdown(content.value)
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>${title.value || 'Article'}</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+        <style>body{max-width:800px;margin:2rem auto;font-family:serif;line-height:1.6;color:#1a1a1a;}
+        pre{background:#f5f5f5;padding:1rem;border-radius:4px;overflow-x:auto;}</style></head>
+        <body>${html}</body></html>`)
+      printWindow.document.close()
+      setTimeout(() => printWindow.print(), 500)
+    }
+  } else {
+    // Typst PDF: requires Tauri sidecar (Slice 2). Web: on-going.
+    errorMsg.value = 'Typst PDF export available in Tauri desktop (Slice 2). Markdown articles can print to PDF via browser.'
   }
 }
+
+defineExpose({ contributions, handlePublish, showSelfReview, totalContribution })
 </script>
 
 <template>
@@ -491,126 +539,18 @@ async function handleCompileDownload() {
       <span>{{ content.length }} characters</span>
     </div>
 
-    <!-- Self-review panel (slide-in) -->
-    <Transition name="slide-up">
-      <div
-        v-if="showSelfReview"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-        @click.self="showSelfReview = false"
-      >
-        <div class="bg-card border border-divider rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in">
-          <h3 class="text-lg font-heading font-semibold text-ink mb-1">{{ t('editor.selfAssessment') }}</h3>
-          <p class="text-xs text-ink-muted mb-5">{{ t('editor.selfAssessmentHint') }}</p>
-
-          <!-- Commit message -->
-          <div class="mb-4">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">
-              {{ t('editor.commitMessage') }} <span class="text-[#d73a49]">*</span>
-            </label>
-            <input
-              v-model="commitMsg"
-              type="text"
-              :placeholder="t('editor.commitMessagePlaceholder')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <!-- 5-dim scores -->
-          <div class="space-y-3 mb-5">
-            <label class="text-xs font-semibold text-ink-muted">{{ t('editor.scores1to5') }}</label>
-            <div class="grid grid-cols-5 gap-2">
-              <div v-for="(_, key) in scores" :key="key" class="text-center">
-                <div class="text-xs text-ink-muted mb-1 capitalize">{{ key.substring(0, 4) }}</div>
-                <select
-                  v-model="(scores as any)[key]"
-                  class="w-full bg-[#0d1117] border border-divider rounded text-center text-sm text-ink py-1.5 focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Keywords -->
-          <div class="mb-3">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.keywords') }}</label>
-            <input
-              v-model="keywords"
-              type="text"
-              :placeholder="t('editor.keywordsPlaceholder')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <!-- Categories -->
-          <div class="mb-3">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.categories') }}</label>
-            <input
-              v-model="categories"
-              type="text"
-              :placeholder="t('editor.categoriesPlaceholder')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <!-- Abstract -->
-          <div class="mb-5">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.abstract') }}</label>
-            <textarea
-              v-model="abstract"
-              rows="3"
-              :placeholder="t('editor.abstractPlaceholder2')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-            />
-          </div>
-
-          <!-- Contribution -->
-          <div class="mb-5">
-            <label class="text-xs font-semibold text-ink-muted flex items-center gap-1.5 mb-2">
-              <SlidersHorizontal class="w-3 h-3" />
-              {{ t('editor.contribution') || 'Contribution' }}
-            </label>
-            <div
-              v-for="(pct, authorId) in contributions"
-              :key="authorId"
-              class="flex items-center gap-3 mb-2"
-            >
-              <span class="text-xs text-ink-muted w-20 truncate">
-                {{ authorId === userStore.viewer?.id ? 'You' : authorId.substring(0, 8) }}
-              </span>
-              <input
-                type="range"
-                :value="pct"
-                min="0"
-                max="100"
-                class="flex-1 h-1.5 accent-accent"
-                @input="(e) => contributions[authorId] = Number((e.target as HTMLInputElement).value)"
-              />
-              <span class="text-xs text-ink font-mono w-8 text-right">{{ pct }}%</span>
-            </div>
-            <p v-if="totalContribution !== 100" class="text-[10px] text-[#d73a49]">
-              {{ t('editor.contributionMustTotal100') || 'Contributions must total 100%. Currently:' }} {{ totalContribution }}%
-            </p>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-3">
-            <button
-              class="btn-outline flex-1"
-              @click="showSelfReview = false"
-            >
-              {{ t('editor.cancel') }}
-            </button>
-            <button
-              class="btn-primary flex-1"
-              :disabled="submitting"
-              @click="handleSubmitToPool"
-            >
-              {{ submitting ? t('editor.submitting') : t('editor.publishToPool') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <!-- Self-review panel -->
+    <SelfReviewPanel
+      v-model="showSelfReview"
+      v-model:commit-msg="commitMsg"
+      v-model:scores="scores"
+      v-model:keywords="keywords"
+      v-model:categories="categories"
+      v-model:abstract="abstract"
+      v-model:contributions="contributions"
+      :total-contribution="totalContribution"
+      :submitting="submitting"
+      @submit="handleSubmitToPool"
+    />
   </div>
 </template>

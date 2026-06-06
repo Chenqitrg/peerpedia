@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { X } from 'lucide-vue-next'
@@ -14,6 +14,8 @@ const email = ref('')
 const displayName = ref('')
 const error = ref('')
 const loading = ref(false)
+
+const isLocal = computed(() => userStore.isTauriMode || userStore.isDevMock)
 
 function switchTab(t: 'login' | 'register') {
   tab.value = t
@@ -31,7 +33,7 @@ async function handleLogin() {
     await userStore.login(username.value, password.value)
     close()
   } catch (e: any) {
-    error.value = (e as any).userMessage || 'Login failed'
+    error.value = (e as any).userMessage || e.message || 'Login failed'
   } finally {
     loading.value = false
   }
@@ -47,20 +49,22 @@ async function handleRegister() {
     error.value = 'Password must be at least 6 characters'
     return
   }
-  if (!email.value.trim() || !email.value.includes('@')) {
-    error.value = 'Please enter a valid email address'
-    return
+  // Email required in Web mode, optional in local mode.
+  if (!isLocal.value) {
+    if (!email.value.trim() || !email.value.includes('@')) {
+      error.value = 'Please enter a valid email address'
+      return
+    }
   }
   if (!displayName.value.trim()) {
-    error.value = 'Display name is required'
-    return
+    displayName.value = username.value
   }
   loading.value = true
   try {
     await userStore.register(username.value, password.value, email.value, displayName.value)
     close()
   } catch (e: any) {
-    error.value = (e as any).userMessage || 'Registration failed'
+    error.value = (e as any).userMessage || e.message || 'Registration failed'
   } finally {
     loading.value = false
   }
@@ -70,22 +74,15 @@ function close() {
   userStore.showAuthModal = false
   error.value = ''
 }
-
-function onOverlayClick(e: MouseEvent) {
-  if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
-    close()
-  }
-}
 </script>
 
 <template>
   <Teleport to="body">
     <div
       v-if="userStore.showAuthModal"
-      class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      @click="onOverlayClick"
+      class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
     >
-      <div class="w-full max-w-sm bg-card border border-divider rounded-xl shadow-2xl p-6 animate-fade-in">
+      <div class="w-full max-w-sm bg-card border border-divider rounded-xl shadow-2xl p-6 animate-fade-in pointer-events-auto">
         <!-- Tab switcher -->
         <div class="flex items-center justify-between mb-5">
           <div class="flex gap-4">
@@ -154,15 +151,15 @@ function onOverlayClick(e: MouseEvent) {
           <input
             v-model="email"
             type="email"
-            :placeholder="t('auth.email')"
-            required
+            :placeholder="isLocal ? 'Email (optional)' : t('auth.email')"
+            :required="!isLocal"
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <input
             v-model="displayName"
             type="text"
-            :placeholder="t('auth.name')"
-            required
+            :placeholder="isLocal ? 'Display name (optional)' : t('auth.name')"
+            :required="!isLocal"
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <input
