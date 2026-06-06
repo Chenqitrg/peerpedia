@@ -122,6 +122,7 @@
     "parents": "父提交",
     "rollback": "回滚",
     "rollingBack": "回滚中...",
+    "subtitle": "提交图谱与版本管理",
     "rollbackAria": "回滚到此版本",
     "selectSecondCommit": "选择第二个提交以查看差异",
     "diff": "差异",

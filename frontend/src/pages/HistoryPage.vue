@@ -104,8 +104,8 @@ function goBack() {
         <ArrowLeft class="w-4 h-4" stroke-width="2" />
       </button>
       <div>
-        <h1 class="text-display-md font-heading font-bold text-ink">History</h1>
-        <p class="text-xs text-ink-muted">Commit graph and version management</p>
+        <h1 class="text-display-md font-heading font-bold text-ink">{{ t('article.history') }}</h1>
+        <p class="text-xs text-ink-muted">{{ t('history.subtitle') }}</p>
       </div>
     </div>
 

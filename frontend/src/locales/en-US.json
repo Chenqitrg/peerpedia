@@ -122,6 +122,7 @@
     "parents": "parents",
     "rollback": "Rollback",
     "rollingBack": "Rolling back...",
+    "subtitle": "Commit graph and version management",
     "rollbackAria": "Rollback to this version",
     "selectSecondCommit": "Select a second commit to view the diff",
     "diff": "Diff",
