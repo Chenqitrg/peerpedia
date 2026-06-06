@@ -10,11 +10,11 @@ defineProps<{
 }>()
 
 const DIMS = [
-  { key: 'originality' as const, short: 'O', full: 'originality' },
-  { key: 'rigor' as const, short: 'R', full: 'rigor' },
-  { key: 'completeness' as const, short: 'C', full: 'completeness' },
-  { key: 'pedagogy' as const, short: 'P', full: 'pedagogy' },
-  { key: 'impact' as const, short: 'I', full: 'impact' },
+  { key: 'originality' as const, short: 'O', full: 'riginality' },
+  { key: 'rigor' as const, short: 'R', full: 'igor' },
+  { key: 'completeness' as const, short: 'C', full: 'ompleteness' },
+  { key: 'pedagogy' as const, short: 'P', full: 'edagogy' },
+  { key: 'impact' as const, short: 'I', full: 'mpact' },
 ] as const
 </script>
 
