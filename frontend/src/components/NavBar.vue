@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import {
   Bookmark,
-  BookOpen,
+  Waypoints,
   FilePlus,
   Search,
   User,
@@ -76,7 +76,7 @@ function handleLogout() {
         class="flex items-center gap-2 text-base font-heading font-bold text-ink hover:text-ink transition-colors duration-200 no-underline shrink-0"
         @click="close"
       >
-        <BookOpen class="w-4 h-4 text-accent" stroke-width="2" />
+        <Waypoints class="w-4 h-4 text-accent" stroke-width="1.5" />
         <span class="hidden sm:inline brand-logo">{{ t('nav.brand') }}</span>
       </router-link>
 
