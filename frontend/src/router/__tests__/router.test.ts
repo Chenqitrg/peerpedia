@@ -12,6 +12,8 @@ describe('router', () => {
     expect(paths).toContain('/edit/:id')
     expect(paths).toContain('/pool')
     expect(paths).toContain('/user/:id')
+    expect(paths).toContain('/user/:id/followers')
+    expect(paths).toContain('/user/:id/following')
     expect(paths).toContain('/search')
   })
 })

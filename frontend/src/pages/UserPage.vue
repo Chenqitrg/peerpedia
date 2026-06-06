@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { getUser, getFollowers, getFollowing } from '../api/users'
+import { getUser, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
@@ -26,11 +26,6 @@ const { t } = useI18n()
 
 const id = computed(() => route.params.id as string)
 
-const showFollowers = ref(false)
-const showFollowing = ref(false)
-const followers = ref<any[]>([])
-const following = ref<any[]>([])
-
 const articles = ref<ArticleSummary[]>([])
 
 const { data: user, loading, error, execute: loadUser } = useAsyncResource(
@@ -42,6 +37,24 @@ const { data: user, loading, error, execute: loadUser } = useAsyncResource(
 const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 
 const isSelf = computed(() => userStore.viewer?.id === id.value)
+
+const isFollowing = ref(false)
+const followLoading = ref(false)
+
+async function handleFollow() {
+  if (!userStore.viewer) return
+  followLoading.value = true
+  try {
+    if (isFollowing.value) {
+      await unfollowUser(id.value)
+      isFollowing.value = false
+    } else {
+      await followUser(id.value)
+      isFollowing.value = true
+    }
+  } catch { /* ignore */ }
+  finally { followLoading.value = false }
+}
 
 async function loadArticles() {
   try {
@@ -64,31 +77,6 @@ watch(() => route.params.id, () => {
   loadArticles()
 })
 
-async function loadFollowers() {
-  if (followers.value.length) {
-    showFollowers.value = !showFollowers.value
-    return
-  }
-  try {
-    followers.value = await getFollowers(id.value)
-    showFollowers.value = true
-  } catch (e) {
-    console.error('Failed to load followers:', e)
-  }
-}
-
-async function loadFollowing() {
-  if (following.value.length) {
-    showFollowing.value = !showFollowing.value
-    return
-  }
-  try {
-    following.value = await getFollowing(id.value)
-    showFollowing.value = true
-  } catch (e) {
-    console.error('Failed to load following:', e)
-  }
-}
 
 </script>
 
@@ -152,31 +140,44 @@ async function loadFollowing() {
 
             <!-- Stats row -->
             <div class="flex items-center gap-4 text-sm">
-              <button
-                class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors"
-                @click="loadFollowers"
+              <router-link
+                :to="`/user/${user.id}/followers`"
+                class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors no-underline"
               >
                 <Users class="w-3.5 h-3.5" stroke-width="2" />
                 <span class="font-semibold">{{ user.followers_count }}</span>
                 <span>{{ t('common.followers') }}</span>
-              </button>
-              <button
-                class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors"
-                @click="loadFollowing"
+              </router-link>
+              <router-link
+                :to="`/user/${user.id}/following`"
+                class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors no-underline"
               >
                 <Users class="w-3.5 h-3.5" stroke-width="2" />
                 <span class="font-semibold">{{ user.following_count }}</span>
                 <span>{{ t('common.following') }}</span>
-              </button>
+              </router-link>
             </div>
           </div>
+
+          <!-- Follow/Unfollow button (viewing others) -->
+          <button
+            v-if="!isSelf && userStore.viewer"
+            class="btn-sm shrink-0 transition-colors duration-200"
+            :class="isFollowing
+              ? 'btn-outline'
+              : 'bg-accent text-[#0d1117] hover:brightness-110'"
+            :disabled="followLoading"
+            @click="handleFollow"
+          >
+            {{ isFollowing ? t('common.following') : t('common.follow') }}
+          </button>
 
           <!-- Edit profile button (self only) — coming soon -->
           <button
             v-if="isSelf"
             class="btn-outline btn-sm shrink-0 opacity-50 cursor-not-allowed"
             disabled
-            title="{{ t('common.comingSoon') }}"
+            :title="t('common.comingSoon')"
           >
             <Edit class="w-3.5 h-3.5" stroke-width="2" />
             {{ t('common.editProfile') }}
@@ -192,34 +193,6 @@ async function loadFollowing() {
           >
             {{ exp }}
           </span>
-        </div>
-
-        <!-- Followers/Following expandable lists -->
-        <div v-if="showFollowers && followers.length" class="mt-3 pt-3 border-t border-divider">
-          <p class="text-xs text-ink-muted mb-2">Followers</p>
-          <div class="flex flex-wrap gap-2">
-            <router-link
-              v-for="f in followers"
-              :key="f.id"
-              :to="`/user/${f.id}`"
-              class="text-xs text-accent hover:text-accent-hover no-underline"
-            >
-              {{ f.name }}
-            </router-link>
-          </div>
-        </div>
-        <div v-if="showFollowing && following.length" class="mt-3 pt-3 border-t border-divider">
-          <p class="text-xs text-ink-muted mb-2">Following</p>
-          <div class="flex flex-wrap gap-2">
-            <router-link
-              v-for="f in following"
-              :key="f.id"
-              :to="`/user/${f.id}`"
-              class="text-xs text-accent hover:text-accent-hover no-underline"
-            >
-              {{ f.name }}
-            </router-link>
-          </div>
         </div>
 
         <!-- Reputation -->
