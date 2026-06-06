@@ -266,7 +266,7 @@ function handleLogout() {
 }
 
 .brand-logo {
-  font-family: 'LXGW WenKai', 'Noto Serif SC', serif;
+  font-family: 'EB Garamond', 'LXGW WenKai', 'Noto Serif SC', serif;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
