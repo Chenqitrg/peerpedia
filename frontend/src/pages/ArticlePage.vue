@@ -612,7 +612,7 @@ async function handleSinkExtension() {
                         : 'bg-accent/15 border border-accent/30 text-ink rounded-br-md'"
                     >
                       <span class="text-[10px] text-ink-muted/50 block mb-0.5">
-                        {{ msg.author_name || msg.author_id?.substring(0, 8) }}
+                        {{ new Date(msg.created_at).toLocaleString() }}
                       </span>
                       <p class="leading-relaxed">{{ msg.content }}</p>
                     </div>
