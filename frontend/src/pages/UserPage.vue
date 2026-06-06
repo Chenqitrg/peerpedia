@@ -71,7 +71,7 @@ async function loadArticles() {
   const merged: ArticleSummary[] = []
 
   // 1. Server articles (skip in pure Tauri mode — server won't respond)
-  if (!tauri.isTauri) {
+  if (!tauri.isTauri.value) {
     try {
       const artData = await getArticles({ author_id: id.value, page: 1, size: 50 })
       const serverArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
@@ -80,7 +80,7 @@ async function loadArticles() {
   }
 
   // 2. Tauri local drafts (only for current user's own page)
-  if (tauri.isTauri && isSelf.value) {
+  if (tauri.isTauri.value && isSelf.value) {
     try {
       const drafts = await tauri.listDrafts({ account_id: id.value })
       for (const d of drafts) {

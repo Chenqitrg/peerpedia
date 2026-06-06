@@ -122,32 +122,17 @@ async function restoreDraft() {
   const savedId = localStorage.getItem(DRAFT_ID_KEY.value)
   if (savedId) currentDraftId.value = savedId
 
+  // Only restore if we have a real draft ID (not a new document).
+  if (!currentDraftId.value) return
+
   // Try Tauri persistence first with the real draft ID.
   const accountId = userStore.viewer?.id || 'local'
-  const lookupId = currentDraftId.value || DRAFT_KEY.value
-  const result = await draftPersistence.load(lookupId)
+  const result = await draftPersistence.load(currentDraftId.value)
 
   if (result && result.content !== undefined) {
     title.value = result.title || ''
     content.value = result.content || ''
     format.value = (result.format as 'markdown' | 'typst') || 'markdown'
-  }
-
-  // Also try localStorage as backup.
-  const saved = localStorage.getItem(DRAFT_KEY.value)
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved)
-      if (!title.value) title.value = parsed.title || ''
-      if (!content.value) content.value = parsed.content || ''
-      if (!format.value || format.value === 'markdown') format.value = parsed.format || 'markdown'
-      scores.value = parsed.scores || { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 }
-      keywords.value = parsed.keywords || ''
-      categories.value = parsed.categories || ''
-      abstract.value = parsed.abstract || ''
-    } catch {
-      // ignore corrupt draft
-    }
   }
 }
 
