@@ -329,15 +329,15 @@ async function handleSinkExtension() {
             <span :class="statusClass">{{ statusLabel }}</span>
             <span v-if="article.forked_from" class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-neutral bg-neutral/10 rounded">
               <GitFork class="w-3 h-3" stroke-width="2" />
-              fork
+              {{ t('card.forkBadge') }}
             </span>
           </div>
           <button
             class="flex items-center justify-center w-7 h-7 rounded
                    text-ink-muted hover:text-accent hover:bg-accent/10
                    transition-colors duration-200"
-            :aria-label="isBookmarked ? 'Remove bookmark' : 'Add bookmark'"
-            :title="isBookmarked ? 'Remove bookmark' : 'Add bookmark'"
+            :aria-label="isBookmarked ? t('card.removeBookmark') : t('card.addBookmark')"
+            :title="isBookmarked ? t('card.removeBookmark') : t('card.addBookmark')"
             @click="toggleBookmark"
           >
             <BookmarkCheck v-if="isBookmarked" class="w-4 h-4 text-accent" stroke-width="2" />
@@ -347,7 +347,7 @@ async function handleSinkExtension() {
 
         <!-- Title -->
         <h1 class="text-display-md font-heading font-bold text-ink mb-3 leading-tight">
-          {{ article.title || 'Untitled' }}
+          {{ article.title || t('card.untitled') }}
         </h1>
 
         <!-- Authors -->
@@ -367,15 +367,15 @@ async function handleSinkExtension() {
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-muted">
           <span class="flex items-center gap-1">
             <GitFork class="w-3 h-3" stroke-width="2" />
-            {{ article.fork_count }} forks
+            {{ article.fork_count }} {{ t('common.forks') }}
           </span>
           <span class="flex items-center gap-1">
             <MessageSquare class="w-3 h-3" stroke-width="2" />
-            {{ article.review_count }} reviews
+            {{ article.review_count }} {{ t('article.reviews') }}
           </span>
           <span v-if="article.days_remaining != null" class="flex items-center gap-1">
             <Clock class="w-3 h-3" stroke-width="2" />
-            {{ article.days_remaining }}d remaining in pool
+            {{ article.days_remaining }}{{ t('card.dRemaining') }}
           </span>
 
           <div class="flex-1" />
@@ -438,7 +438,7 @@ async function handleSinkExtension() {
 
         <!-- Scores row -->
         <div v-if="article.score" class="flex items-center gap-3 mt-3 pt-3 border-t border-divider">
-          <span class="text-xs text-ink-muted font-semibold">Scores</span>
+          <span class="text-xs text-ink-muted font-semibold">{{ t('article.scores') }}</span>
           <ScoreBadges :score="article.score" :highlight-first="true" class="text-xs font-mono" />
         </div>
       </div>
@@ -555,7 +555,7 @@ async function handleSinkExtension() {
               </div>
 
               <!-- Score row: hover-to-edit for my review, static text for others -->
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs font-mono">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-sm">
                 <span
                   v-for="dim in SCORE_DIMS"
                   :key="dim.key"

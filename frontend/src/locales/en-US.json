@@ -53,7 +53,8 @@
     "noArticles": "No articles yet.",
     "editProfile": "Edit Profile",
     "comingSoon": "Coming soon",
-    "reputation": "Reputation"
+    "reputation": "Reputation",
+    "forks": "forks"
   },
   "card": {
     "addBookmark": "Add bookmark",
@@ -112,7 +113,9 @@
     "commentPlaceholder": "Write a comment (optional)...",
     "reviewSubmitted": "Review submitted",
     "reviewFailedComment": "Review submitted but comment failed to send. You can reply in the thread.",
-    "extend": "Extend"
+    "extend": "Extend",
+    "reviews": "reviews",
+    "scores": "Scores"
   },
   "history": {
     "parent": "parent",
