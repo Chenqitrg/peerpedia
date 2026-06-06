@@ -266,11 +266,8 @@ function handleLogout() {
 }
 
 .brand-logo {
-  background: linear-gradient(135deg, #58a6ff 0%, #8b5cf6 50%, #58a6ff 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: 800;
+  font-family: 'LXGW WenKai', 'Noto Serif SC', serif;
+  font-weight: 700;
   letter-spacing: 0.05em;
 }
 </style>
