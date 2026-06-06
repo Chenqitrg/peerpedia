@@ -67,6 +67,42 @@ class TestSearch:
         assert resp.status_code == 200
         assert "articles" in resp.json()
 
+    def test_search_with_category_filter(self, client, db_engine):
+        s = get_session(db_engine)
+        u = User(username="user15", password_hash="", name="测试", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        a1 = Article(status="published", authors=[u.id], title="Quantum Physics",
+                      categories=["physics", "quantum"])
+        a2 = Article(status="published", authors=[u.id], title="Cell Biology",
+                      categories=["biology"])
+        s.add_all([a1, a2])
+        s.commit()
+        s.close()
+
+        resp = client.get("/api/v1/search?category=physics")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["articles"][0]["id"] == a1.id
+
+    def test_search_with_sort_newest(self, client, db_engine):
+        s = get_session(db_engine)
+        u = User(username="user16", password_hash="", name="排序", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        a1 = Article(status="published", authors=[u.id], title="Older Article")
+        a2 = Article(status="published", authors=[u.id], title="Newer Article")
+        s.add_all([a1, a2])
+        s.commit()
+        s.close()
+
+        resp = client.get("/api/v1/search?sort=newest")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["articles"]) >= 2
+        assert data["articles"][0]["id"] == a2.id
+
 
 class TestCompile:
     def test_compile_preview_markdown(self, client):
@@ -183,3 +219,114 @@ class TestMerge:
         resp = client.get(f"/api/v1/articles/{original.id}/merge-proposals")
         assert resp.status_code == 200
         assert len(resp.json()["proposals"]) == 1
+
+    def test_accept_merge_proposal(self, client, db_engine):
+        s = get_session(db_engine)
+        author = User(username="user21", password_hash="", name="作者", anonymous_name="a1")
+        forker = User(username="user22", password_hash="", name="派生", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        original = Article(status="published", authors=[author.id])
+        fork = Article(status="draft", authors=[forker.id], forked_from=original.id)
+        s.add_all([original, fork])
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{original.id}/merge-proposals",
+            json={"fork_article_id": fork.id, "proposer_id": forker.id},
+        )
+        pid = r.json()["id"]
+
+        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/accept")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
+
+    def test_reject_merge_proposal(self, client, db_engine):
+        s = get_session(db_engine)
+        author = User(username="user23", password_hash="", name="作者", anonymous_name="a1")
+        forker = User(username="user24", password_hash="", name="派生", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        original = Article(status="published", authors=[author.id])
+        fork = Article(status="draft", authors=[forker.id], forked_from=original.id)
+        s.add_all([original, fork])
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{original.id}/merge-proposals",
+            json={"fork_article_id": fork.id, "proposer_id": forker.id},
+        )
+        pid = r.json()["id"]
+
+        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/reject")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "rejected"
+
+    def test_merge_nonexistent_article_returns_404(self, client, db_engine):
+        s = get_session(db_engine)
+        u = User(username="user25", password_hash="", name="测试", anonymous_name="a1")
+        s.add(u)
+        s.commit()
+        s.close()
+
+        resp = client.post(
+            "/api/v1/articles/nonexistent-id/merge-proposals",
+            json={"fork_article_id": "irrelevant", "proposer_id": u.id},
+        )
+        assert resp.status_code == 404
+
+    def test_accept_nonexistent_proposal_returns_404(self, client, db_engine):
+        s = get_session(db_engine)
+        u = User(username="user26", password_hash="", name="测试", anonymous_name="a1")
+        s.add(u)
+        a = Article(status="published", authors=[u.id])
+        s.add(a)
+        s.commit()
+        s.close()
+
+        resp = client.post(f"/api/v1/articles/{a.id}/merge-proposals/nonexistent/accept")
+        assert resp.status_code == 404
+
+    def test_search_empty_q_with_category(self, client, db_engine):
+        """Search with only category filter, no query text."""
+        s = get_session(db_engine)
+        u = User(username="user27", password_hash="", name="测试", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        a1 = Article(status="published", authors=[u.id], title="Article A",
+                      categories=["math"])
+        a2 = Article(status="published", authors=[u.id], title="Article B",
+                      categories=["physics"])
+        s.add_all([a1, a2])
+        s.commit()
+        s.close()
+
+        resp = client.get("/api/v1/search?category=math")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["articles"][0]["id"] == a1.id
+
+    def test_search_sort_by_score(self, client, db_engine):
+        s = get_session(db_engine)
+        u = User(username="user28", password_hash="", name="排序测试", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        low = Article(status="published", authors=[u.id], title="Low Score",
+                       score={"originality": 1, "rigor": 1, "completeness": 1,
+                              "pedagogy": 1, "impact": 1})
+        high = Article(status="published", authors=[u.id], title="High Score",
+                        score={"originality": 5, "rigor": 5, "completeness": 5,
+                               "pedagogy": 5, "impact": 5})
+        s.add_all([low, high])
+        s.commit()
+        s.close()
+
+        resp = client.get("/api/v1/search?sort=score")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["articles"]) >= 2
+        # Highest score first
+        assert data["articles"][0]["id"] == high.id

@@ -5,6 +5,7 @@
 - Whenever corrected a bug, always add a recursive test
 - Always ask more questions before executing
 - Some features may seem to be redundant, but may be a plan. Always make sure if you try to simplify it
+- Updates always follow README -> API contract -> test -> code.
 
 ## Session discipline
 

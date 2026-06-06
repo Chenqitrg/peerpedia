@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+
+const { mockPush } = vi.hoisted(() => ({
+  mockPush: vi.fn(),
+}))
 
 const RouterLinkStub = {
   props: ['to'],
@@ -8,7 +12,7 @@ const RouterLinkStub = {
 }
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: mockPush, back: vi.fn() }),
   useRoute: () => ({ params: { id: undefined } }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
@@ -80,5 +84,29 @@ describe('EditorPage', () => {
     const html = wrapper.html()
     // Should have a toolbar with action buttons
     expect(html.length).toBeGreaterThan(0)
+  })
+
+  it('self-assessment modal shows contribution slider', async () => {
+    // Set up a viewer so the publish modal can use their ID
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const pinia = setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+
+    // Click the Publish button to open the self-assessment modal
+    const buttons = wrapper.findAll('button')
+    const publishBtn = buttons.find(b => b.text().match(/publish|Publish|submit/i))
+    expect(publishBtn).toBeTruthy()
+    await publishBtn!.trigger('click')
+    await new Promise(r => setTimeout(r, 50))
+
+    // Modal should now be visible with contribution section
+    expect(wrapper.text()).toMatch(/contribution|Contribution|slider/i)
   })
 })

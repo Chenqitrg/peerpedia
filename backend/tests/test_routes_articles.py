@@ -101,6 +101,39 @@ class TestCreateArticle:
         resp = client.post("/api/v1/articles", json={"authors": [seed_user]})
         assert resp.status_code == 422
 
+    def test_create_with_all_metadata(self, client, seed_user):
+        """Create article with categories, keywords, abstract, contributions."""
+        body = {
+            "authors": [seed_user],
+            "self_review": {"originality": 5, "rigor": 4, "completeness": 4,
+                            "pedagogy": 3, "impact": 4},
+            "title": "Quantum Entanglement in Many-Body Systems",
+            "abstract": "A comprehensive review of entanglement measures.",
+            "keywords": ["quantum", "entanglement", "many-body"],
+            "categories": ["physics", "quantum"],
+            "contributions": {seed_user: {"originality": 5, "rigor": 4,
+                                           "completeness": 4, "pedagogy": 3,
+                                           "impact": 4}},
+            "format": "markdown",
+            "content": "# Introduction\n\nEntanglement is a fundamental resource...",
+            "commit_message": "Initial draft",
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["title"] == "Quantum Entanglement in Many-Body Systems"
+
+    def test_create_with_empty_content_is_accepted(self, client, seed_user):
+        """Empty content is valid — article can be saved as draft."""
+        body = {
+            "authors": [seed_user],
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                            "pedagogy": 3, "impact": 3},
+            "content": "",
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201
+
 
 class TestUpdateArticle:
     def test_update_content_flow(self, client, seed_user):

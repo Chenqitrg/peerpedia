@@ -19,14 +19,22 @@ const userStore = useUserStore()
 const { t } = useI18n()
 
 const query = ref('')
+const category = ref('')
+const sort = ref('')
 const searched = ref(false)
 const currentPage = ref(1)
 const pageSize = 20
 
+const CATEGORIES = ['physics', 'math', 'biology', 'cs', 'chemistry', 'engineering']
+
 const { data: result, loading, error, execute: doSearch } = useAsyncResource(
   async () => {
-    if (!query.value.trim()) return null
-    return await searchArticles(query.value)
+    if (!query.value.trim() && !category.value) return null
+    return await searchArticles({
+      q: query.value.trim(),
+      category: category.value,
+      sort: sort.value,
+    })
   },
   null as SearchResult | null,
   { immediate: false },
@@ -63,8 +71,12 @@ function executeSearch(page: number) {
 
 function handleSearch(e: Event) {
   e.preventDefault()
-  if (query.value.trim()) {
-    router.push(`/search?q=${encodeURIComponent(query.value.trim())}`)
+  const params = new URLSearchParams()
+  if (query.value.trim()) params.set('q', query.value.trim())
+  if (category.value) params.set('category', category.value)
+  if (sort.value) params.set('sort', sort.value)
+  if (params.toString()) {
+    router.push(`/search?${params.toString()}`)
   }
 }
 
@@ -104,6 +116,37 @@ function goToPage(page: number) {
         {{ loading ? t('search.searching') : t('search.title') }}
       </button>
     </form>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+      <label class="flex items-center gap-1.5 text-xs text-ink-muted">
+        <span>Category</span>
+        <select
+          v-model="category"
+          class="bg-card border border-divider rounded px-2 py-1 text-xs text-ink
+                 focus:outline-none focus:ring-1 focus:ring-accent"
+          @change="executeSearch(1)"
+        >
+          <option value="">All</option>
+          <option v-for="cat in CATEGORIES" :key="cat" :value="cat">
+            {{ cat.charAt(0).toUpperCase() + cat.slice(1) }}
+          </option>
+        </select>
+      </label>
+      <label class="flex items-center gap-1.5 text-xs text-ink-muted">
+        <span>Sort</span>
+        <select
+          v-model="sort"
+          class="bg-card border border-divider rounded px-2 py-1 text-xs text-ink
+                 focus:outline-none focus:ring-1 focus:ring-accent"
+          @change="executeSearch(1)"
+        >
+          <option value="">Relevance</option>
+          <option value="newest">Newest</option>
+          <option value="score">Highest Score</option>
+        </select>
+      </label>
+    </div>
 
     <!-- Loading -->
     <SkeletonCard v-if="loading" />

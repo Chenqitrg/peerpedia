@@ -15,6 +15,8 @@ from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
 
 router = APIRouter(prefix="/search", tags=["search"])
 
+VALID_SORTS = {"newest", "score"}
+
 
 def _read_source(article_id: str) -> str:
     """Read article source content for full-text search."""
@@ -26,24 +28,62 @@ def _read_source(article_id: str) -> str:
     return ""
 
 
+def _avg_score(article: Article) -> float:
+    """Average of five-dimension scores, for sorting."""
+    s = article.score
+    if not s:
+        return 0.0
+    dims = ["originality", "rigor", "completeness", "pedagogy", "impact"]
+    vals = [s.get(d, 0) or 0 for d in dims]
+    return sum(vals) / len(vals)
+
+
 @router.get("")
-def search(q: str = Query(default=""), db: Session = Depends(deps.get_db)):
-    """Search articles by title and source content."""
-    if not q.strip():
-        return {"articles": [], "total": 0}
+def search(
+    q: str = Query(default=""),
+    category: str = Query(default=""),
+    sort: str = Query(default=""),
+    db: Session = Depends(deps.get_db),
+):
+    """Search articles by title and source content, with optional filters."""
+    articles_q = db.query(Article).filter(
+        Article.status.in_(["published", "sedimentation"])
+    )
 
-    articles = db.query(Article).filter(Article.status.in_(["published", "sedimentation"])).all()
+    q_lower = q.strip().lower()
+    category_lower = category.strip().lower()
+    sort_lower = sort.strip().lower()
 
-    q_lower = q.lower()
-    results = []
-    for a in articles:
-        title = (a.title or "").lower()
-        source = _read_source(a.id)
-        if q_lower in title or q_lower in source:
-            results.append(a)
+    # Collect results — apply text search if query provided, else list all
+    results: list[Article] = []
+    for a in articles_q.all():
+        # Category filter
+        if category_lower:
+            cats = [c.lower() for c in (a.categories or [])]
+            if category_lower not in cats:
+                continue
+
+        # Text search
+        if q_lower:
+            title = (a.title or "").lower()
+            source = _read_source(a.id)
+            if q_lower not in title and q_lower not in source:
+                continue
+
+        results.append(a)
+
+    # Sort
+    if sort_lower in VALID_SORTS:
+        if sort_lower == "newest":
+            results.sort(key=lambda a: a.created_at, reverse=True)
+        elif sort_lower == "score":
+            results.sort(key=_avg_score, reverse=True)
+
+    # Limit
+    results = results[:20]
 
     summaries = []
-    for a in results[:20]:
+    for a in results:
         summaries.append(ArticleSummary(
             id=a.id,
             title=a.title or "",
@@ -60,4 +100,10 @@ def search(q: str = Query(default=""), db: Session = Depends(deps.get_db)):
             created_at=a.created_at,
         ).model_dump())
 
-    return {"articles": summaries, "total": len(summaries), "query": q}
+    return {
+        "articles": summaries,
+        "total": len(summaries),
+        "query": q,
+        "category": category,
+        "sort": sort,
+    }

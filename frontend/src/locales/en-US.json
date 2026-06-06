@@ -101,7 +101,9 @@
     "abstractPlaceholder2": "Brief summary of your article...",
     "cancel": "Cancel",
     "submitting": "Submitting...",
-    "publishToPool": "Publish to Pool"
+    "publishToPool": "Publish to Pool",
+    "contribution": "Contribution",
+    "contributionMustTotal100": "Contributions must total 100%."
   },
   "auth": {
     "signIn": "Sign In",

@@ -45,6 +45,7 @@ const scores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 3, imp
 const keywords = ref('')
 const categories = ref('')
 const abstract = ref('')
+const contributions = ref<Record<string, number>>({})
 
 // UI state
 const submitting = ref(false)
@@ -79,6 +80,9 @@ function onMouseUp() {
 }
 
 const DRAFT_KEY = computed(() => `editor-draft-${editId.value || 'new'}`)
+const totalContribution = computed(() =>
+  Object.values(contributions.value).reduce((sum, v) => sum + v, 0)
+)
 
 onMounted(() => {
   if (isEdit.value) {
@@ -185,6 +189,9 @@ async function handleSaveDraft() {
 }
 
 function handlePublish() {
+  if (userStore.viewer) {
+    contributions.value = { [userStore.viewer.id]: 100 }
+  }
   showSelfReview.value = true
 }
 
@@ -218,6 +225,7 @@ async function handleSubmitToPool() {
       publish: true,
       keywords: keywords.value ? keywords.value.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
       categories: categories.value ? categories.value.split(',').map((c: string) => c.trim()).filter(Boolean) : [],
+      contributions: { ...contributions.value },
     }
 
     let result: any
@@ -554,6 +562,35 @@ async function handleCompileDownload() {
               :placeholder="t('editor.abstractPlaceholder2')"
               class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
             />
+          </div>
+
+          <!-- Contribution -->
+          <div class="mb-5">
+            <label class="text-xs font-semibold text-ink-muted flex items-center gap-1.5 mb-2">
+              <SlidersHorizontal class="w-3 h-3" />
+              {{ t('editor.contribution') || 'Contribution' }}
+            </label>
+            <div
+              v-for="(pct, authorId) in contributions"
+              :key="authorId"
+              class="flex items-center gap-3 mb-2"
+            >
+              <span class="text-xs text-ink-muted w-20 truncate">
+                {{ authorId === userStore.viewer?.id ? 'You' : authorId.substring(0, 8) }}
+              </span>
+              <input
+                type="range"
+                :value="pct"
+                min="0"
+                max="100"
+                class="flex-1 h-1.5 accent-accent"
+                @input="(e) => contributions[authorId] = Number((e.target as HTMLInputElement).value)"
+              />
+              <span class="text-xs text-ink font-mono w-8 text-right">{{ pct }}%</span>
+            </div>
+            <p v-if="totalContribution !== 100" class="text-[10px] text-[#d73a49]">
+              {{ t('editor.contributionMustTotal100') || 'Contributions must total 100%. Currently:' }} {{ totalContribution }}%
+            </p>
           </div>
 
           <!-- Actions -->

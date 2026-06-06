@@ -2,7 +2,7 @@
 import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { getArticle, getArticleSource, getHistory, forkArticle, extendSink } from '../api/articles'
+import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, createMergeProposal } from '../api/articles'
 import { getReviews as fetchReviews, createReview, postReviewMessage } from '../api/reviews'
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
@@ -308,6 +308,27 @@ async function handleSinkExtension() {
     console.error('Sink extension failed:', e)
   }
 }
+
+const mergeSubmitting = ref(false)
+const mergeError = ref('')
+
+async function handleMerge() {
+  if (!article.value?.forked_from || !userStore.viewer) return
+  mergeSubmitting.value = true
+  mergeError.value = ''
+  try {
+    await createMergeProposal(article.value.forked_from, {
+      fork_article_id: article.value.id,
+      proposer_id: userStore.viewer.id,
+    })
+    router.push(`/articles/${article.value.forked_from}`)
+  } catch (e) {
+    mergeError.value = 'Merge proposal failed'
+    console.error('Merge proposal failed:', e)
+  } finally {
+    mergeSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -432,6 +453,17 @@ async function handleSinkExtension() {
             >
               <Clock class="w-3 h-3" stroke-width="2" />
               Extend
+            </button>
+
+            <button
+              v-if="isOwnArticle && article.forked_from"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-accent hover:text-accent/80 hover:bg-accent/10 rounded-md transition-colors"
+              aria-label="Propose merge"
+              :disabled="mergeSubmitting"
+              @click="handleMerge"
+            >
+              <GitMerge class="w-3 h-3" stroke-width="2" />
+              {{ mergeSubmitting ? 'Proposing...' : 'Merge' }}
             </button>
           </div>
         </div>

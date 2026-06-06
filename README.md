@@ -36,6 +36,8 @@ We're not going to replace Elsevier tomorrow. The strategy — borrowing from Ma
 
 **Phase 1 — A better notebook.** Interconnected note-taking with Git history. Fork ideas. Merge improvements. Cite anything. Build a user base by being genuinely useful to individual scholars, not institutions. *Build the base in the countryside.*
 
+**Phase 1 的载体是 Tauri 桌面版。** 离线 Markdown/Typst 写作 + Git 版本控制 + 本地 SQLite 存储。5MB 体积、30MB 内存。一个人用也爽——这是吸引冷启动用户的关键。Web 版保留给社区功能。
+
 **Phase 2 — Score arXiv.** The millions of preprints on arXiv have no quality signal. A community-driven scoring layer — one that anyone can query, audit, or build on — gives readers a filter that doesn't belong to any publisher. *Surround the cities. Start building parallel infrastructure that makes the old system visibly inadequate.*
 
 **Phase 3 — Replace peer review.** Once reputation and scoring infrastructure exists, and people trust it, the journal's last function becomes obsolete. Peer review is no longer a service. It's a protocol. *Seize the means of filtering.*
@@ -66,23 +68,32 @@ Knowledge should flow freely and build on itself. Instead of isolated documents 
 ## Architecture
 
 ```
-frontend/ (Vue 3 + TypeScript + Tailwind)  →  REST JSON  →  backend/ (FastAPI + Python)
-                                                              ↓
-                                                         core/ (peerpedia_core)
-                                                         · Git-backed storage
-                                                         · Scoring engine
-                                                         · Reputation system
+Phase 1（冷启动 — Tauri Desktop）
+┌──────────────────────────────────────────────────────────┐
+│  Vue 3 → IPC → Rust commands → SQLite + Git（本地）       │
+│  离线写作、本地编译、版本控制                               │
+└──────────────────────────────────────────────────────────┘
+                         ↕ 可选同步（Slice 2）
+
+Phase 2+（社区 — Web）
+┌──────────────────────────────────────────────────────────┐
+│  Vue 3 SPA → REST → FastAPI → SQLite + Git（服务器）       │
+│  沉淀池、社区评审、信誉系统、AI 交融                          │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ### Stack
 
 | Layer | Technology |
 |-------|-----------|
+| Desktop Shell | Tauri 2.x (Rust) |
 | Frontend | Vue 3, TypeScript, Vite, Tailwind CSS, Pinia, vue-i18n |
-| Backend | Python 3, FastAPI, SQLAlchemy, SQLite |
-| Storage | Git repositories (one per article) |
-| Auth | JWT (bcrypt passwords) |
-| Compilation | Typst (→ SVG/PDF), Python Markdown (→ HTML) |
+| Backend (Web) | Python 3, FastAPI, SQLAlchemy, SQLite |
+| Backend (Desktop) | Rust, rusqlite, bcrypt, libgit2 |
+| Storage (Desktop) | SQLite + Git repositories（本地） |
+| Storage (Web) | SQLite + Git repositories（服务器） |
+| Auth | JWT (Web) / bcrypt + SQLite (Desktop) |
+| Compilation | Typst CLI, Python Markdown |
 | Math | KaTeX |
 
 ---
@@ -92,23 +103,23 @@ frontend/ (Vue 3 + TypeScript + Tailwind)  →  REST JSON  →  backend/ (FastAP
 ### Prerequisites
 - Python 3.12+
 - Node.js 18+
+- Rust (for Tauri desktop)
 - [Typst](https://github.com/typst/typst) CLI (for PDF compilation)
 
-### Backend
+### Web Backend
 
 ```bash
-cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Seed demo data (8 users, password: 666666)
-python ../seed.py
+# Seed demo data (23 users, password: 666666)
+python seed.py
 
 # Run server
 uvicorn peerpedia_api.main:app --port 8080 --reload
 ```
 
-### Frontend
+### Web Frontend
 
 ```bash
 cd frontend
@@ -116,7 +127,14 @@ npm install
 npm run dev    # → http://localhost:5173
 ```
 
-### Demo Users
+### Tauri Desktop（开发模式）
+
+```bash
+cd frontend
+npm run tauri dev    # → 启动 Tauri 窗口
+```
+
+### Demo Users（23 位科学家）
 
 | Name | Username | Password |
 |------|----------|----------|
@@ -128,6 +146,7 @@ npm run dev    # → http://localhost:5173
 | Emmy Noether | `noether` | `666666` |
 | Claude Shannon | `shannon` | `666666` |
 | Rosalind Franklin | `franklin` | `666666` |
+| …and 15 more | `bohr`, `heisenberg`, `schrodinger`, `dirac`, `born`, `vonneumann`, `hopper`, `hodgkin`, `crick`, `cajal`, `goldmanrakic`, `popper`, `kuhn`, `putnam`, `chandra` | `666666` |
 
 ---
 
@@ -182,10 +201,17 @@ Higher reputation → greater voting weight in the pool.
 
 ## Features
 
-### Implemented
+### Desktop（Phase 1 — 冷启动）
 
-- Markdown + Typst editing with live preview and split-pane
-- Git-backed version history with side-by-side diff viewer
+- Offline Markdown/Typst editing with live preview
+- Local Git version control（fork, history, diff）
+- SQLite-based drafts and article cache
+- Local account system（bcrypt, no server needed）
+- Typst → PDF compilation, Markdown → HTML
+- 5MB install, 30MB RAM
+
+### Web（Phase 2+ — 社区）
+
 - 5D scoring (O/R/C/P/I) with hover-to-expand ScoreBadges
 - Sedimentation pool with configurable timers
 - Article forking + merge proposals
@@ -193,9 +219,8 @@ Higher reputation → greater voting weight in the pool.
 - JWT authentication (register, login, session restore)
 - User profiles with compact ReputationBadges (P/O/C/R)
 - Follow/unfollow, activity feed, bookmarks
-- Full-text search
-- Source + PDF download (Typst → PDF, Markdown → HTML)
-- Thread-based review discussions
+- Full-text search with category/sort filters
+- Thread-based review discussions（含多轮双作者对话）
 - Chinese/English bilingual UI (vue-i18n, 80+ keys)
 - LXGW WenKai calligraphic brand font + Noto Serif SC headings
 - Waypoints constellation icon as brand mark
@@ -206,15 +231,21 @@ Higher reputation → greater voting weight in the pool.
 
 ```
 peerpedia/
-├── frontend/                  # Vue 3 SPA
-│   └── src/
-│       ├── api/               # Axios API modules
-│       ├── components/        # Reusable components (ScoreBadges, UserCard, etc.)
-│       ├── composables/       # Shared logic (useBookmarkToggle, useAsyncResource)
-│       ├── locales/           # i18n (zh-CN, en-US)
-│       ├── pages/             # Route pages
-│       ├── router/            # Vue Router + auth guards
-│       └── stores/            # Pinia state
+├── frontend/                  # Vue 3 SPA + Tauri
+│   ├── src/
+│   │   ├── api/               # Axios API modules
+│   │   ├── components/        # Reusable components
+│   │   ├── composables/       # Shared logic（含 useTauri）
+│   │   ├── locales/           # i18n (zh-CN, en-US)
+│   │   ├── pages/             # Route pages（含 LoginPage）
+│   │   ├── router/            # Vue Router + auth guards
+│   │   └── stores/            # Pinia state（含 useUserStore localAccount 层）
+│   └── src-tauri/             # Tauri Rust backend
+│       └── src/
+│           ├── main.rs        # Tauri entry
+│           ├── commands.rs    # IPC handlers
+│           ├── local_auth.rs  # 本地账号 CRUD + bcrypt
+│           └── local_store.rs # 草稿 + 文章缓存 SQLite
 ├── backend/                   # FastAPI server
 │   └── peerpedia_api/
 │       ├── routes/            # REST endpoints
@@ -228,8 +259,7 @@ peerpedia/
 ├── docs/
 │   ├── DESIGN.md              # Design document
 │   └── api-contract.json      # OpenAPI 3.1 specification
-└── seed.py                    # Demo data seeder
-```
+└── seed.py                    # Demo data seeder（23 users）
 
 ---
 
@@ -273,28 +303,6 @@ npm test -- --run
 4. Follow TDD: write failing test → implement → refactor
 
 No contribution is too small. Fix a typo. Translate a string. Write a test. Every bit helps.
-
----
-
-## Vision
-
-The long game: **replace academic publishers and break the monopoly of prestige.**
-
-Today, a handful of publishers control what counts as knowledge. They charge universities millions for access to research their own faculty produced. They gatekeep careers through journal prestige rather than merit. And they've held this position for 300 years because there was no alternative infrastructure.
-
-PeerPedia is that alternative. Not next year. Not in five years. But the pieces are on the table:
-
-- **Git-native articles** replace publisher versioning
-- **Community scoring** replaces editorial gatekeeping
-- **Anonymous review** eliminates prestige bias
-- **Reputation** replaces impact factors
-- **Free and open** replaces paywalls
-
-We're a long way from that. Right now we need help making the basics solid. But every pull request moves the needle.
-
-> A world where knowledge connects freely — every idea can link to, build upon, and refine every other idea. Quality emerges from community consensus, not gatekeepers. Every contributor earns recognition proportional to their impact. No one profits from locking knowledge behind walls.
-
-*"走向更好的学术 — To a better academia."*
 
 ---
 

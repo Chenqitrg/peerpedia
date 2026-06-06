@@ -88,6 +88,17 @@ class TestBookmarks:
         assert resp.status_code == 200
         assert resp.json()["bookmarked"] is False
 
+    def test_bookmark_nonexistent_article_returns_404(self, client, db_engine, auth_header):
+        s = get_session(db_engine)
+        u = User(username="bm_user", password_hash="", name="收藏者", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        s.close()
+
+        headers = auth_header(u.id)
+        resp = client.post("/api/v1/bookmarks?article_id=nonexistent-id", headers=headers)
+        assert resp.status_code == 404
+
         # list empty
         resp = client.get("/api/v1/bookmarks", headers=headers)
         assert len(resp.json()["bookmarks"]) == 0
