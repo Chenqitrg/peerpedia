@@ -72,22 +72,15 @@ function close() {
   userStore.showAuthModal = false
   error.value = ''
 }
-
-function onOverlayClick(e: MouseEvent) {
-  if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
-    close()
-  }
-}
 </script>
 
 <template>
   <Teleport to="body">
     <div
       v-if="userStore.showAuthModal"
-      class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      @click="onOverlayClick"
+      class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
     >
-      <div class="w-full max-w-sm bg-card border border-divider rounded-xl shadow-2xl p-6 animate-fade-in">
+      <div class="w-full max-w-sm bg-card border border-divider rounded-xl shadow-2xl p-6 animate-fade-in pointer-events-auto">
         <!-- Tab switcher -->
         <div class="flex items-center justify-between mb-5">
           <div class="flex gap-4">
