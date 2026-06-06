@@ -112,6 +112,7 @@
     "source": "Source",
     "commentPlaceholder": "Write a comment (optional)...",
     "reviewSubmitted": "Review submitted",
+    "threadRestricted": "Only the author and reviewer can participate in this thread.",
     "reviewFailedComment": "Review submitted but comment failed to send. You can reply in the thread.",
     "extend": "Extend",
     "thread": "Discussion",

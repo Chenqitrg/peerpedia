@@ -112,6 +112,7 @@
     "source": "源代码",
     "commentPlaceholder": "写评论（可选）...",
     "reviewSubmitted": "评审已提交",
+    "threadRestricted": "仅作者和评审者可参与此讨论。",
     "reviewFailedComment": "评审已提交，但评论发送失败。你可以在讨论中回复。",
     "extend": "延长时间",
     "thread": "讨论",

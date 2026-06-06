@@ -630,7 +630,7 @@ async function handleSinkExtension() {
 
                   <!-- Read-only indicator for bystanders -->
                   <p v-else-if="userStore.viewer" class="text-[10px] text-ink-muted/40 italic">
-                    Only the author and reviewer can participate in this thread.
+                    {{ t('article.threadRestricted') }}
                   </p>
                 </div>
               </div>
