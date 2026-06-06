@@ -30,6 +30,20 @@ That's what PeerPedia is trying to build.
 
 ---
 
+## The Roadmap: Crawl, Walk, Run
+
+We're not going to replace Elsevier tomorrow. The political route is:
+
+**Phase 1 — A better notebook.** Interconnected note-taking with Git history. Fork ideas. Merge improvements. Cite anything. Build a user base by being genuinely useful to individual scholars, not institutions.
+
+**Phase 2 — Score arXiv.** The millions of preprints on arXiv have no quality signal. A community-driven scoring layer — one that anyone can query, audit, or build on — gives readers a filter that doesn't belong to any publisher.
+
+**Phase 3 — Replace peer review.** Once reputation and scoring infrastructure exists, and people trust it, the journal's last function becomes obsolete. Peer review is no longer a service. It's a protocol.
+
+Every phase is useful on its own. Each one builds the network for the next.
+
+---
+
 ## Why PeerPedia?
 
 Knowledge should flow freely and build on itself. Instead of isolated documents in silos, PeerPedia lets you:
