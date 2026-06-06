@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
@@ -20,6 +20,16 @@ const { t, locale } = useI18n()
 const searchQuery = ref('')
 const mobileOpen = ref(false)
 const avatarPopover = ref(false)
+const avatarRef = ref<HTMLElement | null>(null)
+
+// Close popover on outside click.
+function onDocClick(e: MouseEvent) {
+  if (avatarRef.value && !avatarRef.value.contains(e.target as Node)) {
+    avatarPopover.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onDocClick))
+onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 const isLoggedIn = computed(() => !!userStore.viewer)
 
@@ -194,6 +204,7 @@ function handleLogout() {
           <!-- Popover -->
           <div
             v-if="avatarPopover"
+            ref="avatarRef"
             class="absolute right-0 top-full mt-2 w-48 bg-card border border-divider rounded-xl shadow-xl py-1 animate-fade-in"
           >
             <div class="px-4 py-2 text-sm text-ink border-b border-divider">
