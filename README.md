@@ -1,27 +1,27 @@
-# PeerPedia
+# PeerPedia · 知诸网
 
-**Decentralized academic publishing — where articles sink or swim by merit alone.**
+**An interconnected note-taking platform — where ideas link, evolve, and are judged on merit.**
 
-PeerPedia is an open-source platform that combines Git-backed version control with blind peer review and community-driven scoring. Think: GitHub meets arXiv, with a built-in reputation system.
-
-_This is an on-going Vibe-coding project with Claude code + Deepseek V4, awaiting for your contribution_
+PeerPedia combines Git-backed version control with community review and scoring. Think: a knowledge graph meets collaborative notebook, with reputation-weighted peer assessment.
 
 ---
 
 ## Why PeerPedia?
 
-Academic publishing is broken. Journals charge thousands for access. Reviewers work for free. Authors wait months for decisions. And the incentives reward prestige over quality.
+Knowledge should flow freely and build on itself. Instead of isolated documents in silos, PeerPedia lets you:
 
-PeerPedia replaces the journal with a **sedimentation pool**: every article enters an anonymous review period. Community members rate it on five dimensions. High-quality work surfaces faster; low-quality work sinks. No editors. No paywalls. Just merit.
+- **Connect** notes and articles through citations, forks, and merges
+- **Evolve** ideas with full Git history — every edit is tracked, diffable, rollbackable
+- **Review** each other's work anonymously in a sedimentation pool
+- **Build reputation** that reflects contribution quality, not institutional prestige
 
-| Problem | PeerPedia Solution |
-|---------|-------------------|
-| Paywalled knowledge | All articles free, CC BY-SA 4.0 |
-| Opaque peer review | Transparent 5D scoring (O/R/C/P/I) |
-| No version history | Git-native: every edit is a commit |
-| Centralized gatekeeping | Community-governed sedimentation pool |
-| Weak author incentives | Reputation system rewards quality reviewing |
-| Siloed platforms | Fork, merge, cite — like GitHub for science |
+| Problem | PeerPedia |
+|---------|-----------|
+| Isolated note-taking | Citation graph — every article can reference and be referenced |
+| No version history | Git-native: fork, edit, merge, rollback |
+| Opaque feedback | Transparent 5-dimension scoring (O/R/C/P/I) |
+| No author incentives | Reputation system (P/O/C/R) rewards quality work |
+| English-only | Full Chinese/English bilingual interface (知诸网) |
 
 ---
 
@@ -40,12 +40,12 @@ frontend/ (Vue 3 + TypeScript + Tailwind)  →  REST JSON  →  backend/ (FastAP
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Vue 3, TypeScript, Vite, Tailwind CSS, Pinia |
+| Frontend | Vue 3, TypeScript, Vite, Tailwind CSS, Pinia, vue-i18n |
 | Backend | Python 3, FastAPI, SQLAlchemy, SQLite |
 | Storage | Git repositories (one per article) |
-| Auth | JWT (bcrypt passwords, 24h expiry) |
+| Auth | JWT (bcrypt passwords) |
 | Compilation | Typst (→ SVG/PDF), Python Markdown (→ HTML) |
-| Math | KaTeX (display + inline) |
+| Math | KaTeX |
 
 ---
 
@@ -97,49 +97,48 @@ npm run dev    # → http://localhost:5173
 
 ### Articles as Git Repositories
 
-Every article is an independent Git repository. Writing, editing, forking, and merging all map to Git operations. This means:
+Every article is an independent Git repository. Writing, editing, forking, and merging all map to Git operations:
+
 - Complete version history, forever
-- Side-by-side diffs between any two versions
-- Fork → modify → merge proposal workflow (just like GitHub PRs)
+- Side-by-side diffs between any two versions (diff2html)
+- Fork → modify → merge proposal workflow
 - Immutable audit trail for every change
 
 ### Five-Dimensional Scoring
 
 All reviews use five dimensions:
 
-| Dimension | What it measures |
-|-----------|-----------------|
-| **O**riginality | How novel is the contribution? |
-| **R**igor | Are the methods and arguments sound? |
-| **C**ompleteness | Is the work thorough and self-contained? |
-| **P**edagogy | Is it well-written and accessible? |
-| **I**mpact | How significant is this for the field? |
+| Dim | Name | What it measures |
+|-----|------|-----------------|
+| **O** | Originality | How novel is the contribution? |
+| **R** | Rigor | Are the methods and arguments sound? |
+| **C** | Completeness | Is the work thorough and self-contained? |
+| **P** | Pedagogy | Is it well-written and accessible? |
+| **I** | Impact | How significant is this for the field? |
 
-### Sedimentation Pool
+### Sedimentation Pool (沉淀池)
 
-New articles enter a **sedimentation pool** for a fixed period (default 7 days). During this time:
-- Community members submit anonymous reviews
-- Higher scores **shorten** the time; lower scores **extend** it (up to 180 days)
+New articles enter a **sedimentation pool** for community review:
+
+- Higher scores **shorten** the review period; lower scores **extend** it
+- Reviews are anonymous during the pool phase
 - Authors can rebut each review via thread replies
-- When the timer expires, the article is **published** (or sinks if score is too low)
+- When the timer expires, the article is **published**
 
-The pool is visible only to your follow network (followers + following), not the entire public.
+The pool is visible to your follow network (followers + following).
 
-### Blind Review with Identity Protection
-
-- **Pool reviews**: Anonymous (reviewer's `anonymous_name` is shown). These stay anonymous **forever** — even after the article is published — to prevent cross-referencing attacks that could deanonymize reviewers.
-- **Published reviews**: Real names.
-- **Self-reviews**: Always show the author's real name. The author's identity is already public.
-
-### Reputation System (planned)
+### Reputation System
 
 Authors and reviewers earn reputation across four dimensions:
-- **Professionalism** — quality of submitted work
-- **Objectivity** — fairness of reviews given
-- **Collaboration** — constructive engagement in discussions
-- **Pedagogy** — clarity of writing and explanations
 
-Higher reputation → greater voting weight in the sedimentation pool.
+| Dim | Name | What it measures |
+|-----|------|-----------------|
+| **P** | Professionalism | Quality and integrity of contributions |
+| **O** | Objectivity | Fairness and accuracy of reviews |
+| **C** | Collaboration | Constructive engagement with peers |
+| **R** | Readability | Clarity and accessibility of writing |
+
+Higher reputation → greater voting weight in the pool.
 
 ---
 
@@ -147,33 +146,21 @@ Higher reputation → greater voting weight in the sedimentation pool.
 
 ### Implemented
 
-- Markdown + Typst editing with live preview
-- Git-backed version history with diff viewer (diff2html, side-by-side)
-- 5D scoring (self-review at submission + community review)
+- Markdown + Typst editing with live preview and split-pane
+- Git-backed version history with side-by-side diff viewer
+- 5D scoring (O/R/C/P/I) with hover-to-expand ScoreBadges
 - Sedimentation pool with configurable timers
 - Article forking + merge proposals
 - Citation graph (references + citations, click-to-navigate)
 - JWT authentication (register, login, session restore)
-- User profiles with reputation radar chart
-- Bookmarks, follow/unfollow, activity feed
+- User profiles with compact ReputationBadges (P/O/C/R)
+- Follow/unfollow, activity feed, bookmarks
 - Full-text search
 - Source + PDF download (Typst → PDF, Markdown → HTML)
-- Thread-based review discussions (author rebuttal)
-- Self-review identity protection (real name, not anonymous)
-
-### Roadmap
-
-| Priority | Feature | Status |
-|----------|---------|--------|
-| 🔴 | Commit message required on submit/edit | Planned |
-| 🔴 | Pool review freeze after article publishes | Planned |
-| 🔴 | History timestamps with second precision | Planned |
-| 🟡 | Reputation-weighted scoring | Planned |
-| 🟡 | AI-assisted review (bias detection, quality checks) | Planned |
-| 🟡 | LaTeX support | Planned |
-| 🟢 | P2P distributed storage (IPFS or similar) | Research |
-| 🟢 | Federated identity (ORCID, institutional login) | Research |
-| 🟢 | Production deployment guide (Docker, CI/CD) | Research |
+- Thread-based review discussions
+- Chinese/English bilingual UI (vue-i18n, 80+ keys)
+- LXGW WenKai calligraphic brand font + Noto Serif SC headings
+- Waypoints constellation icon as brand mark
 
 ---
 
@@ -183,26 +170,27 @@ Higher reputation → greater voting weight in the sedimentation pool.
 peerpedia/
 ├── frontend/                  # Vue 3 SPA
 │   └── src/
-│       ├── api/               # Axios API modules (13 files)
-│       ├── components/        # Reusable Vue components
-│       ├── composables/       # Shared logic (useBookmarkToggle, etc.)
-│       ├── pages/             # Route pages (10 pages)
+│       ├── api/               # Axios API modules
+│       ├── components/        # Reusable components (ScoreBadges, UserCard, etc.)
+│       ├── composables/       # Shared logic (useBookmarkToggle, useAsyncResource)
+│       ├── locales/           # i18n (zh-CN, en-US)
+│       ├── pages/             # Route pages
 │       ├── router/            # Vue Router + auth guards
-│       └── stores/            # Pinia state management
+│       └── stores/            # Pinia state
 ├── backend/                   # FastAPI server
 │   └── peerpedia_api/
-│       ├── routes/            # REST endpoints (11 route modules)
+│       ├── routes/            # REST endpoints
 │       ├── schemas/           # Pydantic models
 │       └── tests/             # Integration tests
-├── core/                      # Business logic library
+├── core/                      # Business logic
 │   └── peerpedia_core/
 │       ├── storage/           # Git backend + SQLAlchemy ORM
 │       ├── workflow/          # Scoring, reputation, sedimentation
-│       └── config/            # Parameters and settings
+│       └── config/            # Parameters
 ├── docs/
-│   ├── DESIGN.md                  # 🌟 Complete design document — the single source of truth
-│   └── api-contract.json          # OpenAPI specification
-└── seed.py                        # Demo data seeder
+│   ├── DESIGN.md              # Design document
+│   └── api-contract.json      # OpenAPI 3.1 specification
+└── seed.py                    # Demo data seeder
 ```
 
 ---
@@ -210,11 +198,12 @@ peerpedia/
 ## Testing
 
 ```bash
-# Backend (195 tests)
+# Backend
 cd backend
-python -m pytest core/tests/ backend/tests/ -q
+source ../.venv/bin/activate
+python -m pytest tests/ -q
 
-# Frontend (116 tests)
+# Frontend
 cd frontend
 npm test -- --run
 ```
@@ -223,39 +212,27 @@ npm test -- --run
 
 ## Contributing
 
-PeerPedia is in active early development. We welcome contributions!
-
-**Good first issues:**
-- UI polish (dark theme consistency across components)
-- Test coverage for edge cases
-- Documentation improvements
-- Typst/Markdown compilation enhancements
+PeerPedia is in active development. Contributions welcome!
 
 **Before contributing:**
-1. Read `design/outline.md` for the feature philosophy
-2. Read `frontend/need.md` for the API contract and requirements
-3. Check `CLAUDE.md` for development conventions
-
-All contributions should include tests (TDD preferred).
+1. Read `docs/DESIGN.md` for design philosophy
+2. Check `CLAUDE.md` for development conventions
+3. Follow TDD: write failing test → implement → refactor
 
 ---
 
 ## Vision
 
-> A world where academic knowledge flows freely, quality is determined by community consensus rather than editorial boards, and every researcher — regardless of institution or nationality — has equal opportunity to contribute and be recognized.
+> A world where knowledge connects freely — every idea can link to, build upon, and refine every other idea. Quality emerges from community consensus, not gatekeepers. Every contributor earns recognition proportional to their impact.
 
-PeerPedia is not just a platform. It's an experiment in whether decentralized governance can produce better academic outcomes than the centralized journal system we've relied on for 300 years.
-
-If that sounds interesting, [join us](#contributing).
+PeerPedia is an experiment in whether interconnected, community-governed knowledge can outperform the siloed platforms we've relied on for decades.
 
 ---
 
 ## License
 
-MIT — Protocol is free, reference implementation is MIT.
-
-Content published via PeerPedia is CC BY-SA 4.0 by default.
+MIT. Content published via PeerPedia is CC BY-SA 4.0 by default.
 
 ---
 
-*"To a better academia."*
+*"走向更好的学术 — To a better academia."*
