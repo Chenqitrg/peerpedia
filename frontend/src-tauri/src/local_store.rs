@@ -349,12 +349,17 @@ mod tests {
     fn test_list_drafts_newest_first() {
         let conn = setup();
         let d1 = save_draft(&conn, None, "acc1", "Old", "", "markdown").unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        // Force d1's timestamp to be older.
+        conn.execute(
+            "UPDATE drafts SET updated_at = '2020-01-01' WHERE id = ?1",
+            [&d1.id],
+        )
+        .unwrap();
         let d2 = save_draft(&conn, None, "acc1", "New", "", "markdown").unwrap();
 
         let drafts = list_drafts(&conn, "acc1").unwrap();
         assert_eq!(drafts.len(), 2);
-        // Newest first.
+        // Newest first (d2 has current timestamp, d1 has 2020).
         assert_eq!(drafts[0].id, d2.id);
         assert_eq!(drafts[1].id, d1.id);
     }

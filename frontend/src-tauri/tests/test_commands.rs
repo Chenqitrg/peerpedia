@@ -1,35 +1,24 @@
-// Integration tests — verify the full pipeline from IPC command → SQLite → response.
-// These tests exercise the same code paths that Tauri invoke() calls use at runtime.
-//
-// Note: These tests compile the crate as a library, so they use `peerpedia::*` imports.
-// The main.rs binary is not testable directly; commands are tested through their
-// public function signatures.
+// Integration tests — verify the full pipeline from module functions → SQLite → response.
+// Use in-memory databases to avoid polluting the persistent ~/.peerpedia/peerpedia.db.
 
-use peerpedia::commands;
-use peerpedia::db::init_db;
-use peerpedia::AppState;
-use std::sync::Mutex;
+use peerpedia::db::run_migrations;
+use rusqlite::Connection;
 
-fn test_state() -> AppState {
-    let conn = init_db().unwrap();
-    AppState {
-        db: Mutex::new(conn),
-    }
+fn setup() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    run_migrations(&conn).unwrap();
+    conn
 }
-
-// We can't easily test Tauri commands directly without the Tauri runtime, but we
-// can test the underlying module functions through the same call chain.
-// For full E2E: run `cargo test` with a Tauri test harness (requires binary).
-//
-// These tests validate that all modules link correctly and basic flows work.
 
 #[test]
 fn test_full_account_flow() {
-    let state = test_state();
-    let conn = state.db.lock().unwrap();
+    let conn = setup();
 
     // Create account
-    let account = peerpedia::local_auth::create_account(&conn, "testuser", "password123", "test@test.com", "Test User").unwrap();
+    let account = peerpedia::local_auth::create_account(
+        &conn, "testuser", "password123", "test@test.com", "Test User",
+    )
+    .unwrap();
     assert_eq!(account.username, "testuser");
 
     // Login
@@ -39,26 +28,39 @@ fn test_full_account_flow() {
     // List
     let accounts = peerpedia::local_auth::list_accounts(&conn).unwrap();
     assert_eq!(accounts.len(), 1);
+
+    // Duplicate rejected
+    let dup = peerpedia::local_auth::create_account(
+        &conn, "testuser", "otherpass", "", "Other",
+    );
+    assert!(dup.is_err());
 }
 
 #[test]
 fn test_full_draft_flow() {
-    let state = test_state();
-    let conn = state.db.lock().unwrap();
+    let conn = setup();
 
     // Create account first
-    peerpedia::local_auth::create_account(&conn, "writer", "pass", "", "Writer").unwrap();
+    let account =
+        peerpedia::local_auth::create_account(&conn, "writer", "pass", "", "Writer").unwrap();
 
     // Save draft
-    let draft = peerpedia::local_store::save_draft(&conn, None, "writer", "My Draft", "# Hello", "markdown").unwrap();
+    let draft = peerpedia::local_store::save_draft(
+        &conn, None, &account.id, "My Draft", "# Hello", "markdown",
+    )
+    .unwrap();
     assert_eq!(draft.title, "My Draft");
+    assert_eq!(draft.account_id, account.id);
 
     // Update
-    let updated = peerpedia::local_store::save_draft(&conn, Some(&draft.id), "writer", "Updated", "new", "markdown").unwrap();
+    let updated = peerpedia::local_store::save_draft(
+        &conn, Some(&draft.id), &account.id, "Updated", "new", "markdown",
+    )
+    .unwrap();
     assert_eq!(updated.title, "Updated");
 
     // List
-    let drafts = peerpedia::local_store::list_drafts(&conn, "writer").unwrap();
+    let drafts = peerpedia::local_store::list_drafts(&conn, &account.id).unwrap();
     assert_eq!(drafts.len(), 1);
 
     // Delete
@@ -69,20 +71,28 @@ fn test_full_draft_flow() {
 
 #[test]
 fn test_full_cache_flow() {
-    let state = test_state();
-    let conn = state.db.lock().unwrap();
+    let conn = setup();
 
     // Cache article
-    peerpedia::local_store::cache_article(&conn, "art-1", r#"{"title":"Test Article","score":{"O":4,"R":3}}"#).unwrap();
+    peerpedia::local_store::cache_article(
+        &conn,
+        "art-1",
+        r#"{"title":"Test Article","score":{"O":4,"R":3}}"#,
+    )
+    .unwrap();
 
     // Retrieve
-    let cached = peerpedia::local_store::get_cached_article(&conn, "art-1").unwrap().unwrap();
+    let cached = peerpedia::local_store::get_cached_article(&conn, "art-1")
+        .unwrap()
+        .unwrap();
     assert_eq!(cached.id, "art-1");
     assert!(cached.json.contains("Test Article"));
 
     // Overwrite
     peerpedia::local_store::cache_article(&conn, "art-1", r#"{"title":"Updated"}"#).unwrap();
-    let updated = peerpedia::local_store::get_cached_article(&conn, "art-1").unwrap().unwrap();
+    let updated = peerpedia::local_store::get_cached_article(&conn, "art-1")
+        .unwrap()
+        .unwrap();
     assert!(updated.json.contains("Updated"));
 
     // Not found
