@@ -75,18 +75,21 @@ peerpedia/
 ├── frontend/                   # Vue 3 SPA + Tauri
 │   ├── src/
 │   │   ├── api/                # Axios API modules + types.ts
-│   │   ├── components/         # 11 components
-│   │   ├── composables/        # useBookmarkToggle, useTauri, useStatusMap
-│   │   ├── pages/              # 10 pages (incl. LoginPage)
+│   │   ├── components/         # 14 components (SelfReviewPanel, ReviewPanel, etc.)
+│   │   ├── composables/        # useTauri, useDraftPersistence, useBookmarkToggle, useStatusMap
+│   │   ├── pages/              # 11 pages
 │   │   ├── router/             # Vue Router + auth guards
-│   │   ├── stores/             # Pinia (user, article, pool)
-│   │   └── utils/math.ts       # KaTeX rendering
+│   │   ├── stores/             # Pinia (user, article, pool, review)
+│   │   ├── utils/markdown.ts   # Client-side Markdown compilation (marked + KaTeX)
+│   │   └── utils/math.ts       # KaTeX rendering helpers
 │   └── src-tauri/              # Tauri Rust backend
 │       └── src/
 │           ├── main.rs         # Tauri entry
 │           ├── commands.rs     # IPC handlers
+│           ├── db.rs           # SQLite database layer
 │           ├── local_auth.rs   # Local account CRUD + bcrypt
 │           └── local_store.rs  # Drafts + article cache SQLite
+├── .github/workflows/ci.yml    # CI pipeline (11 jobs, 3 languages)
 ├── seed.py                     # Demo data (23 users)
 ├── docs/DESIGN.md              # This document (Chinese)
 ├── docs/DESIGN.en.md           # This document (English)
