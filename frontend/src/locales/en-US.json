@@ -13,6 +13,9 @@
     "createAccount": "Create Account",
     "toggleMenu": "Toggle navigation menu"
   },
+  "schools": {
+    "subtitle": "Discover researchers. Follow people whose work you find interesting."
+  },
   "home": {
     "tagline": "To a better academia",
     "feed": "Feed",
