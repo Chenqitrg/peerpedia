@@ -119,7 +119,11 @@ export function useTauri() {
 
       return result as T
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e)
+      // Tauri rejects with objects (not Error instances) on command failure.
+      const message =
+        e instanceof Error ? e.message
+        : (typeof e === 'object' && e !== null && 'message' in e) ? String((e as Record<string, unknown>).message)
+        : String(e)
       return { error: message }
     }
   }
