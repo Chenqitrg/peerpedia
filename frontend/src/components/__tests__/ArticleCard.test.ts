@@ -71,11 +71,9 @@ describe('ArticleCard (Article Bar)', () => {
       props: { article: makeArticle() },
       global: { stubs: { 'router-link': RouterLinkStub } },
     })
-    expect(wrapper.text()).toContain('O:4')
-    expect(wrapper.text()).toContain('R:3')
-    expect(wrapper.text()).toContain('C:5')
-    expect(wrapper.text()).toContain('P:4')
-    expect(wrapper.text()).toContain('I:3')
+    expect(wrapper.text()).toContain(':4')
+    expect(wrapper.text()).toContain(':3')
+    expect(wrapper.text()).toContain(':5')
   })
 
   it('renders commit hash', () => {

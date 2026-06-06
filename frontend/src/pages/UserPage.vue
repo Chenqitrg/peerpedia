@@ -8,6 +8,7 @@ import { useUserStore } from '../stores/useUserStore'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import ArticleCard from '../components/ArticleCard.vue'
+import ReputationBadges from '../components/ReputationBadges.vue'
 import type { UserProfile, ArticleSummary } from '../api/types'
 import {
   Users,
@@ -16,7 +17,6 @@ import {
   Mail,
   Edit,
   ExternalLink,
-  Star,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -224,20 +224,7 @@ async function loadFollowing() {
 
         <!-- Reputation -->
         <div v-if="user.reputation" class="mt-4 pt-4 border-t border-divider">
-          <div class="flex items-center gap-1 text-xs text-ink-muted mb-3">
-            <Star class="w-3 h-3" stroke-width="2" />
-            <span class="font-semibold">{{ t('common.reputation') }}</span>
-          </div>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div
-              v-for="(value, key) in user.reputation"
-              :key="key"
-              class="text-center bg-[#0d1117] rounded-lg p-2.5 border border-divider"
-            >
-              <div class="text-lg font-bold text-accent font-mono">{{ value }}</div>
-              <div class="text-xs text-ink-muted capitalize">{{ key }}</div>
-            </div>
-          </div>
+          <ReputationBadges :reputation="user.reputation" :show-label="true" />
         </div>
       </div>
 
