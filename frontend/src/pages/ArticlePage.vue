@@ -3,10 +3,10 @@ import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, createMergeProposal } from '../api/articles'
-import { getReviews as fetchReviews, createReview, postReviewMessage } from '../api/reviews'
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useReviewStore } from '../stores/useReviewStore'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
 import type { ArticleDetail, ReviewOut } from '../api/types'
 import ReviewPanel from '../components/ReviewPanel.vue'
@@ -29,12 +29,11 @@ import {
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const reviewStore = useReviewStore()
 const { t } = useI18n()
 
 const article = ref<ArticleDetail | null>(null)
-const reviews = ref<ReviewOut[]>([])
 const compiledHtml = ref('')
-const reviewsLoading = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
 const activeTab = ref<'body' | 'comments'>('body')
@@ -64,7 +63,7 @@ const reviewFormSuccess = ref('')
 // User's existing review (for pre-filling if already reviewed)
 const myExistingReview = computed(() => {
   if (!userStore.viewer) return null
-  return reviews.value.find(r => r.reviewer_id === userStore.viewer!.id) ?? null
+  return reviewStore.reviews.find(r => r.reviewer_id === userStore.viewer!.id) ?? null
 })
 
 const canUserReview = computed(() => {
@@ -103,7 +102,7 @@ function onDimLeave() {
 // ── Sorted reviews (current user's review first, then self-reviews, then by date) ──
 
 const sortedReviews = computed(() => {
-  return [...reviews.value]
+  return [...reviewStore.reviews]
     .map(r => ({ r, ts: new Date(r.created_at).getTime() }))
     .sort((a, b) => {
       // Current user's review always first
@@ -142,7 +141,7 @@ onMounted(async () => {
 watch(() => route.params.id, async (newId) => {
   if (!newId) return
   loading.value = true
-  reviews.value = []
+  reviewStore.reviews = []
   compiledHtml.value = ''
   activeTab.value = 'body'
   try {
@@ -175,14 +174,7 @@ async function loadCompiledContent() {
 }
 
 async function loadReviews() {
-  reviewsLoading.value = true
-  try {
-    reviews.value = await fetchReviews(id)
-  } catch {
-    reviews.value = []
-  } finally {
-    reviewsLoading.value = false
-  }
+  await reviewStore.fetchReviews(id)
 }
 
 function toggleBookmark() {
@@ -205,28 +197,14 @@ async function handleSubmitReview() {
   reviewFormError.value = ''
   reviewFormSuccess.value = ''
   const comment = reviewComment.value.trim()
-  // Clear comment early to prevent duplicate on retry
   if (comment) reviewComment.value = ''
   try {
     const commitHash = (await getHistory(id)).commits?.[0]?.hash || 'unknown'
-    const result = await createReview(id, {
-      article_id: id,
-      commit_hash: commitHash,
-      scope: article.value?.status === 'published' ? 'published' : 'pool',
-      scores: { ...reviewScores.value },
-    })
-    if (comment) {
-      try {
-        await postReviewMessage(id, result.id, { content: comment })
-      } catch {
-        reviewFormError.value = t('article.reviewFailedComment')
-      }
-    }
-    if (!reviewFormError.value) reviewFormSuccess.value = t('article.reviewSubmitted')
-    await loadReviews()
+    const scope = article.value?.status === 'published' ? 'published' : 'pool' as const
+    await reviewStore.submitReview(id, commitHash, scope, reviewScores.value, comment)
+    reviewFormSuccess.value = t('article.reviewSubmitted')
   } catch (e: any) {
     reviewFormError.value = e.userMessage || 'Failed to submit review'
-    // Restore comment so user can retry
     if (comment) reviewComment.value = comment
   } finally {
     submittingReview.value = false
@@ -235,22 +213,14 @@ async function handleSubmitReview() {
 
 async function updateSingleScore(reviewId: string, dim: string, value: number) {
   if (!userStore.viewer) return
-  const review = reviews.value.find(r => r.id === reviewId)
-  if (!review) return
-  const oldValue = review.scores[dim as keyof typeof review.scores]
-  const updatedScores = { ...review.scores, [dim]: value }
-  // Optimistic update — update local state immediately
-  review.scores = updatedScores
+  const oldValue = reviewStore.optimisticUpdateScore(reviewId, dim, value)
+  if (oldValue === undefined) return
   try {
-    await createReview(id, {
-      article_id: id,
-      commit_hash: review.commit_hash,
-      scope: review.scope as 'pool' | 'published',
-      scores: updatedScores,
-    })
+    const review = reviewStore.reviews.find(r => r.id === reviewId)!
+    await reviewStore.updateScore(id, reviewId, review.commit_hash,
+      review.scope as 'pool' | 'published', review.scores)
   } catch {
-    // Revert on failure — use saved oldValue, not the already-mutated current value
-    review.scores = { ...review.scores, [dim]: oldValue }
+    reviewStore.revertScore(reviewId, dim, oldValue)
     reviewFormError.value = 'Failed to update score'
     setTimeout(() => { reviewFormError.value = '' }, 3000)
   }
@@ -262,9 +232,8 @@ async function handleReply(reviewId: string) {
   sendingReplies[reviewId] = true
   replyErrors[reviewId] = ''
   try {
-    await postReviewMessage(id, reviewId, { content: text })
+    await reviewStore.sendReply(id, reviewId, text)
     replyTexts[reviewId] = ''
-    await loadReviews()
   } catch {
     replyErrors[reviewId] = 'Failed to send'
     setTimeout(() => { replyErrors[reviewId] = '' }, 3000)
@@ -323,7 +292,7 @@ async function handleMerge() {
   }
 }
 
-defineExpose({ updateSingleScore, reviews, mergeError })
+defineExpose({ updateSingleScore, reviewStore, mergeError })
 </script>
 
 <template>
@@ -515,7 +484,7 @@ defineExpose({ updateSingleScore, reviews, mergeError })
           v-model:review-scores="reviewScores"
           v-model:review-comment="reviewComment"
           :sorted-reviews="sortedReviews"
-          :reviews-loading="reviewsLoading"
+          :reviews-loading="reviewStore.loading"
           :can-user-review="canUserReview"
           :my-existing-review="myExistingReview"
           :is-own-article="isOwnArticle"

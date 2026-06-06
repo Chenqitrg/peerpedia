@@ -274,10 +274,10 @@ describe('ArticlePage', () => {
 
     // The mock review has originality: 3
     const vm = wrapper.vm as any
-    const reviews = vm.reviews
-    expect(reviews).toBeDefined()
-    expect(reviews.length).toBeGreaterThan(0)
-    const review = reviews.find((r: any) => r.reviewer_id === 'u1')
+    const store = vm.reviewStore
+    expect(store).toBeDefined()
+    expect(store.reviews.length).toBeGreaterThan(0)
+    const review = store.reviews.find((r: any) => r.reviewer_id === 'u1')
     expect(review).toBeDefined()
     expect(review.scores.originality).toBe(3)
 
