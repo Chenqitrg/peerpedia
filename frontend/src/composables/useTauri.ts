@@ -108,7 +108,8 @@ export function useTauri() {
     if (!invokeFn) return { error: 'Tauri core API not available' }
 
     try {
-      const result = await invokeFn(command, args)
+      // Tauri 2.x uses named arguments: invoke(cmd, { paramName: args })
+      const result = await invokeFn(command, args ? { params: args } : undefined)
 
       // Check if Rust returned an AppError (serialized as { code, message }).
       if (result && typeof result === 'object' && 'code' in result && 'message' in result) {

@@ -59,7 +59,8 @@ describe('useTauri', () => {
     const tauri = useTauri()
     const result = await tauri.saveDraft({ account_id: 'a1', title: 'Draft', content: '# H', format: 'markdown' })
     expect(capturedCmd).toBe('save_draft')
-    expect(capturedArgs).toMatchObject({ account_id: 'a1', title: 'Draft' })
+    // Tauri 2.x wraps args under the named parameter key 'params'
+    expect(capturedArgs.params).toMatchObject({ account_id: 'a1', title: 'Draft' })
     expect(result).toHaveProperty('id', 'd1')
   })
 

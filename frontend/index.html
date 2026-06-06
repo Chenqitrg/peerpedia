@@ -28,7 +28,7 @@
         function save(k) { localStorage.setItem(k, JSON.stringify(store[k.replace('_t_','')])) }
 
         window.__TAURI__ = { core: { invoke: async (cmd, args) => {
-          const a = args || {}
+          const a = (args && args.params) || {}
           switch (cmd) {
             case 'create_account': {
               if (store.accounts.find(x => x.username === a.username))
