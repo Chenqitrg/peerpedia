@@ -6,6 +6,7 @@ import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { parseMarkdown } from '../utils/markdown'
+import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
   Bookmark,
   BookmarkCheck,
@@ -15,7 +16,6 @@ import {
   Play,
   Save,
   Send,
-  SlidersHorizontal,
   FileText,
 } from 'lucide-vue-next'
 
@@ -27,6 +27,7 @@ const userStore = useUserStore()
 const { t } = useI18n()
 
 import { getArticleSource } from '../api/articles'
+import type { ArticleCreatePayload, ArticleUpdatePayload } from '../api/types'
 
 const editId = computed(() => route.params.id as string | undefined)
 const isEdit = computed(() => !!editId.value)
@@ -256,7 +257,7 @@ async function handleSubmitToPool() {
   successMsg.value = ''
 
   try {
-    const body: Record<string, unknown> = {
+    const body: ArticleCreatePayload | ArticleUpdatePayload = {
       title: title.value,
       abstract: abstract.value || title.value,
       content: content.value,
@@ -270,7 +271,7 @@ async function handleSubmitToPool() {
       contributions: { ...contributions.value },
     }
 
-    let result: any
+    let result: { id: string }
     if (isEdit.value) {
       result = await articleStore.updateArticle(editId.value!, body)
       successMsg.value = 'Article updated and submitted to pool!'
@@ -538,126 +539,18 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
       <span>{{ content.length }} characters</span>
     </div>
 
-    <!-- Self-review panel (slide-in) -->
-    <Transition name="slide-up">
-      <div
-        v-if="showSelfReview"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-        @click.self="showSelfReview = false"
-      >
-        <div class="bg-card border border-divider rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in">
-          <h3 class="text-lg font-heading font-semibold text-ink mb-1">{{ t('editor.selfAssessment') }}</h3>
-          <p class="text-xs text-ink-muted mb-5">{{ t('editor.selfAssessmentHint') }}</p>
-
-          <!-- Commit message -->
-          <div class="mb-4">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">
-              {{ t('editor.commitMessage') }} <span class="text-[#d73a49]">*</span>
-            </label>
-            <input
-              v-model="commitMsg"
-              type="text"
-              :placeholder="t('editor.commitMessagePlaceholder')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <!-- 5-dim scores -->
-          <div class="space-y-3 mb-5">
-            <label class="text-xs font-semibold text-ink-muted">{{ t('editor.scores1to5') }}</label>
-            <div class="grid grid-cols-5 gap-2">
-              <div v-for="(_, key) in scores" :key="key" class="text-center">
-                <div class="text-xs text-ink-muted mb-1 capitalize">{{ key.substring(0, 4) }}</div>
-                <select
-                  v-model="(scores as any)[key]"
-                  class="w-full bg-[#0d1117] border border-divider rounded text-center text-sm text-ink py-1.5 focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Keywords -->
-          <div class="mb-3">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.keywords') }}</label>
-            <input
-              v-model="keywords"
-              type="text"
-              :placeholder="t('editor.keywordsPlaceholder')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <!-- Categories -->
-          <div class="mb-3">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.categories') }}</label>
-            <input
-              v-model="categories"
-              type="text"
-              :placeholder="t('editor.categoriesPlaceholder')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <!-- Abstract -->
-          <div class="mb-5">
-            <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.abstract') }}</label>
-            <textarea
-              v-model="abstract"
-              rows="3"
-              :placeholder="t('editor.abstractPlaceholder2')"
-              class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-            />
-          </div>
-
-          <!-- Contribution -->
-          <div class="mb-5">
-            <label class="text-xs font-semibold text-ink-muted flex items-center gap-1.5 mb-2">
-              <SlidersHorizontal class="w-3 h-3" />
-              {{ t('editor.contribution') || 'Contribution' }}
-            </label>
-            <div
-              v-for="(pct, authorId) in contributions"
-              :key="authorId"
-              class="flex items-center gap-3 mb-2"
-            >
-              <span class="text-xs text-ink-muted w-20 truncate">
-                {{ authorId === userStore.viewer?.id ? 'You' : authorId.substring(0, 8) }}
-              </span>
-              <input
-                type="range"
-                :value="pct"
-                min="0"
-                max="100"
-                class="flex-1 h-1.5 accent-accent"
-                @input="(e) => contributions[authorId] = Number((e.target as HTMLInputElement).value)"
-              />
-              <span class="text-xs text-ink font-mono w-8 text-right">{{ pct }}%</span>
-            </div>
-            <p v-if="totalContribution !== 100" class="text-[10px] text-[#d73a49]">
-              {{ t('editor.contributionMustTotal100') || 'Contributions must total 100%. Currently:' }} {{ totalContribution }}%
-            </p>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-3">
-            <button
-              class="btn-outline flex-1"
-              @click="showSelfReview = false"
-            >
-              {{ t('editor.cancel') }}
-            </button>
-            <button
-              class="btn-primary flex-1"
-              :disabled="submitting"
-              @click="handleSubmitToPool"
-            >
-              {{ submitting ? t('editor.submitting') : t('editor.publishToPool') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <!-- Self-review panel -->
+    <SelfReviewPanel
+      v-model="showSelfReview"
+      v-model:commit-msg="commitMsg"
+      v-model:scores="scores"
+      v-model:keywords="keywords"
+      v-model:categories="categories"
+      v-model:abstract="abstract"
+      v-model:contributions="contributions"
+      :total-contribution="totalContribution"
+      :submitting="submitting"
+      @submit="handleSubmitToPool"
+    />
   </div>
 </template>
