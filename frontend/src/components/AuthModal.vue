@@ -167,7 +167,6 @@ function close() {
             required
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <p v-if="userStore.isTauriMode" class="text-xs text-ink-muted">💻 Stored locally — no server required</p>
           <p v-if="error" class="text-xs text-[#d73a49]">{{ error }}</p>
           <button
             type="submit"
