@@ -82,8 +82,9 @@ function onMouseUp() {
   document.removeEventListener('mouseup', onMouseUp)
 }
 
-const DRAFT_KEY = computed(() => `editor-draft-${editId.value || 'new'}`)
-const DRAFT_ID_KEY = computed(() => `editor-draft-id-${editId.value || 'new'}`)
+const draftUid = computed(() => userStore.viewer?.id || 'anonymous')
+const DRAFT_KEY = computed(() => `editor-draft-${draftUid.value}-${editId.value || 'new'}`)
+const DRAFT_ID_KEY = computed(() => `editor-draft-id-${draftUid.value}-${editId.value || 'new'}`)
 const totalContribution = computed(() =>
   Object.values(contributions.value).reduce((sum, v) => sum + v, 0)
 )
@@ -128,7 +129,7 @@ async function restoreDraft() {
 
   // Try Tauri persistence first with the real draft ID.
   const accountId = userStore.viewer?.id || 'local'
-  const result = await draftPersistence.load(currentDraftId.value)
+  const result = await draftPersistence.load(currentDraftId.value, accountId)
 
   if (result && result.content !== undefined) {
     title.value = result.title || ''

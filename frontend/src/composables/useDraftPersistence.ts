@@ -7,10 +7,11 @@
 
 import { useTauri } from './useTauri'
 import type { Draft, DraftSummary } from './useTauri'
-import axios from 'axios'
+import apiClient from '../api/client'
 
-const LOCAL_STORAGE_KEY = 'peerpedia_draft'
-const API_BASE = '/api/v1'
+function draftStorageKey(accountId?: string): string {
+  return accountId ? `peerpedia_draft_${accountId}` : 'peerpedia_draft'
+}
 
 interface PersistenceResult {
   id?: string
@@ -47,16 +48,17 @@ export function useDraftPersistence() {
     }
 
     // Web mode: REST API + localStorage backup.
+    const storageKey = draftStorageKey(accountId)
     try {
       if (draftId) {
         // Update existing draft via PUT.
-        const { data } = await axios.put(`${API_BASE}/articles/${draftId}`, {
+        const { data } = await apiClient.put(`/articles/${draftId}`, {
           title,
           content,
           commit_message: 'Save draft',
           publish: false,
         })
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
+        localStorage.setItem(storageKey, JSON.stringify({
           id: data.id, title: data.title, content, format,
         }))
         return { id: data.id, title: data.title, content, format }
@@ -72,9 +74,9 @@ export function useDraftPersistence() {
         authors: [accountId],
         self_review: { originality: 0, rigor: 0, completeness: 0, pedagogy: 0, impact: 0 },
       }
-      const { data } = await axios.post(`${API_BASE}/articles`, payload)
+      const { data } = await apiClient.post('/articles', payload)
       // Persist to localStorage as offline backup.
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
+      localStorage.setItem(storageKey, JSON.stringify({
         id: data.id,
         title: data.title,
         content,
@@ -96,12 +98,12 @@ export function useDraftPersistence() {
         format,
         updated_at: new Date().toISOString(),
       }
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localDraft))
+      localStorage.setItem(storageKey, JSON.stringify(localDraft))
       return { ...localDraft, error: message }
     }
   }
 
-  async function load(draftId: string): Promise<PersistenceResult> {
+  async function load(draftId: string, accountId?: string): Promise<PersistenceResult> {
     if (tauri.isTauri.value) {
       const result = await tauri.getDraft({ id: draftId })
       if (!result) return { error: 'Tauri unavailable', content: '', format: 'markdown' }
@@ -111,7 +113,7 @@ export function useDraftPersistence() {
 
     // Web mode: try REST source endpoint (returns content), fall back to localStorage.
     try {
-      const { data: source } = await axios.get(`${API_BASE}/articles/${draftId}/source`)
+      const { data: source } = await apiClient.get(`/articles/${draftId}/source`)
       return {
         id: draftId,
         title: '',
@@ -119,8 +121,9 @@ export function useDraftPersistence() {
         format: source.format || 'markdown',
       }
     } catch {
-      // Try localStorage fallback.
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY)
+      // Try localStorage fallback (scoped to user if accountId provided).
+      const storageKey = draftStorageKey(accountId)
+      const stored = localStorage.getItem(storageKey)
       if (stored) {
         try {
           return JSON.parse(stored) as PersistenceResult
@@ -142,7 +145,7 @@ export function useDraftPersistence() {
 
     // Web mode: REST fallback (returns flat array).
     try {
-      const { data } = await axios.get(`${API_BASE}/articles`, {
+      const { data } = await apiClient.get('/articles', {
         params: { status: 'draft', author_id: accountId },
       })
       const list = Array.isArray(data) ? data : (data.items || [])
@@ -156,7 +159,7 @@ export function useDraftPersistence() {
     }
   }
 
-  async function deleteDraft(draftId: string): Promise<PersistenceResult> {
+  async function deleteDraft(draftId: string, accountId?: string): Promise<PersistenceResult> {
     if (tauri.isTauri.value) {
       const result = await tauri.deleteDraft({ id: draftId })
       if (!result) return { error: 'Tauri unavailable' }
@@ -166,8 +169,8 @@ export function useDraftPersistence() {
 
     // Web mode: delete via REST.
     try {
-      await axios.put(`${API_BASE}/articles/${draftId}`, { publish: false })
-      localStorage.removeItem(LOCAL_STORAGE_KEY)
+      await apiClient.put(`/articles/${draftId}`, { publish: false })
+      localStorage.removeItem(draftStorageKey(accountId))
       return { ok: true }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e)

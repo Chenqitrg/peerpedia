@@ -14,17 +14,30 @@ vi.mock('../useTauri', () => ({
   useTauri: () => mockTauriMethods,
 }))
 
-// Mock axios for REST fallback
-const mockPost = vi.fn()
-const mockGet = vi.fn()
-const mockPut = vi.fn()
-vi.mock('axios', () => ({
-  default: {
-    post: (...args: unknown[]) => mockPost(...args),
-    get: (...args: unknown[]) => mockGet(...args),
-    put: (...args: unknown[]) => mockPut(...args),
-  },
-}))
+// Mock axios for REST fallback — must include create() for apiClient.
+const { mockPost, mockGet, mockPut } = vi.hoisted(() => {
+  const mockPost = vi.fn()
+  const mockGet = vi.fn()
+  const mockPut = vi.fn()
+  return { mockPost, mockGet, mockPut }
+})
+
+vi.mock('axios', () => {
+  const noopInterceptor = { use: vi.fn(), eject: vi.fn(), clear: vi.fn() }
+  return {
+    default: {
+      create: () => ({
+        post: (...args: unknown[]) => mockPost(...args),
+        get: (...args: unknown[]) => mockGet(...args),
+        put: (...args: unknown[]) => mockPut(...args),
+        interceptors: { request: noopInterceptor, response: noopInterceptor },
+      }),
+      post: (...args: unknown[]) => mockPost(...args),
+      get: (...args: unknown[]) => mockGet(...args),
+      put: (...args: unknown[]) => mockPut(...args),
+    },
+  }
+})
 
 describe('useDraftPersistence', () => {
   beforeEach(() => {
@@ -96,7 +109,7 @@ describe('useDraftPersistence', () => {
       const { save } = useDraftPersistence()
       await save('a1', 'Draft', '# Content', 'markdown')
 
-      const stored = JSON.parse(localStorage.getItem('peerpedia_draft') || '{}')
+      const stored = JSON.parse(localStorage.getItem('peerpedia_draft_a1') || '{}')
       expect(stored).toHaveProperty('title', 'Draft')
     })
   })

@@ -66,6 +66,10 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function registerLocal(username: string, password: string, email: string, name: string) {
+    // Clear any stale draft data from previous sessions to prevent cross-user leaks.
+    remove('peerpedia_draft')
+    remove('editor-draft-anonymous-new')
+    remove('editor-draft-id-anonymous-new')
     const result = await tauri.createAccount({ username, password, email, name })
     if (!result) throw new Error('Tauri unavailable')
     if ('error' in result) throw new Error(result.error)
@@ -97,11 +101,20 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function clear() {
+    // Capture user ID before nulling for draft key cleanup.
+    const uid = viewer.value?.id
     viewer.value = null
     token.value = null
     localAccount.value = null
     remove('viewer')
     remove('token')
+    // Clear stale draft data to prevent cross-user leaks.
+    remove('peerpedia_draft')
+    if (uid) {
+      remove(`editor-draft-${uid}-new`)
+      remove(`editor-draft-id-${uid}-new`)
+      remove(`peerpedia_draft_${uid}`)
+    }
   }
 
   async function login(username: string, password: string) {
