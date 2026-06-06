@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getUser, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
+import { useTauri } from '../composables/useTauri'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import ArticleCard from '../components/ArticleCard.vue'
@@ -23,6 +24,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const tauri = useTauri()
 const { t } = useI18n()
 
 const id = computed(() => route.params.id as string)
@@ -66,10 +68,48 @@ async function handleFollow() {
 }
 
 async function loadArticles() {
-  try {
-    const artData = await getArticles({ author_id: id.value, page: 1, size: 50 })
-    articles.value = Array.isArray(artData) ? artData : (artData.articles ?? [])
-  } catch { /* ignore */ }
+  const merged: ArticleSummary[] = []
+
+  // 1. Server articles (skip in pure Tauri mode — server won't respond)
+  if (!tauri.isTauri) {
+    try {
+      const artData = await getArticles({ author_id: id.value, page: 1, size: 50 })
+      const serverArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
+      merged.push(...serverArticles)
+    } catch { /* server unreachable in Tauri offline mode */ }
+  }
+
+  // 2. Tauri local drafts (only for current user's own page)
+  if (tauri.isTauri && isSelf.value) {
+    try {
+      const drafts = await tauri.listDrafts({ account_id: id.value })
+      for (const d of drafts) {
+        // Avoid duplicates — skip if already loaded from server
+        if (!merged.some(a => a.id === d.id)) {
+          merged.push({
+            id: d.id,
+            title: d.title || 'Untitled',
+            status: 'draft',
+            authors: [{ id: id.value, name: user.value?.name || id.value, anonymous_name: '' }],
+            content_preview: '',
+            commit_hash: '',
+            fork_count: 0,
+            forked_from: null,
+            commit_count: 0,
+            score: null,
+            days_remaining: null,
+            sink_duration_days: null,
+            is_bookmarked: false,
+            is_own_article: true,
+            created_at: d.updated_at,
+            updated_at: d.updated_at,
+          })
+        }
+      }
+    } catch { /* Tauri drafts unavailable */ }
+  }
+
+  articles.value = merged
 }
 
 // Load articles after user fetch completes (sequential)
