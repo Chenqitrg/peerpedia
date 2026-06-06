@@ -17,10 +17,12 @@ vi.mock('../useTauri', () => ({
 // Mock axios for REST fallback
 const mockPost = vi.fn()
 const mockGet = vi.fn()
+const mockPut = vi.fn()
 vi.mock('axios', () => ({
   default: {
     post: (...args: unknown[]) => mockPost(...args),
     get: (...args: unknown[]) => mockGet(...args),
+    put: (...args: unknown[]) => mockPut(...args),
   },
 }))
 
@@ -120,14 +122,17 @@ describe('useDraftPersistence', () => {
 
     it('falls back to REST when isTauri is false', async () => {
       mockGet.mockResolvedValue({
-        data: { id: 'web-1', title: 'Web Draft', content: '# Web', format: 'markdown' },
+        data: { content: '# Web', format: 'markdown' },
       })
 
       const { load } = useDraftPersistence()
       const result = await load('web-1')
 
       expect(mockGet).toHaveBeenCalled()
-      expect(result).toHaveProperty('title', 'Web Draft')
+      const callUrl = mockGet.mock.calls[0][0]
+      expect(callUrl).toContain('/source')
+      expect(result).toHaveProperty('content', '# Web')
+      expect(result).toHaveProperty('format', 'markdown')
     })
 
     it('falls back to localStorage when REST fails', async () => {

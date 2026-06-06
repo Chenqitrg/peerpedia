@@ -48,6 +48,21 @@ export function useDraftPersistence() {
 
     // Web mode: REST API + localStorage backup.
     try {
+      if (draftId) {
+        // Update existing draft via PUT.
+        const { data } = await axios.put(`${API_BASE}/articles/${draftId}`, {
+          title,
+          content,
+          commit_message: 'Save draft',
+          publish: false,
+        })
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
+          id: data.id, title: data.title, content, format,
+        }))
+        return { id: data.id, title: data.title, content, format }
+      }
+
+      // New draft: create via POST.
       const payload: Record<string, unknown> = {
         title,
         content,
@@ -94,14 +109,14 @@ export function useDraftPersistence() {
       return result as Draft
     }
 
-    // Web mode: try REST, fall back to localStorage.
+    // Web mode: try REST source endpoint (returns content), fall back to localStorage.
     try {
-      const { data } = await axios.get(`${API_BASE}/articles/${draftId}`)
+      const { data: source } = await axios.get(`${API_BASE}/articles/${draftId}/source`)
       return {
-        id: data.id,
-        title: data.title,
-        content: data.content || '',
-        format: data.format || 'markdown',
+        id: draftId,
+        title: '',
+        content: source.content || '',
+        format: source.format || 'markdown',
       }
     } catch {
       // Try localStorage fallback.
@@ -125,12 +140,13 @@ export function useDraftPersistence() {
       return []
     }
 
-    // Web mode: REST fallback.
+    // Web mode: REST fallback (returns flat array).
     try {
       const { data } = await axios.get(`${API_BASE}/articles`, {
         params: { status: 'draft', author_id: accountId },
       })
-      return (data.items || []).map((item: Record<string, unknown>) => ({
+      const list = Array.isArray(data) ? data : (data.items || [])
+      return list.map((item: Record<string, unknown>) => ({
         id: item.id as string,
         title: item.title as string,
         updated_at: item.updated_at as string,
