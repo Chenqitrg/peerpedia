@@ -1,0 +1,10 @@
+/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/deps/icu_normalizer-6f25d783ffe37c8d.d: /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/lib.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/properties.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/provider.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/uts46.rs
+
+/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/deps/libicu_normalizer-6f25d783ffe37c8d.rlib: /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/lib.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/properties.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/provider.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/uts46.rs
+
+/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/deps/libicu_normalizer-6f25d783ffe37c8d.rmeta: /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/lib.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/properties.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/provider.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/uts46.rs
+
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/lib.rs:
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/properties.rs:
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/provider.rs:
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.2.0/src/uts46.rs:

@@ -1,0 +1,14 @@
+/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/deps/thiserror-20da2bf2f586409c.d: /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/build/thiserror-c423c67edff811b7/out/private.rs
+
+/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/deps/libthiserror-20da2bf2f586409c.rlib: /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/build/thiserror-c423c67edff811b7/out/private.rs
+
+/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/deps/libthiserror-20da2bf2f586409c.rmeta: /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/build/thiserror-c423c67edff811b7/out/private.rs
+
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/Users/chenqimeng/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/build/thiserror-c423c67edff811b7/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/chenqimeng/Projects/peerpedia/frontend/src-tauri/target/debug/build/thiserror-c423c67edff811b7/out
