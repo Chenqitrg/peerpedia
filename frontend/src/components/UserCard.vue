@@ -1,19 +1,42 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '../stores/useUserStore'
+import { followUser, unfollowUser } from '../api/users'
 import ReputationBadges from './ReputationBadges.vue'
-import { Users, BookOpen, MapPin } from 'lucide-vue-next'
+import { BookOpen, MapPin } from 'lucide-vue-next'
 import type { UserSummary } from '../api/types'
 
 const { t } = useI18n()
 const router = useRouter()
+const userStore = useUserStore()
 
 const props = defineProps<{
   user: UserSummary
 }>()
 
+const isFollowing = ref(false)
+const followLoading = ref(false)
+
 function goToUser() {
   router.push(`/user/${props.user.id}`)
+}
+
+async function handleFollow(e: Event) {
+  e.stopPropagation()
+  if (!userStore.viewer || followLoading.value) return
+  followLoading.value = true
+  try {
+    if (isFollowing.value) {
+      await unfollowUser(props.user.id)
+      isFollowing.value = false
+    } else {
+      await followUser(props.user.id)
+      isFollowing.value = true
+    }
+  } catch { /* ignore */ }
+  finally { followLoading.value = false }
 }
 </script>
 
@@ -50,6 +73,19 @@ function goToUser() {
           <ReputationBadges :reputation="user.reputation" />
         </div>
       </div>
+
+      <!-- Follow button -->
+      <button
+        v-if="userStore.viewer && userStore.viewer.id !== user.id"
+        class="text-[11px] px-2.5 py-1 rounded-xl font-semibold shrink-0 transition-colors duration-200"
+        :class="isFollowing
+          ? 'border border-accent/30 text-accent hover:bg-accent/10'
+          : 'bg-accent text-[#0d1117] hover:brightness-110'"
+        :disabled="followLoading"
+        @click="handleFollow"
+      >
+        {{ isFollowing ? t('common.following') : t('common.follow') }}
+      </button>
     </div>
   </article>
 </template>
