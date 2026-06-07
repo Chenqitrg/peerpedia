@@ -398,7 +398,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                    text-ink-muted hover:text-ink hover:bg-[#21262d]
                    transition-colors duration-200"
             :aria-label="t('editor.saveDraft')"
-            :title="t('editor.saveDraft')"
+            :data-tooltip="t('editor.saveDraft')"
             :disabled="submitting"
             @click="handleSaveDraft"
           >
@@ -468,7 +468,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="showPreview ? 'Hide preview' : 'Show preview'"
-          :title="showPreview ? 'Hide preview' : 'Show preview'"
+          :data-tooltip="showPreview ? 'Hide preview' : 'Show preview'"
           @click="showPreview = !showPreview"
         >
           <Eye v-if="showPreview" class="w-4 h-4" stroke-width="2" />
@@ -481,7 +481,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('editor.compile')"
-          :title="t('editor.compile')"
+          :data-tooltip="t('editor.compile')"
           :disabled="compiling || !content.trim()"
           @click="handleCompile"
         >
@@ -517,7 +517,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="t('article.history')"
-          :title="t('article.history')"
+          :data-tooltip="t('article.history')"
         >
           <History class="w-4 h-4" stroke-width="2" />
         </router-link>
@@ -533,7 +533,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
             : 'text-ink-muted/30 cursor-not-allowed'"
           :disabled="submitting || !canWrite('editor.publish_pool')"
           :aria-label="t('editor.publish')"
-          :title="canWrite('editor.publish_pool') ? t('editor.publish') : t(getFallback('editor.publish_pool'))"
+          :data-tooltip="canWrite('editor.publish_pool') ? t('editor.publish') : t(getFallback('editor.publish_pool'))"
           @click="handlePublish"
         >
           <Send class="w-4 h-4" stroke-width="2" />

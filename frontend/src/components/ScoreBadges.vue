@@ -61,7 +61,7 @@ function onDimLeave() {
         highlightFirst && idx === 0 ? 'text-accent' : 'text-ink-muted',
         editable ? 'cursor-default' : 'cursor-help',
       ]"
-      :title="`${dim.label}: ${score[dim.key]}`"
+      :data-tooltip="`${dim.label}: ${score[dim.key]}`"
       @mouseenter="onDimEnter(dim.key)"
       @mouseleave="onDimLeave"
     >

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader, FileDown, FileCode } from 'lucide-vue-next'
 import { parseMarkdown } from '../utils/markdown'
@@ -22,6 +22,12 @@ const props = withDefaults(defineProps<{
 })
 
 const downloading = ref(false)
+
+const tooltipText = computed(() => {
+  if (props.disabled && props.disabledReason) return props.disabledReason
+  if (props.showLabel) return undefined
+  return props.format === 'source' ? 'Download source (.md)' : 'Download compiled (.html)'
+})
 
 async function handleDownload() {
   if (downloading.value || props.disabled) return
@@ -71,7 +77,7 @@ async function handleDownload() {
 <template>
   <button
     :aria-label="format === 'source' ? 'Download source (.md)' : 'Download compiled (.html)'"
-    :title="(disabled && disabledReason) ? disabledReason : (showLabel ? undefined : (format === 'source' ? 'Download source (.md)' : 'Download compiled (.html)'))"
+    :data-tooltip="tooltipText"
     :disabled="downloading || disabled"
     class="flex items-center gap-1 rounded-md transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-ink-muted"
     :class="showLabel

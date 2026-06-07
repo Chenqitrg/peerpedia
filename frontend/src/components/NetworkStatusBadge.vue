@@ -1,5 +1,5 @@
 <template>
-  <span class="network-status-badge" :title="label">
+  <span class="network-status-badge" :data-tooltip="label">
     <span class="status-dot" :class="online ? 'online' : 'offline'" />
     <span class="status-label">{{ label }}</span>
   </span>

@@ -401,7 +401,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               <GitFork class="w-3 h-3" stroke-width="2" />
               {{ t('card.forkBadge') }}
             </span>
-            <span v-if="isFromCache && cachedAt" class="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-ink-muted bg-[#21262d] rounded" :title="'This article was cached and may be outdated'">
+            <span v-if="isFromCache && cachedAt" class="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-ink-muted bg-[#21262d] rounded" :data-tooltip="'This article was cached and may be outdated'">
               <Clock class="w-3 h-3" stroke-width="2" />
               Cached {{ cachedAt }}
             </span>
@@ -411,7 +411,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
                    text-ink-muted hover:text-accent hover:bg-accent/10
                    transition-colors duration-200"
             :aria-label="isBookmarked ? t('card.removeBookmark') : t('card.addBookmark')"
-            :title="isBookmarked ? t('card.removeBookmark') : t('card.addBookmark')"
+            :data-tooltip="isBookmarked ? t('card.removeBookmark') : t('card.addBookmark')"
             @click="toggleBookmark"
           >
             <BookmarkCheck v-if="isBookmarked" class="w-4 h-4 text-accent" stroke-width="2" />
@@ -483,7 +483,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
                 ? 'text-ink-muted hover:text-ink hover:bg-[#21262d]'
                 : 'text-ink-muted/40 cursor-not-allowed'"
               :disabled="!canWrite('article.fork')"
-              :title="!canWrite('article.fork') ? t(getFallback('article.fork')) : ''"
+              :data-tooltip="!canWrite('article.fork') ? t(getFallback('article.fork')) : ''"
               @click="handleFork"
             >
               <GitFork class="w-3 h-3" stroke-width="2" />

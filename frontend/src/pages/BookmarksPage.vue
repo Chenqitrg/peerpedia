@@ -68,7 +68,7 @@ const { remove: handleToggleBookmark } = useBookmarkToggle(articles)
       <span
         v-if="isOfflineCache"
         class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[#21262d] text-ink-muted/60"
-        :title="t('offline.local_mode_hint')"
+        :data-tooltip="t('offline.local_mode_hint')"
       >
         <WifiOff class="w-3 h-3" stroke-width="2" />
         {{ t('offline.cached') }}
