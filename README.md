@@ -2,108 +2,93 @@
 
 **Peer review as infrastructure. An open protocol for how knowledge is filtered, not a platform for how it's sold.**
 
+同行评审即基础设施。知识如何被筛选，应当是一个开放的协议，而非一个公司的产品。
+
 ---
 
-## The Problem
+## The Problem · 问题
 
 Academia runs on a broken loop:
 
 ```
 Scholar writes paper   →  free labor
-Scholar submits to publisher  →  gives away copyright for free
-Scholar reviews for publisher  →  free labor
-University buys journal back  →  millions of dollars per year
-Scholar reads own paper  →  paywalled
+Scholar submits         →  gives away copyright for free
+Scholar reviews         →  free labor
+University buys journal →  millions of dollars per year
+Scholar reads own paper →  paywalled
 ```
 
-The scholar writes. The scholar reviews. The scholar pays. The publisher owns the envelope.
+arXiv solved **distribution**. But it didn't solve **filtering** — the problem of deciding what's worth reading. Peer review is still owned by publishers who understand nothing about the science. They just run the mailing list.
 
-arXiv solved **distribution**. But it didn't solve **filtering** — the problem of deciding what's worth reading. Today, filtering is still peer review, and peer review is still owned by publishers who understand nothing about the science. They just run the mailing list.
-
-**Why can't peer review itself be infrastructure?** Not a service run by a company. A protocol. Like TCP/IP, but for knowledge filtering. Anyone can build on it. No one owns it.
-
-That's what PeerPedia is trying to build.
+**Why can't peer review itself be infrastructure?** Like TCP/IP, but for knowledge filtering.
 
 ---
 
-> 🚧 **Early-stage, vibe-coded, and looking for contributors.** Built with Claude Code + DeepSeek V4. Many things work, many are rough, many are missing entirely. The hardest problem is not the code — it's bootstrapping a user base and network effect. If you care about open knowledge, [join us](#contributing). We need designers, engineers, writers, and thinkers.
+## Strategy · 策略
+
+**Phase 1 — Tauri Desktop（冷启动）**
+A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. 5MB install, 30MB RAM. Useful alone — the key to cold-start users.
+
+**Phase 2 — Score arXiv（包围城市）**
+Community scoring layer on top of preprints. A quality filter that doesn't belong to any publisher.
+
+**Phase 3 — Replace Peer Review（夺取政权）**
+When reputation + scoring infrastructure exists and people trust it, journals become obsolete. Peer review is no longer a service — it's a protocol.
 
 ---
 
-## The Roadmap: 农村包围城市，武装夺取政权
-
-We're not going to replace Elsevier tomorrow. The strategy — borrowing from Mao — is **surround the cities from the countryside, seize power through armed struggle.** The "cities" are elite journals, prestige institutions, and the publisher monopoly. The "countryside" is individual scholars, small labs, and the global majority of researchers who are locked out of the prestige economy.
-
-**Phase 1 — A better notebook.** Interconnected note-taking with Git history. Fork ideas. Merge improvements. Cite anything. Build a user base by being genuinely useful to individual scholars, not institutions. *Build the base in the countryside.*
-
-**Phase 1 的载体是 Tauri 桌面版。** 离线 Markdown/Typst 写作 + Git 版本控制 + 本地 SQLite 存储。5MB 体积、30MB 内存。一个人用也爽——这是吸引冷启动用户的关键。Web 版保留给社区功能。
-
-**Phase 2 — Score arXiv.** The millions of preprints on arXiv have no quality signal. A community-driven scoring layer — one that anyone can query, audit, or build on — gives readers a filter that doesn't belong to any publisher. *Surround the cities. Start building parallel infrastructure that makes the old system visibly inadequate.*
-
-**Phase 3 — Replace peer review.** Once reputation and scoring infrastructure exists, and people trust it, the journal's last function becomes obsolete. Peer review is no longer a service. It's a protocol. *Seize the means of filtering.*
-
-Every phase is useful on its own. Each one builds the network for the next. You don't beat publishers by attacking them. You make them irrelevant by building something better underneath.
-
----
-
-## Why PeerPedia?
-
-Knowledge should flow freely and build on itself. Instead of isolated documents in silos, PeerPedia lets you:
-
-- **Connect** notes and articles through citations, forks, and merges
-- **Evolve** ideas with full Git history — every edit is tracked, diffable, rollbackable
-- **Review** each other's work anonymously in a sedimentation pool
-- **Build reputation** that reflects contribution quality, not institutional prestige
-
-| Problem | PeerPedia |
-|---------|-----------|
-| Isolated note-taking | Citation graph — every article can reference and be referenced |
-| No version history | Git-native: fork, edit, merge, rollback |
-| Opaque feedback | Transparent 5-dimension scoring (O/R/C/P/I) |
-| No author incentives | Reputation system (P/O/C/R) rewards quality work |
-| English-only | Full Chinese/English bilingual interface (知诸网) |
-
----
-
-## Architecture
+## Architecture · 架构
 
 ```
-Phase 1（冷启动 — Tauri Desktop）
-┌──────────────────────────────────────────────────────────┐
-│  Vue 3 → IPC → Rust commands → SQLite + Git（本地）       │
-│  离线写作、本地编译、版本控制                               │
-└──────────────────────────────────────────────────────────┘
-                         ↕ 可选同步（Slice 2）
+Phase 1（Tauri Desktop — 离线写作）
+┌─────────────────────────────────────────────────────────┐
+│  Vue 3 → IPC → Rust → SQLite + Git（本地）                │
+│  离线写作 · 客户端编译 · 版本控制 · 浏览即缓存               │
+└─────────────────────────────────────────────────────────┘
 
-Phase 2+（社区 — Web）
-┌──────────────────────────────────────────────────────────┐
+Phase 2+（Web — 社区协作）
+┌─────────────────────────────────────────────────────────┐
 │  Vue 3 SPA → REST → FastAPI → SQLite + Git（服务器）       │
-│  沉淀池、社区评审、信誉系统、AI 交融                          │
-└──────────────────────────────────────────────────────────┘
+│  沉淀池 · 社区评审 · 信誉系统 · 引用图                      │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Stack
+### Stack · 技术栈
 
 | Layer | Technology |
 |-------|-----------|
 | Desktop Shell | Tauri 2.x (Rust) |
 | Frontend | Vue 3, TypeScript, Vite, Tailwind CSS, Pinia, vue-i18n |
-| Backend (Web) | Python 3, FastAPI, SQLAlchemy, SQLite |
+| Backend (Web) | Python 3.12+, FastAPI, SQLAlchemy, SQLite |
 | Backend (Desktop) | Rust, rusqlite, bcrypt, libgit2 |
-| Storage (Desktop) | SQLite + Git repositories（本地） |
-| Storage (Web) | SQLite + Git repositories（服务器） |
+| Storage | SQLite + Git repositories |
+| Compilation | Markdown: client-side (marked + KaTeX). Typst: Tauri sidecar CLI |
 | Auth | JWT (Web) / bcrypt + SQLite (Desktop) |
-| Compilation | Markdown: client-side (marked + KaTeX). Typst: Tauri sidecar CLI (Slice 2) |
-| Math | KaTeX |
+| Source of Truth | Git = Source of Truth, DB = Index |
+
+### DB Schema · 数据模型（9 entities）
+
+| Table | Purpose |
+|-------|---------|
+| `articles` | Core article metadata (title, status, score, etc.) |
+| `article_authors` | Article ↔ User join (replaces JSON `authors` field) |
+| `users` | Account + reputation |
+| `reviews` | Five-dimension scores per (article, reviewer, scope, commit) |
+| `review_messages` | Threaded discussion under reviews (replaces JSON `thread` field) |
+| `follows` | User follow relationships |
+| `bookmarks` | User bookmarks |
+| `merge_proposals` | Fork → merge workflow |
+| `citations` | Article → Article citation edges |
+
+Key architecture decision: **all relationships use proper join tables**, not JSON columns. `article_authors` and `review_messages` replace the old `authors` and `thread` JSON fields. Compile output is generated on-demand with filesystem cache — never stored in the database.
 
 ---
 
-## Quick Start
+## Quick Start · 快速开始
 
 ### Prerequisites
-- Python 3.12+
-- Node.js 18+
-- Rust (for Tauri desktop)
+
+- Python 3.12+, Node.js 18+, Rust (for Tauri)
 - [Typst](https://github.com/typst/typst) CLI (for PDF compilation)
 
 ### Web Backend
@@ -111,30 +96,23 @@ Phase 2+（社区 — Web）
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-
-# Seed demo data (23 users, password: 666666)
-python seed.py
-
-# Run server
+python seed.py          # 23 demo users, password: 666666
 uvicorn peerpedia_api.main:app --port 8080 --reload
 ```
 
 ### Web Frontend
 
 ```bash
-cd frontend
-npm install
-npm run dev    # → http://localhost:5173
+cd frontend && npm install && npm run dev   # → http://localhost:5173
 ```
 
-### Tauri Desktop（开发模式）
+### Tauri Desktop
 
 ```bash
-cd frontend
-npm run tauri dev    # → 启动 Tauri 窗口
+cd frontend && npm run tauri dev
 ```
 
-### Demo Users（23 位科学家）
+### Demo Users · 演示用户（23 位科学家）
 
 | Name | Username | Password |
 |------|----------|----------|
@@ -150,176 +128,109 @@ npm run tauri dev    # → 启动 Tauri 窗口
 
 ---
 
-## Core Concepts
+## Core Concepts · 核心概念
 
-### Articles as Git Repositories
+### Articles as Git Repositories · 文章即 Git 仓库
 
-Every article is an independent Git repository. Writing, editing, forking, and merging all map to Git operations:
+Every article is an independent Git repository. Fork, edit, merge, rollback — complete version history, forever.
 
-- Complete version history, forever
-- Side-by-side diffs between any two versions (diff2html)
-- Fork → modify → merge proposal workflow
-- Immutable audit trail for every change
+### Five-Dimensional Scoring · 五维评分（O/R/C/P/I）
 
-### Five-Dimensional Scoring
+| Dim | Name | Measures |
+|-----|------|----------|
+| **O** | Originality · 原创性 | How novel is the contribution? |
+| **R** | Rigor · 严谨性 | Are the methods sound? |
+| **C** | Completeness · 完整性 | Is the work self-contained? |
+| **P** | Pedagogy · 可读性 | Well-written and accessible? |
+| **I** | Impact · 影响力 | How significant for the field? |
 
-All reviews use five dimensions:
+### Sedimentation Pool · 沉淀池
 
-| Dim | Name | What it measures |
-|-----|------|-----------------|
-| **O** | Originality | How novel is the contribution? |
-| **R** | Rigor | Are the methods and arguments sound? |
-| **C** | Completeness | Is the work thorough and self-contained? |
-| **P** | Pedagogy | Is it well-written and accessible? |
-| **I** | Impact | How significant is this for the field? |
+New articles enter the pool for community review. Higher scores → shorter review. Lower scores → longer review. Anonymous during pool phase. Auto-publishes when the timer expires.
 
-### Sedimentation Pool (沉淀池)
+### Reputation · 信誉系统（P/O/C/R）
 
-New articles enter a **sedimentation pool** for community review:
+Reputation grows across four dimensions: Professionalism, Objectivity, Collaboration, Readability.
 
-- Higher scores **shorten** the review period; lower scores **extend** it
-- Reviews are anonymous during the pool phase
-- Authors can rebut each review via thread replies
-- When the timer expires, the article is **published**
+### Offline Capability · 离线能力
 
-The pool is visible to your follow network (followers + following).
-
-### Reputation System
-
-Authors and reviewers earn reputation across four dimensions:
-
-| Dim | Name | What it measures |
-|-----|------|-----------------|
-| **P** | Professionalism | Quality and integrity of contributions |
-| **O** | Objectivity | Fairness and accuracy of reviews |
-| **C** | Collaboration | Constructive engagement with peers |
-| **R** | Readability | Clarity and accessibility of writing |
-
-Higher reputation → greater voting weight in the pool.
+Phase 1 Tauri desktop is fully offline-capable:
+- Browse = cache: every article you read is cached locally
+- Bookmark = full cache: bookmarked articles include reviews + history
+- Network status indicator shows real-time online/offline state
+- Network-dependent features (pool, schools) show clear offline states, not errors
+- Local account system: bcrypt + SQLite, no server needed
 
 ---
 
-## Features
-
-### Desktop（Phase 1 — 冷启动）
-
-- Offline Markdown/Typst editing with live preview
-- Local Git version control（fork, history, diff）
-- SQLite-based drafts and article cache
-- Local account system（bcrypt, no server needed）
-- Markdown live preview (client-side marked + KaTeX)
-- Typst → PDF via Tauri sidecar (Slice 2, on-going)
-- 5MB install, 30MB RAM
-
-### Web（Phase 2+ — 社区）
-
-- 5D scoring (O/R/C/P/I) with hover-to-edit ScoreBadges
-- Sedimentation pool with configurable timers
-- Article forking + merge proposals
-- Citation graph (references + citations, click-to-navigate)
-- JWT authentication (register, login, session restore)
-- User profiles with compact ReputationBadges (P/O/C/R)
-- Follow/unfollow, activity feed, bookmarks
-- Full-text search with category/sort filters and pagination
-- Thread-based review discussions（含多轮双作者对话）
-- Merge proposals for forked articles
-- Contribution slider in publish panel（per-author allocation）
-- Chinese/English bilingual UI (vue-i18n, 90+ keys)
-- LXGW WenKai calligraphic brand font + Noto Serif SC headings
-- Waypoints constellation icon as brand mark + Tauri app icon
-- Client-side Markdown compilation (marked + KaTeX, no server round-trip)
-- CI pipeline: 11 jobs across Python, TypeScript, Rust
-- Typed localStorage abstraction (`useLocalStorage`) — centralized I/O for 8 consumers
-
----
-
-## Project Structure
+## Project Structure · 项目结构
 
 ```
 peerpedia/
-├── frontend/                  # Vue 3 SPA + Tauri
+├── frontend/                   # Vue 3 SPA + Tauri
 │   ├── src/
-│   │   ├── api/               # Axios API modules
-│   │   ├── components/        # 14 components (SelfReviewPanel, ReviewPanel, etc.)
-│   │   ├── composables/       # Shared logic (useLocalStorage, useTauri, useDraftPersistence, useBookmarkToggle, useStatusMap, useAsyncResource)
-│   │   ├── locales/           # i18n (zh-CN, en-US)
-│   │   ├── pages/             # Route pages（含 LoginPage）
-│   │   ├── router/            # Vue Router + auth guards
-│   │   └── stores/            # Pinia (user, article, pool, review)
-│   └── src-tauri/             # Tauri Rust backend
+│   │   ├── api/                # Axios API modules + types.ts
+│   │   ├── components/         # 15 components (ReviewPanel, NetworkStatusBadge, etc.)
+│   │   ├── composables/        # useLocalStorage, useTauri, useNetworkStatus, useOffline, etc.
+│   │   ├── locales/            # i18n (zh-CN, en-US)
+│   │   ├── pages/              # 10 pages
+│   │   ├── router/             # Vue Router + auth guards
+│   │   └── stores/             # Pinia (user, article, pool, review)
+│   └── src-tauri/              # Tauri Rust backend
 │       └── src/
-│           ├── main.rs        # Tauri entry
-│           ├── commands.rs    # IPC handlers
-│           ├── local_auth.rs  # 本地账号 CRUD + bcrypt
-│           └── local_store.rs # 草稿 + 文章缓存 SQLite
-├── backend/                   # FastAPI server
+│           ├── main.rs         # Tauri entry
+│           ├── commands.rs     # IPC handlers
+│           ├── db.rs           # SQLite database layer
+│           ├── local_auth.rs   # Local account CRUD + bcrypt
+│           └── local_store.rs  # Drafts + article cache
+├── backend/                    # FastAPI server
 │   └── peerpedia_api/
-│       ├── routes/            # REST endpoints
-│       ├── schemas/           # Pydantic models
-│       └── tests/             # Integration tests
-├── core/                      # Business logic
+│       ├── routes/             # 12 route modules
+│       ├── schemas/            # Pydantic request/response models
+│       └── tests/              # Integration tests
+├── core/                       # Business logic
 │   └── peerpedia_core/
-│       ├── storage/           # Git backend + SQLAlchemy ORM
-│       ├── workflow/          # Scoring, reputation, sedimentation
-│       └── config/            # Parameters
+│       ├── storage/db/         # SQLAlchemy ORM (9 entities) + CRUD
+│       ├── storage/git_backend.py
+│       ├── storage/compiler.py
+│       └── workflow/           # scoring, sedimentation, reputation
+├── scripts/
+│   └── migrate_architecture.py # P0 schema migration
 ├── docs/
-│   ├── DESIGN.md              # Design document
-│   └── api-contract.json      # OpenAPI 3.1 specification
-└── seed.py                    # Demo data seeder（23 users）
-
----
-
-## Testing
-
-```bash
-# Backend (166 tests)
-source .venv/bin/activate
-python -m pytest backend/tests/ -q
-
-# Frontend (172 tests, 28 test files)
-cd frontend
-npx vitest run
-
-# Rust (Tauri backend — requires Rust toolchain)
-cd frontend/src-tauri
-cargo test
+│   ├── DESIGN.md               # Design document (Chinese)
+│   ├── DESIGN.en.md            # Design document (English)
+│   └── api-contract.json       # OpenAPI 3.1 specification
+└── seed.py                     # Demo data seeder (23 users)
 ```
 
-**CI Pipeline:** 11 jobs across 3 languages. Every PR must pass pytest, vitest, ruff, clippy, vue-tsc, rustfmt, and a build smoke test. See `.github/workflows/ci.yml`.
+---
+
+## Testing · 测试
+
+```bash
+# Backend (294 tests)
+python -m pytest backend/tests/ core/tests/ -q
+
+# Frontend (231 tests)
+cd frontend && npx vitest run
+
+# Rust
+cd frontend/src-tauri && cargo test
+```
+
+**CI Pipeline:** 8 jobs across 3 languages (pytest, ruff, vitest, vue-tsc, clippy, rustfmt, build smoke). See `.github/workflows/ci.yml`.
 
 ---
 
-## Contributing
+## Contributing · 参与贡献
 
-**We need you.** Seriously. This project has ambition far beyond its current resources.
-
-### What we're missing
-
-- **UI/UX polish** — many screens work but don't feel great yet
-- **Accessibility** — keyboard nav, screen readers, focus management
-- **Performance** — bundle size, lazy loading, API response caching
-- **Testing** — coverage is decent but far from comprehensive
-- **Mobile** — it works but wasn't designed for small screens
-- **Error handling** — edge cases abound, graceful degradation is spotty
-- **Deployment** — no Docker, no CI/CD pipeline, no production guide
-- **Security audit** — JWT works but hasn't been externally reviewed
-- **Documentation** — DESIGN.md exists but needs more detail
-- **i18n** — Chinese/English translations need refinement
-
-### How to start
-
-1. Read `docs/DESIGN.md` for design philosophy
-2. Check `CLAUDE.md` for development conventions
-3. Pick an issue or propose something you care about
-4. Follow TDD: write failing test → implement → refactor
-
-No contribution is too small. Fix a typo. Translate a string. Write a test. Every bit helps.
+We need designers, engineers, writers, and thinkers. Read `docs/DESIGN.en.md` for design philosophy, check `CLAUDE.md` for conventions, follow TDD.
 
 ---
 
-## License
+## License · 许可
 
-MIT. Content published via PeerPedia is CC BY-SA 4.0 by default.
+MIT. Content: CC BY-SA 4.0.
 
 ---
 

@@ -57,9 +57,17 @@ vi.mock('../../api/pool', () => ({
   }),
 }))
 
+const mockOffline = { canRead: () => true, canWrite: () => true, getFallback: () => '' }
+vi.mock('../../composables/useOffline', () => ({
+  useOffline: () => mockOffline,
+}))
+
 describe('PoolPage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockOffline.canRead = () => true
+    mockOffline.canWrite = () => true
+    mockOffline.getFallback = () => ''
   })
 
   it('renders pool page title', async () => {
@@ -103,5 +111,19 @@ describe('PoolPage', () => {
     })
     await new Promise(r => setTimeout(r, 50))
     expect(wrapper.text()).toMatch(/empty|no articles|none/i)
+  })
+
+  it('shows offline blocked message when pool is offline', async () => {
+    mockOffline.canRead = () => false
+    mockOffline.getFallback = () => 'offline.pool_hint'
+
+    const PoolPage = (await import('../PoolPage.vue')).default
+    const wrapper = mount(PoolPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+
+    expect(wrapper.find('.offline-blocked').exists()).toBe(true)
+    expect(wrapper.text()).toContain('unable to access the pool')
   })
 })

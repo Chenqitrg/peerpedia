@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { useOffline } from '../composables/useOffline'
 import { searchArticles } from '../api/search'
 import { useUserStore } from '../stores/useUserStore'
 import { useAsyncResource } from '../composables/useAsyncResource'
@@ -17,6 +18,9 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const { t } = useI18n()
+const { canRead, getFallback } = useOffline()
+
+const searchScope = computed(() => canRead('search.network') ? 'search_network' : 'search_local')
 
 const query = ref('')
 const category = ref('')
@@ -110,7 +114,13 @@ defineExpose({ query, category, sort, doSearch })
 
 <template>
   <div class="search-page animate-fade-in">
-    <h1 class="text-display-md text-ink mb-2">{{ t('search.title') }}</h1>
+    <div class="flex items-center justify-between mb-2">
+      <h1 class="text-display-md text-ink">{{ t('search.title') }}</h1>
+      <span class="text-xs px-2 py-0.5 rounded-full"
+        :class="canRead('search.network') ? 'bg-accent/15 text-accent' : 'bg-[#21262d] text-ink-muted/60'">
+        {{ t(`offline.${searchScope}`) }}
+      </span>
+    </div>
     <p class="text-sm text-ink-muted mb-6">{{ t('search.subtitle') }}</p>
 
     <!-- Search bar -->

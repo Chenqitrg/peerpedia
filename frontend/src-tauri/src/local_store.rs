@@ -35,6 +35,13 @@ pub struct CachedArticle {
     pub cached_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryEntry {
+    pub article_id: String,
+    pub article_title: String,
+    pub visited_at: String,
+}
+
 // ── Drafts ──────────────────────────────────────────────────────────────
 
 /// Save a draft. If `id` is empty or new, a new draft is created. Otherwise the
@@ -193,6 +200,97 @@ pub fn get_cached_article(conn: &Connection, id: &str) -> Result<Option<CachedAr
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(e) => Err(AppError::from(e)),
     }
+}
+
+// ── Browsing History ─────────────────────────────────────────────────────
+
+/// Record or update a browsing history entry. Re-visiting the same article
+/// updates visited_at to now and article_title if changed.
+pub fn record_visit(
+    conn: &Connection,
+    account_id: &str,
+    article_id: &str,
+    article_title: &str,
+) -> Result<(), AppError> {
+    conn.execute(
+        "INSERT INTO browsing_history (account_id, article_id, article_title, visited_at)
+         VALUES (?1, ?2, ?3, datetime('now'))
+         ON CONFLICT(account_id, article_id) DO UPDATE SET
+           article_title = excluded.article_title,
+           visited_at = datetime('now')",
+        rusqlite::params![account_id, article_id, article_title],
+    )?;
+    Ok(())
+}
+
+/// Get browsing history for an account, newest first, with pagination.
+/// Page is 1-based. Returns at most `size` entries.
+pub fn get_history(
+    conn: &Connection,
+    account_id: &str,
+    page: i64,
+    size: i64,
+) -> Result<Vec<HistoryEntry>, AppError> {
+    let offset = (page - 1) * size;
+    let mut stmt = conn.prepare(
+        "SELECT article_id, article_title, visited_at FROM browsing_history
+         WHERE account_id = ?1
+         ORDER BY visited_at DESC
+         LIMIT ?2 OFFSET ?3",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![account_id, size, offset], |row| {
+        Ok(HistoryEntry {
+            article_id: row.get(0)?,
+            article_title: row.get(1)?,
+            visited_at: row.get(2)?,
+        })
+    })?;
+
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row?);
+    }
+    Ok(entries)
+}
+
+/// Return the set of article IDs currently in the article_cache table.
+pub fn get_cached_article_ids(conn: &Connection) -> Result<Vec<String>, AppError> {
+    let mut stmt = conn.prepare("SELECT id FROM article_cache")?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let mut ids = Vec::new();
+    for row in rows {
+        ids.push(row?);
+    }
+    Ok(ids)
+}
+
+// ── Article Full Cache ────────────────────────────────────────────────────
+
+/// Cache a published article with extended data for offline reading.
+/// Accepts a larger JSON payload (up to 20 MB) containing article metadata,
+/// compiled output, reviews, and author profiles.
+pub fn cache_article_full(conn: &Connection, id: &str, article_json: &str) -> Result<(), AppError> {
+    const MAX_FULL_CACHE_SIZE: usize = 20 * 1024 * 1024; // 20 MB
+    if article_json.len() > MAX_FULL_CACHE_SIZE {
+        return Err(AppError::IoError(format!(
+            "Article too large: {} bytes (max {})",
+            article_json.len(),
+            MAX_FULL_CACHE_SIZE
+        )));
+    }
+
+    serde_json::from_str::<serde_json::Value>(article_json)
+        .map_err(|e| AppError::DatabaseError(format!("Invalid article JSON: {}", e)))?;
+
+    conn.execute(
+        "INSERT INTO article_cache (id, json, cached_at)
+         VALUES (?1, ?2, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET
+           json = excluded.json,
+           cached_at = datetime('now')",
+        rusqlite::params![id, article_json],
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -415,5 +513,95 @@ mod tests {
         let result = get_cached_article(&conn, "corrupt");
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AppError::DatabaseError(_)));
+    }
+
+    // ── Browsing history tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_record_visit_inserts_new_row() {
+        let conn = setup();
+        record_visit(&conn, "acc1", "art1", "Test Article").unwrap();
+
+        let history = get_history(&conn, "acc1", 1, 20).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].article_id, "art1");
+        assert_eq!(history[0].article_title, "Test Article");
+    }
+
+    #[test]
+    fn test_record_visit_updates_existing_entry() {
+        let conn = setup();
+        record_visit(&conn, "acc1", "art1", "Old Title").unwrap();
+        // Re-visit same article with new title — should update, not duplicate.
+        record_visit(&conn, "acc1", "art1", "New Title").unwrap();
+
+        let history = get_history(&conn, "acc1", 1, 20).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].article_title, "New Title");
+    }
+
+    #[test]
+    fn test_get_history_returns_newest_first() {
+        let conn = setup();
+        record_visit(&conn, "acc1", "art1", "Old").unwrap();
+        // Force older timestamp on art1.
+        conn.execute(
+            "UPDATE browsing_history SET visited_at = '2020-01-01' WHERE article_id = 'art1'",
+            [],
+        )
+        .unwrap();
+        record_visit(&conn, "acc1", "art2", "New").unwrap();
+
+        let history = get_history(&conn, "acc1", 1, 20).unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].article_id, "art2"); // newest first
+        assert_eq!(history[1].article_id, "art1");
+    }
+
+    #[test]
+    fn test_get_history_pagination() {
+        let conn = setup();
+        for i in 0..5 {
+            let aid = format!("art{}", i);
+            record_visit(&conn, "acc1", &aid, &format!("Article {}", i)).unwrap();
+        }
+
+        let page1 = get_history(&conn, "acc1", 1, 2).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let page2 = get_history(&conn, "acc1", 2, 2).unwrap();
+        assert_eq!(page2.len(), 2);
+
+        // Ensure no overlap.
+        let ids: Vec<&str> = page1.iter().map(|e| e.article_id.as_str()).collect();
+        for entry in &page2 {
+            assert!(!ids.contains(&entry.article_id.as_str()));
+        }
+    }
+
+    #[test]
+    fn test_get_history_empty() {
+        let conn = setup();
+        let history = get_history(&conn, "acc1", 1, 20).unwrap();
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn test_get_cached_article_ids() {
+        let conn = setup();
+        cache_article(&conn, "art_a", r#"{"title":"A"}"#).unwrap();
+        cache_article(&conn, "art_b", r#"{"title":"B"}"#).unwrap();
+
+        let ids = get_cached_article_ids(&conn).unwrap();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"art_a".to_string()));
+        assert!(ids.contains(&"art_b".to_string()));
+    }
+
+    #[test]
+    fn test_get_cached_article_ids_empty() {
+        let conn = setup();
+        let ids = get_cached_article_ids(&conn).unwrap();
+        assert!(ids.is_empty());
     }
 }

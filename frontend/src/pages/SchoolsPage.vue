@@ -7,6 +7,7 @@ import { useUserStore } from '../stores/useUserStore'
 import ReputationBadges from '../components/ReputationBadges.vue'
 import { followUser, unfollowUser } from '../api/users'
 import { useTauri } from '../composables/useTauri'
+import { useOffline } from '../composables/useOffline'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
@@ -16,6 +17,7 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const tauri = useTauri()
+const { canRead, getFallback } = useOffline()
 const following = ref<Set<string>>(new Set())
 
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
@@ -95,6 +97,12 @@ function goToUser(id: string) {
 
 <template>
   <div class="schools-page animate-fade-in max-w-content mx-auto px-4 py-8">
+    <!-- Offline blocked -->
+    <div v-if="!canRead('schools')" class="offline-blocked card p-12 text-center">
+      <p class="text-ink-muted text-lg mb-2">{{ t(getFallback('schools')) }}</p>
+    </div>
+
+    <template v-else>
     <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center gap-3 mb-2">
@@ -164,5 +172,6 @@ function goToUser(id: string) {
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
