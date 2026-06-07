@@ -35,7 +35,7 @@ export function useDraftPersistence() {
     draftId?: string,
   ): Promise<PersistenceResult> {
     // In Tauri/dev-mock mode, always save to local mock storage first.
-    if (tauri.isTauri.value || tauri.isDevMock.value) {
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
       const result = await tauri.saveDraft({
         id: draftId || undefined,
         account_id: accountId,
@@ -125,7 +125,7 @@ export function useDraftPersistence() {
   }
 
   async function load(draftId: string, accountId?: string): Promise<PersistenceResult> {
-    if (tauri.isTauri.value || tauri.isDevMock.value) {
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
       const result = await tauri.getDraft({ id: draftId })
       if (!result) return { error: 'Tauri unavailable', content: '', format: 'markdown' }
       if ('error' in result) return { ...result as PersistenceResult, content: '', format: 'markdown' }
@@ -157,7 +157,7 @@ export function useDraftPersistence() {
   }
 
   async function listDrafts(accountId: string): Promise<DraftSummary[]> {
-    if (tauri.isTauri.value || tauri.isDevMock.value) {
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
       const result = await tauri.listDrafts({ account_id: accountId })
       if (!result) return []
       if (Array.isArray(result)) return result as DraftSummary[]
@@ -181,7 +181,7 @@ export function useDraftPersistence() {
   }
 
   async function deleteDraft(draftId: string, accountId?: string): Promise<PersistenceResult> {
-    if (tauri.isTauri.value || tauri.isDevMock.value) {
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
       const result = await tauri.deleteDraft({ id: draftId })
       if (!result) return { error: 'Tauri unavailable' }
       if ('error' in result) return result as PersistenceResult
