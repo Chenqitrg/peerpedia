@@ -63,6 +63,16 @@ export const useUserStore = defineStore('user', () => {
     }
     viewer.value = profile
     saveJSON('viewer', profile)
+
+    // Try to get a backend JWT so authenticated API calls work when server is up.
+    // Only save the token — keep the local profile as viewer to avoid ID mismatches.
+    try {
+      const { token: t } = await apiLogin({ username, password })
+      token.value = t
+      saveString('token', t)
+    } catch {
+      // Server unreachable — keep using local-only profile (no token).
+    }
   }
 
   async function registerLocal(username: string, password: string, email: string, name: string) {
@@ -89,6 +99,16 @@ export const useUserStore = defineStore('user', () => {
     }
     viewer.value = profile
     saveJSON('viewer', profile)
+
+    // Try to register on backend so authenticated API calls work when server is up.
+    // Only save the token — keep the local profile as viewer to avoid ID mismatches.
+    try {
+      const { token: t } = await apiRegister({ username, password, email, name })
+      token.value = t
+      saveString('token', t)
+    } catch {
+      // Server unreachable — keep using local-only profile (no token).
+    }
   }
 
   // ── Actions (original web auth — unchanged) ─────────────────────────

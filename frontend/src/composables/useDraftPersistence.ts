@@ -34,6 +34,7 @@ export function useDraftPersistence() {
     format: string,
     draftId?: string,
   ): Promise<PersistenceResult> {
+    // In Tauri/dev-mock mode, always save to local mock storage first.
     if (tauri.isTauri.value || tauri.isDevMock.value) {
       const result = await tauri.saveDraft({
         id: draftId || undefined,
@@ -42,6 +43,26 @@ export function useDraftPersistence() {
         content,
         format,
       })
+
+      // Also try REST API in background so articles appear on server when available.
+      try {
+        if (draftId) {
+          await apiClient.put(`/articles/${draftId}`, {
+            title, content,
+            commit_message: 'Save draft',
+            publish: false,
+          })
+        } else {
+          await apiClient.post('/articles', {
+            title, content, format,
+            commit_message: 'Save draft',
+            publish: false,
+            authors: [accountId],
+            self_review: { originality: 0, rigor: 0, completeness: 0, pedagogy: 0, impact: 0 },
+          })
+        }
+      } catch { /* Server unavailable — offline is fine. */ }
+
       if (!result) return { error: 'Tauri unavailable' }
       if ('error' in result) return result as PersistenceResult
       return result as Draft
