@@ -48,7 +48,7 @@ const _draftsKey = '_t_drafts', _cacheKey = '_t_cache', _acctsKey = '_t_accts'
 const _followsKey = '_t_follows', _bookmarksKey = '_t_bookmarks'
 
 async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
-  const a = (args && (args as any).params) || {}
+  const a = args || {}
   const accounts = _load<MockAccount[]>(_acctsKey, [])
   const drafts = _load<MockDraft[]>(_draftsKey, [])
   const cache = _load<Record<string, MockCacheEntry>>(_cacheKey, {})
