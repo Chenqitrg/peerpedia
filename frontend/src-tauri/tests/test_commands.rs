@@ -16,7 +16,11 @@ fn test_full_account_flow() {
 
     // Create account
     let account = peerpedia::local_auth::create_account(
-        &conn, "testuser", "password123", "test@test.com", "Test User",
+        &conn,
+        "testuser",
+        "password123",
+        "test@test.com",
+        "Test User",
     )
     .unwrap();
     assert_eq!(account.username, "testuser");
@@ -30,9 +34,7 @@ fn test_full_account_flow() {
     assert_eq!(accounts.len(), 1);
 
     // Duplicate rejected
-    let dup = peerpedia::local_auth::create_account(
-        &conn, "testuser", "otherpass", "", "Other",
-    );
+    let dup = peerpedia::local_auth::create_account(&conn, "testuser", "otherpass", "", "Other");
     assert!(dup.is_err());
 }
 
@@ -46,7 +48,12 @@ fn test_full_draft_flow() {
 
     // Save draft
     let draft = peerpedia::local_store::save_draft(
-        &conn, None, &account.id, "My Draft", "# Hello", "markdown",
+        &conn,
+        None,
+        &account.id,
+        "My Draft",
+        "# Hello",
+        "markdown",
     )
     .unwrap();
     assert_eq!(draft.title, "My Draft");
@@ -54,7 +61,12 @@ fn test_full_draft_flow() {
 
     // Update
     let updated = peerpedia::local_store::save_draft(
-        &conn, Some(&draft.id), &account.id, "Updated", "new", "markdown",
+        &conn,
+        Some(&draft.id),
+        &account.id,
+        "Updated",
+        "new",
+        "markdown",
     )
     .unwrap();
     assert_eq!(updated.title, "Updated");

@@ -1509,7 +1509,7 @@ program and data. This is the von Neumann architecture.""",
     print(f"  Reviews:   {review_count}")
     print(f"  Bookmarks: {bm_count}")
     print(f"  Citations: {cit_count}")
-    print(f"\n✅ Seed complete! Run the backend and frontend to explore.")
+    print("\n✅ Seed complete! Run the backend and frontend to explore.")
     print(f"{'='*60}")
 
 

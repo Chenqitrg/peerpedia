@@ -56,11 +56,9 @@ pub fn run_migrations(conn: &Connection) -> Result<(), AppError> {
 
     // Read current version (None if no rows yet).
     let current: i32 = conn
-        .query_row(
-            "SELECT MAX(version) FROM schema_version",
-            [],
-            |row| row.get::<_, Option<i32>>(0),
-        )?
+        .query_row("SELECT MAX(version) FROM schema_version", [], |row| {
+            row.get::<_, Option<i32>>(0)
+        })?
         .unwrap_or(0);
 
     if current >= CURRENT_SCHEMA_VERSION {
@@ -117,7 +115,10 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
     }
 
     // Record the applied version.
-    tx.execute("INSERT INTO schema_version (version) VALUES (?1)", [version])?;
+    tx.execute(
+        "INSERT INTO schema_version (version) VALUES (?1)",
+        [version],
+    )?;
     tx.commit()?;
     Ok(())
 }
@@ -172,11 +173,7 @@ mod tests {
         run_migrations(&conn).unwrap();
 
         let count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM schema_version",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
         // Only one version row inserted (v1), not two.
         assert_eq!(count, 1);
