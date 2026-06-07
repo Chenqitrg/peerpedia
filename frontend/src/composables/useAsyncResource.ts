@@ -23,8 +23,17 @@ export function useAsyncResource<T>(
   )
 
   const error = computed(() => {
-    const e = rawError.value as any
-    return e?.userMessage || e?.response?.data?.detail || e?.message || ''
+    const e = rawError.value as Record<string, unknown> | null
+    if (!e) return ''
+    // Try known error message fields
+    const msg = (e.userMessage as string) || (e.message as string) || ''
+    if (msg) return msg
+    const resp = e.response as Record<string, unknown> | undefined
+    if (resp) {
+      const data = resp.data as Record<string, unknown> | undefined
+      if (data) return (data.detail as string) || ''
+    }
+    return ''
   })
 
   return { data: state, loading: isLoading, error, execute }

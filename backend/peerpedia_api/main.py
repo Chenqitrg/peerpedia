@@ -22,17 +22,7 @@ from peerpedia_api.routes.users import router as users_router
 
 logger = logging.getLogger(__name__)
 
-_engine = None
 
-
-def _get_session():
-    """Create a DB session for background tasks (mirrors deps.get_db without DI)."""
-    global _engine
-    from peerpedia_core.storage.db.engine import get_engine, get_session
-    if _engine is None:
-        db_path = os.environ.get("PEERPEDIA_DB", "sqlite:///peerpedia.db")
-        _engine = get_engine(db_path)
-    return get_session(_engine)
 
 
 async def _auto_publish_loop():
@@ -42,13 +32,15 @@ async def _auto_publish_loop():
             await asyncio.sleep(60)
             from peerpedia_core.workflow.sedimentation import publish_ready_articles
 
-            session = _get_session()
+            from peerpedia_api import deps
+            db_gen = deps.get_db()
+            session = next(db_gen)
             try:
                 count = publish_ready_articles(session)
                 if count > 0:
                     logger.info("Auto-published %d article(s)", count)
             finally:
-                session.close()
+                db_gen.close()
         except asyncio.CancelledError:
             raise
         except Exception:

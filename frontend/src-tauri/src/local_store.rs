@@ -149,28 +149,7 @@ pub fn delete_draft(conn: &Connection, id: &str) -> Result<(), AppError> {
 /// Cache a published article for offline reading. Rejects articles larger than
 /// MAX_CACHE_SIZE_BYTES (10 MB).
 pub fn cache_article(conn: &Connection, id: &str, article_json: &str) -> Result<(), AppError> {
-    if article_json.len() > MAX_CACHE_SIZE_BYTES {
-        return Err(AppError::IoError(format!(
-            "Article too large: {} bytes (max {})",
-            article_json.len(),
-            MAX_CACHE_SIZE_BYTES
-        )));
-    }
-
-    // Validate that article_json is valid JSON.
-    serde_json::from_str::<serde_json::Value>(article_json)
-        .map_err(|e| AppError::DatabaseError(format!("Invalid article JSON: {}", e)))?;
-
-    conn.execute(
-        "INSERT INTO article_cache (id, json, cached_at)
-         VALUES (?1, ?2, datetime('now'))
-         ON CONFLICT(id) DO UPDATE SET
-           json = excluded.json,
-           cached_at = datetime('now')",
-        rusqlite::params![id, article_json],
-    )?;
-
-    Ok(())
+    cache_article_with_limit(conn, id, article_json, MAX_CACHE_SIZE_BYTES)
 }
 
 /// Retrieve a cached article by ID. Returns None if not cached.
@@ -266,16 +245,24 @@ pub fn get_cached_article_ids(conn: &Connection) -> Result<Vec<String>, AppError
 
 // ── Article Full Cache ────────────────────────────────────────────────────
 
-/// Cache a published article with extended data for offline reading.
-/// Accepts a larger JSON payload (up to 20 MB) containing article metadata,
-/// compiled output, reviews, and author profiles.
+/// Same as `cache_article` but with a larger size limit (20 MB vs 10 MB).
+/// Used for bookmarked articles that include extended metadata (reviews, authors).
 pub fn cache_article_full(conn: &Connection, id: &str, article_json: &str) -> Result<(), AppError> {
-    const MAX_FULL_CACHE_SIZE: usize = 20 * 1024 * 1024; // 20 MB
-    if article_json.len() > MAX_FULL_CACHE_SIZE {
+    cache_article_with_limit(conn, id, article_json, 20 * 1024 * 1024)
+}
+
+/// Internal helper: cache with a configurable size limit.
+fn cache_article_with_limit(
+    conn: &Connection,
+    id: &str,
+    article_json: &str,
+    max_size: usize,
+) -> Result<(), AppError> {
+    if article_json.len() > max_size {
         return Err(AppError::IoError(format!(
             "Article too large: {} bytes (max {})",
             article_json.len(),
-            MAX_FULL_CACHE_SIZE
+            max_size
         )));
     }
 

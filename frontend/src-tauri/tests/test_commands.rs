@@ -25,9 +25,21 @@ fn test_full_account_flow() {
     .unwrap();
     assert_eq!(account.username, "testuser");
 
-    // Login
+    // Login — returns AccountWithToken with session token
     let logged = peerpedia::local_auth::login(&conn, "testuser", "password123").unwrap();
     assert_eq!(logged.id, account.id);
+    assert!(
+        !logged.token.is_empty(),
+        "login should return a session token"
+    );
+
+    // Verify session token works
+    let verified_id = peerpedia::local_auth::verify_session(&conn, &logged.token).unwrap();
+    assert_eq!(verified_id, account.id);
+
+    // Invalid token is rejected
+    let bad = peerpedia::local_auth::verify_session(&conn, "invalid-token");
+    assert!(bad.is_err());
 
     // List
     let accounts = peerpedia::local_auth::list_accounts(&conn).unwrap();

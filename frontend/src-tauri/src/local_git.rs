@@ -11,8 +11,11 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
 
+/// Returns the base directory for article Git repositories.
+/// In tests, respects PEERPEDIA_TEST_HOME for isolation.
 fn articles_dir() -> Result<PathBuf, AppError> {
-    let home = std::env::var("HOME")
+    let home = std::env::var("PEERPEDIA_TEST_HOME")
+        .or_else(|_| std::env::var("HOME"))
         .or_else(|_| std::env::var("USERPROFILE"))
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."));
@@ -21,7 +24,25 @@ fn articles_dir() -> Result<PathBuf, AppError> {
     Ok(dir)
 }
 
+/// Validate article_id contains only safe characters — prevents path traversal.
+fn validate_article_id(article_id: &str) -> Result<(), AppError> {
+    if article_id.is_empty() {
+        return Err(AppError::AuthFailed("article_id cannot be empty".into()));
+    }
+    if !article_id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(AppError::AuthFailed(format!(
+            "Invalid article_id '{}': only alphanumeric, hyphens, and underscores allowed",
+            article_id
+        )));
+    }
+    Ok(())
+}
+
 fn repo_path(article_id: &str) -> Result<PathBuf, AppError> {
+    validate_article_id(article_id)?;
     Ok(articles_dir()?.join(article_id))
 }
 
@@ -242,6 +263,14 @@ fn get_head_hash(repo_path: &PathBuf) -> Result<String, AppError> {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::OnceLock;
+
+    /// A mutex to serialize git tests that set PEERPEDIA_TEST_HOME.
+    /// This prevents parallel test threads from clobbering each other's env vars.
+    static GIT_TEST_LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
+    fn git_test_lock() -> &'static std::sync::Mutex<()> {
+        GIT_TEST_LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    }
 
     fn setup_dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!("peerpedia-test-{}", uuid::Uuid::new_v4()));
@@ -255,11 +284,12 @@ mod tests {
 
     #[test]
     fn test_init_and_history() {
+        let _lock = git_test_lock().lock().unwrap();
         let dir = setup_dir();
-        // Override articles_dir by setting HOME
+        // Override articles_dir by setting PEERPEDIA_TEST_HOME
         let home = dir.join("home");
         fs::create_dir_all(&home).unwrap();
-        std::env::set_var("HOME", &home);
+        std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
         let result = git_init("test-art", "# Hello", "markdown", "Initial draft", "alice");
         assert!(result.is_ok(), "git_init failed: {:?}", result.err());
@@ -279,10 +309,11 @@ mod tests {
 
     #[test]
     fn test_multiple_commits() {
+        let _lock = git_test_lock().lock().unwrap();
         let dir = setup_dir();
         let home = dir.join("home");
         fs::create_dir_all(&home).unwrap();
-        std::env::set_var("HOME", &home);
+        std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
         git_init("multi", "v1", "markdown", "First", "bob").unwrap();
         git_commit("multi", "v2", "markdown", "Second", "bob").unwrap();
@@ -310,5 +341,29 @@ mod tests {
     fn test_history_nonexistent_repo() {
         let result = git_history("ghost-repo");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rejects_path_traversal_article_id() {
+        // article_id with slashes or dots that escape the articles dir
+        // These should fail at validation before any filesystem op.
+        assert!(git_init("../../etc/passwd", "x", "md", "msg", "alice").is_err());
+        assert!(git_commit("../../etc/passwd", "x", "md", "msg", "alice").is_err());
+        assert!(git_history("../../etc/passwd").is_err());
+        assert!(git_show("../../etc/passwd", "abc123").is_err());
+
+        // article_id with backslashes (Windows)
+        assert!(git_init("..\\..\\windows\\system32", "x", "md", "msg", "alice").is_err());
+
+        // article_id with null byte
+        assert!(git_init("bad\0art", "x", "md", "msg", "alice").is_err());
+
+        // empty article_id
+        assert!(git_init("", "x", "md", "msg", "alice").is_err());
+
+        // normal ids still pass validation
+        assert!(validate_article_id("normal-id_123").is_ok());
+        assert!(validate_article_id("abc123").is_ok());
+        assert!(validate_article_id("a-b_c").is_ok());
     }
 }

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
+import { extractErrorMessage } from '../composables/useLocalStorage'
 import { X } from 'lucide-vue-next'
 
 const userStore = useUserStore()
@@ -32,8 +33,8 @@ async function handleLogin() {
   try {
     await userStore.login(username.value, password.value)
     close()
-  } catch (e: any) {
-    error.value = (e as any).userMessage || e.message || 'Login failed'
+  } catch (e: unknown) {
+    error.value = extractErrorMessage(e) || 'Login failed'
   } finally {
     loading.value = false
   }
@@ -63,8 +64,8 @@ async function handleRegister() {
   try {
     await userStore.register(username.value, password.value, email.value, displayName.value)
     close()
-  } catch (e: any) {
-    error.value = (e as any).userMessage || e.message || 'Registration failed'
+  } catch (e: unknown) {
+    error.value = extractErrorMessage(e) || 'Registration failed'
   } finally {
     loading.value = false
   }

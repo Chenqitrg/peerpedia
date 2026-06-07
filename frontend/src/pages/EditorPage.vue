@@ -6,6 +6,7 @@ import { useOffline } from '../composables/useOffline'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
+import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
@@ -68,29 +69,7 @@ const savedTitle = ref('')
 const isClean = computed(() => content.value === savedContent.value && title.value === savedTitle.value)
 
 // Split panel resize
-const splitRatio = ref(50)
-const isDragging = ref(false)
-const splitterEl = ref<HTMLElement | null>(null)
-
-function onSplitterMouseDown(e: MouseEvent) {
-  isDragging.value = true
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', onMouseUp)
-  e.preventDefault()
-}
-function onMouseMove(e: MouseEvent) {
-  if (!isDragging.value) return
-  const container = splitterEl.value?.parentElement
-  if (!container) return
-  const rect = container.getBoundingClientRect()
-  const pct = ((e.clientX - rect.left) / rect.width) * 100
-  splitRatio.value = Math.min(80, Math.max(20, pct))
-}
-function onMouseUp() {
-  isDragging.value = false
-  document.removeEventListener('mousemove', onMouseMove)
-  document.removeEventListener('mouseup', onMouseUp)
-}
+const { splitRatio, splitterEl, isDragging, onSplitterMouseDown } = useSplitPane()
 
 const draftUid = computed(() => userStore.viewer?.id || 'anonymous')
 const DRAFT_KEY = computed(() => `editor-draft-${draftUid.value}-${editId.value || 'new'}`)

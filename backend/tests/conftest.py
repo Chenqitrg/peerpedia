@@ -3,7 +3,7 @@ import tempfile
 
 import pytest
 from peerpedia_api.deps import create_token
-from peerpedia_core.storage.db.engine import Base, get_engine, init_db
+from peerpedia_core.storage.db.engine import Base, get_engine, get_session, init_db
 from peerpedia_core.storage.db.models import *  # noqa: F401,F403 — register all models
 
 
@@ -26,3 +26,36 @@ def auth_header():
         token = create_token(user_id)
         return {"Authorization": f"Bearer {token}"}
     return _make
+
+
+def _make_client_fixture(app, db_engine, db_override_only=False):
+    """Create a TestClient with dep overrides. If db_override_only, does NOT
+    override require_user — tests must pass auth_header explicitly."""
+    def override_db():
+        session = get_session(db_engine)
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides.clear()
+    from peerpedia_api import deps
+    app.dependency_overrides[deps.get_db] = override_db
+
+    if not db_override_only:
+        # Create a default user and override require_user for convenience.
+        s = get_session(db_engine)
+        _u = User(username="test_auth_user", password_hash="",
+                   name="AuthUser", anonymous_name="anon", affiliation="TestU")
+        s.add(_u)
+        s.commit()
+        _uid = _u.id
+        _user_obj = s.get(User, _uid)
+        s.close()
+
+        def override_require_user():
+            return _user_obj
+        app.dependency_overrides[deps.require_user] = override_require_user
+
+    from fastapi.testclient import TestClient
+    return TestClient(app)

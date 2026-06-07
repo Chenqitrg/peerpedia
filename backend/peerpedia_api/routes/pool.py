@@ -9,8 +9,7 @@ from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
-    get_commit_count,
-    get_commit_hash,
+    build_article_summary,
     get_content_preview,
     resolve_authors,
 )
@@ -27,7 +26,6 @@ def get_pool(
     """List sedimentation articles from followed/following users, sorted by remaining time descending."""
     from datetime import datetime, timedelta, timezone
 
-    # Build the set of user IDs in the user's follow circle
     if current_user:
         follow_circle: set[str] = {current_user.id}
         for f in get_followers(db, current_user.id):
@@ -42,11 +40,11 @@ def get_pool(
 
     summaries = []
     for a in articles:
-        # Only show articles from users in follow circle (if user_id provided)
         if follow_circle is not None and not any(aid in follow_circle for aid in (a.authors or [])):
             continue
 
-        get_reviews_for_article(db, a.id)
+        # Compute sink ETA inline (same logic as helpers.compute_sink but kept local
+        # to avoid circular dep between articles/_crud.py and pool.py)
         sink_eta, days_remaining = None, None
         if a.sink_start:
             st = a.sink_start
@@ -56,25 +54,13 @@ def get_pool(
             sink_eta = eta
             days_remaining = max(0, (eta - now).days)
 
-        summaries.append(ArticleSummary(
-            id=a.id,
-            title=a.title or "",
-            status=a.status,
-            authors=resolve_authors(db, a.authors or []),
-            content_preview=get_content_preview(a.id),
-            commit_hash=get_commit_hash(a.id),
-            fork_count=a.fork_count,
-            forked_from=a.forked_from,
-            commit_count=get_commit_count(a.id),
-            score=a.score,
+        summaries.append(build_article_summary(
+            db, a,
+            current_user=current_user,
             sink_eta=sink_eta,
             days_remaining=days_remaining,
             sink_duration_days=a.sink_duration_days,
-            is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
-            is_own_article=current_user.id in (a.authors or []) if current_user else False,
-            created_at=a.created_at,
         ))
 
-    # Sort descending: highest days_remaining first ("sinking" effect)
     summaries.sort(key=lambda s: s.days_remaining or 0, reverse=True)
     return {"articles": [s.model_dump() for s in summaries], "total": len(summaries)}

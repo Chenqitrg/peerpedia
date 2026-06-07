@@ -1,14 +1,34 @@
 // IPC command handlers — thin wrappers that deserialize params, delegate to the
 // appropriate module, and return Result<T, AppError>. Tauri serializes the Result
 // automatically: Ok → JSON value, Err → { code, message } via AppError's Serialize.
+//
+// Security: all mutating commands require a session token. The token is validated
+// against the sessions table and mapped to an account_id before delegation.
 
 use crate::error::AppError;
-use crate::local_auth::{self, Account, AccountSummary};
+use crate::local_auth::{self, Account, AccountSummary, AccountWithToken};
 use crate::local_git;
 use crate::local_store::{self, CachedArticle, Draft, DraftSummary};
 use crate::AppState;
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use std::sync::MutexGuard;
 use tauri::State;
+
+/// Acquire the database lock, returning a clear error on poison instead of panicking.
+fn lock_db(state: &AppState) -> Result<MutexGuard<'_, Connection>, AppError> {
+    state
+        .db
+        .lock()
+        .map_err(|_| AppError::DatabaseError("Database lock poisoned".into()))
+}
+
+/// Resolve a session token to an account_id. Used by all commands that need
+/// to know which account is making the request.
+fn resolve_account(state: &AppState, token: &str) -> Result<String, AppError> {
+    let conn = lock_db(state)?;
+    local_auth::verify_session(&conn, token)
+}
 
 // ── Auth commands ──────────────────────────────────────────────────────
 
@@ -27,7 +47,7 @@ pub fn create_account(
     state: State<'_, AppState>,
     params: CreateAccountParams,
 ) -> Result<Account, AppError> {
-    let conn = state.db.lock().unwrap();
+    let conn = lock_db(&state)?;
     local_auth::create_account(
         &conn,
         &params.username,
@@ -44,15 +64,30 @@ pub struct LoginParams {
 }
 
 #[tauri::command]
-pub fn login(state: State<'_, AppState>, params: LoginParams) -> Result<Account, AppError> {
-    let conn = state.db.lock().unwrap();
+pub fn login(
+    state: State<'_, AppState>,
+    params: LoginParams,
+) -> Result<AccountWithToken, AppError> {
+    let conn = lock_db(&state)?;
     local_auth::login(&conn, &params.username, &params.password)
 }
 
 #[tauri::command]
 pub fn list_accounts(state: State<'_, AppState>) -> Result<Vec<AccountSummary>, AppError> {
-    let conn = state.db.lock().unwrap();
+    let conn = lock_db(&state)?;
     local_auth::list_accounts(&conn)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LogoutParams {
+    pub token: String,
+}
+
+#[tauri::command]
+pub fn logout(state: State<'_, AppState>, params: LogoutParams) -> Result<OkResponse, AppError> {
+    let conn = lock_db(&state)?;
+    local_auth::logout_session(&conn, &params.token)?;
+    Ok(OkResponse { ok: true })
 }
 
 // ── Draft commands ─────────────────────────────────────────────────────
@@ -61,7 +96,7 @@ pub fn list_accounts(state: State<'_, AppState>) -> Result<Vec<AccountSummary>, 
 pub struct SaveDraftParams {
     #[serde(default)]
     pub id: Option<String>,
-    pub account_id: String,
+    pub token: String,
     #[serde(default)]
     pub title: String,
     #[serde(default)]
@@ -72,11 +107,12 @@ pub struct SaveDraftParams {
 
 #[tauri::command]
 pub fn save_draft(state: State<'_, AppState>, params: SaveDraftParams) -> Result<Draft, AppError> {
-    let conn = state.db.lock().unwrap();
+    let account_id = resolve_account(&state, &params.token)?;
+    let conn = lock_db(&state)?;
     local_store::save_draft(
         &conn,
         params.id.as_deref(),
-        &params.account_id,
+        &account_id,
         &params.title,
         &params.content,
         &params.format,
@@ -85,7 +121,7 @@ pub fn save_draft(state: State<'_, AppState>, params: SaveDraftParams) -> Result
 
 #[derive(Debug, Deserialize)]
 pub struct ListDraftsParams {
-    pub account_id: String,
+    pub token: String,
 }
 
 #[tauri::command]
@@ -93,24 +129,36 @@ pub fn list_drafts(
     state: State<'_, AppState>,
     params: ListDraftsParams,
 ) -> Result<Vec<DraftSummary>, AppError> {
-    let conn = state.db.lock().unwrap();
-    local_store::list_drafts(&conn, &params.account_id)
+    let account_id = resolve_account(&state, &params.token)?;
+    let conn = lock_db(&state)?;
+    local_store::list_drafts(&conn, &account_id)
 }
 
 #[derive(Debug, Deserialize)]
 pub struct GetDraftParams {
     pub id: String,
+    pub token: String,
 }
 
 #[tauri::command]
 pub fn get_draft(state: State<'_, AppState>, params: GetDraftParams) -> Result<Draft, AppError> {
-    let conn = state.db.lock().unwrap();
-    local_store::get_draft(&conn, &params.id)
+    let account_id = resolve_account(&state, &params.token)?;
+    let conn = lock_db(&state)?;
+    let draft = local_store::get_draft(&conn, &params.id)?;
+    // Ensure the draft belongs to the requesting account.
+    if draft.account_id != account_id {
+        return Err(AppError::NotFound(format!(
+            "Draft '{}' not found",
+            params.id
+        )));
+    }
+    Ok(draft)
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DeleteDraftParams {
     pub id: String,
+    pub token: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -123,7 +171,17 @@ pub fn delete_draft(
     state: State<'_, AppState>,
     params: DeleteDraftParams,
 ) -> Result<OkResponse, AppError> {
-    let conn = state.db.lock().unwrap();
+    let account_id = resolve_account(&state, &params.token)?;
+
+    // Verify ownership before deletion.
+    let conn = lock_db(&state)?;
+    let draft = local_store::get_draft(&conn, &params.id)?;
+    if draft.account_id != account_id {
+        return Err(AppError::NotFound(format!(
+            "Draft '{}' not found",
+            params.id
+        )));
+    }
     local_store::delete_draft(&conn, &params.id)?;
     Ok(OkResponse { ok: true })
 }
@@ -141,7 +199,7 @@ pub fn cache_article(
     state: State<'_, AppState>,
     params: CacheArticleParams,
 ) -> Result<OkResponse, AppError> {
-    let conn = state.db.lock().unwrap();
+    let conn = lock_db(&state)?;
     local_store::cache_article(&conn, &params.id, &params.article_json)?;
     Ok(OkResponse { ok: true })
 }
@@ -156,7 +214,7 @@ pub fn get_cached_article(
     state: State<'_, AppState>,
     params: GetCachedArticleParams,
 ) -> Result<Option<CachedArticle>, AppError> {
-    let conn = state.db.lock().unwrap();
+    let conn = lock_db(&state)?;
     local_store::get_cached_article(&conn, &params.id)
 }
 
@@ -164,7 +222,7 @@ pub fn get_cached_article(
 
 #[derive(Debug, Deserialize)]
 pub struct RecordVisitParams {
-    pub account_id: String,
+    pub token: String,
     pub article_id: String,
     #[serde(default)]
     pub article_title: String,
@@ -175,10 +233,11 @@ pub fn record_visit(
     state: State<'_, AppState>,
     params: RecordVisitParams,
 ) -> Result<OkResponse, AppError> {
-    let conn = state.db.lock().unwrap();
+    let account_id = resolve_account(&state, &params.token)?;
+    let conn = lock_db(&state)?;
     local_store::record_visit(
         &conn,
-        &params.account_id,
+        &account_id,
         &params.article_id,
         &params.article_title,
     )?;
@@ -187,7 +246,7 @@ pub fn record_visit(
 
 #[derive(Debug, Deserialize)]
 pub struct GetHistoryParams {
-    pub account_id: String,
+    pub token: String,
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_size")]
@@ -206,17 +265,20 @@ pub fn get_history(
     state: State<'_, AppState>,
     params: GetHistoryParams,
 ) -> Result<Vec<local_store::HistoryEntry>, AppError> {
-    let conn = state.db.lock().unwrap();
-    local_store::get_history(&conn, &params.account_id, params.page, params.size)
+    let account_id = resolve_account(&state, &params.token)?;
+    let conn = lock_db(&state)?;
+    local_store::get_history(&conn, &account_id, params.page, params.size)
 }
 
 #[tauri::command]
 pub fn get_cached_article_ids(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
-    let conn = state.db.lock().unwrap();
+    let conn = lock_db(&state)?;
     local_store::get_cached_article_ids(&conn)
 }
 
 // ── Local Git commands ─────────────────────────────────────────────────
+// Git commands operate on the filesystem, not the database. They don't need
+// a session token — article_id validation happens inside local_git.
 
 #[derive(Debug, Deserialize)]
 pub struct GitInitParams {
@@ -231,10 +293,7 @@ pub struct GitInitParams {
 }
 
 #[tauri::command]
-pub fn git_init(
-    _state: State<'_, AppState>,
-    params: GitInitParams,
-) -> Result<local_git::GitCommitResult, AppError> {
+pub fn git_init(params: GitInitParams) -> Result<local_git::GitCommitResult, AppError> {
     local_git::git_init(
         &params.article_id,
         &params.content,
@@ -257,10 +316,7 @@ pub struct GitCommitParams {
 }
 
 #[tauri::command]
-pub fn git_commit(
-    _state: State<'_, AppState>,
-    params: GitCommitParams,
-) -> Result<local_git::GitCommitResult, AppError> {
+pub fn git_commit(params: GitCommitParams) -> Result<local_git::GitCommitResult, AppError> {
     local_git::git_commit(
         &params.article_id,
         &params.content,
@@ -276,10 +332,7 @@ pub struct GitHistoryParams {
 }
 
 #[tauri::command]
-pub fn git_history(
-    _state: State<'_, AppState>,
-    params: GitHistoryParams,
-) -> Result<Vec<local_git::CommitEntry>, AppError> {
+pub fn git_history(params: GitHistoryParams) -> Result<Vec<local_git::CommitEntry>, AppError> {
     local_git::git_history(&params.article_id)
 }
 
@@ -290,7 +343,7 @@ pub struct GitShowParams {
 }
 
 #[tauri::command]
-pub fn git_show(_state: State<'_, AppState>, params: GitShowParams) -> Result<String, AppError> {
+pub fn git_show(params: GitShowParams) -> Result<String, AppError> {
     local_git::git_show(&params.article_id, &params.commit_hash)
 }
 
@@ -307,7 +360,7 @@ pub fn cache_article_full(
     state: State<'_, AppState>,
     params: CacheArticleFullParams,
 ) -> Result<OkResponse, AppError> {
-    let conn = state.db.lock().unwrap();
+    let conn = lock_db(&state)?;
     local_store::cache_article_full(&conn, &params.id, &params.article_json)?;
     Ok(OkResponse { ok: true })
 }

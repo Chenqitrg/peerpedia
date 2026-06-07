@@ -175,7 +175,8 @@ async function loadArticle(articleId: string) {
 
       const draft = await tauri.getDraft({ id: articleId })
       if (draft && !('error' in draft)) {
-        article.value = buildArticleFromDraft(draft as any)
+        const draftData = draft as { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
+        article.value = buildArticleFromDraft(draftData)
         const { parseMarkdown } = await import('../utils/markdown')
         compiledHtml.value = parseMarkdown(draft.content || '')
         // Populate commit hash from local git
