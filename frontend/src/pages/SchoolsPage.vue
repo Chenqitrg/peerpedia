@@ -28,12 +28,29 @@ const { data: users, loading, error, execute } = useAsyncResource(
 
 async function toggleFollow(u: UserSummary) {
   if (!userStore.viewer) return
-  if (following.value.has(u.id)) {
-    await unfollowUser(u.id)
+  const isCurrentlyFollowing = following.value.has(u.id)
+  // Optimistic UI update — toggle immediately.
+  if (isCurrentlyFollowing) {
     following.value.delete(u.id)
   } else {
-    await followUser(u.id)
     following.value.add(u.id)
+  }
+  // Then persist to server (best-effort; offline mode ignores failures).
+  try {
+    if (isCurrentlyFollowing) {
+      await unfollowUser(u.id)
+    } else {
+      await followUser(u.id)
+    }
+  } catch {
+    // Revert on failure if server is available; keep optimistic in offline mode.
+    if (!userStore.isTauriMode && !userStore.isDevMock) {
+      if (isCurrentlyFollowing) {
+        following.value.add(u.id)
+      } else {
+        following.value.delete(u.id)
+      }
+    }
   }
 }
 
