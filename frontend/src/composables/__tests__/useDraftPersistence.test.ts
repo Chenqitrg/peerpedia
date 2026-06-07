@@ -4,10 +4,12 @@ import { useDraftPersistence } from '../useDraftPersistence'
 // Mock useTauri to control platform mode
 const mockTauriMethods = {
   isTauri: { value: false },
+  isDevMock: { value: false },
   saveDraft: vi.fn(),
   getDraft: vi.fn(),
   listDrafts: vi.fn(),
   deleteDraft: vi.fn(),
+  getCachedArticle: vi.fn(),
 }
 
 vi.mock('../useTauri', () => ({
