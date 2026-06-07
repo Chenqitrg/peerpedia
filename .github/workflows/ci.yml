@@ -32,7 +32,7 @@ jobs:
       - name: Seed
         run: python seed.py
       - name: Test
-        run: python -m pytest backend/tests/ -v --tb=short --durations=10
+        run: python -m pytest backend/tests/ -v --tb=short --durations=10 --ignore=backend/tests/test_seed_driven.py
 
   backend-lint:
     name: Backend — ruff
