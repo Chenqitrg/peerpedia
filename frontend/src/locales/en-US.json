@@ -172,6 +172,7 @@
     "pool_hint": "No network — unable to access the pool",
     "schools_hint": "No network — unable to access Schools",
     "user_hint": "Unavailable offline",
+    "local_mode_hint": "Local account mode — this feature requires the server",
     "search_local": "Local",
     "search_network": "Network"
   }

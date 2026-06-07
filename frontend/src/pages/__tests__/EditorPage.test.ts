@@ -17,6 +17,17 @@ vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
+// After the isOnline default change (false → pings determine truth), the
+// EditorPage publish button is gated on canWrite('editor.publish_pool').
+// Mock the network composable so publish is enabled in tests.
+vi.mock('@/composables/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({
+    isOnline: { value: true },
+    startPing: vi.fn(),
+    stopPing: vi.fn(),
+  })),
+}))
+
 describe('EditorPage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

@@ -6,8 +6,10 @@ import type { UseAsyncStateOptions } from '@vueuse/core'
  * Wraps VueUse's useAsyncState with a unified error extraction pattern.
  * Eliminates the boilerplate error computed duplicated across 8 pages.
  *
- * In Tauri mode, network errors are suppressed — there is no server.
- * Pages show their empty state instead of "Cannot reach server".
+ * Each page is responsible for checking canRead(canWrite) via useOffline()
+ * before triggering a network fetch. This composable no longer blanket-suppresses
+ * errors — if a page fires a request without checking offline capability first,
+ * the error is surfaced to the user.
  */
 export function useAsyncResource<T>(
   fetcher: () => Promise<T>,
@@ -21,13 +23,6 @@ export function useAsyncResource<T>(
   )
 
   const error = computed(() => {
-    // In Tauri mode or dev-mock mode, suppress network errors — no server expected.
-    const isOffline = typeof window !== 'undefined' && (
-      '__TAURI__' in window ||
-      new URLSearchParams(window.location.search).has('tauri')
-    )
-    if (isOffline) return ''
-
     const e = rawError.value as any
     return e?.userMessage || e?.response?.data?.detail || e?.message || ''
   })

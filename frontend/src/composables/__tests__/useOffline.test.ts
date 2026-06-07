@@ -42,6 +42,61 @@ describe('useOffline', () => {
     })
   })
 
+  describe('when in local mode (Tauri/browser-local)', () => {
+    beforeEach(() => {
+      setOnline(true) // pings say "online", but local mode overrides
+      // Simulate Tauri environment.
+      ;(window as any).__TAURI__ = {}
+    })
+
+    afterEach(() => {
+      delete (window as any).__TAURI__
+    })
+
+    it('pool is blocked even when pings say online', () => {
+      const { canRead, canWrite } = useOffline()
+      expect(canRead('pool')).toBe(false)
+      expect(canWrite('pool')).toBe(false)
+    })
+
+    it('schools is blocked even when pings say online', () => {
+      const { canRead, canWrite } = useOffline()
+      expect(canRead('schools')).toBe(false)
+      expect(canWrite('schools')).toBe(false)
+    })
+
+    it('search.network is blocked even when pings say online', () => {
+      const { canRead } = useOffline()
+      expect(canRead('search.network')).toBe(false)
+    })
+
+    it('article.fork is blocked even when pings say online', () => {
+      const { canRead, canWrite } = useOffline()
+      expect(canRead('article.fork')).toBe(false)
+      expect(canWrite('article.fork')).toBe(false)
+    })
+
+    it('local features are not blocked (feed, editor, search.local, bookmarks)', () => {
+      const { canRead, canWrite } = useOffline()
+      expect(canRead('feed')).toBe(true)
+      expect(canRead('editor')).toBe(true)
+      expect(canRead('search.local')).toBe(true)
+      expect(canRead('bookmarks')).toBe(true)
+      expect(canRead('article.content')).toBe(true)
+    })
+
+    it('getFallback returns local_mode_hint for network features', () => {
+      const { getFallback } = useOffline()
+      expect(getFallback('pool')).toBe('offline.local_mode_hint')
+      expect(getFallback('schools')).toBe('offline.local_mode_hint')
+    })
+
+    it('isLocalOnly returns true', () => {
+      const { isLocalOnly } = useOffline()
+      expect(isLocalOnly()).toBe(true)
+    })
+  })
+
   describe('when offline', () => {
     beforeEach(() => setOnline(false))
 
