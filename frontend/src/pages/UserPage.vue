@@ -29,16 +29,39 @@ const { t } = useI18n()
 
 const id = computed(() => route.params.id as string)
 
-// In local mode (Tauri or dev mock), use the local account data for own profile.
+// In local mode (Tauri or browser-local), use local account data.
 const isSelf = computed(() => userStore.viewer?.id === id.value)
-const localProfile = computed(() => {
-  if ((userStore.isTauriMode || userStore.isBrowserLocal) && isSelf.value && userStore.viewer) return userStore.viewer
-  return null
-})
+const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
+
+function _localUserToProfile(a: { id: string; username: string }): UserProfile {
+  return {
+    id: a.id,
+    username: a.username,
+    name: a.username,
+    anonymous_name: '',
+    affiliation: '',
+    expertise: [],
+    reputation: { professionalism: 0, objectivity: 0, collaboration: 0, pedagogy: 0 },
+    followers_count: 0,
+    following_count: 0,
+    article_count: 0,
+    created_at: new Date().toISOString(),
+  }
+}
 
 const { data: user, loading, error, execute: loadUser } = useAsyncResource(
-  () => {
-    if (localProfile.value) return Promise.resolve(localProfile.value)
+  async () => {
+    // Self in local mode — use viewer profile directly.
+    if (isLocal.value && isSelf.value && userStore.viewer) return userStore.viewer
+    // Other user in local mode — look up from browser-local accounts.
+    if (isLocal.value && !isSelf.value) {
+      const accts = await tauri.listAccounts()
+      if (accts && !('error' in accts) && Array.isArray(accts)) {
+        const found = accts.find(a => a.id === id.value)
+        if (found) return _localUserToProfile(found)
+      }
+      throw new Error('User not found')
+    }
     return getUser(id.value)
   },
   null as UserProfile | null,
@@ -51,9 +74,8 @@ const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 
 const isFollowing = ref(false)
 const followLoading = ref(false)
-const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
 
-// Load initial follow state from Tauri mock in local mode.
+// Load initial follow state from browser-local backend in local mode.
 async function loadFollowState() {
   if (!isLocal.value || !userStore.viewer) return
   const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: id.value })
