@@ -175,7 +175,12 @@ pub fn record_visit(
     params: RecordVisitParams,
 ) -> Result<OkResponse, AppError> {
     let conn = state.db.lock().unwrap();
-    local_store::record_visit(&conn, &params.account_id, &params.article_id, &params.article_title)?;
+    local_store::record_visit(
+        &conn,
+        &params.account_id,
+        &params.article_id,
+        &params.article_title,
+    )?;
     Ok(OkResponse { ok: true })
 }
 
