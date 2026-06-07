@@ -53,6 +53,7 @@
   },
   "common": {
     "retry": "Retry",
+    "back": "Back",
     "backToHome": "Back to Home",
     "loading": "Loading...",
     "error": "Something went wrong",

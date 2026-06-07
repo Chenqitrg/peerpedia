@@ -89,6 +89,7 @@ def api_list_articles(
             title=a.title or "",
             status=a.status,
             authors=resolve_authors(db, a.authors or []),
+            abstract=a.abstract,
             content_preview=get_content_preview(a.id),
             commit_hash=ghash,
             fork_count=a.fork_count,

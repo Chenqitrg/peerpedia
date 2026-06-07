@@ -25,6 +25,7 @@ import {
   Eye,
   FileDown,
   FileText,
+  ArrowLeft,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -339,6 +340,14 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
 
 <template>
   <div class="article-page animate-fade-in">
+    <!-- Back button -->
+    <button
+      class="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink mb-4 transition-colors duration-200"
+      @click="router.back()"
+    >
+      <ArrowLeft class="w-4 h-4" stroke-width="2" />
+      {{ t('common.back') }}
+    </button>
     <!-- Loading -->
     <div v-if="loading" class="space-y-4 animate-pulse">
       <div class="skeleton h-8 w-3/4 mb-2" />

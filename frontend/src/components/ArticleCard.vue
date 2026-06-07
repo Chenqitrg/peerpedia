@@ -116,9 +116,9 @@ async function goToFork() {
       </div>
     </div>
 
-    <!-- Content preview -->
-    <p class="text-sm text-ink-muted/80 leading-relaxed mb-3 line-clamp-2">
-      {{ article.content_preview || t('card.noPreview') }}
+    <!-- Abstract (preferred) or content preview -->
+    <p class="text-sm text-ink-muted/80 leading-relaxed mb-3 line-clamp-3">
+      {{ article.abstract || article.content_preview || t('card.noPreview') }}
     </p>
 
     <!-- Sink progress bar (only for sedimentation) -->

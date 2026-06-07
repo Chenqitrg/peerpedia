@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useOffline } from '../composables/useOffline'
 import { saveString } from '../composables/useLocalStorage'
 import {
   Bookmark,
@@ -12,11 +13,16 @@ import {
   Search,
   User,
   ChevronDown,
+  Wifi,
+  WifiOff,
+  Landmark,
+  Waves,
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const userStore = useUserStore()
 const tauri = useTauri()
+const { canRead } = useOffline()
 const { t, locale } = useI18n()
 const searchQuery = ref('')
 const mobileOpen = ref(false)
@@ -121,19 +127,20 @@ function handleLogout() {
         </div>
       </form>
 
-      <!-- Connection status dot — always visible regardless of auth state -->
-      <span
-        class="inline-block w-2 h-2 rounded-full flex-shrink-0"
-        :class="{
-          'bg-green-500': connectionStatus === 'online',
-          'bg-gray-500': connectionStatus === 'offline',
-          'bg-gray-400': connectionStatus === 'local',
-        }"
-        :title="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
-      />
-
-      <!-- Actions — logged in -->
+<!-- Actions — logged in -->
       <div v-if="isLoggedIn" class="flex items-center gap-1">
+        <!-- Connection status -->
+        <span
+          class="flex items-center justify-center w-8 h-8 rounded-lg"
+          :class="{
+            'text-green-500': connectionStatus === 'online',
+            'text-ink-muted': connectionStatus === 'offline' || connectionStatus === 'local',
+          }"
+          :title="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
+        >
+          <Wifi v-if="connectionStatus === 'online'" class="w-4 h-4" stroke-width="2" />
+          <WifiOff v-else class="w-4 h-4" stroke-width="2" />
+        </span>
         <!-- Language toggle -->
         <button
           class="flex items-center justify-center w-8 h-8 rounded-lg
@@ -169,6 +176,7 @@ function handleLogout() {
         </router-link>
 
         <router-link
+          v-if="canRead('schools')"
           to="/schools"
           class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1
                  text-xs font-semibold text-ink-muted
@@ -176,10 +184,22 @@ function handleLogout() {
                  transition-colors duration-200 no-underline"
           @click="close"
         >
+          <Landmark class="w-3.5 h-3.5" stroke-width="2" />
           {{ t('nav.schools') }}
         </router-link>
+        <span
+          v-else
+          class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1
+                 text-xs font-semibold text-ink-muted/30
+                 rounded-lg cursor-not-allowed"
+          :title="'Schools — requires server connection'"
+        >
+          <Landmark class="w-3.5 h-3.5" stroke-width="2" />
+          {{ t('nav.schools') }}
+        </span>
 
         <router-link
+          v-if="canRead('pool')"
           to="/pool"
           class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1
                  text-xs font-semibold text-accent
@@ -187,8 +207,19 @@ function handleLogout() {
                  hover:bg-accent/10 transition-colors duration-200 no-underline"
           @click="close"
         >
+          <Waves class="w-3.5 h-3.5" stroke-width="2" />
           {{ t('nav.pool') }}
         </router-link>
+        <span
+          v-else
+          class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1
+                 text-xs font-semibold text-accent/30
+                 border border-accent/10 rounded-lg cursor-not-allowed"
+          :title="'Pool — requires server connection'"
+        >
+          <Waves class="w-3.5 h-3.5" stroke-width="2" />
+          {{ t('nav.pool') }}
+        </span>
 
         <!-- Avatar + popover (ref on container includes both button and dropdown) -->
         <div ref="avatarRef" class="relative ml-1">
