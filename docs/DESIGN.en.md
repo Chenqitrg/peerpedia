@@ -66,11 +66,14 @@ Phase 1 desktop is fully offline-capable:
 
 - **Browse = cache**: every article read is automatically cached in local SQLite.
 - **Bookmark = full cache**: bookmarked articles cache reviews + citation graph.
-- **Network status**: real-time `navigator.onLine` + periodic server ping.
-- **Graceful degradation**: network-dependent features show clear offline states, not errors.
+- **Network status**: `useNetworkStatus` with Wifi/WifiOff icon. Starts offline, flips online on first successful ping — no 60s window where offline features incorrectly appear accessible.
+- **Network-blocked features**: `useOffline` permanently blocks pool, schools, and search.network in local/Tauri mode. These features show a disabled state (grayed icons with tooltip), not an error after navigation.
+- **Save = Git commit**: every draft save creates or updates a local Git repository (`local_git.rs`). Commit history is available offline via `git log`.
 - **Local accounts**: bcrypt + SQLite, multi-account switching, no server required.
+- **Client-side compilation**: Markdown → HTML via `marked` + KaTeX. The compilation pipeline (protect math → parse markdown → restore math → render KaTeX) runs entirely in the browser.
 
-Key composables: `useNetworkStatus`, `useOffline`, `useTauri`.
+Key composables: `useNetworkStatus`, `useOffline`, `useTauri`, `useDraftPersistence`.
+Key Rust modules: `local_auth`, `local_store`, `local_git`.
 
 ---
 
@@ -255,7 +258,19 @@ Reputation determines voting weight in the pool.
 
 ## 5. Compilation
 
-### 5.1 On-Demand with Filesystem Cache
+### 5.1 Client-Side Pipeline (Default for Markdown)
+
+Markdown compilation uses a four-stage pipeline in `frontend/src/utils/markdown.ts`:
+
+```
+protect math → marked.parse() → restore math → renderMathInHtml()
+```
+
+**Math protection** replaces `$$...$$` and `$...$` with unique placeholders (`PEERPEDIA-MATH-D0`, etc.) to prevent `marked` from corrupting LaTeX. Two critical fixes:
+- Placeholders use hyphens (`PEERPEDIA-MATH-D0`) because `marked`'s GFM parser interpreted underscores (`_MATH_`) as emphasis markers.
+- `restoreMath` uses `split/join` instead of `String.replace()` because JavaScript's `replace()` interprets `$$` in the replacement string as a literal `$`, collapsing KaTeX display-mode delimiters.
+
+### 5.2 On-Demand with Filesystem Cache
 
 Compile output is **never** stored in the database. The compile endpoint generates HTML/SVG on each request and caches the result to disk:
 
@@ -269,7 +284,7 @@ Compile output is **never** stored in the database. The compile endpoint generat
 - Compiler upgrades: delete cache, next request triggers recompile.
 - Markdown: ~50ms. Typst: ~500ms. Cache hit: ~1ms.
 
-### 5.2 Supported Formats
+### 5.3 Supported Formats
 
 | Format | Desktop (Phase 1) | Web (Phase 2+) |
 |--------|------------------|----------------|
@@ -329,13 +344,13 @@ Compile output is **never** stored in the database. The compile endpoint generat
 
 | Suite | Tests | Framework |
 |-------|-------|-----------|
-| Backend | 294 | pytest |
-| Frontend | 231 | vitest |
-| Rust | — | cargo test |
+| Backend | 120 | pytest |
+| Frontend | 252 | vitest |
+| Rust | 53 | cargo test |
 
 ### 7.2 CI Pipeline
 
-8 jobs across 3 languages: pytest, ruff, mypy, vitest, vue-tsc, clippy, rustfmt, build smoke. All blocking on PR. Config: `.github/workflows/ci.yml`.
+10 jobs across 3 languages: pytest, ruff, mypy, eslint, vitest, vue-tsc, vite verify, clippy, rustfmt, cargo test. All blocking on PR. Config: `.github/workflows/ci.yml`.
 
 ---
 
@@ -360,6 +375,16 @@ SQLite is the Phase 1 database. Phase 2 will migrate to PostgreSQL. No business 
 
 ---
 
+### 8.3 Storage Model — Open Question
+
+**Current design:** The server stores a complete Git repository per article at `~/.peerpedia/articles/{uuid}/`. Article IDs are UUIDs.
+
+**Open question:** Should the server store only a repo ID (content hash) instead of the full repository? This would:
+- Enable P2P transition — articles addressable by content hash, repo fetched on-demand from distributed storage.
+- Reduce server storage — deduplication by content hash, server keeps only metadata + hash pointer.
+
+**Tradeoff:** UUIDs are simpler for now. Content-hash addressing is the right primitive for Phase 2/3 but requires changes to the routing, resolution, and sync layers. Decision deferred.
+
 ## 9. Configuration
 
 All tunable parameters live in `core/peerpedia_core/config/params.py`:
@@ -372,4 +397,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-07 · 294 backend tests · 231 frontend tests · 9 DB entities*
+*Last updated: 2026-06-07 · 120 backend tests · 252 frontend tests · 53 Rust tests · 9 DB entities*

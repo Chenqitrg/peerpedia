@@ -66,11 +66,14 @@ Phase 1 桌面版完全离线可用：
 
 - **浏览即缓存**：阅读的每篇文章自动缓存到本地 SQLite。
 - **收藏即完整缓存**：收藏文章缓存评审 + 引用图。
-- **网络状态**：实时 `navigator.onLine` + 定期服务端 ping。
-- **优雅降级**：依赖网络的功能显示清晰离线状态，而非报错。
+- **网络状态**：`useNetworkStatus` 以 Wifi/WifiOff 图标显示。启动时默认为离线，首次 ping 成功后翻转为在线——消除 60s 窗口期内离线功能被误放行的 bug。
+- **网络功能封锁**：`useOffline` 在本地/Tauri 模式下永久封锁 pool、schools、search.network。这些功能在导航栏显示为灰色禁用图标（带 tooltip），而非点到之后才报错。
+- **保存即 Git commit**：每次保存草稿创建或更新本地 Git 仓库（`local_git.rs`），离线可用 `git log` 查看提交历史。
 - **本地账号**：bcrypt + SQLite，多账号切换，无需服务器。
+- **客户端编译**：Markdown → HTML 通过 `marked` + KaTeX 在浏览器内完成。编译管线（保护数学 → 解析 Markdown → 恢复数学 → 渲染 KaTeX）全程本地运行。
 
-核心 composables：`useNetworkStatus`、`useOffline`、`useTauri`。
+核心 composables：`useNetworkStatus`、`useOffline`、`useTauri`、`useDraftPersistence`。
+核心 Rust 模块：`local_auth`、`local_store`、`local_git`。
 
 ---
 
@@ -255,7 +258,19 @@ users ──< follows ── users
 
 ## 5. 编译系统
 
-### 5.1 按需编译 + 文件系统缓存
+### 5.1 客户端编译管线（Markdown 默认路径）
+
+Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
+
+```
+保护数学 → marked.parse() → 恢复数学 → renderMathInHtml()
+```
+
+**数学保护**：将 `$$...$$` 和 `$...$` 替换为唯一占位符（`PEERPEDIA-MATH-D0` 等），防止 `marked` 破坏 LaTeX。两个关键修复：
+- 占位符使用连字符（`PEERPEDIA-MATH-D0`），因为 `marked` 的 GFM 解析器会将下划线（`_MATH_`）误解析为斜体标记。
+- `restoreMath` 使用 `split/join` 而非 `String.replace()`，因为 JavaScript 的 `replace()` 会将替换字符串中的 `$$` 解释为字面 `$`，导致 KaTeX 显示模式分隔符坍缩。
+
+### 5.2 按需编译 + 文件系统缓存
 
 编译结果**绝不存入数据库**。编译端点每次请求时生成 HTML/SVG 并缓存至磁盘：
 
@@ -269,7 +284,7 @@ users ──< follows ── users
 - 编译器升级：删除缓存，下次请求触发重编译。
 - Markdown: ~50ms。Typst: ~500ms。缓存命中: ~1ms。
 
-### 5.2 支持格式
+### 5.3 支持格式
 
 | 格式 | 桌面版 (Phase 1) | Web 版 (Phase 2+) |
 |--------|------------------|----------------|
@@ -329,13 +344,13 @@ users ──< follows ── users
 
 | 套件 | 测试数 | 框架 |
 |-------|-------|-----------|
-| 后端 | 294 | pytest |
-| 前端 | 231 | vitest |
-| Rust | — | cargo test |
+| 后端 | 120 | pytest |
+| 前端 | 252 | vitest |
+| Rust | 53 | cargo test |
 
 ### 7.2 CI 流水线
 
-3 种语言共 8 个 job：pytest、ruff、mypy、vitest、vue-tsc、clippy、rustfmt、build smoke。全部阻塞 PR 合并。配置：`.github/workflows/ci.yml`。
+3 种语言共 10 个 job：pytest、ruff、mypy、eslint、vitest、vue-tsc、vite verify、clippy、rustfmt、cargo test。全部阻塞 PR 合并。配置：`.github/workflows/ci.yml`。
 
 ---
 
@@ -360,6 +375,16 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 ---
 
+### 8.3 存储模型 — 待决策
+
+**当前设计：** 服务器在 `~/.peerpedia/articles/{uuid}/` 下为每篇文章存储完整 Git 仓库。文章 ID 为 UUID。
+
+**待决策：** 服务器是否应只存储 repo ID（内容哈希）而非完整仓库？这样做可以：
+- 顺利过渡到 P2P——文章通过内容哈希寻址，仓库按需从分布式存储拉取。
+- 减少服务器存储负担——按内容哈希去重，服务器仅保留元数据 + 哈希指针。
+
+**权衡：** UUID 当前最简单。内容哈希寻址是 Phase 2/3 的正确原语，但需要改动路由、解析和同步层。决策推迟至 Phase 2。
+
 ## 9. 配置
 
 所有可调参数位于 `core/peerpedia_core/config/params.py`：
@@ -372,4 +397,4 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 ---
 
-*最后更新: 2026-06-07 · 294 后端测试 · 231 前端测试 · 9 个 DB 实体*
+*最后更新: 2026-06-07 · 120 后端测试 · 252 前端测试 · 53 Rust 测试 · 9 个 DB 实体*
