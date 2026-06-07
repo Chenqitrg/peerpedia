@@ -4,7 +4,7 @@ import { useDraftPersistence } from '../useDraftPersistence'
 // Mock useTauri to control platform mode
 const mockTauriMethods = {
   isTauri: { value: false },
-  isDevMock: { value: false },
+  isBrowserLocal: { value: false },
   saveDraft: vi.fn(),
   getDraft: vi.fn(),
   listDrafts: vi.fn(),

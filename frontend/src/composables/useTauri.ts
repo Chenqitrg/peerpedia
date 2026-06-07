@@ -1,8 +1,8 @@
-// Platform abstraction: Tauri IPC vs Web no-op vs Dev mock.
+// Platform abstraction: Tauri IPC vs browser-local vs Web.
 //
-// In Tauri mode:           calls window.__TAURI__.core.invoke() for each IPC command.
-// In Dev mock mode:         uses localStorage-backed mock (activated by ?tauri URL param).
-// In Web mode (neither):    all methods return null (caller falls back to REST).
+// In Tauri mode:              calls window.__TAURI__.core.invoke() for each IPC command.
+// In browser-local mode:      uses localStorage-backed backend (activated by ?tauri URL param).
+// In Web mode (neither):      all methods return null (caller falls back to REST).
 //
 // Error handling: invoke errors and AppError returns are caught and converted
 // to { error: string } so the caller always gets a uniform shape.
@@ -10,26 +10,26 @@
 import { computed } from 'vue'
 import { loadString, loadJSON, saveString, saveJSON, remove } from './useLocalStorage'
 
-// ── Dev mock activation (module-level, runs once on import) ────────────
+// ── Browser-local activation (module-level, runs once on import) ─────────
 
 if (typeof window !== 'undefined') {
   const q = new URLSearchParams(window.location.search)
   if (q.has('tauri')) {
-    if (q.get('tauri') === '0') remove('peerpedia_dev_tauri')
-    else saveString('peerpedia_dev_tauri', '1')
+    if (q.get('tauri') === '0') remove('peerpedia_browser_local')
+    else saveString('peerpedia_browser_local', '1')
   }
 }
 
-function isDevMockActive(): boolean {
+function isBrowserLocalActive(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    return loadString('peerpedia_dev_tauri') === '1'
+    return loadString('peerpedia_browser_local') === '1'
   } catch {
     return false
   }
 }
 
-// ── Dev mock storage (localStorage-backed) ─────────────────────────────
+// ── Browser-local storage (localStorage-backed) ──────────────────────────
 
 interface MockAccount { id: string; username: string; password: string }
 interface MockDraft { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
@@ -47,7 +47,7 @@ function _save<T>(key: string, val: T) {
 const _draftsKey = '_t_drafts', _cacheKey = '_t_cache', _acctsKey = '_t_accts'
 const _followsKey = '_t_follows', _bookmarksKey = '_t_bookmarks'
 
-async function devMockInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
+async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
   const a = (args && (args as any).params) || {}
   const accounts = _load<MockAccount[]>(_acctsKey, [])
   const drafts = _load<MockDraft[]>(_draftsKey, [])
@@ -270,7 +270,7 @@ export function useTauri() {
     return '__TAURI__' in window
   })
 
-  const isDevMock = computed(() => !isTauri.value && isDevMockActive())
+  const isBrowserLocal = computed(() => !isTauri.value && isBrowserLocalActive())
 
   async function _invoke<T>(command: string, args?: Record<string, unknown>): Promise<T | { error: string } | null> {
     // Real Tauri IPC
@@ -299,10 +299,10 @@ export function useTauri() {
       }
     }
 
-    // Dev mock (browser-only)
-    if (isDevMock.value) {
+    // Browser-local backend (browser-only)
+    if (isBrowserLocal.value) {
       try {
-        const result = await devMockInvoke(command, args)
+        const result = await browserLocalInvoke(command, args)
         // Check if mock returned an error shape.
         if (result && typeof result === 'object' && 'code' in result && 'message' in result) {
           const err = result as unknown as { code: string; message: string }
@@ -320,7 +320,7 @@ export function useTauri() {
 
   return {
     isTauri,
-    isDevMock,
+    isBrowserLocal,
 
     // Auth
     async createAccount(params: CreateAccountParams) {

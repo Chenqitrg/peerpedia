@@ -28,7 +28,7 @@ const title = computed(() => isFollowers.value ? t('common.followers') : t('comm
 async function load() {
   loading.value = true
   error.value = ''
-  const isLocal = userStore.isTauriMode || userStore.isDevMock
+  const isLocal = userStore.isTauriMode || userStore.isBrowserLocal
   try {
     if (isLocal) {
       const result = isFollowers.value
