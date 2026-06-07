@@ -68,7 +68,8 @@ function protectMath(text: string): { protectedText: string; placeholders: Place
   // Display math first ($$ must be handled before $ to avoid conflict).
   let result = text.replace(/\$\$([\s\S]+?)\$\$/g, replaceBlock)
   // Inline math: $...$ (single $ not adjacent to another $).
-  result = result.replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, replaceInline)
+  // Use [\s\S] instead of . so inline math spanning newlines is matched.
+  result = result.replace(/(?<!\$)\$(?!\$)([\s\S]+?)(?<!\$)\$(?!\$)/g, replaceInline)
 
   return { protectedText: result, placeholders }
 }

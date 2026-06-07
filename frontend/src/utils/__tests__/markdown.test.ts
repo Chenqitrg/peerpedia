@@ -68,4 +68,38 @@ describe('parseMarkdown', () => {
     expect(result).not.toContain('katex')
     expect(result).toContain('$50')
   })
+
+  // ── Regression: specific math patterns the user reported ──────────────
+
+  it('renders simple display math $$xy$$ correctly', () => {
+    const result = parseMarkdown('$$xy$$')
+    expect(result).toContain('katex-display')
+    // No raw $$ delimiters should leak into output
+    expect(result).not.toMatch(/<span[^>]*katex-display[^>]*>\$\$/)
+  })
+
+  it('renders display math with spaces $$ x + y $$ correctly', () => {
+    const result = parseMarkdown('$$ x + y $$')
+    expect(result).toContain('katex-display')
+    expect(result).not.toContain('$$')
+  })
+
+  it('renders multiline inline math $\\nx\\n$ correctly', () => {
+    // Inline math spanning newlines — the dot in .+? doesn't cross lines
+    const result = parseMarkdown('$\nx\n$')
+    // Should contain katex (rendered math), not raw dollar signs
+    expect(result).toContain('katex')
+  })
+
+  it('renders display math with surrounding text', () => {
+    const result = parseMarkdown('Here is an equation\n\n$$\nx^2 + y^2 = z^2\n$$\n\nNice!')
+    expect(result).toContain('katex-display')
+    expect(result).not.toContain('$$')
+  })
+
+  it('renders multiple display math blocks independently', () => {
+    const result = parseMarkdown('$$\na = 1\n$$\n\n$$\nb = 2\n$$')
+    const displayCount = (result.match(/katex-display/g) || []).length
+    expect(displayCount).toBe(2)
+  })
 })

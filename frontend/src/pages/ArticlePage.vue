@@ -26,6 +26,7 @@ import {
   FileDown,
   FileText,
   ArrowLeft,
+  Loader,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -47,6 +48,7 @@ const id = route.params.id as string
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 const isBookmarked = computed(() => article.value?.is_bookmarked ?? false)
 const articleAuthorIds = computed(() => article.value?.authors.map(a => a.id) ?? [])
+const downloading = ref<'source' | 'pdf' | null>(null)
 
 // Cached article detection (Tauri offline mode).
 const tauri = useTauri()
@@ -290,46 +292,78 @@ function goToHistory() {
 }
 
 async function handleSourceDownload() {
-  // In local mode, download from draft content
-  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-    const draft = await tauri.getDraft({ id })
-    if (draft && !('error' in draft)) {
-      const ext = draft.format === 'typst' ? '.typ' : '.md'
-      const blob = new Blob([draft.content || ''], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = `article${ext}`; a.click()
-      URL.revokeObjectURL(url)
-      return
+  downloading.value = 'source'
+  try {
+    // In local mode, download from draft content
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      const draft = await tauri.getDraft({ id })
+      if (draft && !('error' in draft)) {
+        const ext = draft.format === 'typst' ? '.typ' : '.md'
+        const blob = new Blob([draft.content || ''], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = `article${ext}`; a.click()
+        URL.revokeObjectURL(url)
+        return
+      }
     }
+    // Web mode: open server download URL
+    window.open(`/api/v1/articles/${id}/download/source`, '_blank')
+  } finally {
+    setTimeout(() => { downloading.value = null }, 1000)
   }
-  // Web mode: open server download URL
-  window.open(`/api/v1/articles/${id}/download/source`, '_blank')
 }
 
 async function handlePdfDownload() {
-  // In local mode, render markdown and trigger browser print
-  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-    const draft = await tauri.getDraft({ id })
-    if (draft && !('error' in draft) && draft.format !== 'typst') {
-      import('../utils/markdown').then(({ parseMarkdown }) => {
-        const html = parseMarkdown(draft.content || '')
-        const w = window.open('', '_blank')
-        if (w) {
-          w.document.write(`<!DOCTYPE html><html><head><title>${article.value?.title || 'Article'}</title>
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-            <style>body{max-width:800px;margin:2rem auto;font-family:serif;line-height:1.6;color:#1a1a1a;}
-            pre{background:#f5f5f5;padding:1rem;border-radius:4px;overflow-x:auto;}</style></head>
-            <body>${html}</body></html>`)
-          w.document.close()
-          setTimeout(() => w.print(), 500)
-        }
-      })
-      return
+  downloading.value = 'pdf'
+  try {
+    // Compile markdown to HTML first, then open print dialog
+    let content = ''
+    let format = 'markdown'
+
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      const draft = await tauri.getDraft({ id })
+      if (draft && !('error' in draft)) {
+        content = draft.content || ''
+        format = draft.format || 'markdown'
+      }
     }
+
+    // If no draft found, use the article's compiled output or source
+    if (!content && article.value) {
+      if (article.value.compiled_output) {
+        content = article.value.compiled_output
+      } else {
+        try {
+          const src = await getArticleSource(id)
+          content = src.content
+          format = src.format
+        } catch { /* ignore */ }
+      }
+    }
+
+    if (!content) return
+
+    if (format === 'markdown') {
+      const { parseMarkdown } = await import('../utils/markdown')
+      const html = parseMarkdown(content)
+      const w = window.open('', '_blank')
+      if (w) {
+        w.document.write(`<!DOCTYPE html><html><head><title>${article.value?.title || 'Article'}</title>
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+          <style>body{max-width:800px;margin:2rem auto;font-family:serif;line-height:1.6;color:#1a1a1a;}
+          pre{background:#f5f5f5;padding:1rem;border-radius:4px;overflow-x:auto;}</style></head>
+          <body>${html}</body></html>`)
+        w.document.close()
+        setTimeout(() => w.print(), 500)
+      }
+    } else {
+      // Web mode or Typst: use server download
+      window.open(`/api/v1/articles/${id}/download/pdf`, '_blank')
+    }
+  } finally {
+    setTimeout(() => { downloading.value = null }, 1000)
   }
-  // Web mode: open server download URL
-  window.open(`/api/v1/articles/${id}/download/pdf`, '_blank')
 }
 
 function goToEdit() {
@@ -498,19 +532,23 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             <button
               aria-label="Download source"
               class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors cursor-pointer"
+              :disabled="downloading !== null"
               @click="handleSourceDownload"
             >
-              <FileDown class="w-3 h-3" stroke-width="2" />
-              {{ t('article.source') }}
+              <Loader v-if="downloading === 'source'" class="w-3 h-3 animate-spin" stroke-width="2" />
+              <FileDown v-else class="w-3 h-3" stroke-width="2" />
+              {{ downloading === 'source' ? '...' : t('article.source') }}
             </button>
 
             <button
               aria-label="Download PDF"
               class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors cursor-pointer"
+              :disabled="downloading !== null"
               @click="handlePdfDownload"
             >
-              <FileText class="w-3 h-3" stroke-width="2" />
-              PDF
+              <Loader v-if="downloading === 'pdf'" class="w-3 h-3 animate-spin" stroke-width="2" />
+              <FileText v-else class="w-3 h-3" stroke-width="2" />
+              {{ downloading === 'pdf' ? '...' : 'PDF' }}
             </button>
 
             <button
