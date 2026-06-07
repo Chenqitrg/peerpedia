@@ -2,6 +2,13 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StarRating from './StarRating.vue'
+import {
+  Lightbulb,
+  FlaskConical,
+  CheckCheck,
+  BookOpen,
+  TrendingUp,
+} from 'lucide-vue-next'
 
 const { t } = useI18n()
 
@@ -19,11 +26,11 @@ const emit = defineEmits<{
 }>()
 
 const DIMS = [
-  { key: 'originality' as const, short: 'O', full: 'riginality' },
-  { key: 'rigor' as const, short: 'R', full: 'igor' },
-  { key: 'completeness' as const, short: 'C', full: 'ompleteness' },
-  { key: 'pedagogy' as const, short: 'P', full: 'edagogy' },
-  { key: 'impact' as const, short: 'I', full: 'mpact' },
+  { key: 'originality' as const, icon: Lightbulb, label: 'Originality' },
+  { key: 'rigor' as const, icon: FlaskConical, label: 'Rigor' },
+  { key: 'completeness' as const, icon: CheckCheck, label: 'Completeness' },
+  { key: 'pedagogy' as const, icon: BookOpen, label: 'Pedagogy' },
+  { key: 'impact' as const, icon: TrendingUp, label: 'Impact' },
 ] as const
 
 // ── Hover-to-edit state (only used when editable) ───────────────────────
@@ -44,14 +51,14 @@ function onDimLeave() {
 </script>
 
 <template>
-  <span v-if="score" class="inline-flex items-center gap-x-2.5 text-xs leading-none">
+  <span v-if="score" class="inline-flex items-center gap-x-2.5 text-xs leading-none flex-wrap gap-y-1">
     <span v-if="showLabel" class="text-ink-muted font-semibold">{{ t('article.scores') }}</span>
     <span
       v-for="(dim, idx) in DIMS"
       :key="dim.key"
-      class="score-dim inline-flex items-center"
+      class="inline-flex items-center gap-1 transition-colors"
       :class="[
-        highlightFirst && idx === 0 ? 'text-accent font-semibold' : 'text-ink-muted',
+        highlightFirst && idx === 0 ? 'text-accent' : 'text-ink-muted',
         editable ? 'cursor-default' : 'cursor-default',
       ]"
       @mouseenter="onDimEnter(dim.key)"
@@ -59,37 +66,19 @@ function onDimLeave() {
     >
       <!-- Editable mode: show StarRating on hover -->
       <template v-if="editable && hoveredDim === dim.key">
-        <span class="text-ink-muted mr-0.5">
-          {{ dim.short }}<span class="full">{{ dim.full }}</span>
-        </span>
+        <component :is="dim.icon" class="w-3 h-3" stroke-width="2" />
         <StarRating
           :modelValue="score[dim.key]"
           size="sm"
           @update:modelValue="v => emit('update-score', dim.key, v)"
         />
       </template>
-      <!-- Non-editable / not hovered: show label:value -->
+      <!-- Static display: icon + value (compact) -->
       <template v-else>
-        <span class="short">{{ dim.short }}</span>
-        <span class="full">{{ dim.full }}</span>
-        <span>:{{ score[dim.key] }}</span>
+        <component :is="dim.icon" class="w-3 h-3" stroke-width="2" />
+        <span class="font-mono">{{ score[dim.key] }}</span>
       </template>
     </span>
   </span>
   <span v-else class="text-xs text-ink-muted">—</span>
 </template>
-
-<style scoped>
-.score-dim .full {
-  display: inline-block;
-  max-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  vertical-align: bottom;
-  transition: max-width 0.3s ease;
-}
-
-.score-dim:hover .full {
-  max-width: 100px;
-}
-</style>

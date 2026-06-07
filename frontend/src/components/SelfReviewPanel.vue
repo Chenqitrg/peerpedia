@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
+import StarRating from './StarRating.vue'
+import { SCORE_DIMS } from '../api/constants'
 import { SlidersHorizontal } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -34,79 +36,82 @@ const show = computed({
   <Transition name="slide-up">
     <div
       v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       @click.self="open = false"
     >
-      <div class="bg-card border border-divider rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in">
+      <div class="bg-card border border-divider rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-heading font-semibold text-ink mb-1">{{ t('editor.selfAssessment') }}</h3>
         <p class="text-xs text-ink-muted mb-5">{{ t('editor.selfAssessmentHint') }}</p>
 
         <!-- Commit message -->
-        <div class="mb-4">
-          <label class="text-xs font-semibold text-ink-muted block mb-1">
+        <div class="mb-5">
+          <label class="text-xs font-semibold text-ink-muted block mb-1.5">
             {{ t('editor.commitMessage') }} <span class="text-[#d73a49]">*</span>
           </label>
           <input
             v-model="commitMsg"
             type="text"
             :placeholder="t('editor.commitMessagePlaceholder')"
-            class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+            class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
 
-        <!-- 5-dim scores -->
-        <div class="space-y-3 mb-5">
-          <label class="text-xs font-semibold text-ink-muted">{{ t('editor.scores1to5') }}</label>
-          <div class="grid grid-cols-5 gap-2">
-            <div v-for="dim in Object.keys(scores)" :key="dim" class="text-center">
-              <div class="text-xs text-ink-muted mb-1 capitalize">{{ dim.substring(0, 4) }}</div>
-              <select
-                :model-value="scores[dim]"
-                class="w-full bg-[#0d1117] border border-divider rounded text-center text-sm text-ink py-1.5 focus:outline-none focus:ring-1 focus:ring-accent"
-                @change="scores[dim] = Number(($event.target as HTMLSelectElement).value)"
-              >
-                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-              </select>
+        <!-- 5-dim scores — use StarRating like the article review panel -->
+        <div class="mb-5">
+          <label class="text-xs font-semibold text-ink-muted block mb-3">{{ t('editor.scores1to5') }}</label>
+          <div class="space-y-2">
+            <div
+              v-for="dim in SCORE_DIMS"
+              :key="dim.key"
+              class="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-[#21262d] transition-colors"
+            >
+              <span class="text-xs text-ink-muted w-28 shrink-0">{{ dim.fullLabel }}</span>
+              <StarRating
+                :modelValue="scores[dim.key]"
+                size="sm"
+                @update:modelValue="v => scores[dim.key] = v"
+              />
+              <span class="text-xs text-ink font-mono w-4 text-right">{{ scores[dim.key] }}</span>
             </div>
           </div>
         </div>
 
         <!-- Keywords -->
-        <div class="mb-3">
-          <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.keywords') }}</label>
+        <div class="mb-4">
+          <label class="text-xs font-semibold text-ink-muted block mb-1.5">{{ t('editor.keywords') }}</label>
           <input
             v-model="keywords"
             type="text"
             :placeholder="t('editor.keywordsPlaceholder')"
-            class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+            class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
 
         <!-- Categories -->
-        <div class="mb-3">
-          <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.categories') }}</label>
+        <div class="mb-4">
+          <label class="text-xs font-semibold text-ink-muted block mb-1.5">{{ t('editor.categories') }}</label>
           <input
             v-model="categories"
             type="text"
             :placeholder="t('editor.categoriesPlaceholder')"
-            class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+            class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
 
         <!-- Abstract -->
         <div class="mb-5">
-          <label class="text-xs font-semibold text-ink-muted block mb-1">{{ t('editor.abstract') }}</label>
+          <label class="text-xs font-semibold text-ink-muted block mb-1.5">{{ t('editor.abstract') }}</label>
           <textarea
             v-model="abstract"
             rows="3"
             :placeholder="t('editor.abstractPlaceholder2')"
-            class="w-full bg-[#0d1117] border border-divider rounded px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+            class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
           />
         </div>
 
         <!-- Contribution -->
-        <div class="mb-5">
-          <label class="text-xs font-semibold text-ink-muted flex items-center gap-1.5 mb-2">
+        <div class="mb-6">
+          <label class="text-xs font-semibold text-ink-muted flex items-center gap-1.5 mb-3">
             <SlidersHorizontal class="w-3 h-3" />
             {{ t('editor.contribution') || 'Contribution' }}
           </label>

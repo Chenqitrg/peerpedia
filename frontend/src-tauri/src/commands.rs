@@ -4,6 +4,7 @@
 
 use crate::error::AppError;
 use crate::local_auth::{self, Account, AccountSummary};
+use crate::local_git;
 use crate::local_store::{self, CachedArticle, Draft, DraftSummary};
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -213,6 +214,84 @@ pub fn get_history(
 pub fn get_cached_article_ids(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
     let conn = state.db.lock().unwrap();
     local_store::get_cached_article_ids(&conn)
+}
+
+// ── Local Git commands ─────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct GitInitParams {
+    pub article_id: String,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default)]
+    pub format: String,
+    #[serde(default)]
+    pub commit_message: String,
+    pub author: String,
+}
+
+#[tauri::command]
+pub fn git_init(
+    _state: State<'_, AppState>,
+    params: GitInitParams,
+) -> Result<local_git::GitCommitResult, AppError> {
+    local_git::git_init(
+        &params.article_id,
+        &params.content,
+        &params.format,
+        &params.commit_message,
+        &params.author,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitCommitParams {
+    pub article_id: String,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default)]
+    pub format: String,
+    #[serde(default)]
+    pub commit_message: String,
+    pub author: String,
+}
+
+#[tauri::command]
+pub fn git_commit(
+    _state: State<'_, AppState>,
+    params: GitCommitParams,
+) -> Result<local_git::GitCommitResult, AppError> {
+    local_git::git_commit(
+        &params.article_id,
+        &params.content,
+        &params.format,
+        &params.commit_message,
+        &params.author,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHistoryParams {
+    pub article_id: String,
+}
+
+#[tauri::command]
+pub fn git_history(
+    _state: State<'_, AppState>,
+    params: GitHistoryParams,
+) -> Result<Vec<local_git::CommitEntry>, AppError> {
+    local_git::git_history(&params.article_id)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitShowParams {
+    pub article_id: String,
+    pub commit_hash: String,
+}
+
+#[tauri::command]
+pub fn git_show(_state: State<'_, AppState>, params: GitShowParams) -> Result<String, AppError> {
+    local_git::git_show(&params.article_id, &params.commit_hash)
 }
 
 // ── Article full cache command ──────────────────────────────────────────

@@ -47,6 +47,7 @@
   },
   "common": {
     "retry": "重试",
+    "back": "返回",
     "backToHome": "返回首页",
     "loading": "加载中...",
     "error": "出错了",

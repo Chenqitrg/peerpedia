@@ -25,6 +25,8 @@ import {
   Eye,
   FileDown,
   FileText,
+  ArrowLeft,
+  Loader,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -46,6 +48,7 @@ const id = route.params.id as string
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 const isBookmarked = computed(() => article.value?.is_bookmarked ?? false)
 const articleAuthorIds = computed(() => article.value?.authors.map(a => a.id) ?? [])
+const downloading = ref<'source' | 'pdf' | null>(null)
 
 // Cached article detection (Tauri offline mode).
 const tauri = useTauri()
@@ -117,7 +120,7 @@ function buildArticleFromDraft(draft: { id: string; account_id: string; title: s
     id: draft.id,
     title: draft.title || 'Untitled',
     status: 'draft' as const,
-    authors: [{ id: draft.account_id, name: draft.account_id, anonymous_name: '' }],
+    authors: [{ id: draft.account_id, name: userStore.viewer?.name || userStore.viewer?.username || draft.account_id, anonymous_name: '' }],
     fork_count: 0,
     forked_from: null,
     commit_count: 1,
@@ -163,7 +166,8 @@ async function loadArticle(articleId: string) {
       const draft = await tauri.getDraft({ id: articleId })
       if (draft && !('error' in draft)) {
         article.value = buildArticleFromDraft(draft as any)
-        compiledHtml.value = renderMathInHtml(draft.content || '')
+        const { parseMarkdown } = await import('../utils/markdown')
+        compiledHtml.value = parseMarkdown(draft.content || '')
         return
       }
     }
@@ -199,6 +203,20 @@ watch(() => route.params.id, async (newId) => {
 
 async function loadCompiledContent() {
   if (!article.value) return
+  const isLocal = tauri.isTauri.value || tauri.isBrowserLocal.value
+
+  // In local mode, compiled_output is raw markdown from buildArticleFromDraft.
+  // Use the full parseMarkdown pipeline instead of renderMathInHtml.
+  if (isLocal) {
+    const raw = article.value.compiled_output || ''
+    if (raw) {
+      const { parseMarkdown } = await import('../utils/markdown')
+      compiledHtml.value = parseMarkdown(raw)
+    }
+    return
+  }
+
+  // Web mode: server returns pre-compiled HTML with katex spans.
   let html = ''
   if (article.value.compiled_output) {
     html = article.value.compiled_output
@@ -288,6 +306,81 @@ function goToHistory() {
   router.push(`/articles/${id}/history`)
 }
 
+async function handleSourceDownload() {
+  downloading.value = 'source'
+  try {
+    // In local mode, download from draft content
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      const draft = await tauri.getDraft({ id })
+      if (draft && !('error' in draft)) {
+        const ext = draft.format === 'typst' ? '.typ' : '.md'
+        const blob = new Blob([draft.content || ''], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = `article${ext}`; a.click()
+        URL.revokeObjectURL(url)
+        return
+      }
+    }
+    // Web mode: open server download URL
+    window.open(`/api/v1/articles/${id}/download/source`, '_blank')
+  } finally {
+    setTimeout(() => { downloading.value = null }, 1000)
+  }
+}
+
+async function handlePdfDownload() {
+  downloading.value = 'pdf'
+  try {
+    // Compile markdown to HTML first, then open print dialog
+    let content = ''
+    let format = 'markdown'
+
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      const draft = await tauri.getDraft({ id })
+      if (draft && !('error' in draft)) {
+        content = draft.content || ''
+        format = draft.format || 'markdown'
+      }
+    }
+
+    // If no draft found, use the article's compiled output or source
+    if (!content && article.value) {
+      if (article.value.compiled_output) {
+        content = article.value.compiled_output
+      } else {
+        try {
+          const src = await getArticleSource(id)
+          content = src.content
+          format = src.format
+        } catch { /* ignore */ }
+      }
+    }
+
+    if (!content) return
+
+    if (format === 'markdown') {
+      const { parseMarkdown } = await import('../utils/markdown')
+      const html = parseMarkdown(content)
+      const w = window.open('', '_blank')
+      if (w) {
+        w.document.write(`<!DOCTYPE html><html><head><title>${article.value?.title || 'Article'}</title>
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+          <style>body{max-width:800px;margin:2rem auto;font-family:serif;line-height:1.6;color:#1a1a1a;}
+          pre{background:#f5f5f5;padding:1rem;border-radius:4px;overflow-x:auto;}</style></head>
+          <body>${html}</body></html>`)
+        w.document.close()
+        setTimeout(() => w.print(), 500)
+      }
+    } else {
+      // Web mode or Typst: use server download
+      window.open(`/api/v1/articles/${id}/download/pdf`, '_blank')
+    }
+  } finally {
+    setTimeout(() => { downloading.value = null }, 1000)
+  }
+}
+
 function goToEdit() {
   router.push(`/edit/${id}`)
 }
@@ -339,6 +432,14 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
 
 <template>
   <div class="article-page animate-fade-in">
+    <!-- Back button -->
+    <button
+      class="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink mb-4 transition-colors duration-200"
+      @click="router.back()"
+    >
+      <ArrowLeft class="w-4 h-4" stroke-width="2" />
+      {{ t('common.back') }}
+    </button>
     <!-- Loading -->
     <div v-if="loading" class="space-y-4 animate-pulse">
       <div class="skeleton h-8 w-3/4 mb-2" />
@@ -443,23 +544,27 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               {{ t('article.fork') }}
             </button>
 
-            <a
-              :href="`/api/v1/articles/${id}/download/source`"
+            <button
               aria-label="Download source"
-              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors no-underline"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors cursor-pointer"
+              :disabled="downloading !== null"
+              @click="handleSourceDownload"
             >
-              <FileDown class="w-3 h-3" stroke-width="2" />
-              {{ t('article.source') }}
-            </a>
+              <Loader v-if="downloading === 'source'" class="w-3 h-3 animate-spin" stroke-width="2" />
+              <FileDown v-else class="w-3 h-3" stroke-width="2" />
+              {{ downloading === 'source' ? '...' : t('article.source') }}
+            </button>
 
-            <a
-              :href="`/api/v1/articles/${id}/download/pdf`"
+            <button
               aria-label="Download PDF"
-              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors no-underline"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors cursor-pointer"
+              :disabled="downloading !== null"
+              @click="handlePdfDownload"
             >
-              <FileText class="w-3 h-3" stroke-width="2" />
-              PDF
-            </a>
+              <Loader v-if="downloading === 'pdf'" class="w-3 h-3 animate-spin" stroke-width="2" />
+              <FileText v-else class="w-3 h-3" stroke-width="2" />
+              {{ downloading === 'pdf' ? '...' : 'PDF' }}
+            </button>
 
             <button
               v-if="isOwnArticle && article.status === 'sedimentation'"

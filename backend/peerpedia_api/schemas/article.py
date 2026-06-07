@@ -75,6 +75,7 @@ class ArticleSummary(BaseModel):
     title: str = ""
     status: ArticleStatus
     authors: list[AuthorInfo] = []
+    abstract: Optional[str] = None
     content_preview: str = ""
     commit_hash: str = ""
     fork_count: int = 0

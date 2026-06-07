@@ -26,9 +26,26 @@ vi.mock('@/api/articles', () => ({
   rollbackArticle: vi.fn(),
 }))
 
+// Mock useTauri — default is web mode (isTauri=false). Tests that need
+// local mode can mock individual method return values via the refs below.
+let _isTauri = false
+let _gitHistoryReturn: any = []
+vi.mock('@/composables/useTauri', () => ({
+  useTauri: () => ({
+    isTauri: { value: _isTauri },
+    isBrowserLocal: { value: false },
+    gitHistory: vi.fn().mockImplementation(() => Promise.resolve(_gitHistoryReturn)),
+    gitShow: vi.fn().mockResolvedValue(''),
+  }),
+}))
+
+import { useTauri } from '@/composables/useTauri'
+
 describe('HistoryPage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    _isTauri = false
+    _gitHistoryReturn = []
   })
 
   it('renders page title', async () => {
@@ -56,8 +73,27 @@ describe('HistoryPage', () => {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await flushPromises()
-    // Should either show loading, error, or commits
     const hasContent = wrapper.text().length > 0
     expect(hasContent).toBe(true)
+  })
+
+  it('uses local git history in Tauri mode', async () => {
+    _isTauri = true
+    _gitHistoryReturn = [
+      { hash: 'abc0001', message: 'First draft', author: 'test', timestamp: '2026-06-01T10:00:00Z' },
+      { hash: 'abc0002', message: 'Edit content', author: 'test', timestamp: '2026-06-02T10:00:00Z' },
+    ]
+
+    const HistoryPage = (await import('../HistoryPage.vue')).default
+    const wrapper = mount(HistoryPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('First draft')
+    expect(wrapper.text()).toContain('Edit content')
+    // Should not be loading
+    const hasCommits = wrapper.text().includes('First draft')
+    expect(hasCommits).toBe(true)
   })
 })

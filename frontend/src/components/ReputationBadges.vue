@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
+import { BadgeCheck, Scale, Handshake, MessageSquareText } from 'lucide-vue-next'
 
 defineProps<{
   reputation: { professionalism: number; objectivity: number; collaboration: number; pedagogy: number } | null
@@ -9,44 +7,24 @@ defineProps<{
 }>()
 
 const DIMS = [
-  { key: 'professionalism' as const, short: 'P', full: 'rofessionalism' },
-  { key: 'objectivity' as const, short: 'O', full: 'bjectivity' },
-  { key: 'collaboration' as const, short: 'C', full: 'ollaboration' },
-  { key: 'pedagogy' as const, short: 'R', full: 'eadability' },
+  { key: 'professionalism' as const, icon: BadgeCheck, title: 'Professionalism' },
+  { key: 'objectivity' as const, icon: Scale, title: 'Objectivity' },
+  { key: 'collaboration' as const, icon: Handshake, title: 'Collaboration' },
+  { key: 'pedagogy' as const, icon: MessageSquareText, title: 'Readability' },
 ] as const
 </script>
 
 <template>
-  <span v-if="reputation" class="inline-flex items-center gap-x-2.5 text-xs leading-none">
-    <span v-if="showLabel" class="text-ink-muted font-semibold">{{ t('common.reputation') }}</span>
+  <span v-if="reputation" class="inline-flex items-center gap-x-2.5 text-xs leading-none flex-wrap gap-y-1">
     <span
       v-for="dim in DIMS"
       :key="dim.key"
-      class="rep-dim inline-flex items-center cursor-default text-ink-muted"
+      class="inline-flex items-center gap-1 text-accent"
+      :title="dim.title"
     >
-      <span class="short">{{ dim.short }}</span>
-      <span class="full">{{ dim.full }}</span>
-      <span>:{{ reputation[dim.key] }}</span>
+      <component :is="dim.icon" class="w-3.5 h-3.5" stroke-width="1.5" />
+      <span class="font-mono">{{ reputation[dim.key] }}</span>
     </span>
   </span>
   <span v-else class="text-xs text-ink-muted">—</span>
 </template>
-
-<style scoped>
-.rep-dim .full {
-  display: inline-block;
-  max-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  vertical-align: bottom;
-  transition: max-width 0.3s ease;
-}
-
-.rep-dim:hover .full {
-  max-width: 120px;
-}
-
-.rep-dim:hover {
-  color: #58a6ff;
-}
-</style>

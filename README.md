@@ -170,7 +170,7 @@ peerpedia/
 ├── frontend/                   # Vue 3 SPA + Tauri
 │   ├── src/
 │   │   ├── api/                # Axios API modules + types.ts
-│   │   ├── components/         # 15 components (ReviewPanel, NetworkStatusBadge, etc.)
+│   │   ├── components/         # 17 components (ReviewPanel, NetworkStatusBadge, ScoreBadges, etc.)
 │   │   ├── composables/        # useLocalStorage, useTauri, useNetworkStatus, useOffline, etc.
 │   │   ├── locales/            # i18n (zh-CN, en-US)
 │   │   ├── pages/              # 10 pages
@@ -182,6 +182,7 @@ peerpedia/
 │           ├── commands.rs     # IPC handlers
 │           ├── db.rs           # SQLite database layer
 │           ├── local_auth.rs   # Local account CRUD + bcrypt
+│           ├── local_git.rs    # Local Git operations (init/commit/history)
 │           └── local_store.rs  # Drafts + article cache
 ├── backend/                    # FastAPI server
 │   └── peerpedia_api/
@@ -208,17 +209,17 @@ peerpedia/
 ## Testing · 测试
 
 ```bash
-# Backend (294 tests)
+# Backend (120 tests)
 python -m pytest backend/tests/ core/tests/ -q
 
-# Frontend (231 tests)
+# Frontend (252 tests)
 cd frontend && npx vitest run
 
-# Rust
+# Rust (53 tests)
 cd frontend/src-tauri && cargo test
 ```
 
-**CI Pipeline:** 8 jobs across 3 languages (pytest, ruff, vitest, vue-tsc, clippy, rustfmt, build smoke). See `.github/workflows/ci.yml`.
+**CI Pipeline:** 10 jobs across 3 languages (pytest, ruff, mypy, eslint, vitest, vue-tsc, vite verify, clippy, rustfmt, cargo test). See `.github/workflows/ci.yml`.
 
 ---
 
