@@ -15,7 +15,7 @@ const displayName = ref('')
 const error = ref('')
 const loading = ref(false)
 
-const isLocal = computed(() => userStore.isTauriMode || userStore.isDevMock)
+const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
 
 function switchTab(t: 'login' | 'register') {
   tab.value = t

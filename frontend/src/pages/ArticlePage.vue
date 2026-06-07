@@ -145,7 +145,7 @@ async function loadArticle(articleId: string) {
     return
   } catch (e: any) {
     // 2. In Tauri/dev-mock mode, fall back to local draft cache.
-    const isOffline = tauri.isTauri.value || tauri.isDevMock.value
+    const isOffline = tauri.isTauri.value || tauri.isBrowserLocal.value
     if (isOffline) {
       const cached = await tauri.getCachedArticle({ id: articleId })
       if (cached && !('error' in cached)) {

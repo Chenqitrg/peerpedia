@@ -119,7 +119,7 @@ async function loadExistingArticle() {
     return
   } catch (e: any) {
     // 2. In Tauri/dev-mock mode, fall back to local draft storage.
-    if (tauri.isTauri.value || tauri.isDevMock.value) {
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
       const accountId = userStore.viewer?.id || 'local'
       const draft = await draftPersistence.load(editId.value!, accountId)
       if (draft && draft.content !== undefined) {

@@ -20,7 +20,7 @@ const props = defineProps<{
 
 const isFollowing = ref(false)
 const followLoading = ref(false)
-const isLocal = userStore.isTauriMode || userStore.isDevMock
+const isLocal = userStore.isTauriMode || userStore.isBrowserLocal
 
 function goToUser() {
   router.push(`/user/${props.user.id}`)

@@ -18,7 +18,7 @@ const userStore = useUserStore()
 const tauri = useTauri()
 const following = ref<Set<string>>(new Set())
 
-const isLocal = computed(() => userStore.isTauriMode || userStore.isDevMock)
+const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
 
 const { data: users, loading, error, execute } = useAsyncResource(
   async () => {

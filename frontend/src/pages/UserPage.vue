@@ -32,7 +32,7 @@ const id = computed(() => route.params.id as string)
 // In local mode (Tauri or dev mock), use the local account data for own profile.
 const isSelf = computed(() => userStore.viewer?.id === id.value)
 const localProfile = computed(() => {
-  if ((userStore.isTauriMode || userStore.isDevMock) && isSelf.value && userStore.viewer) return userStore.viewer
+  if ((userStore.isTauriMode || userStore.isBrowserLocal) && isSelf.value && userStore.viewer) return userStore.viewer
   return null
 })
 
@@ -51,7 +51,7 @@ const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 
 const isFollowing = ref(false)
 const followLoading = ref(false)
-const isLocal = computed(() => userStore.isTauriMode || userStore.isDevMock)
+const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
 
 // Load initial follow state from Tauri mock in local mode.
 async function loadFollowState() {
@@ -97,7 +97,7 @@ async function loadArticles() {
   }
 
   // 2. Tauri local drafts (only for current user's own page)
-  if ((tauri.isTauri.value || tauri.isDevMock.value) && isSelf.value) {
+  if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && isSelf.value) {
     try {
       const drafts = await tauri.listDrafts({ account_id: id.value })
       for (const d of drafts) {

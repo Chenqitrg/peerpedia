@@ -20,17 +20,17 @@ export const useUserStore = defineStore('user', () => {
   const localAccount = ref<Account | null>(null)
   const localAccounts = ref<AccountSummary[]>([])
   const isTauriMode = ref(false)
-  const isDevMock = ref(false)
+  const isBrowserLocal = ref(false)
 
   const tauri = useTauri()
 
   // Detect Tauri / dev mock mode on store initialization.
   isTauriMode.value = tauri.isTauri.value
-  isDevMock.value = tauri.isDevMock.value
+  isBrowserLocal.value = tauri.isBrowserLocal.value
 
   // Local mode: real Tauri desktop app OR browser dev mock.
   function isLocalMode() {
-    return isTauriMode.value || isDevMock.value
+    return isTauriMode.value || isBrowserLocal.value
   }
 
   async function loadLocalAccounts() {
@@ -184,7 +184,7 @@ export const useUserStore = defineStore('user', () => {
     localAccount,
     localAccounts,
     isTauriMode,
-    isDevMock,
+    isBrowserLocal,
     login,
     register,
     loginLocal,
