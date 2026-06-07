@@ -1,5 +1,6 @@
 import { type Ref } from 'vue'
 import { useUserStore } from '../stores/useUserStore'
+import { useTauri } from './useTauri'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
 import type { ArticleSummary } from '../api/types'
 
@@ -15,6 +16,8 @@ export function useBookmarkToggle(
   onError?: (msg: string) => void,
 ) {
   const userStore = useUserStore()
+  const tauri = useTauri()
+  const isLocal = userStore.isTauriMode || userStore.isDevMock
 
   async function toggle(articleId: string, currentlyBookmarked: boolean) {
     if (!userStore.viewer) return
@@ -25,10 +28,18 @@ export function useBookmarkToggle(
     article.is_bookmarked = !currentlyBookmarked
 
     try {
-      if (currentlyBookmarked) {
-        await removeBookmark(articleId)
+      if (isLocal) {
+        if (currentlyBookmarked) {
+          await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: articleId })
+        } else {
+          await tauri.addBookmark({ user_id: userStore.viewer.id, article_id: articleId })
+        }
       } else {
-        await addBookmark(articleId)
+        if (currentlyBookmarked) {
+          await removeBookmark(articleId)
+        } else {
+          await addBookmark(articleId)
+        }
       }
     } catch (e: any) {
       article.is_bookmarked = previous
@@ -42,7 +53,11 @@ export function useBookmarkToggle(
   async function remove(articleId: string) {
     if (!userStore.viewer) return
     try {
-      await removeBookmark(articleId)
+      if (isLocal) {
+        await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: articleId })
+      } else {
+        await removeBookmark(articleId)
+      }
       const idx = articles.value.findIndex(a => a.id === articleId)
       if (idx !== -1) {
         articles.value.splice(idx, 1)
