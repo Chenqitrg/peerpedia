@@ -19,8 +19,8 @@ const DIMS = [
     <span
       v-for="dim in DIMS"
       :key="dim.key"
-      class="inline-flex items-center gap-1 text-accent"
-      :title="dim.title"
+      class="inline-flex items-center gap-1 text-accent cursor-help"
+      :data-tooltip="`${dim.title}: ${reputation[dim.key]}`"
     >
       <component :is="dim.icon" class="w-3.5 h-3.5" stroke-width="1.5" />
       <span class="font-mono">{{ reputation[dim.key] }}</span>

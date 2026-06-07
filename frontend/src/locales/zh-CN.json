@@ -178,5 +178,9 @@
     "local_mode_hint": "本地账户模式 — 此功能需要服务器",
     "search_local": "本地",
     "search_network": "全网"
+  },
+  "download": {
+    "source": "源码",
+    "compiled": "HTML"
   }
 }

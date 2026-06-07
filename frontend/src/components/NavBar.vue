@@ -136,7 +136,7 @@ function handleLogout() {
             'text-green-500': connectionStatus === 'online',
             'text-ink-muted': connectionStatus === 'offline' || connectionStatus === 'local',
           }"
-          :title="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
+          :data-tooltip="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
         >
           <Wifi v-if="connectionStatus === 'online'" class="w-4 h-4" stroke-width="2" />
           <WifiOff v-else class="w-4 h-4" stroke-width="2" />
@@ -182,7 +182,7 @@ function handleLogout() {
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="t('nav.schools')"
-          :title="t('nav.schools')"
+          :data-tooltip="t('nav.schools')"
           @click="close"
         >
           <Landmark class="w-4 h-4" stroke-width="2" />
@@ -191,7 +191,7 @@ function handleLogout() {
           v-else
           class="flex items-center justify-center w-8 h-8 rounded-lg
                  text-ink-muted/30 cursor-not-allowed"
-          :title="t('nav.schools') + ' — offline'"
+          :data-tooltip="t('nav.schools') + ' — offline'"
         >
           <Landmark class="w-4 h-4" stroke-width="2" />
         </span>
@@ -203,7 +203,7 @@ function handleLogout() {
                  text-accent hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('nav.pool')"
-          :title="t('nav.pool')"
+          :data-tooltip="t('nav.pool')"
           @click="close"
         >
           <Waves class="w-4 h-4" stroke-width="2" />
@@ -212,7 +212,7 @@ function handleLogout() {
           v-else
           class="flex items-center justify-center w-8 h-8 rounded-lg
                  text-accent/30 cursor-not-allowed"
-          :title="t('nav.pool') + ' — offline'"
+          :data-tooltip="t('nav.pool') + ' — offline'"
         >
           <Waves class="w-4 h-4" stroke-width="2" />
         </span>

@@ -9,6 +9,7 @@ import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { useTauri } from '../composables/useTauri'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
+import DownloadButton from '../components/DownloadButton.vue'
 import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
   ArrowLeft,
@@ -16,11 +17,11 @@ import {
   BookmarkCheck,
   Eye,
   EyeOff,
-  FileDown,
+  GitCommitHorizontal,
+  History,
   Play,
   Save,
   Send,
-  FileText,
 } from 'lucide-vue-next'
 
 
@@ -60,6 +61,11 @@ const errorMsg = ref('')
 const successMsg = ref('')
 const savedMsg = ref(false)
 const showPreview = ref(true)
+const commitHash = ref('')
+// Track saved state to detect unsaved edits
+const savedContent = ref('')
+const savedTitle = ref('')
+const isClean = computed(() => content.value === savedContent.value && title.value === savedTitle.value)
 
 // Split panel resize
 const splitRatio = ref(50)
@@ -97,14 +103,16 @@ const totalContribution = computed(() =>
 const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
 const currentDraftId = ref<string | undefined>(
-  editId.value as string | undefined || loadString(DRAFT_ID_KEY.value) || undefined
+  isEdit.value ? (editId.value as string | undefined) : undefined
 )
 
 onMounted(() => {
   if (isEdit.value) {
     loadExistingArticle()
   } else {
-    restoreDraft()
+    // New article: clear any stale draft keys from previous sessions
+    remove(DRAFT_ID_KEY.value)
+    remove(`editor-draft-id-${draftUid.value}-new`)
   }
 })
 
@@ -115,10 +123,13 @@ async function loadExistingArticle() {
     const a = articleStore.currentArticle
     if (a) {
       title.value = a.title || ''
+      commitHash.value = a.commit_hash || ''
     }
     const src = await getArticleSource(editId.value!)
     content.value = src.content
     format.value = src.format as 'markdown' | 'typst'
+    savedContent.value = src.content
+    savedTitle.value = title.value
     return
   } catch (e: any) {
     // 2. In Tauri/dev-mock mode, fall back to local draft storage.
@@ -129,6 +140,15 @@ async function loadExistingArticle() {
         title.value = draft.title || ''
         content.value = draft.content || ''
         format.value = (draft.format as 'markdown' | 'typst') || 'markdown'
+        savedContent.value = content.value
+        savedTitle.value = title.value
+        // Populate commit hash from local git
+        try {
+          const history = await tauri.gitHistory({ article_id: editId.value! })
+          if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+            commitHash.value = history[0].hash
+          }
+        } catch { /* optional */ }
         return
       }
     }
@@ -180,9 +200,11 @@ async function saveDraft() {
           // Check if git repo exists; if not, init
           const history = await tauri.gitHistory({ article_id: result.id })
           if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
-            await tauri.gitCommit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            const r = await tauri.gitCommit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            if (r && r.hash) commitHash.value = r.hash
           } else {
-            await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            if (r && r.hash) commitHash.value = r.hash
           }
         }
       } catch { /* git ops optional — draft is still saved */ }
@@ -200,6 +222,8 @@ async function saveDraft() {
     abstract: abstract.value,
   }
   saveJSON(DRAFT_KEY.value, draft)
+  savedContent.value = content.value
+  savedTitle.value = title.value
   savedMsg.value = true
   setTimeout(() => { savedMsg.value = false }, 2000)
 }
@@ -332,50 +356,6 @@ async function handleSubmitToPool() {
   }
 }
 
-function handleDownload(dlFormat: 'source' | 'pdf') {
-  if (editId.value) {
-    // Saved article: use the download endpoints
-    window.open(`/api/v1/articles/${editId.value}/download/${dlFormat}`, '_blank')
-  } else if (dlFormat === 'pdf') {
-    // New article PDF: call compile-download endpoint
-    handleCompileDownload()
-  } else {
-    // New article source: download raw content as file
-    const ext = format.value === 'typst' ? '.typ' : '.md'
-    const blob = new Blob([content.value], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `article${ext}`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-}
-
-async function handleCompileDownload() {
-  if (!content.value.trim()) {
-    errorMsg.value = 'Nothing to download — editor is empty'
-    return
-  }
-  if (format.value === 'markdown') {
-    // Render markdown to HTML and open in a new window for browser print → PDF.
-    const html = parseMarkdown(content.value)
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>${title.value || 'Article'}</title>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-        <style>body{max-width:800px;margin:2rem auto;font-family:serif;line-height:1.6;color:#1a1a1a;}
-        pre{background:#f5f5f5;padding:1rem;border-radius:4px;overflow-x:auto;}</style></head>
-        <body>${html}</body></html>`)
-      printWindow.document.close()
-      setTimeout(() => printWindow.print(), 500)
-    }
-  } else {
-    // Typst PDF: requires Tauri sidecar (Slice 2). Web: on-going.
-    errorMsg.value = 'Typst PDF export available in Tauri desktop (Slice 2). Markdown articles can print to PDF via browser.'
-  }
-}
-
 defineExpose({ contributions, handlePublish, showSelfReview, totalContribution })
 </script>
 
@@ -418,7 +398,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                    text-ink-muted hover:text-ink hover:bg-[#21262d]
                    transition-colors duration-200"
             :aria-label="t('editor.saveDraft')"
-            :title="t('editor.saveDraft')"
+            :data-tooltip="t('editor.saveDraft')"
             :disabled="submitting"
             @click="handleSaveDraft"
           >
@@ -488,7 +468,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="showPreview ? 'Hide preview' : 'Show preview'"
-          :title="showPreview ? 'Hide preview' : 'Show preview'"
+          :data-tooltip="showPreview ? 'Hide preview' : 'Show preview'"
           @click="showPreview = !showPreview"
         >
           <Eye v-if="showPreview" class="w-4 h-4" stroke-width="2" />
@@ -501,52 +481,62 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('editor.compile')"
-          :title="t('editor.compile')"
+          :data-tooltip="t('editor.compile')"
           :disabled="compiling || !content.trim()"
           @click="handleCompile"
         >
           <Play class="w-4 h-4" stroke-width="2" />
         </button>
 
-        <!-- Download source button (left side) -->
-        <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg
-                 text-ink-muted hover:text-ink hover:bg-[#21262d]
-                 transition-colors duration-200"
-          :aria-label="t('editor.typst')"
-          :title="t('editor.typst')"
-          @click="handleDownload('source')"
-        >
-          <FileDown class="w-4 h-4" stroke-width="2" />
-        </button>
+        <!-- Download source -->
+        <DownloadButton
+          format="source"
+          :content="content"
+          :content-format="format"
+          :filename="title"
+          :disabled="!commitHash || !isClean || !content.trim()"
+          :commit-hash="commitHash"
+          :disabled-reason="!commitHash ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+        />
+        <!-- Download compiled HTML -->
+        <DownloadButton
+          format="compiled"
+          :content="content"
+          :content-format="format"
+          :filename="title"
+          :disabled="!commitHash || !isClean || !content.trim()"
+          :commit-hash="commitHash"
+          :disabled-reason="!commitHash ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+        />
 
-        <!-- Download PDF button (right side) -->
-        <button
+        <!-- History -->
+        <router-link
+          v-if="isEdit"
+          :to="`/articles/${editId}/history`"
           class="flex items-center justify-center w-8 h-8 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
-          :aria-label="t('editor.download')"
-          :title="t('editor.download')"
-          @click="handleDownload('pdf')"
+          :aria-label="t('article.history')"
+          :data-tooltip="t('article.history')"
         >
-          <FileText class="w-4 h-4" stroke-width="2" />
-        </button>
+          <History class="w-4 h-4" stroke-width="2" />
+        </router-link>
 
         <div class="w-px h-5 bg-divider mx-1" />
 
-        <!-- Publish button -->
+        <!-- Publish to pool -->
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
-                 rounded-lg transition-all duration-200"
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 transition-colors duration-200"
           :class="canWrite('editor.publish_pool')
-            ? 'bg-accent text-[#0d1117] hover:brightness-110'
-            : 'bg-[#21262d] text-ink-muted/50 cursor-not-allowed'"
+            ? 'text-accent hover:text-accent hover:bg-accent/10'
+            : 'text-ink-muted/30 cursor-not-allowed'"
           :disabled="submitting || !canWrite('editor.publish_pool')"
-          :title="!canWrite('editor.publish_pool') ? t(getFallback('editor.publish_pool')) : ''"
+          :aria-label="t('editor.publish')"
+          :data-tooltip="canWrite('editor.publish_pool') ? t('editor.publish') : t(getFallback('editor.publish_pool'))"
           @click="handlePublish"
         >
-          <Send class="w-3.5 h-3.5" stroke-width="2" />
-          {{ isEdit ? t('editor.submitPool') : t('editor.publish') }}
+          <Send class="w-4 h-4" stroke-width="2" />
         </button>
       </div>
     </div>
@@ -614,7 +604,13 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
 
     <!-- Bottom bar -->
     <div class="flex items-center justify-between px-4 py-1.5 bg-card border border-divider rounded-b-lg text-xs text-ink-muted">
-      <span>{{ format.toUpperCase() }}</span>
+      <div class="flex items-center gap-3">
+        <span>{{ format.toUpperCase() }}</span>
+        <span v-if="commitHash" class="flex items-center gap-1 font-mono">
+          <GitCommitHorizontal class="w-3 h-3" stroke-width="2" />
+          {{ commitHash.slice(0, 7) }}
+        </span>
+      </div>
       <span>{{ content.length }} characters</span>
     </div>
 

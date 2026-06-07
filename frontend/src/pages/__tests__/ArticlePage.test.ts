@@ -40,6 +40,7 @@ vi.mock('../../api/articles', () => ({
     fork_count: 2,
     forked_from: null,
     commit_count: 3,
+    commit_hash: 'abc123def456',
     compiled_format: 'html',
     compiled_output: '<p>Quantum error correction is essential...</p>',
     compiled_pages: 12,
@@ -150,17 +151,39 @@ describe('ArticlePage', () => {
     expect(wrapper.text()).toMatch(/body|comments|Body|Comments/i)
   })
 
-  it('renders download source and pdf buttons', async () => {
+  it('renders download source and html buttons', async () => {
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await new Promise(r => setTimeout(r, 100))
-    // Look for download buttons by aria-label
-    const sourceBtn = wrapper.find('a[aria-label*="download source" i], button[aria-label*="download source" i]')
-    const pdfBtn = wrapper.find('a[aria-label*="download pdf" i], button[aria-label*="download pdf" i]')
+    const sourceBtn = wrapper.find('[aria-label="Download source (.md)"]')
+    const htmlBtn = wrapper.find('[aria-label="Download compiled (.html)"]')
     expect(sourceBtn.exists()).toBe(true)
-    expect(pdfBtn.exists()).toBe(true)
+    expect(htmlBtn.exists()).toBe(true)
+  })
+
+  it('shows commit hash in metadata row', async () => {
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+    expect(wrapper.text()).toContain('abc123d')
+  })
+
+  it('passes commit hash to DownloadButton', async () => {
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+    // DownloadButton should receive commit-hash prop
+    const downloadBtns = wrapper.findAllComponents({ name: 'DownloadButton' })
+    expect(downloadBtns.length).toBeGreaterThanOrEqual(2)
+    for (const btn of downloadBtns) {
+      expect(btn.props('commitHash')).toBe('abc123def456')
+    }
   })
 
   it('renders Merge button when article is a fork (has forked_from)', async () => {

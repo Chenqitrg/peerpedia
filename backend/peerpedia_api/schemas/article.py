@@ -95,6 +95,7 @@ class ArticleDetail(BaseModel):
     title: str = ""
     status: ArticleStatus
     authors: list[AuthorInfo] = []
+    commit_hash: str = ""
     fork_count: int = 0
     forked_from: Optional[str] = None
     commit_count: int = 1
