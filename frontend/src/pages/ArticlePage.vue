@@ -205,6 +205,14 @@ async function loadCompiledContent() {
   let html = ''
   if (article.value.compiled_output) {
     html = article.value.compiled_output
+    // In local mode, compiled_output is raw markdown from the draft.
+    // Use parseMarkdown (protect → marked → restore → katex) instead
+    // of renderMathInHtml which expects pre-compiled <span> wrappers.
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      const { parseMarkdown } = await import('../utils/markdown')
+      compiledHtml.value = parseMarkdown(html)
+      return
+    }
   } else {
     try {
       const src = await getArticleSource(id)
