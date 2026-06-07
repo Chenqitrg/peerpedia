@@ -157,7 +157,7 @@ function goBack() {
                 :class="commit.hash === selectedHash1 || commit.hash === selectedHash2
                   ? 'bg-accent border-accent'
                   : 'bg-card border-ink-muted hover:border-accent'"
-                :title="`Select ${commit.hash.substring(0, 7)}`"
+                :data-tooltip="`Select ${commit.hash.substring(0, 7)}`"
                 @click="toggleCommitSelect(commit.hash)"
               />
               <div

@@ -176,5 +176,9 @@
     "local_mode_hint": "Local account mode — this feature requires the server",
     "search_local": "Local",
     "search_network": "Network"
+  },
+  "download": {
+    "source": "Source",
+    "compiled": "HTML"
   }
 }

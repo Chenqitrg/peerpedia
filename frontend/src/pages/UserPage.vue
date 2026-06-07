@@ -129,13 +129,21 @@ async function loadArticles() {
       for (const d of drafts) {
         // Avoid duplicates — skip if already loaded from server
         if (!merged.some(a => a.id === d.id)) {
+          // Try to get actual commit hash from local git
+          let hash = ''
+          try {
+            const history = await tauri.gitHistory({ article_id: d.id })
+            if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+              hash = history[0].hash
+            }
+          } catch { /* optional */ }
           merged.push({
             id: d.id,
             title: d.title || 'Untitled',
             status: 'draft',
             authors: [{ id: id.value, name: user.value?.name || id.value, anonymous_name: '' }],
             content_preview: '',
-            commit_hash: '',
+            commit_hash: hash,
             fork_count: 0,
             forked_from: null,
             commit_count: 0,
@@ -244,7 +252,7 @@ watch(() => route.params.id, () => {
               <span
                 v-else
                 class="flex items-center gap-1.5 text-ink-muted/50 cursor-not-allowed"
-                :title="t(getFallback('user.follow_graph'))"
+                :data-tooltip="t(getFallback('user.follow_graph'))"
               >
                 <UsersRound class="w-3.5 h-3.5" stroke-width="2" />
                 <span class="font-semibold">{{ user.followers_count }}</span>
@@ -262,7 +270,7 @@ watch(() => route.params.id, () => {
               <span
                 v-else
                 class="flex items-center gap-1.5 text-ink-muted/50 cursor-not-allowed"
-                :title="t(getFallback('user.follow_graph'))"
+                :data-tooltip="t(getFallback('user.follow_graph'))"
               >
                 <UserCheck class="w-3.5 h-3.5" stroke-width="2" />
                 <span class="font-semibold">{{ user.following_count }}</span>
@@ -281,7 +289,7 @@ watch(() => route.params.id, () => {
                 ? 'bg-accent text-[#0d1117] hover:brightness-110 rounded-xl'
                 : 'bg-[#21262d] text-ink-muted/50 cursor-not-allowed rounded-xl'"
             :disabled="followLoading || !canWrite('user.follow_graph')"
-            :title="!canWrite('user.follow_graph') ? t(getFallback('user.follow_graph')) : ''"
+            :data-tooltip="!canWrite('user.follow_graph') ? t(getFallback('user.follow_graph')) : ''"
             @click="handleFollow"
           >
             {{ isFollowing ? t('common.following') : t('common.follow') }}
@@ -292,7 +300,7 @@ watch(() => route.params.id, () => {
             v-if="isSelf"
             class="btn-outline btn-sm shrink-0 opacity-50 cursor-not-allowed"
             disabled
-            :title="t('common.comingSoon')"
+            :data-tooltip="t('common.comingSoon')"
           >
             <Edit class="w-3.5 h-3.5" stroke-width="2" />
             {{ t('common.editProfile') }}

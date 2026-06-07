@@ -59,8 +59,9 @@ function onDimLeave() {
       class="inline-flex items-center gap-1 transition-colors"
       :class="[
         highlightFirst && idx === 0 ? 'text-accent' : 'text-ink-muted',
-        editable ? 'cursor-default' : 'cursor-default',
+        editable ? 'cursor-default' : 'cursor-help',
       ]"
+      :data-tooltip="`${dim.label}: ${score[dim.key]}`"
       @mouseenter="onDimEnter(dim.key)"
       @mouseleave="onDimLeave"
     >
