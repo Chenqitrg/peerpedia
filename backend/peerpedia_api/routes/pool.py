@@ -1,6 +1,6 @@
 """Sedimentation pool API routes."""
 from fastapi import APIRouter, Depends
-from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.crud_article import get_article_authors, list_articles
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
 from peerpedia_core.storage.db.crud_review import get_reviews_for_article
 from peerpedia_core.storage.db.crud_user import get_followers, get_following
@@ -43,7 +43,7 @@ def get_pool(
     summaries = []
     for a in articles:
         # Only show articles from users in follow circle (if user_id provided)
-        if follow_circle is not None and not any(aid in follow_circle for aid in (a.authors or [])):
+        if follow_circle is not None and not any(aid in follow_circle for aid in (get_article_authors(db, a.id))):
             continue
 
         get_reviews_for_article(db, a.id)
@@ -60,7 +60,7 @@ def get_pool(
             id=a.id,
             title=a.title or "",
             status=a.status,
-            authors=resolve_authors(db, a.authors or []),
+            authors=resolve_authors(db, get_article_authors(db, a.id)),
             content_preview=get_content_preview(a.id),
             commit_hash=get_commit_hash(a.id),
             fork_count=a.fork_count,
@@ -71,7 +71,7 @@ def get_pool(
             days_remaining=days_remaining,
             sink_duration_days=a.sink_duration_days,
             is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
-            is_own_article=current_user.id in (a.authors or []) if current_user else False,
+            is_own_article=current_user.id in (get_article_authors(db, a.id)) if current_user else False,
             created_at=a.created_at,
         ))
 

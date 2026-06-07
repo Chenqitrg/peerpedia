@@ -20,7 +20,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 VALID_SORTS = {"newest", "score"}
 
 # Max number of articles to scan source files for text-search fallback.
-# Only scanned when compiled_output is NULL and SQL title search didn't match.
+# Only scanned when SQL title search didn't match — source-based content fallback.
 _MAX_SOURCE_SCAN = 50
 
 
@@ -51,7 +51,7 @@ def _build_summary(db: Session, a: Article) -> dict:
         id=a.id,
         title=a.title or "",
         status=a.status,
-        authors=resolve_authors(db, a.authors or []),
+        authors=resolve_authors(db, get_article_authors(db, a.id)),
         content_preview=get_content_preview(a.id),
         commit_hash=get_commit_hash(a.id),
         fork_count=a.fork_count or 0,
@@ -77,12 +77,12 @@ def search(
 
     - Category: SQL LIKE on JSON categories column (case-insensitive)
     - Title: SQL ILIKE (case-insensitive)
-    - Content: SQL ILIKE on compiled_output + file-based source fallback
+    - Content: file-based source fallback (compilation is now on-demand)
     - Sort: SQL ORDER BY (newest → created_at DESC, score → avg score DESC)
     - Pagination: SQL LIMIT/OFFSET with accurate total count
 
     Source file fallback: when a text query is provided, articles that don't
-    match via title/compiled_output are checked against their source files.
+    match via title are checked against their source files for content search.
     This is limited to _MAX_SOURCE_SCAN candidates to avoid scanning every
     article in the database.
     """
@@ -101,12 +101,9 @@ def search(
             func.lower(Article.categories.cast(String)).contains(category_lower)
         )
 
-    # ── Text search: title + compiled_output (SQL) ────────────────────
+    # ── Text search: title (SQL) + source file fallback below ─────────
     if q_lower:
-        query = base.filter(or_(
-            Article.title.ilike(f'%{q_lower}%'),
-            Article.compiled_output.ilike(f'%{q_lower}%'),
-        ))
+        query = base.filter(Article.title.ilike(f'%{q_lower}%'))
     else:
         query = base
 

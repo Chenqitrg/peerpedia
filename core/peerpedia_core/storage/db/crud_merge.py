@@ -58,12 +58,6 @@ def reject_merge_proposal(session: Session, proposal_id: str) -> MergeProposal:
     return _resolve(session, proposal_id, "rejected")
 
 
-def add_merge_thread_message(session: Session, proposal_id: str, message: dict) -> MergeProposal:
-    mp = session.get(MergeProposal, proposal_id)
-    if mp is None:
-        raise ValueError(f"MergeProposal {proposal_id} not found")
-    thread = list(mp.thread) if mp.thread else []
-    thread.append(message)
-    mp.thread = thread
-    session.commit()
-    return mp
+# MergeProposal thread messages deferred per architecture plan (Outside Voice #5).
+# When needed, add a merge_proposal_messages table or reuse review_messages
+# with a context_type discriminator.

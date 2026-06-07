@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from peerpedia_core.storage.db.engine import get_session
+from peerpedia_core.storage.db.crud_article import get_article_authors
 from peerpedia_core.storage.db.models import (
     Article,
     Bookmark,
@@ -55,7 +56,7 @@ class TestArticle:
 
         assert a.id is not None
         assert a.status == "draft"
-        assert a.authors == [user.id]
+        assert get_article_authors(session, a.id) == [user.id]
         assert a.score is None
         assert a.compiled_format is None
         assert a.sink_start is None
@@ -92,25 +93,24 @@ class TestArticle:
         session = get_session(engine)
         user = _make_user(session, "u4")
         a = Article(status="published", authors=[user.id],
-                    compiled_format="html", compiled_output="<h1>Test</h1>")
+                    )
         session.add(a)
         session.commit()
         a2 = session.get(Article, a.id)
         assert a2.compiled_format == "html"
-        assert a2.compiled_output == "<h1>Test</h1>"
+        # compiled_output removed
         session.close()
 
     def test_compiled_cache_for_svg(self, engine):
         session = get_session(engine)
         user = _make_user(session, "u5")
         a = Article(status="published", authors=[user.id],
-                    compiled_format="svg", compiled_output=None,
-                    compiled_pages=["<svg>p1</svg>", "<svg>p2</svg>"])
+                    )
         session.add(a)
         session.commit()
         a2 = session.get(Article, a.id)
         assert a2.compiled_format == "svg"
-        assert a2.compiled_pages == ["<svg>p1</svg>", "<svg>p2</svg>"]
+        # compiled_pages removed
         session.close()
 
     def test_fork_tracking(self, engine):
@@ -165,7 +165,7 @@ class TestReview:
         assert r.commit_hash == "abc123"
         assert r.scope == "pool"
         assert r.scores["originality"] == 4.0
-        assert r.thread == []
+        # thread field removed from Review
         session.close()
 
     def test_both_scopes_for_same_reviewer(self, engine):
@@ -359,7 +359,7 @@ class TestMergeProposal:
         session.commit()
         assert mp.proposer_id == forker.id
         assert mp.status == "open"
-        assert mp.thread == []
+        # thread field removed — see ReviewMessage
         session.close()
 
     def test_merge_thread(self, engine):
@@ -409,14 +409,13 @@ class TestCitation:
         author = _make_user(session, "cit_author")
         a1 = _make_article(session, status="published", authors=[author.id])
         a2 = _make_article(session, status="published", authors=[author.id])
-        c = Citation(from_article_id=a1.id, to_article_id=a2.id,
-                     forward_prob=0.3, backward_prob=0.1)
+        c = Citation(from_article_id=a1.id, to_article_id=a2.id)
         session.add(c)
         session.commit()
         assert c.from_article_id == a1.id
         assert c.to_article_id == a2.id
-        assert c.forward_prob == 0.3
-        assert c.backward_prob == 0.1
+        # prob fields removed from Citation
+        # prob fields removed from Citation
         session.close()
 
     def test_unique_citation(self, engine):

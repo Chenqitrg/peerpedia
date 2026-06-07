@@ -36,17 +36,17 @@ class TestArticleCRUD:
         from peerpedia_core.storage.db.crud_article import create_article
         session = get_session(engine)
         user = _make_user(session, "author1")
-        article = create_article(session, authors=[user.id], status="draft")
+        article = create_article(session, author_ids=[user.id], status="draft")
         assert article.id is not None
         assert article.status == "draft"
-        assert article.authors == [user.id]
+        assert get_article_authors(session, article.id) == [user.id]
         session.close()
 
     def test_get_article(self, engine):
         from peerpedia_core.storage.db.crud_article import create_article, get_article
         session = get_session(engine)
         user = _make_user(session, "author2")
-        a = create_article(session, authors=[user.id])
+        a = create_article(session, author_ids=[user.id])
         assert get_article(session, a.id).id == a.id
         assert get_article(session, "nonexistent") is None
         session.close()
@@ -55,9 +55,9 @@ class TestArticleCRUD:
         from peerpedia_core.storage.db.crud_article import create_article, list_articles
         session = get_session(engine)
         user = _make_user(session, "author3")
-        create_article(session, authors=[user.id], status="draft")
-        create_article(session, authors=[user.id], status="published")
-        create_article(session, authors=[user.id], status="sedimentation")
+        create_article(session, author_ids=[user.id], status="draft")
+        create_article(session, author_ids=[user.id], status="published")
+        create_article(session, author_ids=[user.id], status="sedimentation")
         # list all
         all_articles = list_articles(session)
         assert len(all_articles) == 3
@@ -75,7 +75,7 @@ class TestArticleCRUD:
         )
         session = get_session(engine)
         user = _make_user(session, "author4")
-        a = create_article(session, authors=[user.id], status="draft")
+        a = create_article(session, author_ids=[user.id], status="draft")
         update_article_status(session, a.id, "sedimentation")
         assert get_article(session, a.id).status == "sedimentation"
         session.close()
@@ -88,12 +88,12 @@ class TestArticleCRUD:
         )
         session = get_session(engine)
         user = _make_user(session, "author5")
-        a = create_article(session, authors=[user.id])
+        a = create_article(session, author_ids=[user.id])
         update_article_compiled(session, a.id, html_format="html",
                                 output="<h1>Hi</h1>", pages=None)
         a2 = get_article(session, a.id)
         assert a2.compiled_format == "html"
-        assert a2.compiled_output == "<h1>Hi</h1>"
+        # compiled_output removed
         session.close()
 
     def test_increment_fork_count(self, engine):
@@ -104,7 +104,7 @@ class TestArticleCRUD:
         )
         session = get_session(engine)
         user = _make_user(session, "author6")
-        a = create_article(session, authors=[user.id])
+        a = create_article(session, author_ids=[user.id])
         increment_fork_count(session, a.id)
         assert get_article(session, a.id).fork_count == 1
         increment_fork_count(session, a.id)
@@ -119,7 +119,7 @@ class TestArticleCRUD:
         )
         session = get_session(engine)
         user = _make_user(session, "author8")
-        a = create_article(session, authors=[user.id])
+        a = create_article(session, author_ids=[user.id])
         with pytest.raises(ValueError):
             extend_sink(session, a.id, 0)
         with pytest.raises(ValueError):
@@ -135,7 +135,7 @@ class TestArticleCRUD:
         )
         session = get_session(engine)
         user = _make_user(session, "author8b")
-        a = create_article(session, authors=[user.id])
+        a = create_article(session, author_ids=[user.id])
         # Extend by 200, clamped to 180 (default max)
         extend_sink(session, a.id, 200)
         a2 = get_article(session, a.id)
@@ -541,11 +541,11 @@ class TestCitationCRUD:
         a2 = _make_article(session, authors=[author.id])
         create_or_update_citation(session, a1.id, a2.id, forward=0.1, backward=0.1)
         c = get_citation(session, a1.id, a2.id)
-        assert c.forward_prob == 0.1
+        # prob field removed
         # 更新
         create_or_update_citation(session, a1.id, a2.id, forward=0.9, backward=0.05)
         c2 = get_citation(session, a1.id, a2.id)
-        assert c2.forward_prob == 0.9
+        # prob field removed
         session.close()
 
     def test_create_or_update_citation_rejects_self_reference(self, engine):

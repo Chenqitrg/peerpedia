@@ -92,6 +92,12 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"},
     )
 
+@app.get("/health")
+async def health_check():
+    """Lightweight health check for network status detection."""
+    return {"ok": True}
+
+
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(articles_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")

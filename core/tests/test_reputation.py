@@ -65,7 +65,7 @@ class TestComputeAuthorReputation:
         user = create_user(session, "bob")
         create_article(
             session,
-            authors=[user.id],
+            author_ids=[user.id],
             status="published",
             score=_build_score(originality=4, rigor=3, completeness=5,
                                pedagogy=4, impact=4),
@@ -85,7 +85,7 @@ class TestComputeAuthorReputation:
         # published article with perfect scores
         create_article(
             session,
-            authors=[user.id],
+            author_ids=[user.id],
             status="published",
             score=_build_score(originality=5, rigor=5, completeness=5,
                                pedagogy=5, impact=5),
@@ -93,7 +93,7 @@ class TestComputeAuthorReputation:
         # sedimentation article with moderate scores
         create_article(
             session,
-            authors=[user.id],
+            author_ids=[user.id],
             status="sedimentation",
             score=_build_score(originality=1, rigor=1, completeness=1,
                                pedagogy=1, impact=1),
@@ -120,7 +120,7 @@ class TestComputeAuthorReputation:
         # First computation (no existing rep) -- sets reputation to blended value
         create_article(
             session,
-            authors=[user.id],
+            author_ids=[user.id],
             status="published",
             score=_build_score(originality=4, rigor=4, completeness=4,
                                pedagogy=4, impact=4),
@@ -134,7 +134,7 @@ class TestComputeAuthorReputation:
         # Add a second article. Now blending uses the existing reputation (1.2).
         create_article(
             session,
-            authors=[user.id],
+            author_ids=[user.id],
             status="published",
             score=_build_score(originality=5, rigor=5, completeness=5,
                                pedagogy=5, impact=5),
@@ -153,7 +153,7 @@ class TestComputeAuthorReputation:
         user = create_user(session, "eve")
         create_article(
             session,
-            authors=[user.id],
+            author_ids=[user.id],
             status="published",
             score=None,  # no score set yet
         )
@@ -168,7 +168,7 @@ class TestComputeAuthorReputation:
         user = create_user(session, "frank")
         create_article(
             session,
-            authors=[user.id],
+            author_ids=[user.id],
             status="published",
             score=_build_score(originality=5, rigor=5, completeness=5,
                                pedagogy=5, impact=5),
@@ -248,7 +248,7 @@ class TestRecalculateAllReputations:
         u2 = create_user(session, "jack")
         create_article(
             session,
-            authors=[u1.id, u2.id],
+            author_ids=[u1.id, u2.id],
             status="published",
             score=_build_score(originality=5, rigor=5, completeness=5,
                                pedagogy=5, impact=5),

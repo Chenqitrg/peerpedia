@@ -1,7 +1,7 @@
 """Review CRUD operations."""
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.models import Review
+from peerpedia_core.storage.db.models import Review, ReviewMessage
 
 
 def create_review(
@@ -87,12 +87,52 @@ def update_review_scores(session: Session, review_id: str, scores: dict) -> Revi
     return r
 
 
-def add_thread_message(session: Session, review_id: str, message: dict) -> Review:
-    r = session.get(Review, review_id)
-    if r is None:
+# ── Thread messages (ReviewMessage table) ──────────────────────────────────
+
+
+def add_thread_message(
+    session: Session,
+    review_id: str,
+    author_id: str,
+    content: str,
+    parent_id: str | None = None,
+) -> ReviewMessage:
+    """Add a reply to a review thread. Returns the new message."""
+    # Verify review exists
+    if session.get(Review, review_id) is None:
         raise ValueError(f"Review {review_id} not found")
-    thread = list(r.thread) if r.thread else []
-    thread.append(message)
-    r.thread = thread
+    msg = ReviewMessage(
+        review_id=review_id,
+        author_id=author_id,
+        content=content,
+        parent_id=parent_id,
+    )
+    session.add(msg)
     session.commit()
-    return r
+    return msg
+
+
+def get_thread_messages(
+    session: Session,
+    review_id: str,
+    page: int = 1,
+    page_size: int = 20,
+) -> list[ReviewMessage]:
+    """Get paginated thread messages for a review, oldest first."""
+    return (
+        session.query(ReviewMessage)
+        .filter(ReviewMessage.review_id == review_id)
+        .order_by(ReviewMessage.created_at.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+
+def get_thread_message_count(session: Session, review_id: str) -> int:
+    """Count total messages in a review thread."""
+    return (
+        session.query(ReviewMessage)
+        .filter(ReviewMessage.review_id == review_id)
+        .count()
+    )

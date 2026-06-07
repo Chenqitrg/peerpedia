@@ -1,6 +1,6 @@
 """Feed API route."""
 from fastapi import APIRouter, Depends
-from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.crud_article import get_article_authors, list_articles
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
 from peerpedia_core.storage.db.crud_user import get_following
 from peerpedia_core.storage.db.models import User
@@ -27,7 +27,7 @@ def get_feed(current_user: User | None = Depends(deps.get_current_user),
         followed_ids = [u.id for u in following]
         if followed_ids:
             feed_articles = [a for a in all_articles
-                             if any(aid in followed_ids for aid in (a.authors or []))
+                             if any(aid in followed_ids for aid in get_article_authors(db, a.id))
                              and a.status in ("sedimentation", "published")]
         else:
             feed_articles = []
@@ -39,7 +39,7 @@ def get_feed(current_user: User | None = Depends(deps.get_current_user),
     # Batch-resolve all author IDs
     all_author_ids: set[str] = set()
     for a in feed_articles:
-        for aid in (a.authors or []):
+        for aid in get_article_authors(db, a.id):
             all_author_ids.add(aid)
     author_cache = {aid: resolve_authors(db, [aid])[0] for aid in all_author_ids}
 
@@ -51,7 +51,7 @@ def get_feed(current_user: User | None = Depends(deps.get_current_user),
             id=a.id,
             title=a.title or "",
             status=a.status,
-            authors=[author_cache[aid] for aid in (a.authors or []) if aid in author_cache],
+            authors=[author_cache[aid] for aid in get_article_authors(db, a.id) if aid in author_cache],
             content_preview=get_content_preview(a.id),
             commit_hash=ghash,
             fork_count=a.fork_count,
@@ -59,7 +59,7 @@ def get_feed(current_user: User | None = Depends(deps.get_current_user),
             commit_count=gcount,
             score=a.score,
             is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
-            is_own_article=current_user.id in (a.authors or []) if current_user else False,
+            is_own_article=current_user.id in get_article_authors(db, a.id) if current_user else False,
             created_at=a.created_at,
         ))
     return {"articles": [s.model_dump() for s in summaries], "total": len(summaries)}

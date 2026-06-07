@@ -99,7 +99,7 @@ def publish_ready_articles(session: Session) -> int:
 
         # Check for community reviews and apply penalty if none
         all_reviews = get_reviews_for_article(session, article.id)
-        authors = article.authors or []
+        authors = get_article_authors(session, article.id)
         community_reviews = [r for r in all_reviews if r.reviewer_id not in authors]
         if len(community_reviews) == 0:
             score = apply_no_review_penalty(score)

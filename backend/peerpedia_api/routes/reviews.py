@@ -1,12 +1,13 @@
 """Review API routes."""
 from fastapi import APIRouter, Depends, HTTPException
-from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_article import get_article, get_article_authors
 from peerpedia_core.storage.db.crud_review import (
     add_thread_message,
     create_review,
     get_review,
     get_review_by_user_scope,
     get_reviews_for_article,
+    get_thread_messages,
     update_review_scores,
 )
 from peerpedia_core.storage.db.crud_user import get_user
@@ -36,11 +37,21 @@ def _build_review_out(r, db: Session, article_authors: list[str]) -> ReviewOut:
             reviewer_name = u.name                     # 池外实名
         else:
             reviewer_name = u.anonymous_name or u.name # 池内匿名，出池不变
+    thread_messages = get_thread_messages(db, r.id)
+    thread_out = []
+    for msg in thread_messages:
+        msg_author = get_user(db, msg.author_id) if msg.author_id else None
+        thread_out.append({
+            "author_id": msg.author_id,
+            "content": msg.content,
+            "author_name": msg_author.name if msg_author else "unknown",
+            "created_at": msg.created_at,
+        })
     return ReviewOut(
         id=r.id, article_id=r.article_id, commit_hash=r.commit_hash,
         reviewer_id=r.reviewer_id, scope=r.scope, scores=r.scores,
         contributions=r.contributions,
-        thread=r.thread, reviewer_name=reviewer_name,
+        thread=thread_out, reviewer_name=reviewer_name,
         is_self_review=is_self,
         created_at=r.created_at, updated_at=r.updated_at,
     )
@@ -52,7 +63,8 @@ def list_reviews(article_id: str, db: Session = Depends(deps.get_db)):
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
     reviews = get_reviews_for_article(db, article_id)
-    return [_build_review_out(r, db, article.authors) for r in reviews]
+    author_ids = get_article_authors(db, article_id)
+    return [_build_review_out(r, db, author_ids) for r in reviews]
 
 
 @router.post("", status_code=201, response_model=ReviewOut)
@@ -92,9 +104,10 @@ def submit_review(article_id: str, body: ReviewCreate,
                 db.commit()
     # Update reputation for all authors of the reviewed article
     from peerpedia_core.workflow.reputation import compute_author_reputation
-    for author_id in article.authors:
+    submit_author_ids = get_article_authors(db, article_id)
+    for author_id in submit_author_ids:
         compute_author_reputation(db, author_id)
-    return _build_review_out(r, db, article.authors)
+    return _build_review_out(r, db, submit_author_ids)
 
 
 @router.post("/{review_id}/messages", status_code=201, response_model=dict)
@@ -109,7 +122,8 @@ def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCrea
 
     # Permission: only article authors + the review's reviewer can reply
     article = get_article(db, article_id)
-    is_author = article is not None and current_user.id in article.authors
+    thread_author_ids = get_article_authors(db, article_id) if article else []
+    is_author = article is not None and current_user.id in thread_author_ids
     is_reviewer = r.reviewer_id == current_user.id
     if not (is_author or is_reviewer):
         raise HTTPException(
@@ -117,8 +131,11 @@ def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCrea
             detail="Only the article author and reviewer can participate in this thread",
         )
 
-    from peerpedia_core.types.messages import ThreadMessage
-    msg = ThreadMessage(author_id=current_user.id, content=body.content,
-                        author_name=current_user.name)
-    add_thread_message(db, review_id, msg.to_dict())
-    return {"status": "ok", "message": msg.to_dict()}
+    msg = add_thread_message(db, review_id=r.id, author_id=current_user.id,
+                              content=body.content)
+    return {"status": "ok", "message": {
+        "author_id": msg.author_id,
+        "content": msg.content,
+        "author_name": current_user.name,
+        "created_at": msg.created_at.isoformat(),
+    }}

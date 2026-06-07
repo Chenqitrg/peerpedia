@@ -1,18 +1,21 @@
 """Article CRUD operations."""
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.models import Article
+from peerpedia_core.storage.db.models import Article, ArticleAuthor
 
 
 def create_article(
     session: Session,
-    authors: list[str],
+    author_ids: list[str],
     status: str = "draft",
     **kwargs,
 ) -> Article:
-    """Create a new article record."""
-    a = Article(status=status, authors=authors, **kwargs)
+    """Create a new article record with author associations."""
+    a = Article(status=status, **kwargs)
     session.add(a)
+    session.flush()  # get article.id without commit
+    for pos, author_id in enumerate(author_ids):
+        session.add(ArticleAuthor(article_id=a.id, author_id=author_id, position=pos))
     session.commit()
     return a
 
@@ -27,7 +30,7 @@ def list_articles(session: Session, status: str | None = None,
     if status:
         q = q.filter(Article.status == status)
     if author_id:
-        q = q.filter(Article.authors.contains(author_id))
+        q = q.join(ArticleAuthor).filter(ArticleAuthor.author_id == author_id)
     return q.order_by(Article.created_at.desc()).all()
 
 
@@ -36,23 +39,6 @@ def update_article_status(session: Session, article_id: str, new_status: str) ->
     if a is None:
         raise ValueError(f"Article {article_id} not found")
     a.status = new_status
-    session.commit()
-    return a
-
-
-def update_article_compiled(
-    session: Session,
-    article_id: str,
-    html_format: str,
-    output: str | None,
-    pages: list[str] | None,
-) -> Article:
-    a = session.get(Article, article_id)
-    if a is None:
-        raise ValueError(f"Article {article_id} not found")
-    a.compiled_format = html_format
-    a.compiled_output = output
-    a.compiled_pages = pages
     session.commit()
     return a
 
@@ -98,3 +84,52 @@ def extend_sink(session: Session, article_id: str, extra_days: int, max_days: in
         a.sink_extended_count += 1
     session.commit()
     return a
+
+
+# ── Author associations ────────────────────────────────────────────────────
+
+
+def get_article_authors(session: Session, article_id: str) -> list[str]:
+    """Get ordered list of author IDs for an article."""
+    rows = (
+        session.query(ArticleAuthor.author_id)
+        .filter(ArticleAuthor.article_id == article_id)
+        .order_by(ArticleAuthor.position)
+        .all()
+    )
+    return [r.author_id for r in rows]
+
+
+def set_article_authors(session: Session, article_id: str, author_ids: list[str]) -> None:
+    """Replace all author associations for an article."""
+    session.query(ArticleAuthor).filter(ArticleAuthor.article_id == article_id).delete()
+    for pos, author_id in enumerate(author_ids):
+        session.add(ArticleAuthor(article_id=article_id, author_id=author_id, position=pos))
+    session.commit()
+
+
+# ── Compile cache ──────────────────────────────────────────────────────────
+
+
+def get_compile_cache_path(article_id: str, commit_hash: str, fmt: str) -> str:
+    """Return filesystem path for the compile cache file."""
+    from pathlib import Path
+    cache_dir = Path.home() / ".peerpedia" / "cache" / article_id
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return str(cache_dir / f"{commit_hash}.{fmt}")
+
+
+def read_compile_cache(article_id: str, commit_hash: str, fmt: str) -> str | None:
+    """Read cached compile output. Returns None on cache miss."""
+    from pathlib import Path
+    path = Path(get_compile_cache_path(article_id, commit_hash, fmt))
+    if path.exists():
+        return path.read_text()
+    return None
+
+
+def write_compile_cache(article_id: str, commit_hash: str, fmt: str, output: str) -> None:
+    """Write compile output to file cache."""
+    from pathlib import Path
+    path = Path(get_compile_cache_path(article_id, commit_hash, fmt))
+    path.write_text(output)

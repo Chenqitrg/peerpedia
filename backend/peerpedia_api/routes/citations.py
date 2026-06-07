@@ -32,8 +32,6 @@ def api_get_citations(article_id: str, db: Session = Depends(deps.get_db)):
         return {
             "article_id": aid,
             "title": a.title if a else "Unknown",
-            "forward_prob": article.forward_prob,
-            "backward_prob": article.backward_prob,
         }
 
     return {
@@ -44,6 +42,5 @@ def api_get_citations(article_id: str, db: Session = Depends(deps.get_db)):
 
 @router.post("/citations/click", status_code=201)
 def api_record_click(body: ClickRequest, db: Session = Depends(deps.get_db)):
-    create_or_update_citation(db, body.from_article_id, body.to_article_id,
-                              forward=0.5, backward=0.0)
+    create_or_update_citation(db, body.from_article_id, body.to_article_id)
     return {"status": "ok"}

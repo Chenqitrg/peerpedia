@@ -22,16 +22,19 @@ sys.path.insert(0, str(Path(__file__).parent / "backend"))
 def seed(db_url: str, articles_dir: Path):
     from peerpedia_core.storage.db.crud_article import (
         create_article,
+        get_article_authors,
         set_sink_start,
         update_article_status,
     )
     from peerpedia_core.storage.db.crud_review import (
         add_thread_message,
+        get_thread_message_count,
         upsert_review,
     )
     from peerpedia_core.storage.db.engine import get_engine, init_db
     from peerpedia_core.storage.db.models import (
         Article,
+        ArticleAuthor,
         Bookmark,
         Citation,
         Follow,
@@ -750,7 +753,7 @@ $$
             print(f"  Article (existing): {ad['title'][:55]}...")
             continue
 
-        a = create_article(session, authors=all_authors, status="draft",
+        a = create_article(session, author_ids=all_authors, status="draft",
                           title=ad["title"])
 
         try:
@@ -798,7 +801,7 @@ $$
     for a in a_articles:
         author_name = None
         for name, user in users.items():
-            if user.id in (a.authors or []):
+            if user.id in get_article_authors(session, a.id):
                 author_name = name
                 break
         if author_name:
@@ -837,14 +840,14 @@ program and data. This is the von Neumann architecture.""",
             print(f"  Fork skipped: parent {parent_name} not found")
             continue
         existing = session.query(Article).filter(
-            Article.forked_from == parent.id, Article.authors.contains([forker.id])
+            Article.forked_from == parent.id, Article.id.in_(session.query(ArticleAuthor.article_id).filter(ArticleAuthor.author_id == forker.id))
         ).first()
         if existing:
             print(f"  Fork (existing): {forker_name} → {parent.title[:30]}...")
             fork_map[forker_name] = existing
             continue
 
-        fork = create_article(session, authors=[forker.id], status="draft",
+        fork = create_article(session, author_ids=[forker.id], status="draft",
                             title=f"{parent.title} — Fork by {forker_name}",
                             forked_from=parent.id)
         try:
@@ -978,7 +981,7 @@ program and data. This is the von Neumann architecture.""",
         reviewer = users[reviewer_name]
         # Find any article by this author
         articles = session.query(Article).filter(
-            Article.authors.contains([author.id])
+            Article.id.in_(session.query(ArticleAuthor.article_id).filter(ArticleAuthor.author_id == author.id))
         ).all()
         if not articles:
             continue
@@ -1351,7 +1354,7 @@ program and data. This is the von Neumann architecture.""",
         reviewer = users[reviewer_name]
         # Find the right article: by title if specified, else first by author
         articles = session.query(Article).filter(
-            Article.authors.contains([author.id])
+            Article.id.in_(session.query(ArticleAuthor.article_id).filter(ArticleAuthor.author_id == author.id))
         ).all()
         if not articles:
             continue
@@ -1379,11 +1382,11 @@ program and data. This is the von Neumann architecture.""",
             except Exception:
                 continue
         # Only add if thread is currently empty
-        if review.thread and len(review.thread) > 0:
+        if get_thread_message_count(session, review.id) > 0:
             continue
         for sender_name, content in messages:
             sender = users[sender_name]
-            add_thread_message(session, review.id, {
+            add_thread_message(session, review_id=review.id, 
                 "author_id": sender.id,
                 "author_name": sender.name,
                 "content": content,
@@ -1434,7 +1437,7 @@ program and data. This is the von Neumann architecture.""",
         user = users[user_name]
         author = users[author_name]
         articles = session.query(Article).filter(
-            Article.authors.contains([author.id])
+            Article.id.in_(session.query(ArticleAuthor.article_id).filter(ArticleAuthor.author_id == author.id))
         ).all()
         if not articles:
             continue
@@ -1498,8 +1501,7 @@ program and data. This is the von Neumann architecture.""",
         if not existing:
             session.add(Citation(
                 from_article_id=from_a.id, to_article_id=to_a.id,
-                forward_prob=fwd_prob, backward_prob=back_prob,
-            ))
+                ))
             cit_count += 1
     session.commit()
     print(f"  Citations: {cit_count} new")

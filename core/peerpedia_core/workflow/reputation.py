@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from peerpedia_core.config.params import params
 from peerpedia_core.storage.db.crud_user import update_user_reputation
-from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
 from peerpedia_core.types.scores import ReputationScores
 
 # Status-based weights for article scoring in reputation.
@@ -32,13 +32,11 @@ _REP_DIMS: dict[str, list[str]] = {
 
 
 def _fetch_articles_by_author(session: Session, user_id: str) -> list[Article]:
-    """Return all articles where *user_id* appears in the authors JSON list."""
-    # The `authors` column is stored as JSON text (JSONList TypeDecorator).
-    # We filter with a LIKE clause on the serialised representation so that
-    # SQLite can do the work instead of loading every row into Python.
+    """Return all articles where *user_id* is an author (via ArticleAuthor join)."""
     return (
         session.query(Article)
-        .filter(Article.authors.contains(user_id))
+        .join(ArticleAuthor)
+        .filter(ArticleAuthor.author_id == user_id)
         .all()
     )
 

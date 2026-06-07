@@ -8,6 +8,7 @@ from peerpedia_core.storage.db.crud_article import (
     create_article,
     extend_sink,
     get_article,
+    get_article_authors,
     increment_fork_count,
     list_articles,
     set_sink_start,
@@ -84,11 +85,12 @@ def api_list_articles(
     summaries: list[ArticleSummary] = []
     for a in paged:
         ghash, gcount = get_git_meta(a.id)
+        author_ids = get_article_authors(db, a.id)
         summaries.append(ArticleSummary(
             id=a.id,
             title=a.title or "",
             status=a.status,
-            authors=resolve_authors(db, a.authors or []),
+            authors=resolve_authors(db, author_ids),
             content_preview=get_content_preview(a.id),
             commit_hash=ghash,
             fork_count=a.fork_count,
@@ -99,7 +101,7 @@ def api_list_articles(
             days_remaining=_compute_sink(a)[1],
             sink_duration_days=getattr(a, "sink_duration_days", None),
             is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
-            is_own_article=current_user.id in (a.authors or []) if current_user else False,
+            is_own_article=current_user.id in author_ids if current_user else False,
             created_at=a.created_at,
         ))
     return {"articles": [s.model_dump() for s in summaries], "total": total,
@@ -133,7 +135,8 @@ def _build_article_detail(db: Session, article_id: str,
     reviews = get_reviews_for_article(db, article_id)
     sink_eta, days_remaining = _compute_sink(a)
     distinct_reviewers = len({(r.reviewer_id, r.scope) for r in reviews})
-    authors = resolve_authors(db, a.authors or [])
+    author_ids = get_article_authors(db, a.id)
+    authors = resolve_authors(db, author_ids)
     return ArticleDetail(
         id=a.id,
         title=a.title or "",
@@ -142,16 +145,13 @@ def _build_article_detail(db: Session, article_id: str,
         fork_count=a.fork_count,
         forked_from=a.forked_from,
         commit_count=get_commit_count(a.id),
-        compiled_format=a.compiled_format,
-        compiled_output=a.compiled_output,
-        compiled_pages=a.compiled_pages,
         score=a.score,
         sink_eta=sink_eta,
         days_remaining=days_remaining,
         sink_duration_days=getattr(a, "sink_duration_days", None),
         review_count=distinct_reviewers,
         is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
-        is_own_article=current_user.id in (a.authors or []) if current_user else False,
+        is_own_article=current_user.id in author_ids if current_user else False,
         created_at=a.created_at,
         updated_at=a.updated_at,
     )
@@ -172,7 +172,7 @@ def api_create_article(body: ArticleCreate, db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=422, detail="authors must not be empty")
     a = create_article(
         db,
-        authors=body.authors,
+        author_ids=body.authors,
         status="draft",
         title=body.title,
         abstract=body.abstract,
@@ -224,7 +224,8 @@ def api_update_article(article_id: str, body: ArticleUpdate,
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=400, detail="Article repo not found")
 
-    author = a.authors[0] if a.authors else "unknown"
+    article_author_ids = get_article_authors(db, article_id)
+    author = article_author_ids[0] if article_author_ids else "unknown"
     commit_msg = body.commit_message or "Edit article"
 
     # Write new content if provided
@@ -306,7 +307,8 @@ def api_has_forked(article_id: str, current_user: User = Depends(deps.require_us
     """Check if a user has already forked this article."""
     all_articles = list_articles(db)
     for a in all_articles:
-        if a.forked_from == article_id and current_user.id in (a.authors or []):
+        a_authors = get_article_authors(db, a.id)
+        if a.forked_from == article_id and current_user.id in a_authors:
             return {"has_forked": True, "fork_article_id": a.id}
     return {"has_forked": False, "fork_article_id": None}
 
@@ -453,7 +455,7 @@ def api_fork_article(article_id: str, current_user: User = Depends(deps.require_
                           abstract=original.abstract,
                           keywords=original.keywords,
                           categories=original.categories,
-                          authors=[current_user.id], status="draft",
+                          author_ids=[current_user.id], status="draft",
                           forked_from=article_id)
     increment_fork_count(db, article_id)
     return {"id": fork.id, "forked_from": article_id, "status": "draft"}
@@ -477,11 +479,11 @@ def api_rollback(article_id: str, hash: str, current_user: User = Depends(deps.r
     # Create self-review for the rollback commit
     article = get_article(db, article_id)
     if article:
+        rollback_authors = get_article_authors(db, article_id)
         set_sink_start(db, article_id, params.sink.edit_article_default_days)
-        # Use neutral mid-scale scores — rollback is a system action, not an assessment
         neutral = 3.0
         create_review(db, article_id=article_id, commit_hash=new_hash,
-                      reviewer_id=article.authors[0] if article.authors else "system",
+                      reviewer_id=rollback_authors[0] if rollback_authors else "system",
                       scope="pool", scores={"originality": neutral, "rigor": neutral,
                                              "completeness": neutral,
                                              "pedagogy": neutral, "impact": neutral})

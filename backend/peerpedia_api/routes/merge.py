@@ -33,7 +33,7 @@ def api_create_merge(article_id: str, body: MergeProposalCreate,
         "id": mp.id, "fork_article_id": mp.fork_article_id,
         "target_article_id": mp.target_article_id,
         "proposer_id": mp.proposer_id, "status": mp.status,
-        "thread": mp.thread, "created_at": mp.created_at.isoformat(),
+        "thread": [], "created_at": mp.created_at.isoformat(),
     }
 
 
@@ -44,7 +44,7 @@ def api_list_merges(article_id: str, db: Session = Depends(deps.get_db)):
         "proposals": [
             {"id": p.id, "fork_article_id": p.fork_article_id,
              "target_article_id": p.target_article_id, "proposer_id": p.proposer_id,
-             "status": p.status, "thread": p.thread,
+             "status": p.status, "thread": [],
              "created_at": p.created_at.isoformat()}
             for p in proposals
         ]

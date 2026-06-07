@@ -97,9 +97,6 @@ class ArticleDetail(BaseModel):
     fork_count: int = 0
     forked_from: Optional[str] = None
     commit_count: int = 1
-    compiled_format: Optional[str] = None
-    compiled_output: Optional[str] = None
-    compiled_pages: Optional[list[str]] = None
     score: Optional[dict] = None
     sink_eta: Optional[datetime] = None
     days_remaining: Optional[int] = None

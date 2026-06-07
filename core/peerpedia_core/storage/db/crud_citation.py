@@ -8,9 +8,8 @@ def create_or_update_citation(
     session: Session,
     from_id: str,
     to_id: str,
-    forward: float = 0.0,
-    backward: float = 0.0,
 ) -> Citation:
+    """Record a citation edge. No-op if edge already exists."""
     if from_id == to_id:
         raise ValueError("An article cannot cite itself")
     c = (
@@ -18,18 +17,10 @@ def create_or_update_citation(
         .filter(Citation.from_article_id == from_id, Citation.to_article_id == to_id)
         .first()
     )
-    if c:
-        c.forward_prob = forward
-        c.backward_prob = backward
-    else:
-        c = Citation(
-            from_article_id=from_id,
-            to_article_id=to_id,
-            forward_prob=forward,
-            backward_prob=backward,
-        )
+    if not c:
+        c = Citation(from_article_id=from_id, to_article_id=to_id)
         session.add(c)
-    session.commit()
+        session.commit()
     return c
 
 
