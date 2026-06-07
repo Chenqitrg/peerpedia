@@ -206,11 +206,21 @@ jobs:
     if: always()
     steps:
       - name: Verdict
+        env:
+          BACKEND_TEST: ${{ needs.backend-test.result }}
+          BACKEND_LINT: ${{ needs.backend-lint.result }}
+          FRONTEND_TEST: ${{ needs.frontend-test.result }}
+          FRONTEND_TYPES: ${{ needs.frontend-types.result }}
+          RUST_TEST: ${{ needs.rust-test.result }}
+          RUST_CLIPPY: ${{ needs.rust-clippy.result }}
+          RUST_FMT: ${{ needs.rust-fmt.result }}
+          BUILD_SMOKE: ${{ needs.build-smoke.result }}
         run: |
           FAILED=""
-          for job in backend-test backend-lint frontend-test frontend-types rust-test rust-clippy rust-fmt build-smoke; do
-            result="${{ needs[${job}].result }}"
-            if [ "$result" != "success" ]; then
+          for result in BACKEND_TEST:$BACKEND_TEST BACKEND_LINT:$BACKEND_LINT FRONTEND_TEST:$FRONTEND_TEST FRONTEND_TYPES:$FRONTEND_TYPES RUST_TEST:$RUST_TEST RUST_CLIPPY:$RUST_CLIPPY RUST_FMT:$RUST_FMT BUILD_SMOKE:$BUILD_SMOKE; do
+            job="${result%%:*}"
+            val="${result##*:}"
+            if [ "$val" != "success" ] && [ "$val" != "skipped" ]; then
               FAILED="$FAILED $job"
             fi
           done
