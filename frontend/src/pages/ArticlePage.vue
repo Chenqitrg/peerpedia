@@ -21,6 +21,7 @@ import {
   Edit,
   GitFork,
   GitMerge,
+  GitCommitHorizontal,
   Clock,
   MessageSquare,
   Eye,
@@ -50,6 +51,7 @@ const articleAuthorIds = computed(() => article.value?.authors.map(a => a.id) ??
 const tauri = useTauri()
 const isFromCache = ref(false)
 const cachedAt = ref<string | null>(null)
+const commitHash = ref('')
 
 const statusLabel = useStatusLabel(() => article.value?.status ?? '')
 const statusClass = computed(() => getStatusInfo(article.value?.status ?? '').class)
@@ -117,6 +119,7 @@ function buildArticleFromDraft(draft: { id: string; account_id: string; title: s
     title: draft.title || 'Untitled',
     status: 'draft' as const,
     authors: [{ id: draft.account_id, name: userStore.viewer?.name || userStore.viewer?.username || draft.account_id, anonymous_name: '' }],
+    commit_hash: '',
     fork_count: 0,
     forked_from: null,
     commit_count: 1,
@@ -141,6 +144,7 @@ async function loadArticle(articleId: string) {
   // 1. Try REST API first.
   try {
     article.value = await getArticle(articleId)
+    commitHash.value = article.value.commit_hash || ''
     await loadCompiledContent()
     loadReviews()
     return
@@ -155,6 +159,16 @@ async function loadArticle(articleId: string) {
           isFromCache.value = true
           cachedAt.value = new Date(cached.cached_at).toLocaleString()
           await loadCompiledContent()
+          // Populate commit hash from local git if cache didn't have it
+          commitHash.value = article.value.commit_hash || ''
+          if (!commitHash.value) {
+            try {
+              const history = await tauri.gitHistory({ article_id: articleId })
+              if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+                commitHash.value = history[0].hash
+              }
+            } catch { /* optional */ }
+          }
           return
         } catch { /* corrupt cache, try draft fallback */ }
       }
@@ -164,6 +178,13 @@ async function loadArticle(articleId: string) {
         article.value = buildArticleFromDraft(draft as any)
         const { parseMarkdown } = await import('../utils/markdown')
         compiledHtml.value = parseMarkdown(draft.content || '')
+        // Populate commit hash from local git
+        try {
+          const history = await tauri.gitHistory({ article_id: articleId })
+          if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+            commitHash.value = history[0].hash
+          }
+        } catch { /* optional */ }
         return
       }
     }
@@ -430,6 +451,10 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             <Clock class="w-3 h-3" stroke-width="2" />
             {{ article.days_remaining }}{{ t('card.dRemaining') }}
           </span>
+          <span v-if="commitHash" class="flex items-center gap-1">
+            <GitCommitHorizontal class="w-3 h-3" stroke-width="2" />
+            <span class="font-mono">{{ commitHash.slice(0, 7) }}</span>
+          </span>
 
           <div class="flex-1" />
 
@@ -469,11 +494,15 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               format="source"
               :content="article?.compiled_output || ''"
               :filename="article?.title"
+              :commit-hash="commitHash"
+              show-label
             />
             <DownloadButton
               format="compiled"
               :content="article?.compiled_output || ''"
               :filename="article?.title"
+              :commit-hash="commitHash"
+              show-label
             />
 
             <button
