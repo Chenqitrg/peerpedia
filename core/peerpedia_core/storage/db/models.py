@@ -47,7 +47,8 @@ class Article(Base):
     def __init__(self, **kwargs):
         # Backward compat: pop transient 'authors' kwarg for test/seed code.
         # Ensure id is generated before _pending_authors are flushed.
-        self._pending_authors = kwargs.pop('authors', None)
+        authors = kwargs.pop('authors', None)
+        self._pending_authors = [a for a in (authors or []) if a is not None] or None
         if 'id' not in kwargs:
             kwargs['id'] = _new_id()
         super().__init__(**kwargs)

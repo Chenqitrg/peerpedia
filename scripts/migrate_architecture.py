@@ -24,7 +24,8 @@ def _utcnow() -> datetime:
 
 
 def migrate(db_url: str) -> None:
-    from peerpedia_core.storage.db.engine import get_engine, get_session
+    from peerpedia_core.storage.db import models  # noqa: F401 — register all tables
+    from peerpedia_core.storage.db.engine import get_engine, get_session, init_db
     from sqlalchemy import text
 
     engine = get_engine(db_url)
@@ -44,7 +45,15 @@ def migrate(db_url: str) -> None:
     shutil.copy2(db_path, backup_path)
     print(f"✓ Backed up to {backup_path}")
 
+    # Create new tables (article_authors, review_messages) alongside existing ones
+    init_db(engine)
+    print("✓ New tables created (article_authors, review_messages)")
+
     session = get_session(engine)
+
+    # Disable FK checks for the migration — we're rebuilding tables anyway
+    session.execute(text("PRAGMA foreign_keys = OFF"))
+    session.commit()
 
     try:
         # ── 1. Migrate Article.authors → article_authors table ─────────────
