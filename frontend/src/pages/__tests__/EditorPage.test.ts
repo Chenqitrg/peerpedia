@@ -81,7 +81,9 @@ describe('EditorPage', () => {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await new Promise(r => setTimeout(r, 50))
-    expect(wrapper.text()).toMatch(/publish|Publish/)
+    // Icon-only button — find by aria-label or title
+    const publishBtn = wrapper.find('[aria-label="Publish"]')
+    expect(publishBtn.exists()).toBe(true)
   })
 
   it('has draft save button', async () => {
@@ -128,10 +130,9 @@ describe('EditorPage', () => {
     })
     await new Promise(r => setTimeout(r, 50))
 
-    const buttons = wrapper.findAll('button')
-    const publishBtn = buttons.find(b => b.text().match(/publish|Publish|submit/i))
-    expect(publishBtn).toBeTruthy()
-    await publishBtn!.trigger('click')
+    const publishBtn = wrapper.find('[aria-label="Publish"]')
+    expect(publishBtn.exists()).toBe(true)
+    await publishBtn.trigger('click')
     await new Promise(r => setTimeout(r, 50))
 
     expect(wrapper.text()).toMatch(/contribution|Contribution|slider/i)

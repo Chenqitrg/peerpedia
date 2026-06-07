@@ -163,4 +163,20 @@ describe('ArticleCard (Article Bar)', () => {
     const historyLinks = wrapper.findAll('a[href*="history"]')
     expect(historyLinks.length).toBeGreaterThanOrEqual(1)
   })
+
+  it('renders commit hash badge when hash is present', () => {
+    const wrapper = mount(ArticleCard, {
+      props: { article: makeArticle({ commit_hash: 'a1b2c3d4e5f6' }) },
+      global: { stubs: { 'router-link': RouterLinkStub } },
+    })
+    expect(wrapper.text()).toContain('a1b2c3d')
+  })
+
+  it('hides commit hash badge when hash is empty', () => {
+    const wrapper = mount(ArticleCard, {
+      props: { article: makeArticle({ commit_hash: '' }) },
+      global: { stubs: { 'router-link': RouterLinkStub } },
+    })
+    expect(wrapper.text()).not.toContain('a1b2c3d')
+  })
 })
