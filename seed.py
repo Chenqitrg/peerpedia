@@ -1386,12 +1386,8 @@ program and data. This is the von Neumann architecture.""",
             continue
         for sender_name, content in messages:
             sender = users[sender_name]
-            add_thread_message(session, review_id=review.id, 
-                "author_id": sender.id,
-                "author_name": sender.name,
-                "content": content,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            })
+            add_thread_message(session, review_id=review.id,
+                                author_id=sender.id, content=content)
             thread_count += 1
 
     session.commit()
