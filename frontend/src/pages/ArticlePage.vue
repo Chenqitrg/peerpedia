@@ -118,7 +118,7 @@ function buildArticleFromDraft(draft: { id: string; account_id: string; title: s
     id: draft.id,
     title: draft.title || 'Untitled',
     status: 'draft' as const,
-    authors: [{ id: draft.account_id, name: draft.account_id, anonymous_name: '' }],
+    authors: [{ id: draft.account_id, name: userStore.viewer?.name || userStore.viewer?.username || draft.account_id, anonymous_name: '' }],
     fork_count: 0,
     forked_from: null,
     commit_count: 1,
@@ -289,6 +289,24 @@ function goToHistory() {
   router.push(`/articles/${id}/history`)
 }
 
+async function handleSourceDownload() {
+  // In local mode, download from draft content
+  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    const draft = await tauri.getDraft({ id })
+    if (draft && !('error' in draft)) {
+      const ext = draft.format === 'typst' ? '.typ' : '.md'
+      const blob = new Blob([draft.content || ''], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `article${ext}`; a.click()
+      URL.revokeObjectURL(url)
+      return
+    }
+  }
+  // Web mode: open server download URL
+  window.open(`/api/v1/articles/${id}/download/source`, '_blank')
+}
+
 function goToEdit() {
   router.push(`/edit/${id}`)
 }
@@ -452,14 +470,14 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               {{ t('article.fork') }}
             </button>
 
-            <a
-              :href="`/api/v1/articles/${id}/download/source`"
+            <button
               aria-label="Download source"
-              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors no-underline"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors cursor-pointer"
+              @click="handleSourceDownload"
             >
               <FileDown class="w-3 h-3" stroke-width="2" />
               {{ t('article.source') }}
-            </a>
+            </button>
 
             <a
               :href="`/api/v1/articles/${id}/download/pdf`"

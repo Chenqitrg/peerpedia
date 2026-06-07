@@ -6,6 +6,7 @@ pub mod commands;
 pub mod db;
 pub mod error;
 pub mod local_auth;
+pub mod local_git;
 pub mod local_store;
 
 use rusqlite::Connection;

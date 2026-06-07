@@ -149,6 +149,40 @@ async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): 
       const bms = bookmarks.filter(x => x.user_id === a.user_id)
       return bms.map(b => ({ user_id: b.user_id, article_id: b.article_id, created_at: b.created_at }))
     }
+    // ── Git commands ────────────────────────────────────────────────────
+    case 'git_init': {
+      const key = `_t_git_${a.article_id}`
+      const now = new Date().toISOString()
+      _save(key, [{
+        hash: `0000000${(a.article_id as string).substring(0, 7)}`,
+        message: (a.commit_message as string) || 'Initial draft',
+        author: (a.author as string) || 'local',
+        timestamp: now,
+      }])
+      return { hash: `0000000${(a.article_id as string).substring(0, 7)}`, message: (a.commit_message as string) || 'Initial draft' }
+    }
+    case 'git_commit': {
+      const key = `_t_git_${a.article_id}`
+      const history = _load<any[]>(key, [])
+      const newCommit = {
+        hash: `1111111${(a.article_id as string).substring(0, 7)}`,
+        message: (a.commit_message as string) || 'Edit',
+        author: (a.author as string) || 'local',
+        timestamp: new Date().toISOString(),
+      }
+      history.unshift(newCommit)
+      _save(key, history)
+      return { hash: newCommit.hash, message: newCommit.message }
+    }
+    case 'git_history': {
+      const key = `_t_git_${a.article_id}`
+      return _load<any[]>(key, [])
+    }
+    case 'git_show': {
+      // For mock, return draft content as the file at any commit
+      const draft = drafts.find(x => x.id === a.article_id)
+      return (draft?.content) || ''
+    }
     default:
       return { ok: true }
   }
@@ -218,6 +252,45 @@ export interface BookmarkParams {
 
 export interface GetBookmarksParams {
   user_id: string
+}
+
+// ── Git params ─────────────────────────────────────────────────────────
+
+export interface GitInitParams {
+  article_id: string
+  content?: string
+  format?: string
+  commit_message?: string
+  author: string
+}
+
+export interface GitCommitParams {
+  article_id: string
+  content?: string
+  format?: string
+  commit_message?: string
+  author: string
+}
+
+export interface GitHistoryParams {
+  article_id: string
+}
+
+export interface GitShowParams {
+  article_id: string
+  commit_hash: string
+}
+
+export interface GitCommitResult {
+  hash: string
+  message: string
+}
+
+export interface CommitEntry {
+  hash: string
+  message: string
+  author: string
+  timestamp: string
 }
 
 // ── Return types ──────────────────────────────────────────────────────
@@ -390,6 +463,20 @@ export function useTauri() {
     },
     async getBookmarks(params: GetBookmarksParams) {
       return _invoke<MockBookmark[]>('get_bookmarks', params as unknown as Record<string, unknown>)
+    },
+
+    // Git
+    async gitInit(params: GitInitParams) {
+      return _invoke<GitCommitResult>('git_init', params as unknown as Record<string, unknown>)
+    },
+    async gitCommit(params: GitCommitParams) {
+      return _invoke<GitCommitResult>('git_commit', params as unknown as Record<string, unknown>)
+    },
+    async gitHistory(params: GitHistoryParams) {
+      return _invoke<CommitEntry[]>('git_history', params as unknown as Record<string, unknown>)
+    },
+    async gitShow(params: GitShowParams) {
+      return _invoke<string>('git_show', params as unknown as Record<string, unknown>)
     },
   }
 }

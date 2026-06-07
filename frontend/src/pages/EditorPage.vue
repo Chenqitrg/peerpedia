@@ -156,6 +156,7 @@ async function restoreDraft() {
 
 async function saveDraft() {
   const accountId = userStore.viewer?.id || 'local'
+  const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
 
   // Persist via Tauri or REST (handled by useDraftPersistence).
   const result = await draftPersistence.save(
@@ -169,6 +170,22 @@ async function saveDraft() {
     currentDraftId.value = result.id
     // Persist the Tauri draft ID so it survives page refresh.
     saveString(DRAFT_ID_KEY.value, result.id)
+
+    // In local mode, save = git commit.
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      const msg = commitMsg.value.trim() || 'Save draft'
+      try {
+        if (!currentDraftId.value || currentDraftId.value === result.id) {
+          // Check if git repo exists; if not, init
+          const history = await tauri.gitHistory({ article_id: result.id })
+          if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+            await tauri.gitCommit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+          } else {
+            await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+          }
+        }
+      } catch { /* git ops optional — draft is still saved */ }
+    }
   }
 
   // Also save to localStorage as offline backup (works in both modes).

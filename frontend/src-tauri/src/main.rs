@@ -30,6 +30,10 @@ fn main() {
             commands::get_history,
             commands::get_cached_article_ids,
             commands::cache_article_full,
+            commands::git_init,
+            commands::git_commit,
+            commands::git_history,
+            commands::git_show,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PeerPedia");
