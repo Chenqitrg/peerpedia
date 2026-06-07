@@ -96,14 +96,16 @@ const totalContribution = computed(() =>
 const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
 const currentDraftId = ref<string | undefined>(
-  editId.value as string | undefined || loadString(DRAFT_ID_KEY.value) || undefined
+  isEdit.value ? (editId.value as string | undefined) : undefined
 )
 
 onMounted(() => {
   if (isEdit.value) {
     loadExistingArticle()
   } else {
-    restoreDraft()
+    // New article: clear any stale draft keys from previous sessions
+    remove(DRAFT_ID_KEY.value)
+    remove(`editor-draft-id-${draftUid.value}-new`)
   }
 })
 
