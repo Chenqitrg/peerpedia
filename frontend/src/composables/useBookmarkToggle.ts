@@ -17,7 +17,7 @@ export function useBookmarkToggle(
 ) {
   const userStore = useUserStore()
   const tauri = useTauri()
-  const isLocal = userStore.isTauriMode || userStore.isDevMock
+  const isLocal = userStore.isTauriMode || userStore.isBrowserLocal
 
   async function toggle(articleId: string, currentlyBookmarked: boolean) {
     if (!userStore.viewer) return

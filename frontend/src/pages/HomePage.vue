@@ -43,13 +43,13 @@ function goToPage(page: number) {
 }
 
 onMounted(() => {
-  if (isLoggedIn.value && !userStore.isTauriMode && !userStore.isDevMock) loadFeed()
+  if (isLoggedIn.value && !userStore.isTauriMode && !userStore.isBrowserLocal) loadFeed()
 })
 
 // Re-fetch feed when user logs in (modal doesn't remount the page)
 // Skip in Tauri mode — no server to fetch from.
 watch(isLoggedIn, (loggedIn) => {
-  if (loggedIn && !userStore.isTauriMode && !userStore.isDevMock) loadFeed()
+  if (loggedIn && !userStore.isTauriMode && !userStore.isBrowserLocal) loadFeed()
 })
 </script>
 
