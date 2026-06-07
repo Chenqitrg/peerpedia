@@ -8,8 +8,8 @@ pub mod error;
 pub mod local_auth;
 pub mod local_store;
 
-use std::sync::Mutex;
 use rusqlite::Connection;
+use std::sync::Mutex;
 
 /// Shared database connection, protected by a Mutex for thread safety.
 pub struct AppState {

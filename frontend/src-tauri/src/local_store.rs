@@ -259,15 +259,7 @@ mod tests {
         let draft = save_draft(&conn, None, "acc1", "V1", "content", "markdown").unwrap();
         let id = draft.id.clone();
 
-        let updated = save_draft(
-            &conn,
-            Some(&id),
-            "acc1",
-            "V2",
-            "new content",
-            "typst",
-        )
-        .unwrap();
+        let updated = save_draft(&conn, Some(&id), "acc1", "V2", "new content", "typst").unwrap();
         assert_eq!(updated.id, id);
         assert_eq!(updated.title, "V2");
         assert_eq!(updated.content, "new content");

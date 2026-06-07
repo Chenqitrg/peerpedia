@@ -70,7 +70,9 @@ pub fn create_account(
 pub fn login(conn: &Connection, username: &str, password: &str) -> Result<Account, AppError> {
     let username = username.trim();
     if username.is_empty() || password.is_empty() {
-        return Err(AppError::AuthFailed("Username and password are required".into()));
+        return Err(AppError::AuthFailed(
+            "Username and password are required".into(),
+        ));
     }
 
     let result = conn.query_row(
@@ -90,7 +92,10 @@ pub fn login(conn: &Connection, username: &str, password: &str) -> Result<Accoun
             let valid = verify(password, &password_hash)
                 .map_err(|e| AppError::AuthFailed(e.to_string()))?;
             if valid {
-                Ok(Account { id, username: uname })
+                Ok(Account {
+                    id,
+                    username: uname,
+                })
             } else {
                 Err(AppError::AuthFailed("Incorrect password".into()))
             }
@@ -133,7 +138,8 @@ mod tests {
     #[test]
     fn test_create_account_success() {
         let conn = setup();
-        let account = create_account(&conn, "alice", "password123", "alice@test.com", "Alice").unwrap();
+        let account =
+            create_account(&conn, "alice", "password123", "alice@test.com", "Alice").unwrap();
         assert!(!account.id.is_empty());
         assert_eq!(account.username, "alice");
     }
