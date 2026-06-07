@@ -206,12 +206,7 @@ pub fn get_history(
     params: GetHistoryParams,
 ) -> Result<Vec<local_store::HistoryEntry>, AppError> {
     let conn = state.db.lock().unwrap();
-    local_store::get_history(
-        &conn,
-        &params.account_id,
-        params.page,
-        params.size,
-    )
+    local_store::get_history(&conn, &params.account_id, params.page, params.size)
 }
 
 #[tauri::command]
