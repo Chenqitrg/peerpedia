@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { getHistory, getDiff, rollbackArticle } from '../api/articles'
 import { useAsyncResource } from '../composables/useAsyncResource'
+import { useTauri } from '../composables/useTauri'
 import ErrorState from '../components/ErrorState.vue'
 import ScoreBadges from '../components/ScoreBadges.vue'
 import type { CommitInfo, ArticleDiff, ArticleHistory } from '../api/types'
+import type { CommitEntry } from '../composables/useTauri'
 import {
   GitCommitHorizontal,
   GitBranch,
@@ -21,6 +23,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
+const tauri = useTauri()
 
 const selectedHash1 = ref<string | null>(null)
 const selectedHash2 = ref<string | null>(null)
@@ -29,8 +32,25 @@ const diffLoading = ref(false)
 const rollingBack = ref<string | null>(null)
 const rollbackError = ref('')
 
+const isLocal = computed(() => tauri.isTauri.value || tauri.isBrowserLocal.value)
+
 const { data: history, loading, error, execute: loadHistory } = useAsyncResource(
-  () => getHistory(id),
+  async () => {
+    // In local mode, fetch from local git history
+    if (isLocal.value) {
+      const entries = await tauri.gitHistory({ article_id: id })
+      if (entries && !('error' in entries) && Array.isArray(entries)) {
+        const commits = (entries as CommitEntry[]).map(e => ({
+          hash: e.hash,
+          message: e.message,
+          author: e.author,
+          timestamp: e.timestamp,
+        }))
+        return { commits } as ArticleHistory
+      }
+    }
+    return getHistory(id)
+  },
   null as ArticleHistory | null,
   { immediate: true },
 )

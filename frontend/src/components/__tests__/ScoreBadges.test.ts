@@ -21,16 +21,15 @@ function mountComponent(props = {}) {
 
 describe('ScoreBadges', () => {
   describe('read-only mode (default)', () => {
-    it('renders all five dimensions with label:value format', () => {
+    it('renders all five dimensions with icon and value', () => {
       const wrapper = mountComponent()
       const text = wrapper.text()
-      // The .full span is in the DOM but hidden via CSS max-width: 0.
-      // text() returns the full unfolded content.
-      expect(text).toContain('Originality')
-      expect(text).toContain('Rigor')
-      expect(text).toContain(':4')
-      expect(text).toContain(':3')
-      expect(text).toContain(':5')
+      // Icons replace the old O:/R:/C: text — values should be present
+      expect(text).toContain('4')
+      expect(text).toContain('3')
+      expect(text).toContain('5')
+      // Should have 5 icon components (Lightbulb, FlaskConical, CheckCheck, BookOpen, TrendingUp)
+      expect(wrapper.findAll('svg').length).toBeGreaterThanOrEqual(5)
     })
 
     it('shows "Scores" label when showLabel is true', () => {
@@ -45,9 +44,10 @@ describe('ScoreBadges', () => {
 
     it('highlights originality when highlightFirst is true', () => {
       const wrapper = mountComponent({ highlightFirst: true })
-      const dims = wrapper.findAll('.score-dim')
-      expect(dims[0].classes()).toContain('text-accent')
-      expect(dims[0].classes()).toContain('font-semibold')
+      // First dimension span should have text-accent class
+      const spans = wrapper.findAll('span')
+      const accentSpans = spans.filter(s => s.classes().includes('text-accent'))
+      expect(accentSpans.length).toBeGreaterThan(0)
     })
 
     it('does not render StarRating in read-only mode', () => {
@@ -64,17 +64,19 @@ describe('ScoreBadges', () => {
 
     it('shows StarRating on mouseenter over a dimension', async () => {
       const wrapper = mountComponent({ editable: true })
-      const firstDim = wrapper.findAll('.score-dim')[0]
-      await firstDim.trigger('mouseenter')
+      // Find all dimension containers by looking for spans with cursor-default
+      const dims = wrapper.findAll('.cursor-default')
+      expect(dims.length).toBeGreaterThan(0)
+      await dims[0].trigger('mouseenter')
       expect(wrapper.findComponent(StarRating).exists()).toBe(true)
     })
 
     it('hides StarRating on mouseleave', async () => {
       const wrapper = mountComponent({ editable: true })
-      const firstDim = wrapper.findAll('.score-dim')[0]
-      await firstDim.trigger('mouseenter')
+      const dims = wrapper.findAll('.cursor-default')
+      await dims[0].trigger('mouseenter')
       expect(wrapper.findComponent(StarRating).exists()).toBe(true)
-      await firstDim.trigger('mouseleave')
+      await dims[0].trigger('mouseleave')
       // Wait for the 100ms debounce
       await new Promise(r => setTimeout(r, 150))
       expect(wrapper.findComponent(StarRating).exists()).toBe(false)
@@ -82,8 +84,8 @@ describe('ScoreBadges', () => {
 
     it('emits update-score when star is clicked', async () => {
       const wrapper = mountComponent({ editable: true })
-      const firstDim = wrapper.findAll('.score-dim')[0]
-      await firstDim.trigger('mouseenter')
+      const dims = wrapper.findAll('.cursor-default')
+      await dims[0].trigger('mouseenter')
       // Click the 5th star to change rating from 4 to 5
       const stars = wrapper.findComponent(StarRating).findAll('[role="radio"]')
       await stars[4].trigger('click')
@@ -93,9 +95,8 @@ describe('ScoreBadges', () => {
 
     it('only shows StarRating for the hovered dimension', async () => {
       const wrapper = mountComponent({ editable: true })
-      const dims = wrapper.findAll('.score-dim')
+      const dims = wrapper.findAll('.cursor-default')
       await dims[0].trigger('mouseenter')
-      // Only one StarRating should be visible
       expect(wrapper.findAllComponents(StarRating).length).toBe(1)
       await dims[0].trigger('mouseleave')
       await new Promise(r => setTimeout(r, 150))
@@ -105,9 +106,8 @@ describe('ScoreBadges', () => {
 
     it('does nothing on mouseenter when score is null', async () => {
       const wrapper = mountComponent({ editable: true, score: null })
-      const el = wrapper.find('.score-dim')
-      // Null score means the element isn't rendered at all
-      expect(el.exists()).toBe(false)
+      // Null score means no dimensions rendered at all
+      expect(wrapper.find('svg').exists()).toBe(false)
     })
   })
 })

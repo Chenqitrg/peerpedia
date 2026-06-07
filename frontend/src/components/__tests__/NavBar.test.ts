@@ -1,7 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import NavBar from '../NavBar.vue'
+
+// Mock useNetworkStatus so canRead('pool')/canRead('schools') pass in tests
+vi.mock('@/composables/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({
+    isOnline: { value: true },
+    startPing: vi.fn(),
+    stopPing: vi.fn(),
+  })),
+}))
 
 const RouterLinkStub = {
   props: ['to'],
@@ -50,8 +59,8 @@ describe('NavBar', () => {
     const wrapper = mount(NavBar, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    // Should show Pool link
-    expect(wrapper.text()).toContain('Pool')
+    // Should show Pool link (icon-only with title tooltip)
+    expect(wrapper.find('a[href="/pool"]').exists()).toBe(true)
     // Should show action links
     expect(wrapper.find('a[href="/bookmarks"]').exists()).toBe(true)
     expect(wrapper.find('a[href="/edit"]').exists()).toBe(true)

@@ -34,6 +34,7 @@ export interface ArticleSummary {
   title: string
   status: 'draft' | 'sedimentation' | 'published'
   authors: AuthorInfo[]
+  abstract: string | null
   content_preview: string
   commit_hash: string
   fork_count: number

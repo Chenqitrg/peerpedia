@@ -2,8 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-const { mockPush } = vi.hoisted(() => ({
+const { mockPush, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft } = vi.hoisted(() => ({
   mockPush: vi.fn(),
+  mockSaveDraft: vi.fn().mockResolvedValue({ id: 'draft-99', account_id: 'u1', title: '', content: '', format: 'markdown', updated_at: '2026-06-07' }),
+  mockGitInit: vi.fn().mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' }),
+  mockGitCommit: vi.fn().mockResolvedValue({ hash: 'abc5678', message: 'Update' }),
+  mockGitHistory: vi.fn().mockResolvedValue([]),
+  mockGetDraft: vi.fn().mockResolvedValue(null),
 }))
 
 const RouterLinkStub = {
@@ -28,10 +33,27 @@ vi.mock('@/composables/useNetworkStatus', () => ({
   })),
 }))
 
+// Mock useTauri — default web mode. Tests that need local mode set _isTauri=true.
+let _isTauri = false
+vi.mock('@/composables/useTauri', () => ({
+  useTauri: () => ({
+    isTauri: { value: _isTauri },
+    isBrowserLocal: { value: false },
+    saveDraft: mockSaveDraft,
+    getDraft: mockGetDraft,
+    listDrafts: vi.fn().mockResolvedValue([]),
+    deleteDraft: vi.fn().mockResolvedValue({ ok: true }),
+    gitInit: mockGitInit,
+    gitCommit: mockGitCommit,
+    gitHistory: mockGitHistory,
+  }),
+}))
+
 describe('EditorPage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+    _isTauri = false
   })
 
   it('renders editor page with title input', async () => {
@@ -78,7 +100,6 @@ describe('EditorPage', () => {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await new Promise(r => setTimeout(r, 50))
-    // Should have some button elements
     const buttons = wrapper.findAll('button')
     expect(buttons.length).toBeGreaterThan(0)
   })
@@ -91,14 +112,11 @@ describe('EditorPage', () => {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await new Promise(r => setTimeout(r, 50))
-    // EditorPage renders with compile/preview area — download is available
     const html = wrapper.html()
-    // Should have a toolbar with action buttons
     expect(html.length).toBeGreaterThan(0)
   })
 
   it('self-assessment modal shows contribution slider', async () => {
-    // Set up a viewer so the publish modal can use their ID
     const { useUserStore } = await import('../../stores/useUserStore')
     const pinia = setActivePinia(createPinia())
     const userStore = useUserStore()
@@ -110,14 +128,12 @@ describe('EditorPage', () => {
     })
     await new Promise(r => setTimeout(r, 50))
 
-    // Click the Publish button to open the self-assessment modal
     const buttons = wrapper.findAll('button')
     const publishBtn = buttons.find(b => b.text().match(/publish|Publish|submit/i))
     expect(publishBtn).toBeTruthy()
     await publishBtn!.trigger('click')
     await new Promise(r => setTimeout(r, 50))
 
-    // Modal should now be visible with contribution section
     expect(wrapper.text()).toMatch(/contribution|Contribution|slider/i)
   })
 
@@ -135,20 +151,45 @@ describe('EditorPage', () => {
 
     const vm = wrapper.vm as any
 
-    // Open publish modal — contributions initialized to { u1: 100 }
     await vm.handlePublish()
     expect(vm.contributions).toEqual({ u1: 100 })
 
-    // User adjusts contribution from 100% → 50%
     vm.contributions['u1'] = 50
     expect(vm.contributions['u1']).toBe(50)
 
-    // Close modal
     vm.showSelfReview = false
 
-    // Reopen — contributions should still be { u1: 50 }, not reset to { u1: 100 }
     await vm.handlePublish()
     expect(vm.contributions['u1']).toBe(50)
     expect(vm.contributions).toEqual({ u1: 50 })
+  })
+
+  // Regression: saveDraft must trigger git init in Tauri/local mode
+  it('saveDraft triggers git init in Tauri mode', async () => {
+    _isTauri = true
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    vm.title = 'Test Article'
+    vm.content = '# Hello World'
+    vm.commitMsg = 'Initial draft'
+    await vm.saveDraft()
+
+    // Verify gitInit was called
+    expect(mockGitInit).toHaveBeenCalled()
+    const callArgs = mockGitInit.mock.calls[0][0]
+    expect(callArgs.article_id).toBe('draft-99')
+    expect(callArgs.content).toBe('# Hello World')
+    expect(callArgs.commit_message).toBe('Initial draft')
+    expect(callArgs.author).toBe('Alice Chen')
   })
 })

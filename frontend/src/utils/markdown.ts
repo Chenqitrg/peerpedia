@@ -13,7 +13,7 @@
 import { marked } from 'marked'
 import { renderMathInHtml } from './math'
 
-const PLACEHOLDER_PREFIX = 'PEERPEDIA_MATH_'
+const PLACEHOLDER_PREFIX = 'PEERPEDIA-MATH-'
 
 /**
  * Compile a markdown string to HTML, with KaTeX math rendering.
@@ -68,7 +68,8 @@ function protectMath(text: string): { protectedText: string; placeholders: Place
   // Display math first ($$ must be handled before $ to avoid conflict).
   let result = text.replace(/\$\$([\s\S]+?)\$\$/g, replaceBlock)
   // Inline math: $...$ (single $ not adjacent to another $).
-  result = result.replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, replaceInline)
+  // Use [\s\S] instead of . so inline math spanning newlines is matched.
+  result = result.replace(/(?<!\$)\$(?!\$)([\s\S]+?)(?<!\$)\$(?!\$)/g, replaceInline)
 
   return { protectedText: result, placeholders }
 }
@@ -83,11 +84,13 @@ function restoreMath(html: string, placeholders: PlaceholderMap): string {
   let result = html
   for (const key of keys) {
     const math = placeholders[key]
-    if (key.includes(`${PLACEHOLDER_PREFIX}D`)) {
-      result = result.replace(key, `<span class="katex-display">${math}</span>`)
-    } else {
-      result = result.replace(key, `<span class="katex-inline">${math}</span>`)
-    }
+    // Use split/join instead of String.replace() to avoid $$ interpretation:
+    // String.replace() treats $$ as literal $ in the replacement string,
+    // corrupting KaTeX display-mode delimiters ($$x^2$$ → $x^2$).
+    const span = key.includes(`${PLACEHOLDER_PREFIX}D`)
+      ? `<span class="katex-display">${math}</span>`
+      : `<span class="katex-inline">${math}</span>`
+    result = result.split(key).join(span)
   }
   return result
 }

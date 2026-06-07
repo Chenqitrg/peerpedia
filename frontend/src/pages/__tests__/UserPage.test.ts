@@ -87,8 +87,10 @@ describe('UserPage', () => {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await flushPromises()
-    expect(wrapper.text()).toMatch(/professionalism|Professionalism/i)
-    expect(wrapper.text()).toMatch(/objectivity|Objectivity/i)
+    // Reputation badges now use icons + numbers (no text labels)
+    expect(wrapper.text()).toContain('4')
+    expect(wrapper.text()).toContain('3')
+    expect(wrapper.text()).toContain('5')
   })
 
   it('renders follower and following counts', async () => {

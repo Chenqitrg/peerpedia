@@ -11,6 +11,7 @@ import { loadString, saveString, saveJSON, remove } from '../composables/useLoca
 import { parseMarkdown } from '../utils/markdown'
 import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
+  ArrowLeft,
   Bookmark,
   BookmarkCheck,
   Eye,
@@ -156,6 +157,7 @@ async function restoreDraft() {
 
 async function saveDraft() {
   const accountId = userStore.viewer?.id || 'local'
+  const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
 
   // Persist via Tauri or REST (handled by useDraftPersistence).
   const result = await draftPersistence.save(
@@ -169,6 +171,22 @@ async function saveDraft() {
     currentDraftId.value = result.id
     // Persist the Tauri draft ID so it survives page refresh.
     saveString(DRAFT_ID_KEY.value, result.id)
+
+    // In local mode, save = git commit.
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      const msg = commitMsg.value.trim() || 'Save draft'
+      try {
+        if (!currentDraftId.value || currentDraftId.value === result.id) {
+          // Check if git repo exists; if not, init
+          const history = await tauri.gitHistory({ article_id: result.id })
+          if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+            await tauri.gitCommit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+          } else {
+            await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+          }
+        }
+      } catch { /* git ops optional — draft is still saved */ }
+    }
   }
 
   // Also save to localStorage as offline backup (works in both modes).
@@ -206,7 +224,27 @@ async function handleCompile() {
   }
 }
 
+// Commit message popup
+const showCommitPopup = ref(false)
+const tempCommitMsg = ref('')
+
+function openCommitPopup() {
+  tempCommitMsg.value = commitMsg.value
+  showCommitPopup.value = true
+}
+
+async function confirmSaveWithCommit() {
+  commitMsg.value = tempCommitMsg.value.trim() || 'Save draft'
+  showCommitPopup.value = false
+  await saveDraft()
+}
+
 async function handleSaveDraft() {
+  // In local mode, require a commit message
+  if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && !commitMsg.value.trim()) {
+    openCommitPopup()
+    return
+  }
   await saveDraft()
   if (!userStore.viewer) return
   if (!editId.value) return  // can't save unsaved article to backend
@@ -345,6 +383,15 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
   <div class="editor-page flex flex-col h-[calc(100vh-6rem)] animate-fade-in">
     <!-- Top toolbar -->
     <div class="flex items-center justify-between px-4 py-2 bg-card border border-divider rounded-t-lg mb-0">
+      <button
+        class="flex items-center justify-center w-8 h-8 rounded-lg
+               text-ink-muted hover:text-ink hover:bg-[#21262d]
+               transition-colors duration-200 shrink-0"
+        aria-label="Back"
+        @click="router.back()"
+      >
+        <ArrowLeft class="w-4 h-4" stroke-width="2" />
+      </button>
       <div class="flex items-center gap-3 flex-1 min-w-0">
         <!-- Title input (editable only on create) -->
         <input
@@ -377,6 +424,32 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           >
             <Save class="w-4 h-4" stroke-width="2" />
           </button>
+          <!-- Commit message popup -->
+          <Transition name="slide-up">
+            <div
+              v-if="showCommitPopup"
+              class="absolute top-full right-0 mt-2 z-50 bg-card border border-divider rounded-xl shadow-2xl p-4 w-72 animate-fade-in"
+            >
+              <p class="text-xs text-ink-muted mb-2">{{ t('editor.commitMessage') }} <span class="text-[#d73a49]">*</span></p>
+              <input
+                v-model="tempCommitMsg"
+                type="text"
+                :placeholder="t('editor.commitMessagePlaceholder')"
+                class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent mb-3"
+                @keyup.enter="confirmSaveWithCommit"
+              />
+              <div class="flex items-center gap-2">
+                <button
+                  class="flex-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-lg py-1.5 transition-colors"
+                  @click="showCommitPopup = false"
+                >{{ t('editor.cancel') }}</button>
+                <button
+                  class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-1.5 hover:brightness-110 transition-all"
+                  @click="confirmSaveWithCommit"
+                >{{ t('editor.saveDraft') }}</button>
+              </div>
+            </div>
+          </Transition>
           <span
             v-if="savedMsg"
             class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-success whitespace-nowrap"
