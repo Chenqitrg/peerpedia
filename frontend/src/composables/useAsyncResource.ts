@@ -21,9 +21,12 @@ export function useAsyncResource<T>(
   )
 
   const error = computed(() => {
-    // In Tauri mode, suppress network errors — no server expected.
-    const isTauri = typeof window !== 'undefined' && '__TAURI__' in window
-    if (isTauri) return ''
+    // In Tauri mode or dev-mock mode, suppress network errors — no server expected.
+    const isOffline = typeof window !== 'undefined' && (
+      '__TAURI__' in window ||
+      new URLSearchParams(window.location.search).has('tauri')
+    )
+    if (isOffline) return ''
 
     const e = rawError.value as any
     return e?.userMessage || e?.response?.data?.detail || e?.message || ''

@@ -107,23 +107,80 @@ const sortedReviews = computed(() => {
     .map(x => x.r)
 })
 
-// ── Lifecycle ───────────────────────────────────────────────────────────
+// ── Offline fallback: build ArticleDetail from Tauri/dev-mock draft ──────
 
-onMounted(async () => {
+function buildArticleFromDraft(draft: { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }): ArticleDetail {
+  const viewerId = userStore.viewer?.id
+  return {
+    id: draft.id,
+    title: draft.title || 'Untitled',
+    status: 'draft' as const,
+    authors: [{ id: draft.account_id, name: draft.account_id, anonymous_name: '' }],
+    fork_count: 0,
+    forked_from: null,
+    commit_count: 1,
+    compiled_format: draft.format,
+    compiled_output: draft.content,  // use raw content as compiled output
+    compiled_pages: null,
+    score: null,
+    sink_eta: null,
+    days_remaining: null,
+    sink_duration_days: null,
+    review_count: 0,
+    is_bookmarked: false,
+    is_own_article: viewerId === draft.account_id,
+    created_at: draft.updated_at,
+    updated_at: draft.updated_at,
+  }
+}
+
+// ── Shared article loader (REST API with Tauri/dev-mock fallback) ─────────
+
+async function loadArticle(articleId: string) {
+  // 1. Try REST API first.
   try {
-    article.value = await getArticle(id)
+    article.value = await getArticle(articleId)
     await loadCompiledContent()
     loadReviews()
+    return
   } catch (e: any) {
+    // 2. In Tauri/dev-mock mode, fall back to local draft cache.
+    const isOffline = tauri.isTauri.value || tauri.isDevMock.value
+    if (isOffline) {
+      const cached = await tauri.getCachedArticle({ id: articleId })
+      if (cached && !('error' in cached)) {
+        try {
+          article.value = JSON.parse(cached.json) as ArticleDetail
+          isFromCache.value = true
+          cachedAt.value = new Date(cached.cached_at).toLocaleString()
+          await loadCompiledContent()
+          return
+        } catch { /* corrupt cache, try draft fallback */ }
+      }
+
+      const draft = await tauri.getDraft({ id: articleId })
+      if (draft && !('error' in draft)) {
+        article.value = buildArticleFromDraft(draft as any)
+        compiledHtml.value = renderMathInHtml(draft.content || '')
+        return
+      }
+    }
+
+    // 3. Neither source worked — show error.
     const status = e?.response?.status
     if (status === 404) {
       errorMessage.value = 'Article not found.'
     } else {
       errorMessage.value = e.userMessage || 'Failed to load article. Is the server running?'
     }
-  } finally {
-    loading.value = false
   }
+}
+
+// ── Lifecycle ───────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  await loadArticle(id)
+  loading.value = false
 })
 
 watch(() => route.params.id, async (newId) => {
@@ -132,15 +189,10 @@ watch(() => route.params.id, async (newId) => {
   reviewStore.reviews = []
   compiledHtml.value = ''
   activeTab.value = 'body'
-  try {
-    article.value = await getArticle(newId as string)
-    await loadCompiledContent()
-    loadReviews()
-  } catch (e) {
-    console.error('Failed to load article:', e)
-  } finally {
-    loading.value = false
-  }
+  isFromCache.value = false
+  cachedAt.value = null
+  await loadArticle(newId as string)
+  loading.value = false
 })
 
 async function loadCompiledContent() {
