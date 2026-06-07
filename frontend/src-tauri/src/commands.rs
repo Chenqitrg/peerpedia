@@ -231,6 +231,7 @@ pub struct GitInitParams {
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub fn git_init(
     state: State<'_, AppState>,
     params: GitInitParams,
@@ -257,6 +258,7 @@ pub struct GitCommitParams {
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub fn git_commit(
     state: State<'_, AppState>,
     params: GitCommitParams,
