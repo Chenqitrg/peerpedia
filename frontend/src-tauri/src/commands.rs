@@ -158,3 +158,70 @@ pub fn get_cached_article(
     let conn = state.db.lock().unwrap();
     local_store::get_cached_article(&conn, &params.id)
 }
+
+// ── Browsing history commands ───────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct RecordVisitParams {
+    pub account_id: String,
+    pub article_id: String,
+    #[serde(default)]
+    pub article_title: String,
+}
+
+#[tauri::command]
+pub fn record_visit(
+    state: State<'_, AppState>,
+    params: RecordVisitParams,
+) -> Result<OkResponse, AppError> {
+    let conn = state.db.lock().unwrap();
+    local_store::record_visit(&conn, &params.account_id, &params.article_id, &params.article_title)?;
+    Ok(OkResponse { ok: true })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetHistoryParams {
+    pub account_id: String,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_size")]
+    pub size: i64,
+}
+
+fn default_page() -> i64 { 1 }
+fn default_size() -> i64 { 20 }
+
+#[tauri::command]
+pub fn get_history(
+    state: State<'_, AppState>,
+    params: GetHistoryParams,
+) -> Result<Vec<local_store::HistoryEntry>, AppError> {
+    let conn = state.db.lock().unwrap();
+    local_store::get_history(&conn, &params.account_id, params.page, params.size)
+}
+
+#[tauri::command]
+pub fn get_cached_article_ids(
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, AppError> {
+    let conn = state.db.lock().unwrap();
+    local_store::get_cached_article_ids(&conn)
+}
+
+// ── Article full cache command ──────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct CacheArticleFullParams {
+    pub id: String,
+    pub article_json: String,
+}
+
+#[tauri::command]
+pub fn cache_article_full(
+    state: State<'_, AppState>,
+    params: CacheArticleFullParams,
+) -> Result<OkResponse, AppError> {
+    let conn = state.db.lock().unwrap();
+    local_store::cache_article_full(&conn, &params.id, &params.article_json)?;
+    Ok(OkResponse { ok: true })
+}

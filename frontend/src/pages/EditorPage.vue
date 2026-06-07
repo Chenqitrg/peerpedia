@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { useOffline } from '../composables/useOffline'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
@@ -27,6 +28,7 @@ const router = useRouter()
 const articleStore = useArticleStore()
 const userStore = useUserStore()
 const { t } = useI18n()
+const { canWrite, getFallback } = useOffline()
 
 import { getArticleSource } from '../api/articles'
 import type { ArticleCreatePayload, ArticleUpdatePayload } from '../api/types'
@@ -462,9 +464,12 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         <!-- Publish button -->
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
-                 bg-accent text-[#0d1117] rounded-lg
-                 hover:brightness-110 transition-all duration-200"
-          :disabled="submitting"
+                 rounded-lg transition-all duration-200"
+          :class="canWrite('editor.publish_pool')
+            ? 'bg-accent text-[#0d1117] hover:brightness-110'
+            : 'bg-[#21262d] text-ink-muted/50 cursor-not-allowed'"
+          :disabled="submitting || !canWrite('editor.publish_pool')"
+          :title="!canWrite('editor.publish_pool') ? t(getFallback('editor.publish_pool')) : ''"
           @click="handlePublish"
         >
           <Send class="w-3.5 h-3.5" stroke-width="2" />

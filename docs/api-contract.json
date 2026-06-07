@@ -1886,6 +1886,35 @@
         "deprecated": true
       }
     },
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "description": "Lightweight health check endpoint for network status detection. Returns 200 OK with server status. Used by Tauri desktop for connectivity monitoring (30s ping interval). Does not query the database.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "title": "Ok"
+                    }
+                  },
+                  "required": ["ok"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/articles/{article_id}/citations": {
       "get": {
         "tags": [

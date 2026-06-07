@@ -1,49 +1,90 @@
-## Need to be careful
+# CLAUDE.md
 
-- Always check you are in the correct directory.
-- When there is new feature, always use /test-driven-development
-- Whenever corrected a bug, always add a recursive test
-- Always ask more questions before executing
-- Some features may seem to be redundant, but may be a plan. Always make sure if you try to simplify it
-- Updates always follow README -> API contract -> test -> code.
+## Read First
 
-## All files that should read first
+- README.md
+- docs/DESIGN.en.md
+- docs/api-contract.json
 
-- README.md: a file for current stage and outlook
-- docs/DESIGN.en.md: a file that can reconstruct this project
-- docs/api-contract.json: API contract
+---
 
-## Session discipline
+## Workflow
 
-**After every code change**, clear all caches before verifying:
+README → Architecture → API → Test → Code
 
-```bash
-lsof -ti:8080 | xargs kill -9 2>/dev/null
-find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-find . -name "*.pyc" -delete 2>/dev/null
-rm -rf .pytest_cache .mypy_cache .ruff_cache
-rm -f .coverage
-```
+Bug fix:
 
-Then restart server and verify.
+1. Reproduce
+2. Add regression test
+3. Fix
+4. Verify
 
+---
 
+## Entity First
 
-## Skill routing
+Before coding, define:
 
-When the user's request matches an available skill, invoke it via the Skill tool.
+- Entities
+- Relationships
+- Lifecycle
+- Source of Truth
 
-Key routing rules:
-- Product ideas/brainstorming → invoke /office-hours
-- Strategy/scope → invoke /plan-ceo-review
-- Architecture → invoke /plan-eng-review
-- Design system/plan review → invoke /design-consultation or /plan-design-review
-- Full review pipeline → invoke /autoplan
-- Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
-- Code review/diff check → invoke /review
-- Visual polish → invoke /design-review
-- Ship/deploy/PR → invoke /ship or /land-and-deploy
-- Save progress → invoke /context-save
-- Resume context → invoke /context-restore
-- Author a backlog-ready spec/issue → invoke /spec
+---
+
+## Storage Rules
+
+Every field must be:
+
+- Primary Data
+- Derived Data
+- Cache
+
+Do not mix them.
+
+Relationships must be explicitly modeled.
+
+Do not store relationships in JSON.
+
+---
+
+## Source of Truth
+
+Every piece of data has exactly one canonical owner.
+
+Default:
+
+- Git = Source of Truth
+- Database = Index / Cache
+
+No dual-write systems without approval.
+
+---
+
+## Architecture Rules
+
+- Modules communicate via Service Interfaces.
+- No direct cross-module database access.
+- Modules must be replaceable.
+- Prefer rewrite over patching complexity.
+
+---
+
+## Stop and Review Before Adding
+
+- New Entity
+- New Persistence Layer
+- New Cache
+- Background Job
+- Graph Structure
+
+---
+
+## Final Check
+
+Before coding:
+
+1. What are the entities?
+2. How are they related?
+3. Who owns the data?
+4. What future queries must be supported?

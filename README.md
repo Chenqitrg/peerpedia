@@ -82,6 +82,8 @@ Phase 2+（社区 — Web）
 └──────────────────────────────────────────────────────────┘
 ```
 
+**Offline capability**: Phase 1 desktop is fully offline-capable. See `docs/DESIGN.en.md` Section 13 for the complete offline behavior matrix.
+
 ### Stack
 
 | Layer | Technology |
@@ -203,11 +205,13 @@ Higher reputation → greater voting weight in the pool.
 
 ### Desktop（Phase 1 — 冷启动）
 
-- Offline Markdown/Typst editing with live preview
-- Local Git version control（fork, history, diff）
-- SQLite-based drafts and article cache
-- Local account system（bcrypt, no server needed）
-- Markdown live preview (client-side marked + KaTeX)
+- **Offline-first writing**：Markdown/Typst editing with live preview, local compilation, no network needed
+- **Local Git version control**：fork, history, diff — full audit trail on your machine
+- **Graceful degradation**：network-dependent features (pool, schools, comments) show clear "offline" states instead of errors
+- **Browse = cache**：every article you read is automatically cached for offline access; your offline feed is your reading history
+- **Bookmark = full cache**：bookmarked articles are cached with complete reviews and history — your offline library
+- **Local account system**：bcrypt + SQLite, multi-account switching, no server needed
+- **Network status indicator**：real-time online/offline icon in navbar
 - Typst → PDF via Tauri sidecar (Slice 2, on-going)
 - 5MB install, 30MB RAM
 

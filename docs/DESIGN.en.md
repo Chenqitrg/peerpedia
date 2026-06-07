@@ -583,3 +583,185 @@ cd frontend && npm run tauri dev    # → Tauri window
 - **seed.py uses relative path `sqlite:///peerpedia.db`** — must run from project root
 - **Tauri IPC via `useTauri()` composable** — no-op in Web mode, no impact on existing Web features
 - **Vue components are platform-agnostic** — all platform logic encapsulated in composables
+
+---
+
+## 13. Offline Behavior Matrix (Phase 1 — Tauri Desktop)
+
+PeerPedia Tauri 桌面版的核心承诺：**一个人用也爽**。离线时，所有与"自己"相关的功能正常工作；需要协作的功能优雅降级，显示明确的状态提示。
+
+### 13.1 Design Principles
+
+1. **Local-first, network-optional** — 本地操作立即完成，远程同步异步发生
+2. **Graceful degradation** — 功能不可用时灰色 + 提示文案，不隐藏、不报错、不白屏
+3. **Bookmark = cache** — 收藏即全量本地缓存，用户不需要理解"缓存"概念
+4. **Browse = cache** — 看过的文章自动缓存，离线 feed = 浏览历史
+
+### 13.2 Network Detection
+
+导航栏右上角显示网络状态图标（在线绿色 / 离线灰色）。
+
+- **机制**：每 30s ping `GET /health`，2 次连续失败 → 离线，恢复 → 在线
+- **Tauri 模式**：Rust 端发起 HTTP ping，通过 IPC 推送状态到 Vue
+- **Web 模式**：`navigator.onLine` + `fetch('/health')` 兜底
+
+### 13.3 Offline Capability Matrix
+
+每个功能在离线时有三种能力级别：
+
+| Level | 含义 | UI 表现 |
+|-------|------|---------|
+| `full` | 完全可用，与在线无区别 | 正常 |
+| `readonly` | 可查看已缓存内容，不可写入 | 输入区灰色 + 提示文案 |
+| `blocked` | 完全不可用 | 灰色遮罩 + "需要联网" |
+
+**逐功能矩阵：**
+
+| Feature | 离线 Read | 离线 Write | 数据来源 | 备注 |
+|---------|----------|-----------|---------|------|
+| **首页 Feed** | `full` | `full` | 本地 browsing_history 表 | 无历史时显示空状态；在线关注网络 feed 不可用 |
+| **收藏夹** | `full` | `full` | 全量缓存（bookmark 触发） | 收藏的文章含完整评论 + 历史 |
+| **搜索** | `full` (本地) | `full` | 本地 SQLite（缓存 + 自己文章 + drafts） | 搜索栏标签自动显示"本地"；在线扩展为"全网" |
+| **沉淀池** | `blocked` | `blocked` | — | 显示"无网络，进不去" |
+| **Schools** | `blocked` | `blocked` | — | 显示"无网络，进不去" |
+| **个人主页（自己）** | `full` | `full` | 本地数据（自己文章 + drafts + 评分） | 与线上完全相同 |
+| **个人主页（他人已缓存）** | `full` | `blocked` | 缓存的 user profile | 可看 profile 和文章列表；关注/粉丝列表不可点击跳转 |
+| **个人主页（他人未缓存）** | `blocked` | `blocked` | — | "离线不可用" |
+| **文章编辑器** | `full` | `full` | 本地 draft + 本地编译 | 仅"发布到沉淀池"按钮灰色 |
+| **编译/下载** | `full` | `full` | 本地工具（marked/KaTeX/Typst sidecar） | 不依赖服务器 |
+| **文章内容** | `full` | — | 本地缓存 | 浏览即缓存 |
+| **文章评论** | `readonly` | `blocked` | 缓存评论（跟随文章缓存） | 输入框灰色 + "需要联网才能评论" |
+| **文章 Fork** | `blocked` | `blocked` | — | 灰色 + "需要联网" |
+| **文章历史** | `full` (到缓存点) | `blocked` | 文章缓存时 snapshot 的 git log | 截止到缓存那一刻的历史 |
+
+### 13.4 Per-Page Behavior
+
+#### 13.4.1 首页 `/`
+
+- **在线**：关注用户的活动 feed（与现在相同）
+- **离线**：显示浏览历史，按访问时间倒序。来源：`browsing_history` SQLite 表
+- **空状态**：既无网络也无历史时，显示"离线模式 — 去探索文章吧，看过的会出现在这里"
+- 导航栏网络图标实时反映状态
+
+#### 13.4.2 文章编辑页 `/edit` `/edit/:id`
+
+- 所有编辑功能正常（Markdown/Typst 编写、预览、保存草稿）
+- **编译**：Markdown 用 marked + KaTeX 客户端渲染，Typst 用 Tauri sidecar CLI
+- **下载**：源码/PDF 下载调用本地工具
+- **发布到沉淀池**：按钮灰色，不可点击，hover 显示"需要联网才能发布到沉淀池"
+- 保存 = 存本地 SQLite draft，个人主页可见
+
+#### 13.4.3 文章页面 `/articles/:id`
+
+- 文章内容、源码、预览：本地缓存，正常可用
+- **评论 tab**：显示缓存评论（只读），输入框灰色 + "需要联网才能评论"
+- **Fork 按钮**：灰色 + "需要联网"
+- **作者链接**：若作者已缓存 → 可点击跳转；未缓存 → 灰色不可点击
+- **历史页**：显示截止到缓存时刻的 commit 历史，diff 正常
+
+#### 13.4.4 个人主页 `/users/:id`
+
+- **自己的主页**：与线上完全相同（自己的文章、drafts、评分、关注/粉丝列表）
+- **他人主页（已缓存）**：可见 profile + 文章列表。关注/粉丝列表显示数量和头像，但不可点击跳转
+- **他人主页（未缓存）**："离线不可用"
+- 评分继承上次联网时的 snapshot
+
+#### 13.4.5 沉淀池 `/pool`
+
+- 整个页面显示"无网络，进不去"，无法进入
+
+#### 13.4.6 Schools `/schools`
+
+- 整个页面显示"无网络，进不去"，无法进入
+
+#### 13.4.7 搜索 `/search`
+
+- 自动根据网络状态切换搜索范围
+- **离线**：搜索本地数据库（缓存文章 + 自己文章 + drafts），标签显示"本地"
+- **在线**：扩展搜索到关注网络，标签显示"全网"
+
+#### 13.4.8 收藏夹 `/bookmarks`
+
+- 完全正常，收藏 = 全量缓存（文章内容 + 评论 + 历史）
+- 可以添加/移除收藏（本地操作）
+
+### 13.5 Data Layer Additions
+
+#### 13.5.1 Browsing History (Rust SQLite)
+
+```sql
+CREATE TABLE browsing_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id TEXT NOT NULL,
+    article_id TEXT NOT NULL,
+    article_title TEXT NOT NULL DEFAULT '',
+    visited_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(account_id, article_id)
+);
+```
+
+IPC commands：
+- `record_visit(account_id, article_id, title)` → `{ok: true}` — 浏览文章时自动调用
+- `get_history(account_id, page, size)` → `[{article_id, title, visited_at}, ...]` — 离线 feed 的数据源
+
+#### 13.5.2 Article Full Cache (Rust local_store.rs)
+
+增强现有 `cache_article` IPC，支持全量缓存：
+
+```
+cache_article_full(id, article_json_with_reviews_and_authors) → {ok: true}
+```
+
+缓存内容：article metadata + compiled_output + reviews[] + author profiles[]。
+
+#### 13.5.3 /health Endpoint (FastAPI)
+
+```python
+@router.get("/health")
+async def health_check():
+    return {"ok": True}
+```
+
+轻量 ping，不查数据库，30s 间隔。
+
+### 13.6 Architecture: Offline Composables
+
+```
+Vue Pages (只调用 useOffline，不自己判断 isOnline)
+    ↓
+useOffline(feature) composable     ← 集中式能力查询
+  - canRead(): boolean              ← 查矩阵
+  - canWrite(): boolean             ← 查矩阵
+  - fallbackMessage(): string       ← 查矩阵
+    ↓
+useNetworkStatus() composable      ← 网络检测
+  - isOnline: Ref<boolean>
+  - startPing() / stopPing()
+    ↓
+┌──────────────┬──────────────────┐
+│ Tauri 模式    │ Web 模式          │
+│ Rust HTTP ping│ fetch(/health)   │
+│ + IPC push    │ + setInterval     │
+└──────────────┴──────────────────┘
+```
+
+### 13.7 i18n Keys (新增)
+
+```json
+{
+  "offline": {
+    "status_online": "在线",
+    "status_offline": "离线",
+    "feed_hint": "离线模式 — 这里显示你最近看过的文章",
+    "feed_empty": "还没有浏览记录 — 去探索文章吧",
+    "comment_hint": "需要联网才能评论",
+    "fork_hint": "需要联网才能 Fork",
+    "publish_hint": "需要联网才能发布到沉淀池",
+    "pool_hint": "无网络，无法访问沉淀池",
+    "schools_hint": "无网络，无法访问 Schools",
+    "user_hint": "离线不可用",
+    "search_local": "本地",
+    "search_network": "全网"
+  }
+}
+```
