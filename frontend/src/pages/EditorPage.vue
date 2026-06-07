@@ -11,6 +11,7 @@ import { loadString, saveString, saveJSON, remove } from '../composables/useLoca
 import { parseMarkdown } from '../utils/markdown'
 import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
+  ArrowLeft,
   Bookmark,
   BookmarkCheck,
   Eye,
@@ -382,6 +383,15 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
   <div class="editor-page flex flex-col h-[calc(100vh-6rem)] animate-fade-in">
     <!-- Top toolbar -->
     <div class="flex items-center justify-between px-4 py-2 bg-card border border-divider rounded-t-lg mb-0">
+      <button
+        class="flex items-center justify-center w-8 h-8 rounded-lg
+               text-ink-muted hover:text-ink hover:bg-[#21262d]
+               transition-colors duration-200 shrink-0"
+        aria-label="Back"
+        @click="router.back()"
+      >
+        <ArrowLeft class="w-4 h-4" stroke-width="2" />
+      </button>
       <div class="flex items-center gap-3 flex-1 min-w-0">
         <!-- Title input (editable only on create) -->
         <input
