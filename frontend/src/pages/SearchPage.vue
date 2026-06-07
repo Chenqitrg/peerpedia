@@ -59,8 +59,8 @@ onMounted(() => {
   if (q) query.value = q
   if (cat) category.value = cat
   if (s) sort.value = s
-  // Trigger search if any filter param is present
-  if (q || cat) {
+  // Trigger search if any filter param is present AND network search is available
+  if ((q || cat) && canRead('search.network')) {
     searched.value = true
     doSearch()
   }
@@ -87,6 +87,7 @@ watch(
 )
 
 function executeSearch(page: number) {
+  if (!canRead('search.network')) return
   currentPage.value = page
   searched.value = true
   doSearch()

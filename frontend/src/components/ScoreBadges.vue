@@ -61,6 +61,7 @@ function onDimLeave() {
         highlightFirst && idx === 0 ? 'text-accent' : 'text-ink-muted',
         editable ? 'cursor-default' : 'cursor-default',
       ]"
+      :title="dim.label"
       @mouseenter="onDimEnter(dim.key)"
       @mouseleave="onDimLeave"
     >
