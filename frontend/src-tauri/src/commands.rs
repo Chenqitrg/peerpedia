@@ -193,8 +193,12 @@ pub struct GetHistoryParams {
     pub size: i64,
 }
 
-fn default_page() -> i64 { 1 }
-fn default_size() -> i64 { 20 }
+fn default_page() -> i64 {
+    1
+}
+fn default_size() -> i64 {
+    20
+}
 
 #[tauri::command]
 pub fn get_history(
@@ -202,7 +206,12 @@ pub fn get_history(
     params: GetHistoryParams,
 ) -> Result<Vec<local_store::HistoryEntry>, AppError> {
     let conn = state.db.lock().unwrap();
-    local_store::get_history(&conn, &params.account_id, params.page, params.size)
+    local_store::get_history(
+        &conn,
+        &params.account_id,
+        params.page,
+        params.size,
+    )
 }
 
 #[tauri::command]
