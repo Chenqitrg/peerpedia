@@ -9,6 +9,7 @@ import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { useTauri } from '../composables/useTauri'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
+import DownloadButton from '../components/DownloadButton.vue'
 import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
   ArrowLeft,
@@ -16,11 +17,9 @@ import {
   BookmarkCheck,
   Eye,
   EyeOff,
-  FileDown,
+  History,
   Play,
   Save,
-  Send,
-  FileText,
 } from 'lucide-vue-next'
 
 
@@ -332,50 +331,6 @@ async function handleSubmitToPool() {
   }
 }
 
-function handleDownload(dlFormat: 'source' | 'pdf') {
-  if (editId.value) {
-    // Saved article: use the download endpoints
-    window.open(`/api/v1/articles/${editId.value}/download/${dlFormat}`, '_blank')
-  } else if (dlFormat === 'pdf') {
-    // New article PDF: call compile-download endpoint
-    handleCompileDownload()
-  } else {
-    // New article source: download raw content as file
-    const ext = format.value === 'typst' ? '.typ' : '.md'
-    const blob = new Blob([content.value], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `article${ext}`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-}
-
-async function handleCompileDownload() {
-  if (!content.value.trim()) {
-    errorMsg.value = 'Nothing to download — editor is empty'
-    return
-  }
-  if (format.value === 'markdown') {
-    // Render markdown to HTML and open in a new window for browser print → PDF.
-    const html = parseMarkdown(content.value)
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>${title.value || 'Article'}</title>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-        <style>body{max-width:800px;margin:2rem auto;font-family:serif;line-height:1.6;color:#1a1a1a;}
-        pre{background:#f5f5f5;padding:1rem;border-radius:4px;overflow-x:auto;}</style></head>
-        <body>${html}</body></html>`)
-      printWindow.document.close()
-      setTimeout(() => printWindow.print(), 500)
-    }
-  } else {
-    // Typst PDF: requires Tauri sidecar (Slice 2). Web: on-going.
-    errorMsg.value = 'Typst PDF export available in Tauri desktop (Slice 2). Markdown articles can print to PDF via browser.'
-  }
-}
-
 defineExpose({ contributions, handlePublish, showSelfReview, totalContribution })
 </script>
 
@@ -508,29 +463,23 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           <Play class="w-4 h-4" stroke-width="2" />
         </button>
 
-        <!-- Download source button (left side) -->
-        <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg
-                 text-ink-muted hover:text-ink hover:bg-[#21262d]
-                 transition-colors duration-200"
-          :aria-label="t('editor.typst')"
-          :title="t('editor.typst')"
-          @click="handleDownload('source')"
-        >
-          <FileDown class="w-4 h-4" stroke-width="2" />
-        </button>
+        <!-- Download source -->
+        <DownloadButton format="source" :content="content" :content-format="format" :filename="title" :disabled="!content.trim()" />
+        <!-- Download compiled HTML -->
+        <DownloadButton format="compiled" :content="content" :content-format="format" :filename="title" :disabled="!content.trim()" />
 
-        <!-- Download PDF button (right side) -->
-        <button
+        <!-- History -->
+        <router-link
+          v-if="isEdit"
+          :to="`/articles/${editId}/history`"
           class="flex items-center justify-center w-8 h-8 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
-          :aria-label="t('editor.download')"
-          :title="t('editor.download')"
-          @click="handleDownload('pdf')"
+          :aria-label="t('article.history')"
+          :title="t('article.history')"
         >
-          <FileText class="w-4 h-4" stroke-width="2" />
-        </button>
+          <History class="w-4 h-4" stroke-width="2" />
+        </router-link>
 
         <div class="w-px h-5 bg-divider mx-1" />
 

@@ -150,17 +150,16 @@ describe('ArticlePage', () => {
     expect(wrapper.text()).toMatch(/body|comments|Body|Comments/i)
   })
 
-  it('renders download source and pdf buttons', async () => {
+  it('renders download source and html buttons', async () => {
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await new Promise(r => setTimeout(r, 100))
-    // Look for download buttons by aria-label
-    const sourceBtn = wrapper.find('a[aria-label*="download source" i], button[aria-label*="download source" i]')
-    const pdfBtn = wrapper.find('a[aria-label*="download pdf" i], button[aria-label*="download pdf" i]')
+    const sourceBtn = wrapper.find('[aria-label="Download source"]')
+    const htmlBtn = wrapper.find('[aria-label="Download HTML"]')
     expect(sourceBtn.exists()).toBe(true)
-    expect(pdfBtn.exists()).toBe(true)
+    expect(htmlBtn.exists()).toBe(true)
   })
 
   it('renders Merge button when article is a fork (has forked_from)', async () => {
