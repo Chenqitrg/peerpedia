@@ -166,7 +166,8 @@ async function loadArticle(articleId: string) {
       const draft = await tauri.getDraft({ id: articleId })
       if (draft && !('error' in draft)) {
         article.value = buildArticleFromDraft(draft as any)
-        compiledHtml.value = renderMathInHtml(draft.content || '')
+        const { parseMarkdown } = await import('../utils/markdown')
+        compiledHtml.value = parseMarkdown(draft.content || '')
         return
       }
     }
