@@ -159,6 +159,16 @@ async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): 
       return { count: follows.filter(x => x.follower_id === targetId).length }
     }
     // ── Bookmarks ────────────────────────────────────────────────────────
+    case 'add_bookmark': {
+      const accountId = _resolveToken(a, sessions) || ''
+      const bm = bookmarks.find(x => x.user_id === accountId && x.article_id === a.article_id)
+      if (!bm) {
+        bookmarks.push({ user_id: accountId, article_id: a.article_id as string, created_at: new Date().toISOString() })
+        _save(_bookmarksKey, bookmarks)
+      }
+      return { ok: true }
+    }
+    case 'remove_bookmark': {
       const accountId = _resolveToken(a, sessions) || ''
       _save(_bookmarksKey, bookmarks.filter(x => !(x.user_id === accountId && x.article_id === a.article_id)))
       return { ok: true }
