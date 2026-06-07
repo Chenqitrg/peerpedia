@@ -53,7 +53,7 @@ def seed(db_url: str, articles_dir: Path):
     print(f"Articles directory: {articles_dir}")
 
     from peerpedia_api.deps import hash_password
-    DEFAULT_PASSWORD = "666666"
+    default_password = "666666"
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 1. Users — 22 diverse researchers
@@ -144,7 +144,7 @@ def seed(db_url: str, articles_dir: Path):
          "expertise": ["philosophy of mind", "philosophy of language", "philosophy of science"]},
     ]
 
-    pwd_hash = hash_password(DEFAULT_PASSWORD)
+    pwd_hash = hash_password(default_password)
     users = {}
     for u in user_defs:
         existing = session.query(User).filter(User.username == u["username"]).first()
@@ -168,7 +168,7 @@ def seed(db_url: str, articles_dir: Path):
             users[u["name"]] = user
             print(f"  User (new): {u['name']} ({u['username']})")
 
-    print(f"\n  Default password for all users: {DEFAULT_PASSWORD}")
+    print(f"\n  Default password for all users: {default_password}")
     print(f"  Total users: {len(users)}")
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -755,7 +755,6 @@ $$
 
         try:
             rp = init_article_repo(a.id, base_dir=articles_dir)
-            ext = ".md"
             (rp / "article.md").write_text(ad["content"])
             commit_article(rp, "Initial submission", author.name,
                           f"{author.name.lower().replace(' ', '.')}@peerpedia",
@@ -1484,7 +1483,7 @@ program and data. This is the von Neumann architecture.""",
     ]
 
     cit_count = 0
-    all_articles = {a.title: a for a in session.query(Article).all()}
+    {a.title: a for a in session.query(Article).all()}
     for from_name, to_name, fwd_prob, back_prob in citation_edges:
         from_articles = article_map.get(from_name, [])
         to_articles = article_map.get(to_name, [])

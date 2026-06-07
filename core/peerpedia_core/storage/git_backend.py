@@ -26,7 +26,7 @@ def init_article_repo(
     repo_path = base / article_id
     repo_path.mkdir(parents=True, exist_ok=True)
 
-    repo = git.Repo.init(repo_path)
+    git.Repo.init(repo_path)
     return repo_path
 
 

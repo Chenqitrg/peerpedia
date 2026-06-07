@@ -344,7 +344,7 @@ class TestMerge:
         s.add_all(articles)
         s.commit()
         # Collect IDs in creation order (oldest first since no created_at override)
-        ids = [a.id for a in articles]
+        [a.id for a in articles]
         s.close()
 
         # Page 1, size 2 → returns first 2 articles, total=5

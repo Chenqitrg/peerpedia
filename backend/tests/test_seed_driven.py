@@ -225,7 +225,7 @@ class TestForkMergeFlow:
         proposal_id = merge_resp.json()["id"]
 
         # Accept merge (as article author — need to login as parent author)
-        parent_author = parent.authors[0] if parent.authors else None
+        parent.authors[0] if parent.authors else None
         resp2 = client.post(
             f"/api/v1/articles/{parent.id}/merge-proposals/{proposal_id}/accept",
         )
