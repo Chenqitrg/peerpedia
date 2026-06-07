@@ -2,12 +2,11 @@
 
 from pathlib import Path
 
+from peerpedia_core.storage.db.crud_user import get_user
+from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
 from sqlalchemy.orm import Session
 
 from peerpedia_api.schemas.article import AuthorInfo
-from peerpedia_core.storage.db.crud_user import get_user
-from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
-
 
 # ── Author resolution (batched) ──────────────────────────────────────────────
 

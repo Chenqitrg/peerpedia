@@ -14,7 +14,7 @@ def articles_dir():
 @pytest.fixture
 def repo(articles_dir):
     """An initialized article repo with one commit."""
-    from peerpedia_core.storage.git_backend import init_article_repo, commit_article
+    from peerpedia_core.storage.git_backend import commit_article, init_article_repo
     rp = init_article_repo("test-article", articles_dir)
     # write initial content
     (rp / "article.md").write_text("# Test\n\nHello world.\n")
@@ -30,14 +30,14 @@ class TestInitAndCommit:
         assert rp.name == "test-1"
 
     def test_commit_returns_hash(self, articles_dir):
-        from peerpedia_core.storage.git_backend import init_article_repo, commit_article
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
         rp = init_article_repo("test-2", articles_dir)
         (rp / "notes.md").write_text("content")
         h = commit_article(rp, "add notes", "Author", "a@b.com")
         assert len(h) == 40  # full SHA hash
 
     def test_commit_updates_file(self, articles_dir):
-        from peerpedia_core.storage.git_backend import init_article_repo, commit_article
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
         rp = init_article_repo("test-3", articles_dir)
         f = rp / "article.md"
         f.write_text("v1")
@@ -49,7 +49,7 @@ class TestInitAndCommit:
 
     def test_commit_allow_empty_on_empty_repo(self, articles_dir):
         """commit_article with allow_empty=True on empty repo should create initial commit."""
-        from peerpedia_core.storage.git_backend import init_article_repo, commit_article
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
         rp = init_article_repo("test-empty-allow", articles_dir)
         h = commit_article(rp, "initial", "A", "a@b.com", allow_empty=True)
         assert len(h) == 40
@@ -65,7 +65,11 @@ class TestHistory:
         assert "author" in history[0]
 
     def test_history_order_is_newest_first(self, articles_dir):
-        from peerpedia_core.storage.git_backend import init_article_repo, commit_article, get_commit_history
+        from peerpedia_core.storage.git_backend import (
+            commit_article,
+            get_commit_history,
+            init_article_repo,
+        )
         rp = init_article_repo("test-order", articles_dir)
         (rp / "a.md").write_text("v1")
         commit_article(rp, "first", "A", "a@b.com")
@@ -78,7 +82,7 @@ class TestHistory:
 
     def test_history_empty_repo_returns_empty_list(self, articles_dir):
         """Bug 2: get_commit_history crashes on empty repo. Should return empty list."""
-        from peerpedia_core.storage.git_backend import init_article_repo, get_commit_history
+        from peerpedia_core.storage.git_backend import get_commit_history, init_article_repo
         rp = init_article_repo("test-empty-history", articles_dir)
         history = get_commit_history(rp)
         assert history == []
@@ -94,7 +98,10 @@ class TestDiff:
 
     def test_diff_between_two_commits(self, articles_dir):
         from peerpedia_core.storage.git_backend import (
-            init_article_repo, commit_article, get_commit_history, get_diff_between,
+            commit_article,
+            get_commit_history,
+            get_diff_between,
+            init_article_repo,
         )
         rp = init_article_repo("test-diff2", articles_dir)
         (rp / "a.md").write_text("line1\n")
@@ -109,7 +116,10 @@ class TestDiff:
     def test_diff_between_has_real_stats(self, articles_dir):
         """Bug 12: get_diff_between returns 'stats': {} — should compute real stats."""
         from peerpedia_core.storage.git_backend import (
-            init_article_repo, commit_article, get_commit_history, get_diff_between,
+            commit_article,
+            get_commit_history,
+            get_diff_between,
+            init_article_repo,
         )
         rp = init_article_repo("test-diff-stats", articles_dir)
         (rp / "a.md").write_text("line1\n")

@@ -9,7 +9,6 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.orm import relationship
 
 from peerpedia_core.storage.db.engine import Base, JSONDict, JSONList
 

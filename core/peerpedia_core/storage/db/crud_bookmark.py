@@ -1,7 +1,7 @@
 """Bookmark CRUD operations."""
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.models import Bookmark, Article
+from peerpedia_core.storage.db.models import Article, Bookmark
 
 
 def add_bookmark(session: Session, user_id: str, article_id: str) -> Bookmark:

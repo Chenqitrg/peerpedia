@@ -23,8 +23,7 @@ class TestFiveDimScoresSchema:
 
 class TestArticleSummary:
     def test_valid_article_summary(self):
-        from peerpedia_api.schemas.article import ArticleSummary
-        from peerpedia_api.schemas.article import AuthorInfo
+        from peerpedia_api.schemas.article import ArticleSummary, AuthorInfo
         a = ArticleSummary(
             id="abc123", status="published",
             authors=[AuthorInfo(id="u1", name="Alice", anonymous_name="anon_alice")],

@@ -6,10 +6,9 @@ from typing import Optional
 import bcrypt
 import jwt
 from fastapi import Depends, Header, HTTPException
-from sqlalchemy.orm import Session
-
 from peerpedia_core.storage.db.engine import get_engine, get_session
 from peerpedia_core.storage.db.models import User
+from sqlalchemy.orm import Session
 
 _engine = None
 _JWT_SECRET = os.environ.get("JWT_SECRET", "peerpedia-dev-secret")

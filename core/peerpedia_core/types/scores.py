@@ -1,5 +1,5 @@
 """Shared score types used across models."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 5.0) -> float:

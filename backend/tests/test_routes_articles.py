@@ -1,16 +1,14 @@
 """Integration tests for article API routes."""
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import User, Article
+from peerpedia_core.storage.db.models import Article, User
 
 
 @pytest.fixture
 def client(db_engine):
-    from peerpedia_api.main import app
     from peerpedia_api import deps
+    from peerpedia_api.main import app
 
     def override_db():
         session = get_session(db_engine)
@@ -357,7 +355,7 @@ class TestPagination:
     def test_list_articles_paginated(self, client, db_engine):
         """GET /articles returns paginated response with page and size."""
         from peerpedia_core.storage.db.engine import get_session
-        from peerpedia_core.storage.db.models import User, Article
+        from peerpedia_core.storage.db.models import Article, User
         s = get_session(db_engine)
         u = User(username="user22", password_hash="", name="pagination_user", anonymous_name="anon_pag")
         s.add(u)

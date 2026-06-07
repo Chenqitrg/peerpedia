@@ -1,19 +1,19 @@
 """Search API route — SQL-level filtering with file-based source fallback."""
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from peerpedia_core.storage.db.models import Article
+from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
 from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
 from sqlalchemy.types import String
 
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
-    resolve_authors,
+    get_commit_count,
     get_commit_hash,
     get_content_preview,
-    get_commit_count,
+    resolve_authors,
 )
 from peerpedia_api.schemas.article import ArticleSummary
-from peerpedia_core.storage.db.models import Article
-from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
 
 router = APIRouter(prefix="/search", tags=["search"])
 

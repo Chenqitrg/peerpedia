@@ -1,17 +1,24 @@
 """User API routes."""
 from fastapi import APIRouter, Depends, HTTPException
+from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.crud_user import (
+    create_user,
+    follow_user,
+    get_follower_count,
+    get_followers,
+    get_following,
+    get_following_count,
+    get_user,
+    is_following,
+    list_users,
+    unfollow_user,
+)
+from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
-from peerpedia_api.schemas.user import UserProfile, UserSummary, UserCreate, UserUpdate
-from peerpedia_api.deps import get_current_user, require_user, hash_password
-from peerpedia_core.storage.db.crud_user import (
-    create_user, get_user, list_users,
-    follow_user, unfollow_user, is_following,
-    get_followers, get_following, get_follower_count, get_following_count,
-)
-from peerpedia_core.storage.db.crud_article import list_articles
-from peerpedia_core.storage.db.models import User
+from peerpedia_api.deps import hash_password, require_user
+from peerpedia_api.schemas.user import UserCreate, UserProfile, UserSummary, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 

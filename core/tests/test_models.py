@@ -6,16 +6,14 @@ from sqlalchemy.orm import Session
 from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import (
     Article,
+    Bookmark,
+    Citation,
+    Follow,
+    MergeProposal,
     Review,
     User,
-    Follow,
-    Bookmark,
-    MergeProposal,
-    Citation,
 )
-from peerpedia_core.types.scores import FiveDimScores, ReputationScores
 from peerpedia_core.types.messages import ThreadMessage
-
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -131,7 +129,6 @@ class TestArticle:
 
     def test_article_updated_at_updates_on_change(self, engine):
         """Bug 6: Article.updated_at has onupdate so it refreshes on each commit."""
-        from datetime import datetime, timezone
         session = get_session(engine)
         user = _make_user(session, "u7")
         a = Article(status="draft", authors=[user.id])
@@ -242,7 +239,6 @@ class TestReview:
 
     def test_review_updated_at_updates_on_change(self, engine):
         """Bug 7: Review.updated_at has onupdate so it refreshes on each commit."""
-        from datetime import datetime, timezone
         session = get_session(engine)
         user = _make_user(session, "rv_up")
         author = _make_user(session, "au_up")

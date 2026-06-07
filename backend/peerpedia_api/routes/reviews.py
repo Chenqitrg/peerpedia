@@ -1,20 +1,26 @@
 """Review API routes."""
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-
-from peerpedia_api import deps
-from peerpedia_api.schemas.review import (
-    ReviewCreate, ReviewOut, ThreadMessageCreate,
-)
-from peerpedia_core.storage.db.crud_review import (
-    create_review, get_review, get_reviews_for_article,
-    get_review_by_user_scope, update_review_scores, add_thread_message,
-)
 from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_review import (
+    add_thread_message,
+    create_review,
+    get_review,
+    get_review_by_user_scope,
+    get_reviews_for_article,
+    update_review_scores,
+)
 from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
 from peerpedia_core.workflow.scoring import compute_article_score_for_commit
+from sqlalchemy.orm import Session
+
+from peerpedia_api import deps
+from peerpedia_api.schemas.review import (
+    ReviewCreate,
+    ReviewOut,
+    ThreadMessageCreate,
+)
 
 router = APIRouter(prefix="/articles/{article_id}/reviews", tags=["reviews"])
 

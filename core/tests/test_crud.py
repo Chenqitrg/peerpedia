@@ -4,9 +4,10 @@ from sqlalchemy.orm import Session
 
 from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import (
-    Article, Review, User, Follow, Bookmark, MergeProposal, Citation,
+    Article,
+    Review,
+    User,
 )
-
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -68,7 +69,9 @@ class TestArticleCRUD:
 
     def test_update_article_status(self, engine):
         from peerpedia_core.storage.db.crud_article import (
-            create_article, get_article, update_article_status,
+            create_article,
+            get_article,
+            update_article_status,
         )
         session = get_session(engine)
         user = _make_user(session, "author4")
@@ -79,7 +82,9 @@ class TestArticleCRUD:
 
     def test_update_article_compiled_cache(self, engine):
         from peerpedia_core.storage.db.crud_article import (
-            create_article, get_article, update_article_compiled,
+            create_article,
+            get_article,
+            update_article_compiled,
         )
         session = get_session(engine)
         user = _make_user(session, "author5")
@@ -93,7 +98,9 @@ class TestArticleCRUD:
 
     def test_increment_fork_count(self, engine):
         from peerpedia_core.storage.db.crud_article import (
-            create_article, get_article, increment_fork_count,
+            create_article,
+            get_article,
+            increment_fork_count,
         )
         session = get_session(engine)
         user = _make_user(session, "author6")
@@ -107,7 +114,8 @@ class TestArticleCRUD:
     def test_extend_sink_rejects_non_positive(self, engine):
         """Bug 8: extend_sink must reject extra_days <= 0."""
         from peerpedia_core.storage.db.crud_article import (
-            create_article, extend_sink,
+            create_article,
+            extend_sink,
         )
         session = get_session(engine)
         user = _make_user(session, "author8")
@@ -121,7 +129,9 @@ class TestArticleCRUD:
     def test_extend_sink_does_not_overcount_when_already_at_max(self, engine):
         """Bug 8: extend_sink counter should only increment when days actually increase."""
         from peerpedia_core.storage.db.crud_article import (
-            create_article, get_article, extend_sink,
+            create_article,
+            extend_sink,
+            get_article,
         )
         session = get_session(engine)
         user = _make_user(session, "author8b")
@@ -158,7 +168,8 @@ class TestReviewCRUD:
 
     def test_get_reviews_for_article(self, engine):
         from peerpedia_core.storage.db.crud_review import (
-            create_review, get_reviews_for_article,
+            create_review,
+            get_reviews_for_article,
         )
         session = get_session(engine)
         rv1 = _make_user(session, "rv_a")
@@ -175,7 +186,8 @@ class TestReviewCRUD:
 
     def test_get_review_by_user_and_scope(self, engine):
         from peerpedia_core.storage.db.crud_review import (
-            create_review, get_review_by_user_scope,
+            create_review,
+            get_review_by_user_scope,
         )
         session = get_session(engine)
         rv = _make_user(session, "rv_s")
@@ -192,7 +204,8 @@ class TestReviewCRUD:
 
     def test_update_review_scores(self, engine):
         from peerpedia_core.storage.db.crud_review import (
-            create_review, update_review_scores,
+            create_review,
+            update_review_scores,
         )
         session = get_session(engine)
         rv = _make_user(session, "rv_u")
@@ -203,7 +216,6 @@ class TestReviewCRUD:
         new_scores = {"originality": 5, "rigor": 5, "completeness": 5,
                       "pedagogy": 5, "impact": 5}
         update_review_scores(session, r.id, new_scores)
-        from peerpedia_core.storage.db.models import Review
         updated = session.get(Review, r.id)
         assert updated.scores["originality"] == 5
         session.close()
@@ -229,8 +241,9 @@ class TestReviewCRUD:
 
     def test_duplicate_same_commit_fails(self, engine):
         """Same (article, reviewer, scope, commit_hash) must raise integrity error."""
-        from peerpedia_core.storage.db.crud_review import create_review
         import sqlalchemy
+
+        from peerpedia_core.storage.db.crud_review import create_review
         session = get_session(engine)
         rv = _make_user(session, "rv_dup")
         author = _make_user(session, "au_dup")
@@ -248,7 +261,8 @@ class TestReviewCRUD:
     def test_get_by_user_scope_with_commit(self, engine):
         """get_review_by_user_scope with commit_hash filters correctly."""
         from peerpedia_core.storage.db.crud_review import (
-            create_review, get_review_by_user_scope,
+            create_review,
+            get_review_by_user_scope,
         )
         session = get_session(engine)
         rv = _make_user(session, "rv_filt")
@@ -270,7 +284,8 @@ class TestReviewCRUD:
 
     def test_add_thread_message(self, engine):
         from peerpedia_core.storage.db.crud_review import (
-            create_review, add_thread_message,
+            add_thread_message,
+            create_review,
         )
         session = get_session(engine)
         rv = _make_user(session, "rv_t")
@@ -281,7 +296,6 @@ class TestReviewCRUD:
         from peerpedia_core.types.messages import ThreadMessage
         msg = ThreadMessage(author_id=author.id, content="谢谢指出，已修改。")
         add_thread_message(session, r.id, msg.to_dict())
-        from peerpedia_core.storage.db.models import Review
         updated = session.get(Review, r.id)
         assert len(updated.thread) == 1
         assert "谢谢指出" in updated.thread[0]["content"]
@@ -318,7 +332,9 @@ class TestUserCRUD:
 
     def test_update_user_reputation(self, engine):
         from peerpedia_core.storage.db.crud_user import (
-            create_user, get_user, update_user_reputation,
+            create_user,
+            get_user,
+            update_user_reputation,
         )
         session = get_session(engine)
         u = create_user(session, name="rep_user")
@@ -334,7 +350,10 @@ class TestUserCRUD:
 class TestFollowCRUD:
     def test_follow_unfollow(self, engine):
         from peerpedia_core.storage.db.crud_user import (
-            create_user, follow_user, unfollow_user, is_following,
+            create_user,
+            follow_user,
+            is_following,
+            unfollow_user,
         )
         session = get_session(engine)
         a = create_user(session, name="A")
@@ -348,8 +367,12 @@ class TestFollowCRUD:
 
     def test_get_followers_following(self, engine):
         from peerpedia_core.storage.db.crud_user import (
-            create_user, follow_user, get_followers, get_following,
-            get_follower_count, get_following_count,
+            create_user,
+            follow_user,
+            get_follower_count,
+            get_followers,
+            get_following,
+            get_following_count,
         )
         session = get_session(engine)
         a = create_user(session, name="A")
@@ -368,7 +391,8 @@ class TestFollowCRUD:
     def test_follow_user_rejects_self_follow(self, engine):
         """Bug 10: follow_user must reject when follower_id == followed_id."""
         from peerpedia_core.storage.db.crud_user import (
-            create_user, follow_user,
+            create_user,
+            follow_user,
         )
         session = get_session(engine)
         a = create_user(session, name="A")
@@ -382,7 +406,10 @@ class TestFollowCRUD:
 class TestBookmarkCRUD:
     def test_bookmark_crud(self, engine):
         from peerpedia_core.storage.db.crud_bookmark import (
-            add_bookmark, remove_bookmark, get_bookmarks_for_user, is_bookmarked,
+            add_bookmark,
+            get_bookmarks_for_user,
+            is_bookmarked,
+            remove_bookmark,
         )
         session = get_session(engine)
         user = _make_user(session, "reader")
@@ -405,7 +432,8 @@ class TestBookmarkCRUD:
 class TestMergeProposalCRUD:
     def test_create_and_get(self, engine):
         from peerpedia_core.storage.db.crud_merge import (
-            create_merge_proposal, get_merge_proposal,
+            create_merge_proposal,
+            get_merge_proposal,
             get_merge_proposals_for_article,
         )
         session = get_session(engine)
@@ -424,8 +452,9 @@ class TestMergeProposalCRUD:
 
     def test_accept_reject(self, engine):
         from peerpedia_core.storage.db.crud_merge import (
-            create_merge_proposal, accept_merge_proposal,
-            reject_merge_proposal, get_merge_proposal,
+            accept_merge_proposal,
+            create_merge_proposal,
+            get_merge_proposal,
         )
         session = get_session(engine)
         author = _make_user(session, "mp_a2")
@@ -444,7 +473,9 @@ class TestMergeProposalCRUD:
 
     def test_add_thread_message(self, engine):
         from peerpedia_core.storage.db.crud_merge import (
-            create_merge_proposal, add_merge_thread_message, get_merge_proposal,
+            add_merge_thread_message,
+            create_merge_proposal,
+            get_merge_proposal,
         )
         session = get_session(engine)
         author = _make_user(session, "mp_a3")
@@ -481,8 +512,9 @@ class TestMergeProposalCRUD:
 class TestCitationCRUD:
     def test_create_and_update(self, engine):
         from peerpedia_core.storage.db.crud_citation import (
-            create_or_update_citation, get_citations,
-            get_cites, get_cited_by,
+            create_or_update_citation,
+            get_cited_by,
+            get_cites,
         )
         session = get_session(engine)
         author = _make_user(session, "cit_author")
@@ -500,7 +532,8 @@ class TestCitationCRUD:
 
     def test_update_probabilities(self, engine):
         from peerpedia_core.storage.db.crud_citation import (
-            create_or_update_citation, get_citation,
+            create_or_update_citation,
+            get_citation,
         )
         session = get_session(engine)
         author = _make_user(session, "cp_au")

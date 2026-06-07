@@ -5,11 +5,15 @@ that the seed data represents work properly. If a seed scenario breaks, the
 corresponding test catches it.
 """
 import pytest
-from peerpedia_core.storage.db.engine import get_session, get_engine
+from peerpedia_core.storage.db.engine import get_engine, get_session
 from peerpedia_core.storage.db.models import (
-    User, Article, Follow, Review, Bookmark, Citation,
+    Article,
+    Bookmark,
+    Citation,
+    Follow,
+    Review,
+    User,
 )
-from peerpedia_api.deps import create_token
 
 DB_URL = "sqlite:////Users/chenqimeng/Projects/peerpedia/peerpedia.db"
 
@@ -17,8 +21,8 @@ DB_URL = "sqlite:////Users/chenqimeng/Projects/peerpedia/peerpedia.db"
 @pytest.fixture
 def client():
     """Real client against the seeded DB."""
-    from peerpedia_api.main import app
     from peerpedia_api import deps
+    from peerpedia_api.main import app
 
     engine = get_engine(DB_URL)
 

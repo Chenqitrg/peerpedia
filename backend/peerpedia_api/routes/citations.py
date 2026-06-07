@@ -1,13 +1,15 @@
 """Citation API routes."""
 from fastapi import APIRouter, Depends, HTTPException
+from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_citation import (
+    create_or_update_citation,
+    get_cited_by,
+    get_cites,
+)
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
-from peerpedia_core.storage.db.crud_citation import (
-    create_or_update_citation, get_cites, get_cited_by,
-)
-from peerpedia_core.storage.db.crud_article import get_article
 
 router = APIRouter(tags=["citations"])
 

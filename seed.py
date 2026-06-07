@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "core"))
@@ -20,19 +20,27 @@ sys.path.insert(0, str(Path(__file__).parent / "backend"))
 
 
 def seed(db_url: str, articles_dir: Path):
+    from peerpedia_core.storage.db.crud_article import (
+        create_article,
+        set_sink_start,
+        update_article_status,
+    )
+    from peerpedia_core.storage.db.crud_review import (
+        add_thread_message,
+        upsert_review,
+    )
     from peerpedia_core.storage.db.engine import get_engine, init_db
     from peerpedia_core.storage.db.models import (
-        Article, User, Follow, Bookmark, Review, Citation,
-    )
-    from peerpedia_core.storage.db.crud_article import (
-        create_article, set_sink_start, update_article_status,
-    )
-    from peerpedia_core.storage.db.crud_review import create_review, upsert_review, add_thread_message
-    from peerpedia_core.storage.db.crud_user import (
-        create_user, list_users,
+        Article,
+        Bookmark,
+        Citation,
+        Follow,
+        Review,
+        User,
     )
     from peerpedia_core.storage.git_backend import (
-        init_article_repo, commit_article,
+        commit_article,
+        init_article_repo,
     )
 
     engine = get_engine(db_url)

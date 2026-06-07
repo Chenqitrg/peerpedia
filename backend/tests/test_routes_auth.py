@@ -10,15 +10,14 @@ These tests ensure every seed user scenario is well-tested:
 import time
 
 import pytest
-from peerpedia_core.storage.db.engine import get_session, get_engine
-from peerpedia_core.storage.db.models import User
-from peerpedia_api.deps import create_token, decode_token
+from peerpedia_api.deps import create_token
+from peerpedia_core.storage.db.engine import get_session
 
 
 @pytest.fixture
 def client(db_engine):
-    from peerpedia_api.main import app
     from peerpedia_api import deps
+    from peerpedia_api.main import app
     def override_db():
         session = get_session(db_engine)
         try:

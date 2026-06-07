@@ -1,20 +1,20 @@
 """Sedimentation pool API routes."""
 from fastapi import APIRouter, Depends
+from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
+from peerpedia_core.storage.db.crud_review import get_reviews_for_article
+from peerpedia_core.storage.db.crud_user import get_followers, get_following
+from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
-    resolve_authors,
+    get_commit_count,
     get_commit_hash,
     get_content_preview,
-    get_commit_count,
+    resolve_authors,
 )
 from peerpedia_api.schemas.article import ArticleSummary
-from peerpedia_core.storage.db.crud_article import list_articles
-from peerpedia_core.storage.db.crud_review import get_reviews_for_article
-from peerpedia_core.storage.db.crud_user import get_followers, get_following
-from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
-from peerpedia_core.storage.db.models import User
 
 router = APIRouter(prefix="/pool", tags=["pool"])
 
@@ -25,7 +25,7 @@ def get_pool(
     db: Session = Depends(deps.get_db),
 ):
     """List sedimentation articles from followed/following users, sorted by remaining time descending."""
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
 
     # Build the set of user IDs in the user's follow circle
     if current_user:

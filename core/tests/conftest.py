@@ -1,11 +1,9 @@
 """Shared fixtures for core tests."""
 import tempfile
-from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine
 
-from peerpedia_core.storage.db.engine import get_engine, init_db, get_session, Base
+from peerpedia_core.storage.db.engine import Base, get_engine, init_db
 
 
 @pytest.fixture

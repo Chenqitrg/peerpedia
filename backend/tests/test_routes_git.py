@@ -1,17 +1,15 @@
 """Tests for git-backed article sub-routes: history, diff, fork."""
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import User, Article
-from peerpedia_core.storage.git_backend import init_article_repo, commit_article
+from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
 
 @pytest.fixture
 def client(db_engine):
-    from peerpedia_api.main import app
     from peerpedia_api import deps
+    from peerpedia_api.main import app
     def override_db():
         session = get_session(db_engine)
         try:

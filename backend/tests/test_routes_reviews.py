@@ -1,16 +1,14 @@
 """Integration tests for review API routes."""
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import User, Article, Review
+from peerpedia_core.storage.db.models import Article, User
 
 
 @pytest.fixture
 def client(db_engine):
-    from peerpedia_api.main import app
     from peerpedia_api import deps
+    from peerpedia_api.main import app
     def override_db():
         session = get_session(db_engine)
         try:
@@ -354,7 +352,7 @@ class TestPoolReviewFreeze:
         """池内评审出池后应被冻结，不可修改。"""
         from peerpedia_core.storage.db.engine import get_session
         s = get_session(db_engine)
-        from peerpedia_core.storage.db.models import User, Article
+        from peerpedia_core.storage.db.models import Article, User
         author = User(username="freeze_author", password_hash="", name="冻结作者", anonymous_name="anon_fa")
         reviewer = User(username="freeze_rv", password_hash="", name="冻结评审", anonymous_name="冻结观察者")
         s.add_all([author, reviewer])
@@ -397,7 +395,7 @@ class TestPoolReviewFreeze:
         """已存在的池内评审在文章出池后不可修改。"""
         from peerpedia_core.storage.db.engine import get_session
         s = get_session(db_engine)
-        from peerpedia_core.storage.db.models import User, Article
+        from peerpedia_core.storage.db.models import Article, User
         author = User(username="frz_auth2", password_hash="", name="作者2", anonymous_name="anon_a2")
         reviewer = User(username="frz_rv2", password_hash="", name="评审2", anonymous_name="anon_r2")
         s.add_all([author, reviewer])

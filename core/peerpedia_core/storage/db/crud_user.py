@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.models import User, Follow
+from peerpedia_core.storage.db.models import Follow, User
 
 
 def _generate_anonymous_name() -> str:

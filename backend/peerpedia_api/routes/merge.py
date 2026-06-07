@@ -1,14 +1,17 @@
 """Merge proposal API routes."""
 from fastapi import APIRouter, Depends, HTTPException
+from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_merge import (
+    accept_merge_proposal,
+    create_merge_proposal,
+    get_merge_proposal,
+    get_merge_proposals_for_article,
+    reject_merge_proposal,
+)
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
-from peerpedia_core.storage.db.crud_merge import (
-    create_merge_proposal, get_merge_proposal, get_merge_proposals_for_article,
-    accept_merge_proposal, reject_merge_proposal,
-)
-from peerpedia_core.storage.db.crud_article import get_article
 
 router = APIRouter(tags=["merge"])
 

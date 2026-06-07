@@ -1,15 +1,18 @@
 """Authentication API routes."""
 from fastapi import APIRouter, Depends, HTTPException
+from peerpedia_core.storage.db.crud_user import create_user, get_user_by_username
+from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
 
-from peerpedia_api import deps
+from peerpedia_api.deps import (
+    create_token,
+    get_current_user,
+    get_db,
+    hash_password,
+    verify_password,
+)
 from peerpedia_api.schemas.auth import AuthResponse, LoginRequest, RegisterRequest
 from peerpedia_api.schemas.user import UserProfile
-from peerpedia_api.deps import (
-    get_db, get_current_user, hash_password, verify_password, create_token,
-)
-from peerpedia_core.storage.db.models import User
-from peerpedia_core.storage.db.crud_user import create_user, get_user_by_username, get_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

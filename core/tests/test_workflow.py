@@ -1,7 +1,7 @@
 """Tests for sedimentation pool workflow and scoring aggregation."""
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
-from unittest import mock
 
 # Register all models with Base.metadata before engine fixture creates tables
 import peerpedia_core.storage.db.models  # noqa: F401
@@ -53,7 +53,6 @@ class TestSedimentation:
 
     def test_compute_sink_eta_max_score(self):
         from peerpedia_core.workflow.sedimentation import compute_sink_eta
-        from datetime import datetime, timezone
         start = datetime(2026, 6, 1, tzinfo=timezone.utc)
         eta = compute_sink_eta(start, avg_score=5.0,
                                min_days=2, max_days=180)
@@ -63,7 +62,6 @@ class TestSedimentation:
 
     def test_compute_sink_eta_min_score(self):
         from peerpedia_core.workflow.sedimentation import compute_sink_eta
-        from datetime import datetime, timezone
         start = datetime(2026, 6, 1, tzinfo=timezone.utc)
         eta = compute_sink_eta(start, avg_score=0.0,
                                min_days=2, max_days=180)
@@ -73,7 +71,6 @@ class TestSedimentation:
 
     def test_compute_sink_eta_mid_score(self):
         from peerpedia_core.workflow.sedimentation import compute_sink_eta
-        from datetime import datetime, timezone
         start = datetime(2026, 6, 1, tzinfo=timezone.utc)
         eta_max = compute_sink_eta(start, 0.0, 2, 180)
         eta_mid = compute_sink_eta(start, 2.5, 2, 180)
@@ -83,7 +80,6 @@ class TestSedimentation:
 
     def test_is_ready_to_publish(self):
         from peerpedia_core.workflow.sedimentation import is_ready_to_publish
-        from datetime import datetime, timezone
         past = datetime.now(timezone.utc) - timedelta(days=10)
         future = datetime.now(timezone.utc) + timedelta(days=10)
         assert is_ready_to_publish(past) is True

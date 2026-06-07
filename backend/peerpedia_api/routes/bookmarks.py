@@ -1,13 +1,16 @@
 """Bookmark API routes."""
 from fastapi import APIRouter, Depends, HTTPException
+from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_bookmark import (
+    add_bookmark,
+    get_bookmarks_for_user,
+    is_bookmarked,
+    remove_bookmark,
+)
+from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
-from peerpedia_core.storage.db.crud_bookmark import (
-    add_bookmark, remove_bookmark, is_bookmarked, get_bookmarks_for_user,
-)
-from peerpedia_core.storage.db.crud_article import get_article
-from peerpedia_core.storage.db.models import User
 
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 

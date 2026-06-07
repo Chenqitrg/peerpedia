@@ -9,15 +9,15 @@ from fastapi.responses import JSONResponse
 
 from peerpedia_api.routes.articles import router as articles_router
 from peerpedia_api.routes.auth import router as auth_router
-from peerpedia_api.routes.reviews import router as reviews_router
-from peerpedia_api.routes.users import router as users_router
-from peerpedia_api.routes.pool import router as pool_router
 from peerpedia_api.routes.bookmarks import router as bookmarks_router
-from peerpedia_api.routes.feed import router as feed_router
-from peerpedia_api.routes.search import router as search_router
-from peerpedia_api.routes.compile import router as compile_router
 from peerpedia_api.routes.citations import router as citations_router
+from peerpedia_api.routes.compile import router as compile_router
+from peerpedia_api.routes.feed import router as feed_router
 from peerpedia_api.routes.merge import router as merge_router
+from peerpedia_api.routes.pool import router as pool_router
+from peerpedia_api.routes.reviews import router as reviews_router
+from peerpedia_api.routes.search import router as search_router
+from peerpedia_api.routes.users import router as users_router
 
 logger = logging.getLogger(__name__)
 

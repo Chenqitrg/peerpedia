@@ -2,7 +2,6 @@
 from sqlalchemy.orm import Session
 
 from peerpedia_core.config.params import params
-from peerpedia_core.types.scores import FiveDimScores
 
 DIMS = ["originality", "rigor", "completeness", "pedagogy", "impact"]
 

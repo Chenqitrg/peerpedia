@@ -1,5 +1,5 @@
 """Sedimentation pool logic — sink time calculation and auto-publish."""
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -62,11 +62,10 @@ def publish_ready_articles(session: Session) -> int:
 
     Returns the number of articles published in this call.
     """
-    from peerpedia_core.storage.db.crud_article import get_article, update_article_status
     from peerpedia_core.storage.db.crud_review import get_reviews_for_article
-    from peerpedia_core.workflow.scoring import compute_article_score_for_commit
-    from peerpedia_core.workflow.reputation import compute_author_reputation
     from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
+    from peerpedia_core.workflow.reputation import compute_author_reputation
+    from peerpedia_core.workflow.scoring import compute_article_score_for_commit
 
     articles = session.query(Article).filter(Article.status == "sedimentation").all()
 

@@ -1,11 +1,9 @@
 """Review API schemas."""
 from datetime import datetime
 from enum import Enum
-
 from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
-
 
 FIVE_DIMS = {"originality", "rigor", "completeness", "pedagogy", "impact"}
 

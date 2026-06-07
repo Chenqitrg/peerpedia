@@ -1,17 +1,41 @@
 """Article API routes."""
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from peerpedia_core.config.params import params
+from peerpedia_core.storage.db.crud_article import (
+    create_article,
+    extend_sink,
+    get_article,
+    increment_fork_count,
+    list_articles,
+    set_sink_start,
+    update_article_status,
+)
+from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
+from peerpedia_core.storage.db.crud_review import (
+    create_review,
+    get_reviews_for_article,
+    upsert_review,
+)
+from peerpedia_core.storage.db.models import User
+from peerpedia_core.storage.git_backend import (
+    DEFAULT_ARTICLES_DIR,
+    commit_article,
+    get_commit_history,
+    get_diff_between,
+    init_article_repo,
+)
+from peerpedia_core.workflow.scoring import compute_article_score_for_commit
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
-    resolve_authors,
-    get_commit_hash,
-    get_content_preview,
     get_commit_count,
+    get_content_preview,
     get_git_meta,
+    resolve_authors,
 )
 from peerpedia_api.schemas.article import (
     ArticleCreate,
@@ -19,33 +43,8 @@ from peerpedia_api.schemas.article import (
     ArticleSourceResponse,
     ArticleSummary,
     ArticleUpdate,
-    AuthorInfo,
     SinkExtensionRequest,
 )
-from peerpedia_core.storage.db.crud_article import (
-    create_article,
-    get_article,
-    list_articles,
-    set_sink_start,
-    extend_sink,
-    update_article_status,
-    increment_fork_count,
-)
-from peerpedia_core.storage.db.crud_review import create_review, upsert_review, get_reviews_for_article
-from peerpedia_core.storage.db.crud_user import get_user
-from peerpedia_core.storage.db.models import User
-from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
-from peerpedia_core.storage.git_backend import (
-    DEFAULT_ARTICLES_DIR,
-    init_article_repo,
-    commit_article,
-    get_commit_history,
-    get_diff,
-    get_diff_between,
-)
-from peerpedia_core.workflow.scoring import compute_article_score_for_commit
-from peerpedia_core.config.params import params
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -439,7 +438,8 @@ def api_fork_article(article_id: str, current_user: User = Depends(deps.require_
     if original is None:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    import shutil, uuid
+    import shutil
+    import uuid
     fork_id = str(uuid.uuid4())
     src = _repo_path(article_id)
     dst = _repo_path(fork_id)

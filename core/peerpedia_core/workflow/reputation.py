@@ -6,9 +6,9 @@ to weight reviewer contributions.
 from sqlalchemy.orm import Session
 
 from peerpedia_core.config.params import params
-from peerpedia_core.types.scores import ReputationScores
-from peerpedia_core.storage.db.models import Article, User
 from peerpedia_core.storage.db.crud_user import update_user_reputation
+from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.types.scores import ReputationScores
 
 # Status-based weights for article scoring in reputation.
 # Published articles carry the most weight.

@@ -1,12 +1,14 @@
 """Tests for peerpedia_core.config.params — all tunable system parameters."""
-import math
 import pytest
+
 from peerpedia_core.config.params import (
-    SinkParams,
-    ScoreParams,
-    ReputationParams,
     CommentParams,
     Params,
+    ReputationParams,
+    ScoreParams,
+    SinkParams,
+)
+from peerpedia_core.config.params import (
     params as default_params,
 )
 

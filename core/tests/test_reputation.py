@@ -1,9 +1,9 @@
 """Tests for the reputation mechanism (core calculation logic)."""
 import pytest
 
-from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.crud_user import create_user, update_user_reputation
 from peerpedia_core.storage.db.crud_article import create_article
+from peerpedia_core.storage.db.crud_user import create_user, update_user_reputation
+from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import User
 from peerpedia_core.types.scores import ReputationScores
 from peerpedia_core.workflow.reputation import (
@@ -11,7 +11,6 @@ from peerpedia_core.workflow.reputation import (
     get_reviewer_weight,
     recalculate_all_reputations,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
