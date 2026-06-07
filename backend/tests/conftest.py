@@ -4,8 +4,8 @@ import tempfile
 import pytest
 from peerpedia_api.deps import create_token
 from peerpedia_core.storage.db.engine import Base, get_engine, get_session, init_db
-from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.db.models import *  # noqa: F401,F403 — register all models
+from peerpedia_core.storage.db.models import User  # noqa: F401 — explicit import for type checking
 
 
 @pytest.fixture
