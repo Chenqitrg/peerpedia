@@ -141,30 +141,24 @@ async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): 
       return { following: !!f }
     }
     case 'get_followers': {
-      const ids = follows.filter(x => x.followed_id === a.followed_id).map(x => x.follower_id)
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      const ids = follows.filter(x => x.followed_id === targetId).map(x => x.follower_id)
       return accounts.filter(acct => ids.includes(acct.id)).map(x => ({ id: x.id, username: x.username }))
     }
     case 'get_following': {
-      const ids = follows.filter(x => x.follower_id === a.followed_id).map(x => x.followed_id)
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      const ids = follows.filter(x => x.follower_id === targetId).map(x => x.followed_id)
       return accounts.filter(acct => ids.includes(acct.id)).map(x => ({ id: x.id, username: x.username }))
     }
     case 'get_follower_count': {
-      return { count: follows.filter(x => x.followed_id === a.followed_id).length }
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      return { count: follows.filter(x => x.followed_id === targetId).length }
     }
     case 'get_following_count': {
-      return { count: follows.filter(x => x.follower_id === a.followed_id).length }
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      return { count: follows.filter(x => x.follower_id === targetId).length }
     }
     // ── Bookmarks ────────────────────────────────────────────────────────
-    case 'add_bookmark': {
-      const accountId = _resolveToken(a, sessions) || ''
-      const bm = bookmarks.find(x => x.user_id === accountId && x.article_id === a.article_id)
-      if (!bm) {
-        bookmarks.push({ user_id: accountId, article_id: a.article_id as string, created_at: new Date().toISOString() })
-        _save(_bookmarksKey, bookmarks)
-      }
-      return { ok: true }
-    }
-    case 'remove_bookmark': {
       const accountId = _resolveToken(a, sessions) || ''
       _save(_bookmarksKey, bookmarks.filter(x => !(x.user_id === accountId && x.article_id === a.article_id)))
       return { ok: true }

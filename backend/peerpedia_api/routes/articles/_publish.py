@@ -19,7 +19,7 @@ from peerpedia_api.schemas.article import (
     SinkExtensionRequest,
 )
 
-from ._crud import repo_path, build_article_detail
+from ._crud import build_article_detail, repo_path
 from ._router import router
 
 
@@ -83,6 +83,7 @@ def api_download_source(article_id: str):
 def api_download_pdf(article_id: str):
     """Compile article to PDF and return as downloadable file."""
     import tempfile
+
     from fastapi.responses import FileResponse, PlainTextResponse
 
     rp = repo_path(article_id)

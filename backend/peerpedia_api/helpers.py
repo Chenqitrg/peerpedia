@@ -1,16 +1,14 @@
 """Shared route helpers — used by articles, feed, pool, and search routes."""
 
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from peerpedia_core.storage.db.crud_bookmark import is_bookmarked as _is_bookmarked
 from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.crud_bookmark import is_bookmarked as _is_bookmarked
 from peerpedia_api.schemas.article import ArticleSummary, AuthorInfo
-
 
 # ── Author resolution ─────────────────────────────────────────────────────
 

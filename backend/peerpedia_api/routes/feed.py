@@ -1,7 +1,6 @@
 """Feed API route."""
 from fastapi import APIRouter, Depends
 from peerpedia_core.storage.db.crud_article import list_articles
-from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
 from peerpedia_core.storage.db.crud_user import get_following
 from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
@@ -9,10 +8,8 @@ from sqlalchemy.orm import Session
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
     build_article_summary,
-    get_content_preview,
     resolve_authors,
 )
-from peerpedia_api.schemas.article import ArticleSummary
 
 router = APIRouter(prefix="/feed", tags=["feed"])
 

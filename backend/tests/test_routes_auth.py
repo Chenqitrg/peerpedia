@@ -12,7 +12,6 @@ import time
 import pytest
 from peerpedia_api.deps import create_token
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import User
 
 
 @pytest.fixture

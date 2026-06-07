@@ -7,10 +7,10 @@ from peerpedia_core.storage.db.models import Article, User
 
 @pytest.fixture
 def client(db_engine):
+    from peerpedia_api import deps
     from peerpedia_api.main import app
     from peerpedia_core.storage.db.engine import get_session
     from peerpedia_core.storage.db.models import User
-    from peerpedia_api import deps
 
     def override_db():
         session = get_session(db_engine)

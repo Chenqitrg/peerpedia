@@ -9,9 +9,7 @@ from sqlalchemy.types import String
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
     build_article_summary,
-    get_content_preview,
 )
-from peerpedia_api.schemas.article import ArticleSummary
 
 router = APIRouter(prefix="/search", tags=["search"])
 

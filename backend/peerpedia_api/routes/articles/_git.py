@@ -11,17 +11,18 @@ from peerpedia_core.storage.db.crud_review import create_review
 from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.git_backend import (
     commit_article,
-    get_commit_history as _get_commit_history,
     get_diff_between,
     init_article_repo,
+)
+from peerpedia_core.storage.git_backend import (
+    get_commit_history as _get_commit_history,
 )
 from peerpedia_core.workflow.scoring import compute_article_score_for_commit
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
-from peerpedia_api.schemas.article import ArticleDetail
 
-from ._crud import repo_path, build_article_detail
+from ._crud import repo_path
 from ._router import router
 
 

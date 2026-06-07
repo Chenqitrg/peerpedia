@@ -31,19 +31,15 @@ from peerpedia_api.helpers import (
     build_article_summary,
     get_commit_count,
     get_commit_hash,
-    get_content_preview,
-    get_git_meta,
     resolve_authors,
 )
 from peerpedia_api.schemas.article import (
     ArticleCreate,
     ArticleDetail,
-    ArticleSummary,
     ArticleUpdate,
 )
 
 from ._router import router
-
 
 # ── Shared helpers ──────────────────────────────────────────────────────
 
