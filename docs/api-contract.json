@@ -2,7 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PeerPedia API",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "description": "PeerPedia API — P0 architecture debt resolved (2026-06-07)"
   },
   "paths": {
     "/api/v1/auth/register": {
@@ -1751,34 +1752,57 @@
             "name": "q",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "", "title": "Q" }
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
           },
           {
             "name": "category",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "", "title": "Category" },
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Category"
+            },
             "description": "Filter by article category (e.g. physics, math, cs)"
           },
           {
             "name": "sort",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "", "title": "Sort" },
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Sort"
+            },
             "description": "Sort order: 'newest' or 'score'"
           },
           {
             "name": "page",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 1, "minimum": 1, "title": "Page" },
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1,
+              "title": "Page"
+            },
             "description": "Page number (1-based)"
           },
           {
             "name": "size",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 100, "title": "Size" },
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100,
+              "title": "Size"
+            },
             "description": "Results per page (max 100)"
           }
         ],
@@ -1907,7 +1931,9 @@
                       "title": "Ok"
                     }
                   },
-                  "required": ["ok"]
+                  "required": [
+                    "ok"
+                  ]
                 }
               }
             }
@@ -2311,42 +2337,6 @@
             "type": "integer",
             "title": "Commit Count",
             "default": 1
-          },
-          "compiled_format": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Compiled Format"
-          },
-          "compiled_output": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Compiled Output"
-          },
-          "compiled_pages": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Compiled Pages"
           },
           "score": {
             "anyOf": [
