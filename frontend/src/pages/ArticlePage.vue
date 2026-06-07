@@ -307,6 +307,31 @@ async function handleSourceDownload() {
   window.open(`/api/v1/articles/${id}/download/source`, '_blank')
 }
 
+async function handlePdfDownload() {
+  // In local mode, render markdown and trigger browser print
+  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    const draft = await tauri.getDraft({ id })
+    if (draft && !('error' in draft) && draft.format !== 'typst') {
+      import('../utils/markdown').then(({ parseMarkdown }) => {
+        const html = parseMarkdown(draft.content || '')
+        const w = window.open('', '_blank')
+        if (w) {
+          w.document.write(`<!DOCTYPE html><html><head><title>${article.value?.title || 'Article'}</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+            <style>body{max-width:800px;margin:2rem auto;font-family:serif;line-height:1.6;color:#1a1a1a;}
+            pre{background:#f5f5f5;padding:1rem;border-radius:4px;overflow-x:auto;}</style></head>
+            <body>${html}</body></html>`)
+          w.document.close()
+          setTimeout(() => w.print(), 500)
+        }
+      })
+      return
+    }
+  }
+  // Web mode: open server download URL
+  window.open(`/api/v1/articles/${id}/download/pdf`, '_blank')
+}
+
 function goToEdit() {
   router.push(`/edit/${id}`)
 }
@@ -479,14 +504,14 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               {{ t('article.source') }}
             </button>
 
-            <a
-              :href="`/api/v1/articles/${id}/download/pdf`"
+            <button
               aria-label="Download PDF"
-              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors no-underline"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors cursor-pointer"
+              @click="handlePdfDownload"
             >
               <FileText class="w-3 h-3" stroke-width="2" />
               PDF
-            </a>
+            </button>
 
             <button
               v-if="isOwnArticle && article.status === 'sedimentation'"
