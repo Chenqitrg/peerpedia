@@ -55,6 +55,7 @@ export interface ArticleDetail {
   title: string
   status: 'draft' | 'sedimentation' | 'published'
   authors: AuthorInfo[]
+  commit_hash: string
   fork_count: number
   forked_from: string | null
   commit_count: number

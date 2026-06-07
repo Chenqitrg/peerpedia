@@ -163,7 +163,7 @@ async function goToFork() {
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="article.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'"
-          :title="article.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'"
+          :data-tooltip="article.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'"
           @click="handleBookmarkClick"
         >
           <BookmarkCheck v-if="article.is_bookmarked" class="w-3.5 h-3.5 text-accent" stroke-width="2" />
@@ -176,7 +176,7 @@ async function goToFork() {
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('card.history')"
-          :title="t('card.history')"
+          :data-tooltip="t('card.history')"
         >
           <History class="w-3.5 h-3.5" stroke-width="2" />
         </router-link>
@@ -187,7 +187,7 @@ async function goToFork() {
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('card.edit')"
-          :title="t('card.edit')"
+          :data-tooltip="t('card.edit')"
           @click="goToEdit"
         >
           <Edit class="w-3.5 h-3.5" stroke-width="2" />
@@ -198,7 +198,7 @@ async function goToFork() {
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('card.fork')"
-          :title="t('card.fork')"
+          :data-tooltip="t('card.fork')"
           @click="goToFork"
         >
           <GitFork class="w-3.5 h-3.5" stroke-width="2" />

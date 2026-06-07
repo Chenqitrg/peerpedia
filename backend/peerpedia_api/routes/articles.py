@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
     get_commit_count,
+    get_commit_hash,
     get_content_preview,
     get_git_meta,
     resolve_authors,
@@ -140,6 +141,7 @@ def _build_article_detail(db: Session, article_id: str,
         title=a.title or "",
         status=a.status,
         authors=authors,
+        commit_hash=get_commit_hash(a.id),
         fork_count=a.fork_count,
         forked_from=a.forked_from,
         commit_count=get_commit_count(a.id),

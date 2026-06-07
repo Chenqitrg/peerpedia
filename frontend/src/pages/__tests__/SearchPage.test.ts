@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+// Mock useNetworkStatus so canRead('search.network') passes in tests
+vi.mock('@/composables/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({
+    isOnline: { value: true },
+    startPing: vi.fn(),
+    stopPing: vi.fn(),
+  })),
+}))
+
 const { mockPush, mockSearchArticles } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockSearchArticles: vi.fn().mockResolvedValue({
