@@ -13,7 +13,7 @@
 import { marked } from 'marked'
 import { renderMathInHtml } from './math'
 
-const PLACEHOLDER_PREFIX = 'PEERPEDIA_MATH_'
+const PLACEHOLDER_PREFIX = 'PEERPEDIA-MATH-'
 
 /**
  * Compile a markdown string to HTML, with KaTeX math rendering.

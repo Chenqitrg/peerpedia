@@ -97,6 +97,14 @@ describe('parseMarkdown', () => {
     expect(result).not.toContain('$$')
   })
 
+  it('placeholder survives marked parsing (no underscore emphasis)', () => {
+    // Regression: marked's GFM interpreted _MATH_ in PEERPEDIA_MATH_D0 as
+    // emphasis, breaking the placeholder. Now uses PEERPEDIA-MATH-D0 (hyphens).
+    const result = parseMarkdown('$$x$$')
+    expect(result).toContain('katex-display')
+    expect(result).toContain('katex')
+  })
+
   it('renders multiple display math blocks independently', () => {
     const result = parseMarkdown('$$\na = 1\n$$\n\n$$\nb = 2\n$$')
     const displayCount = (result.match(/katex-display/g) || []).length
