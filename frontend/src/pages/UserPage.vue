@@ -129,13 +129,21 @@ async function loadArticles() {
       for (const d of drafts) {
         // Avoid duplicates — skip if already loaded from server
         if (!merged.some(a => a.id === d.id)) {
+          // Try to get actual commit hash from local git
+          let hash = ''
+          try {
+            const history = await tauri.gitHistory({ article_id: d.id })
+            if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+              hash = history[0].hash
+            }
+          } catch { /* optional */ }
           merged.push({
             id: d.id,
             title: d.title || 'Untitled',
             status: 'draft',
             authors: [{ id: id.value, name: user.value?.name || id.value, anonymous_name: '' }],
             content_preview: '',
-            commit_hash: '',
+            commit_hash: hash,
             fork_count: 0,
             forked_from: null,
             commit_count: 0,

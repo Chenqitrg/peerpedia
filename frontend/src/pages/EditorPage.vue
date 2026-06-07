@@ -17,9 +17,11 @@ import {
   BookmarkCheck,
   Eye,
   EyeOff,
+  GitCommitHorizontal,
   History,
   Play,
   Save,
+  Send,
 } from 'lucide-vue-next'
 
 
@@ -59,6 +61,11 @@ const errorMsg = ref('')
 const successMsg = ref('')
 const savedMsg = ref(false)
 const showPreview = ref(true)
+const commitHash = ref('')
+// Track saved state to detect unsaved edits
+const savedContent = ref('')
+const savedTitle = ref('')
+const isClean = computed(() => content.value === savedContent.value && title.value === savedTitle.value)
 
 // Split panel resize
 const splitRatio = ref(50)
@@ -116,10 +123,13 @@ async function loadExistingArticle() {
     const a = articleStore.currentArticle
     if (a) {
       title.value = a.title || ''
+      commitHash.value = a.commit_hash || ''
     }
     const src = await getArticleSource(editId.value!)
     content.value = src.content
     format.value = src.format as 'markdown' | 'typst'
+    savedContent.value = src.content
+    savedTitle.value = title.value
     return
   } catch (e: any) {
     // 2. In Tauri/dev-mock mode, fall back to local draft storage.
@@ -130,6 +140,15 @@ async function loadExistingArticle() {
         title.value = draft.title || ''
         content.value = draft.content || ''
         format.value = (draft.format as 'markdown' | 'typst') || 'markdown'
+        savedContent.value = content.value
+        savedTitle.value = title.value
+        // Populate commit hash from local git
+        try {
+          const history = await tauri.gitHistory({ article_id: editId.value! })
+          if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+            commitHash.value = history[0].hash
+          }
+        } catch { /* optional */ }
         return
       }
     }
@@ -181,9 +200,11 @@ async function saveDraft() {
           // Check if git repo exists; if not, init
           const history = await tauri.gitHistory({ article_id: result.id })
           if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
-            await tauri.gitCommit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            const r = await tauri.gitCommit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            if (r && r.hash) commitHash.value = r.hash
           } else {
-            await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+            if (r && r.hash) commitHash.value = r.hash
           }
         }
       } catch { /* git ops optional — draft is still saved */ }
@@ -201,6 +222,8 @@ async function saveDraft() {
     abstract: abstract.value,
   }
   saveJSON(DRAFT_KEY.value, draft)
+  savedContent.value = content.value
+  savedTitle.value = title.value
   savedMsg.value = true
   setTimeout(() => { savedMsg.value = false }, 2000)
 }
@@ -466,9 +489,25 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         </button>
 
         <!-- Download source -->
-        <DownloadButton format="source" :content="content" :content-format="format" :filename="title" :disabled="!content.trim()" />
+        <DownloadButton
+          format="source"
+          :content="content"
+          :content-format="format"
+          :filename="title"
+          :disabled="!commitHash || !isClean || !content.trim()"
+          :commit-hash="commitHash"
+          :disabled-reason="!commitHash ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+        />
         <!-- Download compiled HTML -->
-        <DownloadButton format="compiled" :content="content" :content-format="format" :filename="title" :disabled="!content.trim()" />
+        <DownloadButton
+          format="compiled"
+          :content="content"
+          :content-format="format"
+          :filename="title"
+          :disabled="!commitHash || !isClean || !content.trim()"
+          :commit-hash="commitHash"
+          :disabled-reason="!commitHash ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+        />
 
         <!-- History -->
         <router-link
@@ -485,19 +524,19 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
 
         <div class="w-px h-5 bg-divider mx-1" />
 
-        <!-- Publish button -->
+        <!-- Publish to pool -->
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
-                 rounded-lg transition-all duration-200"
+          class="flex items-center justify-center w-8 h-8 rounded-lg
+                 transition-colors duration-200"
           :class="canWrite('editor.publish_pool')
-            ? 'bg-accent text-[#0d1117] hover:brightness-110'
-            : 'bg-[#21262d] text-ink-muted/50 cursor-not-allowed'"
+            ? 'text-accent hover:text-accent hover:bg-accent/10'
+            : 'text-ink-muted/30 cursor-not-allowed'"
           :disabled="submitting || !canWrite('editor.publish_pool')"
-          :title="!canWrite('editor.publish_pool') ? t(getFallback('editor.publish_pool')) : ''"
+          :aria-label="t('editor.publish')"
+          :title="canWrite('editor.publish_pool') ? t('editor.publish') : t(getFallback('editor.publish_pool'))"
           @click="handlePublish"
         >
-          <Send class="w-3.5 h-3.5" stroke-width="2" />
-          {{ isEdit ? t('editor.submitPool') : t('editor.publish') }}
+          <Send class="w-4 h-4" stroke-width="2" />
         </button>
       </div>
     </div>
@@ -565,7 +604,13 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
 
     <!-- Bottom bar -->
     <div class="flex items-center justify-between px-4 py-1.5 bg-card border border-divider rounded-b-lg text-xs text-ink-muted">
-      <span>{{ format.toUpperCase() }}</span>
+      <div class="flex items-center gap-3">
+        <span>{{ format.toUpperCase() }}</span>
+        <span v-if="commitHash" class="flex items-center gap-1 font-mono">
+          <GitCommitHorizontal class="w-3 h-3" stroke-width="2" />
+          {{ commitHash.slice(0, 7) }}
+        </span>
+      </div>
       <span>{{ content.length }} characters</span>
     </div>
 
