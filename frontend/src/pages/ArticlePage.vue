@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { useOffline } from '../composables/useOffline'
 import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, createMergeProposal } from '../api/articles'
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
@@ -31,6 +32,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const reviewStore = useReviewStore()
 const { t } = useI18n()
+const { canRead, canWrite, getFallback } = useOffline()
 
 const article = ref<ArticleDetail | null>(null)
 const compiledHtml = ref('')
@@ -429,7 +431,12 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             </button>
 
             <button
-              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-colors"
+              :class="canWrite('article.fork')
+                ? 'text-ink-muted hover:text-ink hover:bg-[#21262d]'
+                : 'text-ink-muted/40 cursor-not-allowed'"
+              :disabled="!canWrite('article.fork')"
+              :title="!canWrite('article.fork') ? t(getFallback('article.fork')) : ''"
               @click="handleFork"
             >
               <GitFork class="w-3 h-3" stroke-width="2" />

@@ -162,5 +162,19 @@
   "citation": {
     "forward": "前向引用",
     "backward": "后向引用"
+  },
+  "offline": {
+    "status_online": "在线",
+    "status_offline": "离线",
+    "feed_hint": "离线模式 — 这里显示你最近看过的文章",
+    "feed_empty": "还没有浏览记录 — 去探索文章吧",
+    "comment_hint": "需要联网才能评论",
+    "fork_hint": "需要联网才能 Fork",
+    "publish_hint": "需要联网才能发布到沉淀池",
+    "pool_hint": "无网络，无法访问沉淀池",
+    "schools_hint": "无网络，无法访问 Schools",
+    "user_hint": "离线不可用",
+    "search_local": "本地",
+    "search_network": "全网"
   }
 }

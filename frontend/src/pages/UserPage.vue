@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { useOffline } from '../composables/useOffline'
 import { getUser, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
@@ -26,6 +27,9 @@ const router = useRouter()
 const userStore = useUserStore()
 const tauri = useTauri()
 const { t } = useI18n()
+const { canRead, canWrite, getFallback } = useOffline()
+
+const canViewFollowGraph = computed(() => canRead('user.follow_graph'))
 
 const id = computed(() => route.params.id as string)
 
@@ -229,6 +233,7 @@ watch(() => route.params.id, () => {
             <!-- Stats row -->
             <div class="flex items-center gap-4 text-sm">
               <router-link
+                v-if="canViewFollowGraph"
                 :to="`/user/${user.id}/followers`"
                 class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors no-underline"
               >
@@ -236,7 +241,17 @@ watch(() => route.params.id, () => {
                 <span class="font-semibold">{{ user.followers_count }}</span>
                 <span>{{ t('common.followers') }}</span>
               </router-link>
+              <span
+                v-else
+                class="flex items-center gap-1.5 text-ink-muted/50 cursor-not-allowed"
+                :title="t(getFallback('user.follow_graph'))"
+              >
+                <UsersRound class="w-3.5 h-3.5" stroke-width="2" />
+                <span class="font-semibold">{{ user.followers_count }}</span>
+                <span>{{ t('common.followers') }}</span>
+              </span>
               <router-link
+                v-if="canViewFollowGraph"
                 :to="`/user/${user.id}/following`"
                 class="flex items-center gap-1.5 text-ink-muted hover:text-ink transition-colors no-underline"
               >
@@ -244,6 +259,15 @@ watch(() => route.params.id, () => {
                 <span class="font-semibold">{{ user.following_count }}</span>
                 <span>{{ t('common.following') }}</span>
               </router-link>
+              <span
+                v-else
+                class="flex items-center gap-1.5 text-ink-muted/50 cursor-not-allowed"
+                :title="t(getFallback('user.follow_graph'))"
+              >
+                <UserCheck class="w-3.5 h-3.5" stroke-width="2" />
+                <span class="font-semibold">{{ user.following_count }}</span>
+                <span>{{ t('common.following') }}</span>
+              </span>
             </div>
           </div>
 
@@ -253,8 +277,11 @@ watch(() => route.params.id, () => {
             class="btn-sm shrink-0 transition-colors duration-200"
             :class="isFollowing
               ? 'btn-outline rounded-xl'
-              : 'bg-accent text-[#0d1117] hover:brightness-110 rounded-xl'"
-            :disabled="followLoading"
+              : canWrite('user.follow_graph')
+                ? 'bg-accent text-[#0d1117] hover:brightness-110 rounded-xl'
+                : 'bg-[#21262d] text-ink-muted/50 cursor-not-allowed rounded-xl'"
+            :disabled="followLoading || !canWrite('user.follow_graph')"
+            :title="!canWrite('user.follow_graph') ? t(getFallback('user.follow_graph')) : ''"
             @click="handleFollow"
           >
             {{ isFollowing ? t('common.following') : t('common.follow') }}

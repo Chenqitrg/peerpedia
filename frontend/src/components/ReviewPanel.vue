@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { useOffline } from '../composables/useOffline'
 import StarRating from './StarRating.vue'
 import ScoreBadges from './ScoreBadges.vue'
 import ThreadReplyInput from './ThreadReplyInput.vue'
@@ -8,6 +9,7 @@ import type { ReviewOut, FiveDimScores } from '../api/types'
 import { ChevronRight, ChevronDown } from 'lucide-vue-next'
 
 const { t } = useI18n()
+const { canWrite, getFallback } = useOffline()
 
 // ── Two-way bound form fields ──────────────────────────────────────────
 
@@ -50,7 +52,13 @@ const emit = defineEmits<{
 
     <div v-else>
       <!-- Review submission form -->
-      <div v-if="canUserReview && !myExistingReview" class="mb-6 p-4 border border-divider rounded-lg">
+      <!-- Offline: cannot write comments -->
+      <div v-if="canUserReview && !myExistingReview && !canWrite('article.comments')" class="mb-6 p-4 border border-divider rounded-lg opacity-50 cursor-not-allowed">
+        <p class="text-xs text-ink-muted mb-2 font-medium">Write a review</p>
+        <p class="text-xs text-ink-muted/60">{{ t(getFallback('article.comments')) }}</p>
+      </div>
+
+      <div v-else-if="canUserReview && !myExistingReview" class="mb-6 p-4 border border-divider rounded-lg">
         <p class="text-xs text-ink-muted mb-3 font-medium">Write a review</p>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3">
           <span v-for="dim in SCORE_DIMS" :key="dim.key" class="inline-flex items-center gap-1">

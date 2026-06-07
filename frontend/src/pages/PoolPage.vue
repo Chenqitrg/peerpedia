@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useOffline } from '../composables/useOffline'
 import { getPool } from '../api/pool'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
@@ -25,10 +26,18 @@ watch(error, (e) => {
 const poolArticles = computed(() => pool.value?.articles ?? [])
 
 const { toggle: handleToggleBookmark } = useBookmarkToggle(poolArticles, (_msg: string) => {})
+
+const { canRead, getFallback } = useOffline()
 </script>
 
 <template>
   <div class="pool-page animate-fade-in">
+    <!-- Offline blocked -->
+    <div v-if="!canRead('pool')" class="offline-blocked card p-12 text-center">
+      <p class="text-ink-muted text-lg mb-2">{{ t(getFallback('pool')) }}</p>
+    </div>
+
+    <template v-else>
     <header class="mb-8">
       <h1 class="text-display-md text-ink mb-2">{{ t('pool.title') }}</h1>
       <p class="text-sm text-ink-muted">
@@ -60,5 +69,6 @@ const { toggle: handleToggleBookmark } = useBookmarkToggle(poolArticles, (_msg: 
         @toggle-bookmark="handleToggleBookmark"
       />
     </div>
+    </template>
   </div>
 </template>

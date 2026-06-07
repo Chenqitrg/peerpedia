@@ -160,5 +160,19 @@
   "citation": {
     "forward": "Forward",
     "backward": "Backward"
+  },
+  "offline": {
+    "status_online": "Online",
+    "status_offline": "Offline",
+    "feed_hint": "Offline mode — showing your recently viewed articles",
+    "feed_empty": "No browsing history yet — explore some articles",
+    "comment_hint": "Network required to comment",
+    "fork_hint": "Network required to fork",
+    "publish_hint": "Network required to publish to pool",
+    "pool_hint": "No network — unable to access the pool",
+    "schools_hint": "No network — unable to access Schools",
+    "user_hint": "Unavailable offline",
+    "search_local": "Local",
+    "search_network": "Network"
   }
 }

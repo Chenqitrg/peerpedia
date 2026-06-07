@@ -14,7 +14,7 @@ use crate::error::AppError;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
-const CURRENT_SCHEMA_VERSION: i32 = 1;
+const CURRENT_SCHEMA_VERSION: i32 = 2;
 
 /// Resolve the database path: ~/.peerpedia/peerpedia.db
 fn get_db_path() -> Result<PathBuf, AppError> {
@@ -105,6 +105,18 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
                 );",
             )?;
         }
+        2 => {
+            tx.execute_batch(
+                "CREATE TABLE IF NOT EXISTS browsing_history (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_id      TEXT NOT NULL,
+                    article_id      TEXT NOT NULL,
+                    article_title   TEXT NOT NULL DEFAULT '',
+                    visited_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                    UNIQUE(account_id, article_id)
+                );",
+            )?;
+        }
         _ => {
             // Unknown migration — rollback and report.
             return Err(AppError::DatabaseError(format!(
@@ -143,7 +155,7 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        assert_eq!(v, 1);
+        assert_eq!(v, 2);
 
         // Verify tables exist by inserting and querying.
         conn.execute(
@@ -163,6 +175,12 @@ mod tests {
             [],
         )
         .unwrap();
+
+        conn.execute(
+            "INSERT INTO browsing_history (account_id, article_id, article_title) VALUES ('a1', 'art1', 'Test')",
+            [],
+        )
+        .unwrap();
     }
 
     #[test]
@@ -175,8 +193,8 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
-        // Only one version row inserted (v1), not two.
-        assert_eq!(count, 1);
+        // Two version rows (v1, v2), not duplicated on re-run.
+        assert_eq!(count, 2);
     }
 
     #[test]
