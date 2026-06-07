@@ -3,6 +3,8 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getFollowers, getFollowing } from '../api/users'
+import { useUserStore } from '../stores/useUserStore'
+import { useTauri } from '../composables/useTauri'
 import UserCard from '../components/UserCard.vue'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
@@ -11,6 +13,8 @@ import { ArrowLeft, UsersRound, UserCheck } from 'lucide-vue-next'
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const userStore = useUserStore()
+const tauri = useTauri()
 
 const userId = computed(() => route.params.id as string)
 const isFollowers = computed(() => route.path.endsWith('/followers'))
@@ -24,10 +28,26 @@ const title = computed(() => isFollowers.value ? t('common.followers') : t('comm
 async function load() {
   loading.value = true
   error.value = ''
+  const isLocal = userStore.isTauriMode || userStore.isDevMock
   try {
-    users.value = isFollowers.value
-      ? await getFollowers(userId.value)
-      : await getFollowing(userId.value)
+    if (isLocal) {
+      const result = isFollowers.value
+        ? await tauri.getFollowers({ user_id: userId.value })
+        : await tauri.getFollowing({ user_id: userId.value })
+      if (result && !('error' in result) && Array.isArray(result)) {
+        users.value = result.map(a => ({
+          id: a.id,
+          name: a.username,
+          anonymous_name: '',
+          article_count: 0,
+          reputation: {},
+        })) as UserSummary[]
+      }
+    } else {
+      users.value = isFollowers.value
+        ? await getFollowers(userId.value)
+        : await getFollowing(userId.value)
+    }
   } catch (e: any) {
     error.value = e.userMessage || t('common.error')
   } finally {

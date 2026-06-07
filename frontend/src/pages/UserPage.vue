@@ -51,18 +51,35 @@ const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 
 const isFollowing = ref(false)
 const followLoading = ref(false)
+const isLocal = computed(() => userStore.isTauriMode || userStore.isDevMock)
+
+// Load initial follow state from Tauri mock in local mode.
+async function loadFollowState() {
+  if (!isLocal.value || !userStore.viewer) return
+  const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: id.value })
+  if (r && !('error' in r)) {
+    isFollowing.value = r.following
+  }
+}
 
 async function handleFollow() {
   if (!userStore.viewer) return
   followLoading.value = true
   try {
-    if (isFollowing.value) {
-      await unfollowUser(id.value)
-      isFollowing.value = false
+    if (isLocal.value) {
+      if (isFollowing.value) {
+        await tauri.unfollowUser({ follower_id: userStore.viewer.id, followed_id: id.value })
+      } else {
+        await tauri.followUser({ follower_id: userStore.viewer.id, followed_id: id.value })
+      }
     } else {
-      await followUser(id.value)
-      isFollowing.value = true
+      if (isFollowing.value) {
+        await unfollowUser(id.value)
+      } else {
+        await followUser(id.value)
+      }
     }
+    isFollowing.value = !isFollowing.value
   } catch { /* ignore */ }
   finally { followLoading.value = false }
 }
@@ -114,7 +131,7 @@ async function loadArticles() {
 
 // Load articles after user fetch completes (sequential)
 watch(user, (u) => {
-  if (u) loadArticles()
+  if (u) { loadArticles(); loadFollowState() }
 }, { immediate: true })
 
 watch(() => route.params.id, () => {

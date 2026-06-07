@@ -6,6 +6,7 @@ import { getUsers } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import ReputationBadges from '../components/ReputationBadges.vue'
 import { followUser, unfollowUser } from '../api/users'
+import { useTauri } from '../composables/useTauri'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
@@ -14,11 +15,38 @@ import { Users, UserPlus, UserCheck, Landmark } from 'lucide-vue-next'
 const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
+const tauri = useTauri()
 const following = ref<Set<string>>(new Set())
+
+const isLocal = computed(() => userStore.isTauriMode || userStore.isDevMock)
 
 const { data: users, loading, error, execute } = useAsyncResource(
   async () => {
-    const list = await getUsers()
+    let list: UserSummary[]
+    // In local mode, get users from Tauri mock accounts.
+    if (isLocal.value) {
+      const accts = await tauri.listAccounts()
+      list = (accts && !('error' in accts) ? accts : []).map(a => ({
+        id: a.id,
+        name: a.username,
+        anonymous_name: '',
+        affiliation: '',
+        article_count: 0,
+        reputation: {},
+      })) as UserSummary[]
+      // Load initial follow state from local storage.
+      if (userStore.viewer) {
+        for (const acct of accts || []) {
+          if (acct.id === userStore.viewer.id) continue
+          const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: acct.id })
+          if (r && !('error' in r) && r.following) {
+            following.value.add(acct.id)
+          }
+        }
+      }
+    } else {
+      list = await getUsers()
+    }
     list.sort((a: UserSummary, b: UserSummary) => b.article_count - a.article_count)
     return list
   },
@@ -35,16 +63,22 @@ async function toggleFollow(u: UserSummary) {
   } else {
     following.value.add(u.id)
   }
-  // Then persist to server (best-effort; offline mode ignores failures).
-  try {
+  // Persist locally in dev-mock mode, via REST API otherwise.
+  if (isLocal.value) {
     if (isCurrentlyFollowing) {
-      await unfollowUser(u.id)
+      await tauri.unfollowUser({ follower_id: userStore.viewer.id, followed_id: u.id })
     } else {
-      await followUser(u.id)
+      await tauri.followUser({ follower_id: userStore.viewer.id, followed_id: u.id })
     }
-  } catch {
-    // Revert on failure if server is available; keep optimistic in offline mode.
-    if (!userStore.isTauriMode && !userStore.isDevMock) {
+  } else {
+    try {
+      if (isCurrentlyFollowing) {
+        await unfollowUser(u.id)
+      } else {
+        await followUser(u.id)
+      }
+    } catch {
+      // Revert on failure when server is available.
       if (isCurrentlyFollowing) {
         following.value.add(u.id)
       } else {

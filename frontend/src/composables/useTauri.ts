@@ -34,6 +34,8 @@ function isDevMockActive(): boolean {
 interface MockAccount { id: string; username: string; password: string }
 interface MockDraft { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
 interface MockCacheEntry { id: string; json: string; cached_at: string }
+interface MockFollow { follower_id: string; followed_id: string; created_at: string }
+interface MockBookmark { user_id: string; article_id: string; created_at: string }
 
 function _load<T>(key: string, fallback: T): T {
   return loadJSON<T>(key) ?? fallback
@@ -43,12 +45,15 @@ function _save<T>(key: string, val: T) {
 }
 
 const _draftsKey = '_t_drafts', _cacheKey = '_t_cache', _acctsKey = '_t_accts'
+const _followsKey = '_t_follows', _bookmarksKey = '_t_bookmarks'
 
 async function devMockInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
   const a = (args && (args as any).params) || {}
   const accounts = _load<MockAccount[]>(_acctsKey, [])
   const drafts = _load<MockDraft[]>(_draftsKey, [])
   const cache = _load<Record<string, MockCacheEntry>>(_cacheKey, {})
+  const follows = _load<MockFollow[]>(_followsKey, [])
+  const bookmarks = _load<MockBookmark[]>(_bookmarksKey, [])
 
   switch (cmd) {
     case 'create_account': {
@@ -92,6 +97,58 @@ async function devMockInvoke(cmd: string, args?: Record<string, unknown>): Promi
     }
     case 'get_cached_article':
       return cache[a.id as string] || null
+    // ── Follows ──────────────────────────────────────────────────────────
+    case 'follow_user': {
+      const exists = follows.find(x => x.follower_id === a.follower_id && x.followed_id === a.followed_id)
+      if (!exists) {
+        follows.push({ follower_id: a.follower_id as string, followed_id: a.followed_id as string, created_at: new Date().toISOString() })
+        _save(_followsKey, follows)
+      }
+      return { ok: true }
+    }
+    case 'unfollow_user': {
+      _save(_followsKey, follows.filter(x => !(x.follower_id === a.follower_id && x.followed_id === a.followed_id)))
+      return { ok: true }
+    }
+    case 'is_following': {
+      const f = follows.find(x => x.follower_id === a.follower_id && x.followed_id === a.followed_id)
+      return { following: !!f }
+    }
+    case 'get_followers': {
+      const ids = follows.filter(x => x.followed_id === a.user_id).map(x => x.follower_id)
+      return accounts.filter(acct => ids.includes(acct.id)).map(x => ({ id: x.id, username: x.username }))
+    }
+    case 'get_following': {
+      const ids = follows.filter(x => x.follower_id === a.user_id).map(x => x.followed_id)
+      return accounts.filter(acct => ids.includes(acct.id)).map(x => ({ id: x.id, username: x.username }))
+    }
+    case 'get_follower_count': {
+      return { count: follows.filter(x => x.followed_id === a.user_id).length }
+    }
+    case 'get_following_count': {
+      return { count: follows.filter(x => x.follower_id === a.user_id).length }
+    }
+    // ── Bookmarks ────────────────────────────────────────────────────────
+    case 'add_bookmark': {
+      const bm = bookmarks.find(x => x.user_id === a.user_id && x.article_id === a.article_id)
+      if (!bm) {
+        bookmarks.push({ user_id: a.user_id as string, article_id: a.article_id as string, created_at: new Date().toISOString() })
+        _save(_bookmarksKey, bookmarks)
+      }
+      return { ok: true }
+    }
+    case 'remove_bookmark': {
+      _save(_bookmarksKey, bookmarks.filter(x => !(x.user_id === a.user_id && x.article_id === a.article_id)))
+      return { ok: true }
+    }
+    case 'is_bookmarked': {
+      const bm = bookmarks.find(x => x.user_id === a.user_id && x.article_id === a.article_id)
+      return { bookmarked: !!bm }
+    }
+    case 'get_bookmarks': {
+      const bms = bookmarks.filter(x => x.user_id === a.user_id)
+      return bms.map(b => ({ user_id: b.user_id, article_id: b.article_id, created_at: b.created_at }))
+    }
     default:
       return { ok: true }
   }
@@ -138,6 +195,29 @@ export interface CacheArticleParams {
 
 export interface GetCachedArticleParams {
   id: string
+}
+
+export interface FollowUserParams {
+  follower_id: string
+  followed_id: string
+}
+
+export interface IsFollowingParams {
+  follower_id: string
+  followed_id: string
+}
+
+export interface GetFollowListParams {
+  user_id: string
+}
+
+export interface BookmarkParams {
+  user_id: string
+  article_id: string
+}
+
+export interface GetBookmarksParams {
+  user_id: string
 }
 
 // ── Return types ──────────────────────────────────────────────────────
@@ -273,6 +353,43 @@ export function useTauri() {
     },
     async getCachedArticle(params: GetCachedArticleParams) {
       return _invoke<CachedArticle>('get_cached_article', params as unknown as Record<string, unknown>)
+    },
+
+    // Follows
+    async followUser(params: FollowUserParams) {
+      return _invoke<{ ok: boolean }>('follow_user', params as unknown as Record<string, unknown>)
+    },
+    async unfollowUser(params: FollowUserParams) {
+      return _invoke<{ ok: boolean }>('unfollow_user', params as unknown as Record<string, unknown>)
+    },
+    async isFollowing(params: IsFollowingParams) {
+      return _invoke<{ following: boolean }>('is_following', params as unknown as Record<string, unknown>)
+    },
+    async getFollowers(params: GetFollowListParams) {
+      return _invoke<AccountSummary[]>('get_followers', params as unknown as Record<string, unknown>)
+    },
+    async getFollowing(params: GetFollowListParams) {
+      return _invoke<AccountSummary[]>('get_following', params as unknown as Record<string, unknown>)
+    },
+    async getFollowerCount(params: GetFollowListParams) {
+      return _invoke<{ count: number }>('get_follower_count', params as unknown as Record<string, unknown>)
+    },
+    async getFollowingCount(params: GetFollowListParams) {
+      return _invoke<{ count: number }>('get_following_count', params as unknown as Record<string, unknown>)
+    },
+
+    // Bookmarks
+    async addBookmark(params: BookmarkParams) {
+      return _invoke<{ ok: boolean }>('add_bookmark', params as unknown as Record<string, unknown>)
+    },
+    async removeBookmark(params: BookmarkParams) {
+      return _invoke<{ ok: boolean }>('remove_bookmark', params as unknown as Record<string, unknown>)
+    },
+    async isBookmarked(params: BookmarkParams) {
+      return _invoke<{ bookmarked: boolean }>('is_bookmarked', params as unknown as Record<string, unknown>)
+    },
+    async getBookmarks(params: GetBookmarksParams) {
+      return _invoke<MockBookmark[]>('get_bookmarks', params as unknown as Record<string, unknown>)
     },
   }
 }
