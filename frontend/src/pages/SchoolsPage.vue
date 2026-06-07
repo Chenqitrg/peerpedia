@@ -24,36 +24,15 @@ const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal
 
 const { data: users, loading, error, execute } = useAsyncResource(
   async () => {
-    let list: UserSummary[]
-    // In local mode, get users from Tauri mock accounts.
-    if (isLocal.value) {
-      const accts = await tauri.listAccounts()
-      list = (accts && !('error' in accts) ? accts : []).map(a => ({
-        id: a.id,
-        name: a.username,
-        anonymous_name: '',
-        affiliation: '',
-        article_count: 0,
-        reputation: {},
-      })) as UserSummary[]
-      // Load initial follow state from local storage.
-      if (userStore.viewer) {
-        for (const acct of accts || []) {
-          if (acct.id === userStore.viewer.id) continue
-          const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: acct.id })
-          if (r && !('error' in r) && r.following) {
-            following.value.add(acct.id)
-          }
-        }
-      }
-    } else {
-      list = await getUsers()
-    }
+    // Block data fetch when offline or in local mode — schools requires
+    // a server connection and should never show local accounts.
+    if (!canRead('schools')) return [] as UserSummary[]
+    const list = await getUsers()
     list.sort((a: UserSummary, b: UserSummary) => b.article_count - a.article_count)
     return list
   },
   [] as UserSummary[],
-  { immediate: true },
+  { immediate: canRead('schools') },
 )
 
 async function toggleFollow(u: UserSummary) {
