@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
+import { useTauri } from '../composables/useTauri'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
 import SelfReviewPanel from '../components/SelfReviewPanel.vue'
@@ -91,6 +92,7 @@ const totalContribution = computed(() =>
 
 // Draft persistence — Tauri IPC when available, REST + localStorage fallback.
 const draftPersistence = useDraftPersistence()
+const tauri = useTauri()
 const currentDraftId = ref<string | undefined>(
   editId.value as string | undefined || loadString(DRAFT_ID_KEY.value) || undefined
 )
@@ -104,17 +106,29 @@ onMounted(() => {
 })
 
 async function loadExistingArticle() {
+  // 1. Try REST API first.
   try {
     await articleStore.fetchArticle(editId.value!)
     const a = articleStore.currentArticle
     if (a) {
       title.value = a.title || ''
     }
-    // Load source content from git repo (needed for forks and editing existing articles)
     const src = await getArticleSource(editId.value!)
     content.value = src.content
     format.value = src.format as 'markdown' | 'typst'
+    return
   } catch (e: any) {
+    // 2. In Tauri/dev-mock mode, fall back to local draft storage.
+    if (tauri.isTauri.value || tauri.isDevMock.value) {
+      const accountId = userStore.viewer?.id || 'local'
+      const draft = await draftPersistence.load(editId.value!, accountId)
+      if (draft && draft.content !== undefined) {
+        title.value = draft.title || ''
+        content.value = draft.content || ''
+        format.value = (draft.format as 'markdown' | 'typst') || 'markdown'
+        return
+      }
+    }
     errorMsg.value = 'Failed to load article'
   }
 }
