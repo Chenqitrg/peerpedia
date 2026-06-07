@@ -265,7 +265,7 @@ class TestAuthRoundTrip:
         })
         assert r1.status_code == 201
         reg_user = r1.json()["user"]
-        reg_token = r1.json()["token"]
+        r1.json()["token"]
 
         # 2. Login
         r2 = client.post("/api/v1/auth/login", json={
@@ -307,19 +307,19 @@ class TestAuthRoundTrip:
         })
 
         # Login as A
-        rA = client.post("/api/v1/auth/login", json={
+        ra = client.post("/api/v1/auth/login", json={
             "username": "shannon", "password": "info123!!",
         })
-        assert rA.json()["user"]["name"] == "Claude Shannon"
+        assert ra.json()["user"]["name"] == "Claude Shannon"
 
         # Login as B
-        rB = client.post("/api/v1/auth/login", json={
+        rb = client.post("/api/v1/auth/login", json={
             "username": "hopper", "password": "compiler42",
         })
-        assert rB.json()["user"]["name"] == "Grace Hopper"
+        assert rb.json()["user"]["name"] == "Grace Hopper"
 
         # A's token sees A, not B
-        rMe = client.get("/api/v1/auth/me", headers={
-            "Authorization": f"Bearer {rA.json()['token']}",
+        rme = client.get("/api/v1/auth/me", headers={
+            "Authorization": f"Bearer {ra.json()['token']}",
         })
-        assert rMe.json()["user"]["username"] == "shannon"
+        assert rme.json()["user"]["username"] == "shannon"

@@ -381,7 +381,6 @@ class TestPoolReviewFreeze:
         s2 = get_session(db_engine)
         s2.add(art2)
         s2.commit()
-        aid2 = art2.id
         s2.close()
 
         # Create pool review while article is "published" (simulating a later state)

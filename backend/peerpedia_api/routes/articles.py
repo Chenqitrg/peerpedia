@@ -469,7 +469,7 @@ def api_rollback(article_id: str, hash: str, current_user: User = Depends(deps.r
 
     import git
     repo = git.Repo(rp)
-    old_commit = repo.commit(hash)
+    repo.commit(hash)
     # Checkout old content
     repo.git.checkout(hash, "--", ".")
     new_hash = commit_article(rp, f"Rollback to {hash[:8]}", "System", "system@peerpedia")

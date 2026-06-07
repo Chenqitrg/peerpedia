@@ -46,7 +46,7 @@ def get_pool(
         if follow_circle is not None and not any(aid in follow_circle for aid in (a.authors or [])):
             continue
 
-        reviews = get_reviews_for_article(db, a.id)
+        get_reviews_for_article(db, a.id)
         sink_eta, days_remaining = None, None
         if a.sink_start:
             st = a.sink_start

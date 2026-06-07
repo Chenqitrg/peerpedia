@@ -263,8 +263,10 @@ class TestReview:
 class TestUserModel:
     def test_create_user(self, engine):
         session = get_session(engine)
-        u = User(username="zhangsan", password_hash="$2b$12$test", name="张三", anonymous_name="星云评审员", affiliation="清华大学",
-                 expertise=["理论物理", "数学"],
+        u = User(
+            username="zhangsan", password_hash="$2b$12$test", name="张三",
+            anonymous_name="星云评审员", affiliation="清华大学",
+            expertise=["理论物理", "数学"],
                  reputation={"professionalism": 3.5, "objectivity": 4.0,
                              "collaboration": 2.0, "pedagogy": 4.5})
         session.add(u)
