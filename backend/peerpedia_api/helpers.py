@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
@@ -78,13 +78,13 @@ def get_git_meta(article_id: str) -> tuple[str, int]:
 
 def build_article_summary(
     db: Session,
-    a: object,
+    a: Any,
     *,
-    current_user: object = None,
-    sink_eta: object = None,
-    days_remaining: object = None,
-    sink_duration_days: object = None,
-    authors: list[AuthorInfo] = None,
+    current_user: Any = None,
+    sink_eta: Any = None,
+    days_remaining: Any = None,
+    sink_duration_days: Any = None,
+    authors: Optional[list[AuthorInfo]] = None,
     is_bookmarked: Optional[bool] = None,
     is_own_article: Optional[bool] = None,
 ) -> ArticleSummary:
