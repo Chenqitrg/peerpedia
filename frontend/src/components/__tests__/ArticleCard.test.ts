@@ -71,9 +71,10 @@ describe('ArticleCard (Article Bar)', () => {
       props: { article: makeArticle() },
       global: { stubs: { 'router-link': RouterLinkStub } },
     })
-    expect(wrapper.text()).toContain(':4')
-    expect(wrapper.text()).toContain(':3')
-    expect(wrapper.text()).toContain(':5')
+    // ScoreBadges now shows icon + value (e.g. <Lightbulb/> 4)
+    expect(wrapper.text()).toContain('4')
+    expect(wrapper.text()).toContain('3')
+    expect(wrapper.text()).toContain('5')
   })
 
   it('renders commit hash', () => {
