@@ -215,9 +215,7 @@ pub fn get_history(
 }
 
 #[tauri::command]
-pub fn get_cached_article_ids(
-    state: State<'_, AppState>,
-) -> Result<Vec<String>, AppError> {
+pub fn get_cached_article_ids(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
     let conn = state.db.lock().unwrap();
     local_store::get_cached_article_ids(&conn)
 }

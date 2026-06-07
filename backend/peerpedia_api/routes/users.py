@@ -13,7 +13,7 @@ from peerpedia_core.storage.db.crud_user import (
     list_users,
     unfollow_user,
 )
-from peerpedia_core.storage.db.models import ArticleAuthor, User
+from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("", response_model=list[UserSummary])
 def api_list_users(db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import ArticleAuthor, Article
+    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = list_users(db)
     out = []
     for u in users:
@@ -122,7 +122,7 @@ def api_update_user(user_id: str, body: UserUpdate,
 
 @router.get("/{user_id}/followers", response_model=list[UserSummary])
 def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import ArticleAuthor, Article
+    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = get_followers(db, user_id)
     out = []
     for u in users:
@@ -139,7 +139,7 @@ def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
 
 @router.get("/{user_id}/following", response_model=list[UserSummary])
 def api_get_following(user_id: str, db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import ArticleAuthor, Article
+    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = get_following(db, user_id)
     out = []
     for u in users:

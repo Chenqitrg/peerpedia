@@ -3,8 +3,8 @@ MergeProposal, Citation."""
 import pytest
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.crud_article import get_article_authors
+from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import (
     Article,
     Bookmark,
@@ -14,7 +14,6 @@ from peerpedia_core.storage.db.models import (
     Review,
     User,
 )
-from peerpedia_core.types.messages import ThreadMessage
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -202,7 +201,6 @@ class TestReview:
     def test_review_message_crud(self, engine):
         """Review.thread JSON replaced by ReviewMessage table with proper CRUD."""
         from peerpedia_core.storage.db.crud_review import add_thread_message, get_thread_messages
-        from peerpedia_core.storage.db.models import ReviewMessage
         session = get_session(engine)
         author = _make_user(session, "au2")
         reviewer = _make_user(session, "rv2")

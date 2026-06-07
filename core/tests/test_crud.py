@@ -2,8 +2,8 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.crud_article import get_article_authors
+from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import (
     Article,
     Review,
@@ -520,7 +520,6 @@ class TestCitationCRUD:
     def test_update_probabilities(self, engine):
         from peerpedia_core.storage.db.crud_citation import (
             create_or_update_citation,
-            get_citation,
         )
         session = get_session(engine)
         author = _make_user(session, "cp_au")

@@ -71,7 +71,7 @@ def compute_article_score_for_commit(
 
     Returns ``None`` if no reviews exist for the given commit.
     """
-    from peerpedia_core.storage.db.crud_article import get_article_authors, get_article
+    from peerpedia_core.storage.db.crud_article import get_article, get_article_authors
     from peerpedia_core.storage.db.crud_review import get_reviews_for_article
     from peerpedia_core.workflow.reputation import get_reviewer_weight
 

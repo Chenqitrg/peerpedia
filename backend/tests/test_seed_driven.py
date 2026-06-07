@@ -5,8 +5,8 @@ that the seed data represents work properly. If a seed scenario breaks, the
 corresponding test catches it.
 """
 import pytest
-from peerpedia_core.storage.db.engine import get_engine, get_session
 from peerpedia_core.storage.db.crud_article import get_article_authors
+from peerpedia_core.storage.db.engine import get_engine, get_session
 from peerpedia_core.storage.db.models import (
     Article,
     ArticleAuthor,
