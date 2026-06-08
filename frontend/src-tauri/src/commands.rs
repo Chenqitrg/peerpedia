@@ -96,7 +96,9 @@ pub fn logout(state: State<'_, AppState>, params: LogoutParams) -> Result<OkResp
 pub struct SaveDraftParams {
     #[serde(default)]
     pub id: Option<String>,
-    pub token: String,
+    pub token: Option<String>,
+    #[serde(default)]
+    pub account_id: String, // backward compat — used when token is None
     #[serde(default)]
     pub title: String,
     #[serde(default)]
@@ -107,7 +109,13 @@ pub struct SaveDraftParams {
 
 #[tauri::command]
 pub fn save_draft(state: State<'_, AppState>, params: SaveDraftParams) -> Result<Draft, AppError> {
-    let account_id = resolve_account(&state, &params.token)?;
+    let account_id = if let Some(ref token) = params.token {
+        resolve_account(&state, token)?
+    } else if !params.account_id.is_empty() {
+        params.account_id.clone()
+    } else {
+        return Err(AppError::AuthFailed("Authentication required".into()));
+    };
     let conn = lock_db(&state)?;
     local_store::save_draft(
         &conn,

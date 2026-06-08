@@ -107,7 +107,7 @@ async function handleRollback(hash: string) {
 }
 
 function goBack() {
-  router.push(`/articles/${id}`)
+  router.back()
 }
 </script>
 

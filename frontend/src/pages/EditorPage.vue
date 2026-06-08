@@ -68,6 +68,11 @@ const savedContent = ref('')
 const savedTitle = ref('')
 const isClean = computed(() => content.value === savedContent.value && title.value === savedTitle.value)
 
+/** True after first save — enables download per design doc: '只要保存过，就应该是亮的'.
+ *  Uses currentDraftId (set after first successful save) instead of commitHash,
+ *  because git commit may not always succeed (e.g., running before login). */
+const hasSaved = computed(() => !!currentDraftId.value || !!commitHash.value)
+
 // Split panel resize
 const { splitRatio, splitterEl, isDragging, onSplitterMouseDown } = useSplitPane()
 
@@ -473,9 +478,9 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           :content="content"
           :content-format="format"
           :filename="title"
-          :disabled="!commitHash || !isClean || !content.trim()"
+          :disabled="!hasSaved || !isClean || !content.trim()"
           :commit-hash="commitHash"
-          :disabled-reason="!commitHash ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+          :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
         />
         <!-- Download compiled HTML -->
         <DownloadButton
@@ -483,9 +488,9 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           :content="content"
           :content-format="format"
           :filename="title"
-          :disabled="!commitHash || !isClean || !content.trim()"
+          :disabled="!hasSaved || !isClean || !content.trim()"
           :commit-hash="commitHash"
-          :disabled-reason="!commitHash ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+          :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
         />
 
         <!-- History -->

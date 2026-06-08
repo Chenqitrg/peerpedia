@@ -7,8 +7,13 @@ const RouterLinkStub = {
   template: '<a :href="to"><slot /></a>',
 }
 
+const { mockBack, mockPush } = vi.hoisted(() => ({
+  mockBack: vi.fn(),
+  mockPush: vi.fn(),
+}))
+
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush, back: mockBack }),
   useRoute: () => ({ params: { id: 'art-1' } }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
@@ -75,6 +80,29 @@ describe('HistoryPage', () => {
     await flushPromises()
     const hasContent = wrapper.text().length > 0
     expect(hasContent).toBe(true)
+  })
+
+  // Regression: goBack must use router.back() so user returns to EditorPage
+  // (not router.push('/articles/:id') which always goes to ArticlePage).
+  // This preserves "从哪来到哪去" (from where you came, go back there).
+  it('goBack uses router.back() to preserve navigation origin', async () => {
+    mockBack.mockClear()
+    mockPush.mockClear()
+
+    const HistoryPage = (await import('../HistoryPage.vue')).default
+    const wrapper = mount(HistoryPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    const backBtn = wrapper.find('button[aria-label="Back to article"]')
+    expect(backBtn.exists()).toBe(true)
+    await backBtn.trigger('click')
+
+    // Must call router.back() not router.push() — so the user returns
+    // to whichever page they came from (Editor, Article, or elsewhere).
+    expect(mockBack).toHaveBeenCalled()
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it('uses local git history in Tauri mode', async () => {
