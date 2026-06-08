@@ -207,6 +207,57 @@ pub fn delete_draft(
     Ok(OkResponse { ok: true })
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DeleteArticleParams {
+    pub id: String,
+    pub token: Option<String>,
+    #[serde(default)]
+    pub account_id: String,
+}
+
+#[tauri::command]
+pub fn delete_article(
+    state: State<'_, AppState>,
+    params: DeleteArticleParams,
+) -> Result<OkResponse, AppError> {
+    let account_id = if let Some(ref token) = params.token {
+        resolve_account(&state, token)?
+    } else if !params.account_id.is_empty() {
+        params.account_id.clone()
+    } else {
+        return Err(AppError::AuthFailed("Authentication required".into()));
+    };
+    let conn = lock_db(&state)?;
+    local_store::delete_article(&conn, &params.id, &account_id)?;
+    Ok(OkResponse { ok: true })
+}
+
+// ── Draft search command ────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct SearchDraftsParams {
+    pub q: String,
+    pub token: Option<String>,
+    #[serde(default)]
+    pub account_id: String,
+}
+
+#[tauri::command]
+pub fn search_drafts(
+    state: State<'_, AppState>,
+    params: SearchDraftsParams,
+) -> Result<Vec<local_store::DraftSearchResult>, AppError> {
+    let account_id = if let Some(ref token) = params.token {
+        resolve_account(&state, token)?
+    } else if !params.account_id.is_empty() {
+        params.account_id.clone()
+    } else {
+        return Err(AppError::AuthFailed("Authentication required".into()));
+    };
+    let conn = lock_db(&state)?;
+    local_store::search_drafts(&conn, &params.q, &account_id)
+}
+
 // ── Article cache commands ─────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -237,6 +288,20 @@ pub fn get_cached_article(
 ) -> Result<Option<CachedArticle>, AppError> {
     let conn = lock_db(&state)?;
     local_store::get_cached_article(&conn, &params.id)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchCachedArticlesParams {
+    pub q: String,
+}
+
+#[tauri::command]
+pub fn search_cached_articles(
+    state: State<'_, AppState>,
+    params: SearchCachedArticlesParams,
+) -> Result<Vec<local_store::DraftSearchResult>, AppError> {
+    let conn = lock_db(&state)?;
+    local_store::search_cached_articles(&conn, &params.q)
 }
 
 // ── Browsing history commands ───────────────────────────────────────────
@@ -366,6 +431,31 @@ pub struct GitShowParams {
 #[tauri::command]
 pub fn git_show(params: GitShowParams) -> Result<String, AppError> {
     local_git::git_show(&params.article_id, &params.commit_hash)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitDiffParams {
+    pub article_id: String,
+    pub hash1: String,
+    pub hash2: String,
+}
+
+#[tauri::command]
+pub fn git_diff(params: GitDiffParams) -> Result<local_git::DiffResult, AppError> {
+    local_git::git_diff(&params.article_id, &params.hash1, &params.hash2)
+}
+
+// ── Compile command ─────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct CompileTypstParams {
+    pub content: String,
+    pub format: String,
+}
+
+#[tauri::command]
+pub fn compile_typst(params: CompileTypstParams) -> Result<String, AppError> {
+    local_store::compile_typst(&params.content, &params.format)
 }
 
 // ── Article full cache command ──────────────────────────────────────────

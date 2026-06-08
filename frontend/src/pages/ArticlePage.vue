@@ -26,11 +26,13 @@ import {
   MessageSquare,
   Eye,
   ArrowLeft,
+  Trash2,
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const tauriDelete = useTauri()
 const reviewStore = useReviewStore()
 const { t } = useI18n()
 const { canRead, canWrite, getFallback } = useOffline()
@@ -45,6 +47,26 @@ const isForked = ref(false)
 const id = route.params.id as string
 
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
+
+// Delete
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
+async function handleDeleteArticle() {
+  if (deleting.value || !article.value) return
+  deleting.value = true
+  try {
+    if (tauriDelete.isTauri.value || tauriDelete.isBrowserLocal.value) {
+      await tauriDelete.deleteArticle({ id: article.value.id, account_id: '' })
+    }
+    showDeleteConfirm.value = false
+    router.push(`/user/${userStore.viewer?.id}`)
+  } catch {
+    // article remains
+  } finally {
+    deleting.value = false
+  }
+}
+
 const isBookmarked = computed(() => article.value?.is_bookmarked ?? false)
 const articleAuthorIds = computed(() => article.value?.authors.map(a => a.id) ?? [])
 // Cached article detection (Tauri offline mode).
@@ -491,6 +513,33 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               <Edit class="w-3 h-3" stroke-width="2" />
               {{ t('card.edit') }}
             </button>
+
+            <template v-if="isOwnArticle && !showDeleteConfirm">
+              <button
+                class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-[#d73a49] hover:bg-[#d73a49]/10 rounded-md transition-colors"
+                aria-label="Delete article"
+                data-tooltip="Delete"
+                @click="showDeleteConfirm = true"
+              >
+                <Trash2 class="w-3 h-3" stroke-width="2" />
+              </button>
+            </template>
+            <template v-if="showDeleteConfirm">
+              <button
+                class="flex items-center gap-1 px-2.5 py-1 text-xs text-[#d73a49] hover:bg-[#d73a49]/10 rounded-md transition-colors font-semibold"
+                :disabled="deleting"
+                @click="handleDeleteArticle"
+              >
+                {{ deleting ? '...' : 'Delete' }}
+              </button>
+              <button
+                class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
+                :disabled="deleting"
+                @click="showDeleteConfirm = false"
+              >
+                Cancel
+              </button>
+            </template>
 
             <button
               class="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-colors"

@@ -14,7 +14,7 @@ use crate::error::AppError;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
-const CURRENT_SCHEMA_VERSION: i32 = 3;
+const CURRENT_SCHEMA_VERSION: i32 = 5;
 
 /// Resolve the database path: ~/.peerpedia/peerpedia.db
 fn get_db_path() -> Result<PathBuf, AppError> {
@@ -127,6 +127,50 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
                 );",
             )?;
         }
+        4 => {
+            tx.execute_batch(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS drafts_fts USING fts5(
+                    title, content,
+                    tokenize='porter unicode61',
+                    content='drafts',
+                    content_rowid='rowid'
+                );
+
+                -- Triggers to keep FTS index in sync with drafts table
+                CREATE TRIGGER IF NOT EXISTS drafts_ai AFTER INSERT ON drafts BEGIN
+                    INSERT INTO drafts_fts(rowid, title, content)
+                    VALUES (new.rowid, new.title, new.content);
+                END;
+
+                CREATE TRIGGER IF NOT EXISTS drafts_ad AFTER DELETE ON drafts BEGIN
+                    INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
+                    VALUES ('delete', old.rowid, old.title, old.content);
+                END;
+
+                CREATE TRIGGER IF NOT EXISTS drafts_au AFTER UPDATE ON drafts BEGIN
+                    INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
+                    VALUES ('delete', old.rowid, old.title, old.content);
+                    INSERT INTO drafts_fts(rowid, title, content)
+                    VALUES (new.rowid, new.title, new.content);
+                END;
+
+                -- Backfill existing drafts into FTS index so they're searchable.
+                INSERT INTO drafts_fts(rowid, title, content)
+                SELECT rowid, title, content FROM drafts;",
+            )?;
+        }
+        5 => {
+            // Backfill: re-index all existing drafts into FTS5.
+            // v4 originally shipped without this backfill INSERT (later fixed
+            // in commit d752f60), so databases that ran v4 before the fix have
+            // old drafts missing from the FTS index. This migration runs the
+            // backfill unconditionally — INSERT OR REPLACE avoids duplicates
+            // for drafts already indexed by triggers.
+            tx.execute_batch(
+                "INSERT OR REPLACE INTO drafts_fts(rowid, title, content)
+                 SELECT rowid, title, content FROM drafts;",
+            )?;
+        }
         _ => {
             // Unknown migration — rollback and report.
             return Err(AppError::DatabaseError(format!(
@@ -165,7 +209,7 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        assert_eq!(v, 3);
+        assert_eq!(v, 5);
 
         // Create account first (FK target for sessions).
         conn.execute(
@@ -202,6 +246,183 @@ mod tests {
     }
 
     #[test]
+    fn test_migration_v4_backfills_existing_drafts() {
+        /// 🔴 RED: Existing drafts should be indexed in FTS5 after migration v4.
+        /// Without the backfill INSERT, the FTS5 virtual table stays empty for
+        /// pre-migration data and search returns nothing.
+        let conn = test_conn();
+
+        // Simulate pre-v4 state: run v1-v3, create account + draft
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
+             INSERT INTO schema_version VALUES (0);",
+        )
+        .unwrap();
+        // Apply v1-v3 migrations manually
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS local_accounts (
+                id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL, email TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS drafts (
+                id TEXT PRIMARY KEY, account_id TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '',
+                format TEXT NOT NULL DEFAULT 'markdown',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (account_id) REFERENCES local_accounts(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS article_cache (
+                id TEXT PRIMARY KEY, json TEXT NOT NULL,
+                cached_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO schema_version VALUES (1);
+            INSERT INTO schema_version VALUES (2);
+            INSERT INTO schema_version VALUES (3);",
+        )
+        .unwrap();
+
+        // Insert a pre-existing draft
+        conn.execute(
+            "INSERT INTO local_accounts (id, username, password_hash) VALUES ('acc-backfill', 'tester', 'hash')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO drafts (id, account_id, title, content) VALUES ('existing-draft', 'acc-backfill', 'Quantum Physics', 'Discusses quantum mechanics')",
+            [],
+        ).unwrap();
+
+        // Now run full migration — applies v4
+        run_migrations(&conn).unwrap();
+
+        // Verify FTS5 has the pre-existing draft indexed
+        let fts_count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM drafts_fts", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(
+            fts_count, 1,
+            "FTS5 should contain the pre-existing draft after backfill"
+        );
+
+        // Verify the draft is actually searchable via FTS5
+        let searchable: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM drafts_fts WHERE drafts_fts MATCH 'quantum'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            searchable, 1,
+            "Pre-existing draft should be searchable via FTS5 after migration v4"
+        );
+    }
+
+    #[test]
+    fn test_migration_v5_backfills_after_v4_without_backfill() {
+        /// 🔴 RED: If v4 ran WITHOUT the backfill INSERT (original v4 bug),
+        /// upgrading to v5 should backfill existing drafts into FTS5.
+        let conn = test_conn();
+
+        // Simulate: v1-v3 setup + v4 WITHOUT backfill (the original buggy v4)
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
+             INSERT INTO schema_version VALUES (0);",
+        )
+        .unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS local_accounts (
+                id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL, email TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS drafts (
+                id TEXT PRIMARY KEY, account_id TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '',
+                format TEXT NOT NULL DEFAULT 'markdown',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (account_id) REFERENCES local_accounts(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS article_cache (
+                id TEXT PRIMARY KEY, json TEXT NOT NULL,
+                cached_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO schema_version VALUES (1);
+            INSERT INTO schema_version VALUES (2);
+            INSERT INTO schema_version VALUES (3);",
+        )
+        .unwrap();
+        // Insert a draft BEFORE v4 FTS5 is created — this simulates the user
+        // scenario: drafts existed before the migration added FTS5 + triggers.
+        // Since the backfill INSERT was missing from the original v4, these
+        // drafts never got indexed.
+        conn.execute(
+            "INSERT INTO local_accounts (id, username, password_hash) VALUES ('acc-v5', 'tester', 'hash')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO drafts (id, account_id, title, content) VALUES ('old-draft', 'acc-v5', 'Quantum Physics', 'Discusses quantum')",
+            [],
+        ).unwrap();
+
+        // Apply v4 WITHOUT backfill — just create FTS5 table + triggers.
+        // This simulates the buggy v4 that lacked the backfill INSERT.
+        conn.execute_batch(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS drafts_fts USING fts5(
+                title, content,
+                tokenize='porter unicode61',
+                content='drafts',
+                content_rowid='rowid'
+            );
+            CREATE TRIGGER IF NOT EXISTS drafts_ai AFTER INSERT ON drafts BEGIN
+                INSERT INTO drafts_fts(rowid, title, content)
+                VALUES (new.rowid, new.title, new.content);
+            END;
+            CREATE TRIGGER IF NOT EXISTS drafts_ad AFTER DELETE ON drafts BEGIN
+                INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
+                VALUES ('delete', old.rowid, old.title, old.content);
+            END;
+            CREATE TRIGGER IF NOT EXISTS drafts_au AFTER UPDATE ON drafts BEGIN
+                INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
+                VALUES ('delete', old.rowid, old.title, old.content);
+                INSERT INTO drafts_fts(rowid, title, content)
+                VALUES (new.rowid, new.title, new.content);
+            END;
+            INSERT INTO schema_version VALUES (4);",
+        )
+        .unwrap();
+
+        // Verify: draft is NOT searchable via FTS5 (no backfill ran)
+        let searchable_before: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM drafts_fts WHERE drafts_fts MATCH 'quantum'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            searchable_before, 0,
+            "Draft should NOT be searchable before v5 backfill"
+        );
+
+        // Now run migrations — v5 should backfill existing drafts
+        run_migrations(&conn).unwrap();
+
+        // Verify: FTS5 now finds the draft
+        let searchable_after: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM drafts_fts WHERE drafts_fts MATCH 'quantum'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            searchable_after, 1,
+            "Pre-existing draft should be searchable after v5 backfill"
+        );
+    }
+
+    #[test]
     fn test_migration_is_idempotent() {
         let conn = test_conn();
         run_migrations(&conn).unwrap();
@@ -211,8 +432,8 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
-        // Three version rows (v1, v2, v3), not duplicated on re-run.
-        assert_eq!(count, 3);
+        // Five version rows (v1, v2, v3, v4, v5), not duplicated on re-run.
+        assert_eq!(count, 5);
     }
 
     #[test]

@@ -28,6 +28,17 @@ pub struct DraftSummary {
     pub updated_at: String,
 }
 
+/// Search result with content for client-side relevance ranking.
+/// Used by search_drafts to return enough data for the frontend to
+/// sort by title-match relevance.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DraftSearchResult {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedArticle {
     pub id: String,
@@ -144,6 +155,71 @@ pub fn delete_draft(conn: &Connection, id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Search drafts using FTS5 full-text search.
+/// Returns drafts matching the query, ranked by relevance (title matches first).
+/// Empty query returns all drafts for the account (unsorted — caller can sort).
+pub fn search_drafts(
+    conn: &Connection,
+    query: &str,
+    account_id: &str,
+) -> Result<Vec<DraftSearchResult>, AppError> {
+    if query.trim().is_empty() {
+        let summaries = list_drafts(conn, account_id)?;
+        return Ok(summaries
+            .into_iter()
+            .map(|s| DraftSearchResult {
+                id: s.id,
+                title: s.title,
+                content: String::new(),
+                updated_at: s.updated_at,
+            })
+            .collect());
+    }
+
+    // FTS5 query: use `rank` for BM25 ranking — title matches naturally rank higher
+    // because FTS5 considers term frequency across the matched columns.
+    let sql = "
+        SELECT d.id, d.title, d.content, d.updated_at
+        FROM drafts d
+        JOIN drafts_fts fts ON d.rowid = fts.rowid
+        WHERE drafts_fts MATCH ?1
+          AND d.account_id = ?2
+        ORDER BY rank
+    ";
+
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt.query_map(rusqlite::params![query, account_id], |row| {
+        Ok(DraftSearchResult {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            content: row.get(2)?,
+            updated_at: row.get(3)?,
+        })
+    })?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row?);
+    }
+    Ok(results)
+}
+
+/// Delete an article entirely: removes the DB row AND the git repository directory.
+/// This is the full "delete article" operation used by the frontend.
+pub fn delete_article(conn: &Connection, id: &str, _account_id: &str) -> Result<(), AppError> {
+    // Remove the DB row first.
+    delete_draft(conn, id)?;
+
+    // Remove the git repository directory.
+    let repo_path = crate::local_git::repo_path(id)?;
+    if repo_path.exists() {
+        std::fs::remove_dir_all(&repo_path)
+            .map_err(|e| AppError::IoError(format!("Failed to remove article directory: {}", e)))?;
+    }
+
+    Ok(())
+}
+
 // ── Article Cache ───────────────────────────────────────────────────────
 
 /// Cache a published article for offline reading. Rejects articles larger than
@@ -232,6 +308,105 @@ pub fn get_history(
     Ok(entries)
 }
 
+/// Search cached articles by query, matching against title and content_preview
+/// fields in the stored JSON. Returns results sorted by relevance.
+/// Empty query returns all cached articles.
+pub fn search_cached_articles(
+    conn: &Connection,
+    query: &str,
+) -> Result<Vec<DraftSearchResult>, AppError> {
+    let mut stmt = conn.prepare("SELECT id, json, cached_at FROM article_cache")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?, // id
+            row.get::<_, String>(1)?, // json
+            row.get::<_, String>(2)?, // cached_at
+        ))
+    })?;
+
+    let q = query.trim().to_lowercase();
+    let mut results: Vec<DraftSearchResult> = Vec::new();
+
+    for row in rows {
+        let (id, json, cached_at) = row?;
+        // Parse JSON to extract title and optional content_preview
+        let parsed: serde_json::Value = match serde_json::from_str(&json) {
+            Ok(v) => v,
+            Err(_) => continue, // skip corrupt entries
+        };
+        let title = parsed.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let content = parsed
+            .get("content_preview")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        if q.is_empty() {
+            results.push(DraftSearchResult {
+                id,
+                title: title.to_string(),
+                content: content.to_string(),
+                updated_at: cached_at.clone(),
+            });
+            continue;
+        }
+
+        let title_lower = title.to_lowercase();
+        let content_lower = content.to_lowercase();
+        let score = if title_lower == q {
+            100
+        } else if title_lower.starts_with(&q) {
+            50
+        } else if title_lower.contains(&q) {
+            10
+        } else if content_lower.contains(&q) {
+            1
+        } else {
+            0
+        };
+
+        if score > 0 {
+            results.push(DraftSearchResult {
+                id,
+                title: title.to_string(),
+                content: content.to_string(),
+                updated_at: cached_at,
+            });
+            // Store score for sorting (reuse title field temporarily is wrong,
+            // so sort in-place by remembering the score order via insertion)
+            // We'll sort after the loop using a simple approach
+        }
+    }
+
+    // Sort by relevance: simple substring match ordering
+    if !q.is_empty() {
+        results.sort_by(|a, b| {
+            let a_title = a.title.to_lowercase();
+            let b_title = b.title.to_lowercase();
+            let a_score = if a_title == q {
+                3
+            } else if a_title.starts_with(&q) {
+                2
+            } else if a_title.contains(&q) {
+                1
+            } else {
+                0
+            };
+            let b_score = if b_title == q {
+                3
+            } else if b_title.starts_with(&q) {
+                2
+            } else if b_title.contains(&q) {
+                1
+            } else {
+                0
+            };
+            b_score.cmp(&a_score)
+        });
+    }
+
+    Ok(results)
+}
+
 /// Return the set of article IDs currently in the article_cache table.
 pub fn get_cached_article_ids(conn: &Connection) -> Result<Vec<String>, AppError> {
     let mut stmt = conn.prepare("SELECT id FROM article_cache")?;
@@ -278,6 +453,103 @@ fn cache_article_with_limit(
         rusqlite::params![id, article_json],
     )?;
     Ok(())
+}
+
+// ── Typst Compilation ────────────────────────────────────────────────────
+
+/// Compile Typst content to SVG string using the `typst` CLI.
+///
+/// Writes content to a temp `.typ` file, runs `typst compile --format svg`,
+/// reads the SVG output, and cleans up. Timeout is 30 seconds.
+///
+/// Returns an error if `typst` is not installed, content is invalid, or
+/// the format is not "typst".
+pub fn compile_typst(content: &str, format: &str) -> Result<String, AppError> {
+    use std::io::Read;
+    use std::time::Duration;
+
+    if format != "typst" {
+        return Err(AppError::AuthFailed(
+            "Only typst format is supported for compilation".into(),
+        ));
+    }
+
+    let tmp_dir = std::env::temp_dir().join(format!("peerpedia-compile-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&tmp_dir)?;
+
+    let input_path = tmp_dir.join("input.typ");
+    let output_path = tmp_dir.join("output.svg");
+
+    std::fs::write(&input_path, content)?;
+
+    let mut child = std::process::Command::new("typst")
+        .args([
+            "compile",
+            input_path.to_str().unwrap_or("input.typ"),
+            output_path.to_str().unwrap_or("output.svg"),
+            "--format",
+            "svg",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            AppError::IoError(format!(
+                "Failed to run typst CLI: {}. Is typst installed? (https://github.com/typst/typst)",
+                e
+            ))
+        })?;
+
+    let start = std::time::Instant::now();
+    const TIMEOUT: Duration = Duration::from_secs(30);
+
+    loop {
+        if start.elapsed() > TIMEOUT {
+            let _ = child.kill();
+            let _ = std::fs::remove_dir_all(&tmp_dir);
+            return Err(AppError::IoError(
+                "Typst compilation timed out (30s)".into(),
+            ));
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    let stderr = child
+                        .stderr
+                        .take()
+                        .map(|s| {
+                            let mut buf = String::new();
+                            let _ = std::io::BufReader::new(s).read_to_string(&mut buf);
+                            buf
+                        })
+                        .unwrap_or_default();
+                    let _ = std::fs::remove_dir_all(&tmp_dir);
+                    return Err(AppError::IoError(format!(
+                        "Typst compilation failed: {}",
+                        if stderr.is_empty() {
+                            "Unknown error"
+                        } else {
+                            stderr.trim()
+                        }
+                    )));
+                }
+                break;
+            }
+            Ok(None) => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(e) => {
+                let _ = std::fs::remove_dir_all(&tmp_dir);
+                return Err(AppError::IoError(format!("Typst process error: {}", e)));
+            }
+        }
+    }
+
+    let svg = std::fs::read_to_string(&output_path)
+        .map_err(|_| AppError::IoError("Typst compilation produced no output".into()))?;
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    Ok(svg)
 }
 
 #[cfg(test)]

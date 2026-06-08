@@ -41,7 +41,7 @@ fn validate_article_id(article_id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-fn repo_path(article_id: &str) -> Result<PathBuf, AppError> {
+pub fn repo_path(article_id: &str) -> Result<PathBuf, AppError> {
     validate_article_id(article_id)?;
     Ok(articles_dir()?.join(article_id))
 }
@@ -243,6 +243,171 @@ fn run_git(repo_path: &PathBuf, args: &[&str]) -> Result<(), AppError> {
         return Err(AppError::DatabaseError(format!("git error: {}", stderr)));
     }
     Ok(())
+}
+
+// ── Diff ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DiffLineType {
+    #[serde(rename = "add")]
+    Add,
+    #[serde(rename = "del")]
+    Delete,
+    #[serde(rename = "ctx")]
+    Context,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffLine {
+    pub line_type: DiffLineType,
+    pub content: String,
+    pub old_lineno: Option<u32>,
+    pub new_lineno: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffHunk {
+    pub old_start: u32,
+    pub old_lines: u32,
+    pub new_start: u32,
+    pub new_lines: u32,
+    pub header: String,
+    pub lines: Vec<DiffLine>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffResult {
+    pub files: Vec<String>,
+    pub hunks: Vec<DiffHunk>,
+}
+
+/// Parse `git diff hash1..hash2 --unified=3` output into structured DiffResult.
+pub fn git_diff(article_id: &str, hash1: &str, hash2: &str) -> Result<DiffResult, AppError> {
+    let rp = repo_path(article_id)?;
+    if !rp.join(".git").is_dir() {
+        return Err(AppError::NotFound(format!(
+            "Git repo not found for article '{}'",
+            article_id
+        )));
+    }
+
+    let output = Command::new("git")
+        .args(["diff", &format!("{}..{}", hash1, hash2), "--unified=3"])
+        .current_dir(&rp)
+        .output()
+        .map_err(|e| AppError::IoError(format!("git diff failed: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::DatabaseError(format!(
+            "git diff error: {}",
+            stderr
+        )));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    parse_diff_output(&stdout)
+}
+
+fn parse_diff_output(output: &str) -> Result<DiffResult, AppError> {
+    let mut files: Vec<String> = Vec::new();
+    let mut hunks: Vec<DiffHunk> = Vec::new();
+    let mut current_hunk: Option<DiffHunk> = None;
+    let mut old_line = 0u32;
+    let mut new_line = 0u32;
+
+    for line in output.lines() {
+        if line.starts_with("diff --git ") {
+            // Push current hunk if any
+            if let Some(hunk) = current_hunk.take() {
+                hunks.push(hunk);
+            }
+            // Extract filename from "diff --git a/path b/path"
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if let Some(path) = parts.get(3) {
+                let path = path.trim_start_matches("b/");
+                if !files.contains(&path.to_string()) {
+                    files.push(path.to_string());
+                }
+            }
+        } else if line.starts_with("@@") {
+            // Push previous hunk
+            if let Some(hunk) = current_hunk.take() {
+                hunks.push(hunk);
+            }
+            // Parse "@@ -old_start,old_lines +new_start,new_lines @@ header"
+            if let Some(parsed) = parse_hunk_header(line) {
+                old_line = parsed.0;
+                new_line = parsed.1;
+                current_hunk = Some(DiffHunk {
+                    old_start: parsed.0,
+                    old_lines: parsed.2,
+                    new_start: parsed.1,
+                    new_lines: parsed.3,
+                    header: parsed.4.clone(),
+                    lines: Vec::new(),
+                });
+            }
+        } else if let Some(ref mut hunk) = current_hunk {
+            let (lt, ct, old_no, new_no) = if line.starts_with("+") && !line.starts_with("+++") {
+                let content = if line.len() > 1 { &line[1..] } else { "" };
+                let ln = new_line;
+                new_line += 1;
+                (DiffLineType::Add, content.to_string(), None, Some(ln))
+            } else if line.starts_with("-") && !line.starts_with("---") {
+                let content = if line.len() > 1 { &line[1..] } else { "" };
+                let ln = old_line;
+                old_line += 1;
+                (DiffLineType::Delete, content.to_string(), Some(ln), None)
+            } else {
+                let content = if !line.is_empty() { line } else { "" };
+                let (o, n) = (old_line, new_line);
+                old_line += 1;
+                new_line += 1;
+                (DiffLineType::Context, content.to_string(), Some(o), Some(n))
+            };
+            hunk.lines.push(DiffLine {
+                line_type: lt,
+                content: ct,
+                old_lineno: old_no,
+                new_lineno: new_no,
+            });
+        }
+    }
+
+    // Push last hunk
+    if let Some(hunk) = current_hunk {
+        hunks.push(hunk);
+    }
+
+    Ok(DiffResult { files, hunks })
+}
+
+fn parse_hunk_header(line: &str) -> Option<(u32, u32, u32, u32, String)> {
+    // @@ -old_start,old_lines +new_start,new_lines @@ optional header
+    let rest = line.strip_prefix("@@")?.trim();
+    let rest = rest.strip_suffix("@@")?.trim();
+    // Split into parts by space: the first part is "-old,lines" the second is "+new,lines"
+    let parts: Vec<&str> = rest.splitn(3, ' ').collect();
+    if parts.len() < 2 {
+        return None;
+    }
+    let old_part = parts[0].trim_start_matches('-');
+    let new_part = parts[1].trim_start_matches('+');
+    let header = parts.get(2).unwrap_or(&"").to_string();
+
+    let (old_start, old_lines) = parse_range(old_part);
+    let (new_start, new_lines) = parse_range(new_part);
+
+    Some((old_start, new_start, old_lines, new_lines, header))
+}
+
+fn parse_range(s: &str) -> (u32, u32) {
+    if let Some((start, count)) = s.split_once(',') {
+        (start.parse().unwrap_or(1), count.parse().unwrap_or(1))
+    } else {
+        (s.parse().unwrap_or(1), 1)
+    }
 }
 
 fn get_head_hash(repo_path: &PathBuf) -> Result<String, AppError> {

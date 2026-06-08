@@ -63,7 +63,9 @@ function close() {
 function handleSearch(e: Event) {
   e.preventDefault()
   if (searchQuery.value.trim()) {
-    router.push(`/search?q=${encodeURIComponent(searchQuery.value.trim())}`)
+    const q = encodeURIComponent(searchQuery.value.trim())
+    const local = tauri.isTauri.value || tauri.isBrowserLocal.value ? '&mode=local' : ''
+    router.push(`/search?q=${q}${local}`)
     searchQuery.value = ''
     close()
   }

@@ -230,10 +230,20 @@ async function handleCompile() {
   try {
     if (format.value === 'markdown') {
       previewHtml.value = parseMarkdown(content.value)
+    } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      // Typst: use Tauri local compilation
+      const svg = await tauri.compileTypst({
+        content: content.value,
+        format: format.value,
+      })
+      if (svg && !('error' in svg)) {
+        // Wrap SVG for display in the preview area
+        previewHtml.value = `<div class="typst-preview">${svg}</div>`
+      } else {
+        errorMsg.value = 'Compilation failed'
+      }
     } else {
-      // Typst: requires Tauri sidecar (Slice 2) for local compilation.
-      // Web: on-going — no browser-native Typst→HTML path yet.
-      previewHtml.value = '<p class="text-ink-muted text-sm">Typst preview available in Tauri desktop (Slice 2). Write in Markdown for live preview.</p>'
+      previewHtml.value = '<p class="text-ink-muted text-sm">Typst preview available in Tauri desktop mode. Use Markdown for browser preview.</p>'
     }
   } catch (e: any) {
     errorMsg.value = e.message || 'Compile failed'

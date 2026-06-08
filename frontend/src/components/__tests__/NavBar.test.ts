@@ -1,7 +1,13 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import NavBar from '../NavBar.vue'
+
+const mockPush = vi.fn()
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+  useRoute: () => ({ path: '/' }),
+}))
 
 // Mock useNetworkStatus so canRead('pool')/canRead('schools') pass in tests
 vi.mock('@/composables/useNetworkStatus', () => ({
@@ -79,5 +85,45 @@ describe('NavBar', () => {
     // Should show action links
     expect(wrapper.find('a[href="/bookmarks"]').exists()).toBe(true)
     expect(wrapper.find('a[href="/edit"]').exists()).toBe(true)
+  })
+})
+
+describe('NavBar — search routing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    const user = { id: 'u1', username: 'test', name: 'Test' }
+    localStorage.setItem('viewer', JSON.stringify(user))
+    localStorage.setItem('token', 'test-token')
+    setActivePinia(createPinia())
+  })
+
+  it('routes to /search?mode=local when in browser-local mode', async () => {
+    localStorage.setItem('peerpedia_browser_local', '1')
+
+    const wrapper = mount(NavBar, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+
+    // Find search input, type, submit the form
+    const input = wrapper.find('input')
+    expect(input.exists()).toBe(true)
+    await input.setValue('quantum physics')
+    await wrapper.find('form').trigger('submit')
+
+    expect(mockPush).toHaveBeenCalledWith('/search?q=quantum%20physics&mode=local')
+  })
+
+  it('routes to /search without mode when in web mode', async () => {
+    const wrapper = mount(NavBar, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+
+    const input = wrapper.find('input')
+    expect(input.exists()).toBe(true)
+    await input.setValue('general relativity')
+    await wrapper.find('form').trigger('submit')
+
+    expect(mockPush).toHaveBeenCalledWith('/search?q=general%20relativity')
   })
 })
