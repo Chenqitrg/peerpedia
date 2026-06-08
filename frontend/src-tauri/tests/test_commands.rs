@@ -146,6 +146,39 @@ fn test_list_drafts_backward_compat_account_id() {
 }
 
 #[test]
+fn test_save_draft_backward_compat_account_id() {
+    /// Regression: EditorPage calls saveDraft({ account_id }) without token.
+    /// Must work because SaveDraftParams.account_id is now a fallback.
+    let conn = setup();
+
+    let account =
+        peerpedia::local_auth::create_account(&conn, "saver", "pass", "", "Saver").unwrap();
+
+    // Save draft with bare account_id — no token, no login.
+    // This simulates the frontend sending { account_id: 'xxx' } before token restore.
+    let draft = peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "Newly Created Draft",
+        "# Fresh content",
+        "markdown",
+    )
+    .unwrap();
+    assert!(
+        !draft.id.is_empty(),
+        "save_draft with bare account_id must work"
+    );
+    assert_eq!(draft.title, "Newly Created Draft");
+    assert_eq!(draft.account_id, account.id);
+
+    // Verify the draft is visible when listing by account_id
+    let drafts = peerpedia::local_store::list_drafts(&conn, &account.id).unwrap();
+    assert_eq!(drafts.len(), 1, "saved draft must be listable");
+    assert_eq!(drafts[0].title, "Newly Created Draft");
+}
+
+#[test]
 fn test_full_draft_flow() {
     let conn = setup();
 
