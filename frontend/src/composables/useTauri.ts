@@ -381,6 +381,12 @@ function getInvoke(): ((cmd: string, args?: Record<string, unknown>) => Promise<
   return tauriWindow.__TAURI__?.core?.invoke ?? null
 }
 
+// ── Shared session token (module-level — shared across all useTauri() calls) ──
+// Set by useUserStore after login, used by _invoke to authenticate Tauri commands.
+// Must be module-level, not per-instance, because useUserStore and every page
+// component call useTauri() independently — they must share the same token.
+let _sessionToken: string | null = null
+
 // ── Composable ────────────────────────────────────────────────────────
 
 export function useTauri() {
@@ -390,10 +396,6 @@ export function useTauri() {
   })
 
   const isBrowserLocal = computed(() => !isTauri.value && isBrowserLocalActive())
-
-  // Session token — set by useUserStore after login, used by _invoke to
-  // authenticate Tauri commands. Not persisted (ephemeral per session).
-  let _sessionToken: string | null = null
 
   /** Store a session token for authenticating subsequent Tauri commands. */
   function setSessionToken(token: string | null) {
