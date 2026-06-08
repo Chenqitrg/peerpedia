@@ -408,24 +408,14 @@ export function useTauri() {
   }
 
   async function _invoke<T>(command: string, args?: Record<string, unknown>): Promise<T | { error: string } | null> {
-    // Inject session token for authenticated commands, replacing bare account_id.
-    // This keeps backward compat with callers that still pass account_id.
+    // If a session token is set, add it alongside existing args. We do NOT
+    // delete account_id/follower_id/user_id — the backend (both Rust and
+    // browser-local mock) resolves token first and falls back to bare IDs.
+    // This preserves backward compat when the token hasn't been restored yet
+    // (e.g., page refresh before login, or existing users upgrading).
     let resolvedArgs = args
-    if (_sessionToken && args) {
-      if ('account_id' in args) {
-        // Caller passed account_id for draft/auth ops — replace with session token.
-        resolvedArgs = { ...args }
-        delete resolvedArgs.account_id
-        resolvedArgs.token = _sessionToken
-      } else if ('follower_id' in args) {
-        // Caller passed follower_id — replace with token.
-        resolvedArgs = { ...args }
-        delete resolvedArgs.follower_id
-        resolvedArgs.token = _sessionToken
-      } else if (!('token' in args)) {
-        // No token in args at all — inject it for commands that might need it.
-        resolvedArgs = { ...args, token: _sessionToken }
-      }
+    if (_sessionToken && args && !('token' in args)) {
+      resolvedArgs = { ...args, token: _sessionToken }
     }
 
     // Real Tauri IPC

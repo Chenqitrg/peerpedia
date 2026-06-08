@@ -483,4 +483,19 @@ describe('useTauri — session token sharing', () => {
     expect(drafts).toHaveLength(1)
     expect((drafts as any[])[0].title).toBe('My Draft')
   })
+
+  it('listDrafts works WITHOUT session token via backward compat account_id fallback', async () => {
+    // This tests the case where isLocalMode() returns false → token not restored
+    const tauri = useTauri()
+    // NEVER call setSessionToken — simulate store init failing to restore token
+    await tauri.createAccount({ username: 'bob', password: 'pass' })
+    const loginResult = await tauri.login({ username: 'bob', password: 'pass' }) as any
+    const accountId = loginResult.id
+    // Save draft with account_id
+    await tauri.saveDraft({ account_id: accountId, title: 'Backward Compat Draft', content: '# Test', format: 'markdown' })
+    // List drafts — _resolveToken should fall back to a.account_id since token is null
+    const drafts = await tauri.listDrafts({ account_id: accountId })
+    expect(drafts).toHaveLength(1)
+    expect(drafts[0].title).toBe('Backward Compat Draft')
+  })
 })
