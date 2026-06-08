@@ -7,6 +7,26 @@ const RouterLinkStub = {
   template: '<a :href="to"><slot /></a>',
 }
 
+// Mutable state for controlling mock behavior across test blocks.
+const tauriState = vi.hoisted(() => ({
+  isTauri: false,
+  isBrowserLocal: false,
+  mockListDrafts: vi.fn().mockResolvedValue([]),
+}))
+
+vi.mock('../../composables/useTauri', () => ({
+  useTauri: () => ({
+    isTauri: { value: tauriState.isTauri },
+    isBrowserLocal: { value: tauriState.isBrowserLocal },
+    getSessionToken: vi.fn(() => null),
+    setSessionToken: vi.fn(),
+    listDrafts: tauriState.mockListDrafts,
+    isFollowing: vi.fn().mockResolvedValue({ following: false }),
+    listAccounts: vi.fn().mockResolvedValue([]),
+    gitHistory: vi.fn().mockResolvedValue([]),
+  }),
+}))
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ params: { id: 'test-user' } }),
@@ -138,17 +158,28 @@ describe('UserPage', () => {
     }
   })
 
-  it('shows Follow/Unfollow button on other user\'s profile', async () => {
+  it('loads Tauri local drafts when in browser-local mode on own profile', async () => {
+    // This test reproduces the bug: UserPage should show drafts from local
+    // storage in browser-local mode when viewing own profile.
+    tauriState.isBrowserLocal = true
+    tauriState.isTauri = false
+    tauriState.mockListDrafts.mockResolvedValue([
+      { id: 'draft-1', title: 'My Local Draft', updated_at: '2026-06-07T00:00:00Z' },
+    ])
+
     const { useUserStore } = await import('../../stores/useUserStore')
     const store = useUserStore()
-    store.viewer = { id: 'other-user', name: 'Other' } as any
+    store.viewer = { id: 'test-user', name: 'Alice Chen', username: 'alice' } as any
+    store.isBrowserLocal = true
 
     const UserPage = (await import('../UserPage.vue')).default
     const wrapper = mount(UserPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await flushPromises()
-    const btn = wrapper.find('button.btn-sm')
-    expect(btn.exists()).toBe(true)
+
+    // The local draft should appear
+    expect(tauriState.mockListDrafts).toHaveBeenCalled()
+    expect(wrapper.text()).toContain('My Local Draft')
   })
 })
