@@ -290,8 +290,8 @@ Compile output is **never** stored in the database. The compile endpoint generat
 | Format | Desktop (Phase 1) | Web (Phase 2+) |
 |--------|------------------|----------------|
 | Markdown → HTML | Client-side (marked + KaTeX) | Client-side (marked + KaTeX) |
-| Typst → SVG | Tauri sidecar CLI | Server compiler |
-| Typst → PDF | Tauri sidecar CLI | Server compiler |
+| Typst → SVG | Tauri sidecar CLI ✅ | Server compiler |
+| Typst → PDF | Tauri sidecar CLI (TODO) | Server compiler |
 
 ---
 
@@ -346,8 +346,8 @@ Compile output is **never** stored in the database. The compile endpoint generat
 | Suite | Tests | Framework |
 |-------|-------|-----------|
 | Backend | 120 | pytest |
-| Frontend | 252 | vitest |
-| Rust | 53 | cargo test |
+| Frontend | 319 | vitest |
+| Rust | 16 | cargo test |
 
 ### 7.2 CI Pipeline
 
@@ -394,12 +394,13 @@ The detailed engineering plan is maintained in [`docs/plan_reshape.md`](plan_res
 
 | Priority | Feature | Status |
 |----------|---------|--------|
-| P0 | Delete articles | ⬜ |
-| P0 | Diff view (side-by-side) | ⬜ |
-| P0 | Typst compilation | ⬜ |
-| P0 | Editor UX (CodeMirror, hotkeys) | ⬜ |
+| P0 | Delete articles | ✅ |
+| P0 | Diff view (side-by-side) | ✅ |
+| P0 | Typst compilation (SVG preview) | ✅ |
+| P0 | Typst compilation (PDF download) | ⬜ |
+| P0 | Draft search (FTS5) | ✅ |
+| P0 | Editor UX (keep-alive, split pane) | ✅ |
 | P0 | Distribute & user testing | ⬜ |
-| P0 | Draft search (FTS5) | ⬜ |
 | P1 | arXiv mirror with scoring | ⬜ |
 | P1 | Tags & categories | ⬜ |
 | P2 | AI agent (exploratory) | ⬜ |
@@ -427,4 +428,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-07 · 120 backend tests · 252 frontend tests · 53 Rust tests · 9 DB entities*
+*Last updated: 2026-06-09 · 120 backend tests · 319 frontend tests · 16 Rust tests · 9 DB entities*

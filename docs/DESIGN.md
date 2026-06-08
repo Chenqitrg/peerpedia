@@ -290,8 +290,8 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 | 格式 | 桌面版 (Phase 1) | Web 版 (Phase 2+) |
 |--------|------------------|----------------|
 | Markdown → HTML | 客户端 (marked + KaTeX) | 客户端 (marked + KaTeX) |
-| Typst → SVG | Tauri sidecar CLI | 服务端编译器 |
-| Typst → PDF | Tauri sidecar CLI | 服务端编译器 |
+| Typst → SVG | Tauri sidecar CLI ✅ | 服务端编译器 |
+| Typst → PDF | Tauri sidecar CLI（待完成） | 服务端编译器 |
 
 ---
 
@@ -346,8 +346,8 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 | 套件 | 测试数 | 框架 |
 |-------|-------|-----------|
 | 后端 | 120 | pytest |
-| 前端 | 252 | vitest |
-| Rust | 53 | cargo test |
+| 前端 | 319 | vitest |
+| Rust | 16 | cargo test |
 
 ### 7.2 CI 流水线
 
@@ -394,12 +394,13 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 | 优先级 | 功能 | 状态 |
 |----------|---------|--------|
-| P0 | 删除文章 | ⬜ |
-| P0 | 差异对比（左右分栏） | ⬜ |
-| P0 | Typst 编译 | ⬜ |
-| P0 | 编辑器体验（CodeMirror、快捷键） | ⬜ |
+| P0 | 删除文章 | ✅ |
+| P0 | 差异对比（左右分栏） | ✅ |
+| P0 | Typst 编译（SVG 预览） | ✅ |
+| P0 | Typst 编译（PDF 下载） | ⬜ |
+| P0 | 草稿搜索（FTS5） | ✅ |
+| P0 | 编辑器体验（keep-alive、分栏） | ✅ |
 | P0 | 软件分发与用户评测 | ⬜ |
-| P0 | 草稿搜索（FTS5） | ⬜ |
 | P1 | arXiv 镜像与评分 | ⬜ |
 | P1 | 分类标签 | ⬜ |
 | P2 | AI 代理（探索中） | ⬜ |
@@ -427,4 +428,4 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 ---
 
-*最后更新: 2026-06-07 · 120 后端测试 · 252 前端测试 · 53 Rust 测试 · 9 个 DB 实体*
+*最后更新: 2026-06-09 · 120 后端测试 · 319 前端测试 · 16 Rust 测试 · 9 个 DB 实体*

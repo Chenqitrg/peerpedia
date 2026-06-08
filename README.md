@@ -62,7 +62,7 @@ Phase 2+（Web — 社区协作）
 | Backend (Web) | Python 3.12+, FastAPI, SQLAlchemy, SQLite |
 | Backend (Desktop) | Rust, rusqlite, bcrypt, libgit2 |
 | Storage | SQLite + Git repositories |
-| Compilation | Markdown: client-side (marked + KaTeX). Typst: Tauri sidecar CLI |
+| Compilation | Markdown: client-side (marked + KaTeX). Typst: SVG preview via Tauri sidecar CLI + `typst compile` |
 | Auth | JWT (Web) / bcrypt + SQLite (Desktop) |
 | Source of Truth | Git = Source of Truth, DB = Index |
 
@@ -214,10 +214,10 @@ peerpedia/
 # Backend (120 tests)
 python -m pytest backend/tests/ core/tests/ -q
 
-# Frontend (252 tests)
+# Frontend (319 tests)
 cd frontend && npx vitest run
 
-# Rust (53 tests)
+# Rust (16 tests)
 cd frontend/src-tauri && cargo test
 ```
 
@@ -232,7 +232,7 @@ See [`docs/plan_reshape.md`](docs/plan_reshape.md) for the detailed engineering 
 | Phase | Focus | Status |
 |-------|-------|--------|
 | **1 — Desktop MVP** | Offline writing, local git, session auth, profile with drafts | ✅ Done |
-| **2 — Polish & Ship** | Delete articles, diff view, Typst compile, editor UX, distribution, draft search, arXiv mirror, tags | 🔜 In progress |
+| **2 — Polish & Ship** | Delete articles, diff view, Typst preview, draft search, editor UX | 🚧 In progress |
 | **3 — P2P Network** | Index server, content-addressed storage, peer-to-peer distribution | 🔮 Future |
 
 ---
