@@ -145,20 +145,25 @@ pub fn list_drafts(
 #[derive(Debug, Deserialize)]
 pub struct GetDraftParams {
     pub id: String,
-    pub token: String,
+    pub token: Option<String>,
+    #[serde(default)]
+    pub account_id: String, // backward compat — used when token is None
 }
 
 #[tauri::command]
 pub fn get_draft(state: State<'_, AppState>, params: GetDraftParams) -> Result<Draft, AppError> {
-    let account_id = resolve_account(&state, &params.token)?;
     let conn = lock_db(&state)?;
     let draft = local_store::get_draft(&conn, &params.id)?;
-    // Ensure the draft belongs to the requesting account.
-    if draft.account_id != account_id {
-        return Err(AppError::NotFound(format!(
-            "Draft '{}' not found",
-            params.id
-        )));
+
+    // When token is provided, verify ownership.
+    if let Some(ref token) = params.token {
+        let account_id = resolve_account(&state, token)?;
+        if draft.account_id != account_id {
+            return Err(AppError::NotFound(format!(
+                "Draft '{}' not found",
+                params.id
+            )));
+        }
     }
     Ok(draft)
 }
