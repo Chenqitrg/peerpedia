@@ -456,22 +456,29 @@ describe('useTauri — session token sharing', () => {
   })
 
   it('session token is injected into listDrafts args replacing account_id', async () => {
-    // Simulate the real flow: useUserStore sets token, UserPage calls listDrafts
+    // Simulate the EXACT real flow: login → get token → setSessionToken → save draft
+    // (same instance, like useUserStore does) → then use DIFFERENT instance for listDrafts
+    // (like UserPage does). The critical point: setSessionToken must use the token from
+    // the login response, which matches a real session in the mock backend.
     const tauriA = useTauri()
-    tauriA.setSessionToken('user-session-token')
 
-    // Create an account so the list_drafts lookup works
+    // Step 1: Create account (like registerLocal)
     await tauriA.createAccount({ username: 'alice', password: 'secret' })
-    const loginResult = await tauriA.login({ username: 'alice', password: 'secret' })
-    const accountId = (loginResult as any).id
 
-    // Save a draft under this account
+    // Step 2: Login and use the ACTUAL returned token (like loginLocal)
+    const loginResult = await tauriA.login({ username: 'alice', password: 'secret' }) as any
+    const accountId = loginResult.id
+    const realToken = loginResult.token
+    expect(realToken).toBeTruthy()
+    tauriA.setSessionToken(realToken)
+
+    // Step 3: Save a draft (like EditorPage.saveDraft via _invoke)
     await tauriA.saveDraft({ account_id: accountId, title: 'My Draft', content: '# Hello', format: 'markdown' })
 
-    // Now create a SECOND tauri instance (simulating UserPage)
+    // Step 4: Page refresh simulation — new useTauri() instance (like UserPage)
+    // The module-level _sessionToken should still be set from step 2
     const tauriB = useTauri()
-    // listDrafts with account_id — should be replaced with token by _invoke
-    const drafts = await tauriB.listDrafts({ account_id: accountId })
+    const drafts = await tauriB.listDrafts({ account_id: 'any-id-should-be-replaced' })
     expect(Array.isArray(drafts)).toBe(true)
     expect(drafts).toHaveLength(1)
     expect((drafts as any[])[0].title).toBe('My Draft')
