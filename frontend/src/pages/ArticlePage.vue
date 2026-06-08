@@ -327,13 +327,10 @@ async function handleReply(reviewId: string) {
 }
 
 function goBack() {
-  // In Tauri/local mode the history stack is minimal, so avoid router.back()
-  // which can loop between ArticlePage and HistoryPage.
-  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-    router.push('/')
-  } else {
-    router.back()
-  }
+  // HistoryPage's goBack was fixed to use router.back(), so the infinite
+  // loop ArticlePage ↔ HistoryPage is resolved. router.back() now correctly
+  // returns to whichever page the user came from (UserPage, home, etc.).
+  router.back()
 }
 
 function goToHistory() {

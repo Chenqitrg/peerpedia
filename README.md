@@ -225,6 +225,18 @@ cd frontend/src-tauri && cargo test
 
 ---
 
+## Roadmap · 路线图
+
+See [`docs/plan_reshape.md`](docs/plan_reshape.md) for the detailed engineering plan across all phases.
+
+| Phase | Focus | Status |
+|-------|-------|--------|
+| **1 — Desktop MVP** | Offline writing, local git, session auth, profile with drafts | ✅ Done |
+| **2 — Polish & Ship** | Delete articles, diff view, Typst compile, editor UX, distribution, draft search, arXiv mirror, tags | 🔜 In progress |
+| **3 — P2P Network** | Index server, content-addressed storage, peer-to-peer distribution | 🔮 Future |
+
+---
+
 ## Contributing · 参与贡献
 
 We need designers, engineers, writers, and thinkers. Read `docs/DESIGN.en.md` for design philosophy, check `CLAUDE.md` for conventions, follow TDD.

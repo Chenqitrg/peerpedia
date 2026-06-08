@@ -346,14 +346,11 @@ describe('ArticlePage', () => {
     expect(mockPush).not.toHaveBeenCalled()
   })
 
-  it('goBack navigates to / in Tauri mode to avoid loop', async () => {
-    // This test directly tests the goBack logic:
-    // When isTauri=true, goBack must call router.push('/') not router.back()
+  // Regression: goBack must use router.back() so UserPage → ArticlePage → Back
+  // returns to UserPage, not Home. HistoryPage loop was fixed separately.
+  it('goBack uses router.back() preserving navigation origin', async () => {
     mockPush.mockClear()
     mockBack.mockClear()
-
-    const { useUserStore } = await import('../../stores/useUserStore')
-    const userStore = useUserStore()
 
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
@@ -361,16 +358,13 @@ describe('ArticlePage', () => {
     })
     await new Promise(r => setTimeout(r, 100))
 
-    // Directly call goBack with Tauri mode simulated
-    // The component checks tauri.isTauri.value — we need to mock that
-    // by checking the component's behavior
     const vm = wrapper.vm as any
-    if (vm.goBack) {
-      vm.goBack()
-      await new Promise(r => setTimeout(r, 50))
-      // In non-Tauri mode, should use router.back()
-      expect(mockBack).toHaveBeenCalled()
-    }
+    vm.goBack()
+    await new Promise(r => setTimeout(r, 50))
+
+    // Must use router.back() — must NOT use router.push('/')
+    expect(mockBack).toHaveBeenCalled()
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it('shows merge error message when merge proposal fails', async () => {

@@ -94,9 +94,13 @@ onMounted(() => {
   if (isEdit.value) {
     loadExistingArticle()
   } else {
-    // New article: restore any previously-saved draft.
-    // Cross-user leak prevention is handled in registerLocal and clear().
-    restoreDraft()
+    // New article: do NOT restore DRAFT_ID_KEY from localStorage — that would
+    // resurrect a draft from a previous session when the user explicitly
+    // clicked "New Article". Drafts are accessible from the UserPage profile.
+    // The save button will create a fresh draft on first click.
+    remove(DRAFT_ID_KEY.value)
+    remove(DRAFT_KEY.value)
+    currentDraftId.value = undefined
   }
 })
 
@@ -152,10 +156,16 @@ async function restoreDraft() {
   const accountId = userStore.viewer?.id || 'local'
   const result = await draftPersistence.load(currentDraftId.value, accountId)
 
-  if (result && result.content !== undefined) {
+  if (result && !('error' in result) && result.content !== undefined) {
     title.value = result.title || ''
     content.value = result.content || ''
     format.value = (result.format as 'markdown' | 'typst') || 'markdown'
+  } else {
+    // Stored draft ID no longer exists (e.g., deleted or session expired).
+    // Clear the stale keys so next visit starts fresh.
+    remove(DRAFT_ID_KEY.value)
+    remove(DRAFT_KEY.value)
+    currentDraftId.value = undefined
   }
 }
 
@@ -493,10 +503,10 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
         />
 
-        <!-- History -->
+        <!-- History — show after first save even for new articles -->
         <router-link
-          v-if="isEdit"
-          :to="`/articles/${editId}/history`"
+          v-if="isEdit || currentDraftId"
+          :to="`/articles/${editId || currentDraftId}/history`"
           class="flex items-center justify-center w-8 h-8 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"

@@ -386,7 +386,36 @@ SQLite is the Phase 1 database. Phase 2 will migrate to PostgreSQL. No business 
 
 **Tradeoff:** UUIDs are simpler for now. Content-hash addressing is the right primitive for Phase 2/3 but requires changes to the routing, resolution, and sync layers. Decision deferred.
 
-## 9. Configuration
+## 9. Roadmap
+
+The detailed engineering plan is maintained in [`docs/plan_reshape.md`](plan_reshape.md).
+
+### Phase 2 — Polish & Ship (In Progress)
+
+| Priority | Feature | Status |
+|----------|---------|--------|
+| P0 | Delete articles | ⬜ |
+| P0 | Diff view (side-by-side) | ⬜ |
+| P0 | Typst compilation | ⬜ |
+| P0 | Editor UX (CodeMirror, hotkeys) | ⬜ |
+| P0 | Distribute & user testing | ⬜ |
+| P0 | Draft search (FTS5) | ⬜ |
+| P1 | arXiv mirror with scoring | ⬜ |
+| P1 | Tags & categories | ⬜ |
+| P2 | AI agent (exploratory) | ⬜ |
+
+### Phase 3 — P2P Network (Future)
+
+| Component | Description |
+|-----------|-------------|
+| Index Server | Maps content hash → peer addresses |
+| Peer Client | Embedded in Tauri desktop, serves cached articles |
+| Content Hash | SHA-256 of article source → `peerpedia://<hash>` |
+| Sync Engine | Background pull/push of popular articles |
+
+---
+
+## 10. Configuration
 
 All tunable parameters live in `core/peerpedia_core/config/params.py`:
 

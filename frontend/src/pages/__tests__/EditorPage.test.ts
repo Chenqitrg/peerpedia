@@ -310,6 +310,61 @@ describe('EditorPage', () => {
     expect(vm.currentDraftId).toBeTruthy()
   })
 
+  // Regression: history icon shows after first save on new article
+  it('shows history link after saving a new draft', async () => {
+    _isTauri = true
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    // Before save: no history link (isEdit=false, no currentDraftId)
+    expect(wrapper.find('[aria-label="History"]').exists()).toBe(false)
+
+    // Save a new draft
+    vm.title = 'History Test'
+    vm.content = '# Test'
+    vm.commitMsg = 'first'
+    await vm.saveDraft()
+    await new Promise(r => setTimeout(r, 50))
+
+    // After save: history link should appear (currentDraftId is set)
+    const historyLink = wrapper.find('[aria-label="History"]')
+    expect(historyLink.exists()).toBe(true)
+    expect(vm.currentDraftId).toBeTruthy()
+  })
+
+  // Regression: new article must always start fresh, never restore old draft
+  it('starts fresh for new article even when localStorage has stale draft', async () => {
+    _isTauri = true
+    localStorage.setItem('editor-draft-id-u1-new', 'old-draft-id')
+    localStorage.setItem('editor-draft-u1-new', JSON.stringify({ title: 'Old Draft', content: '# Old content' }))
+
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 200))
+    const vm = wrapper.vm as any
+
+    expect(vm.currentDraftId).toBeUndefined()
+    expect(vm.title).toBe('')
+    expect(vm.content).toBe('')
+    expect(localStorage.getItem('editor-draft-id-u1-new')).toBeNull()
+    expect(localStorage.getItem('editor-draft-u1-new')).toBeNull()
+  })
   // Regression: confirmSaveWithCommit sets commit message and saves
   it('confirmSaveWithCommit saves after setting commit message', async () => {
     _isTauri = true
