@@ -46,10 +46,22 @@ function _save<T>(key: string, val: T) {
 
 const _draftsKey = '_t_drafts', _cacheKey = '_t_cache', _acctsKey = '_t_accts'
 const _followsKey = '_t_follows', _bookmarksKey = '_t_bookmarks'
+const _sessionsKey = '_t_sessions'
+
+/// Resolve a token to account_id in mock mode, or return a raw user identifier.
+/// Falls back through: token session lookup → account_id → follower_id → user_id.
+function _resolveToken(a: Record<string, unknown>, sessions: { token: string; account_id: string }[]): string | undefined {
+  if (a.token) {
+    const s = sessions.find(s => s.token === a.token)
+    if (s) return s.account_id
+  }
+  return (a.account_id as string) || (a.follower_id as string) || (a.user_id as string) || undefined
+}
 
 async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
   const a = args || {}
   const accounts = _load<MockAccount[]>(_acctsKey, [])
+  const sessions = _load<{ token: string; account_id: string }[]>(_sessionsKey, [])
   const drafts = _load<MockDraft[]>(_draftsKey, [])
   const cache = _load<Record<string, MockCacheEntry>>(_cacheKey, {})
   const follows = _load<MockFollow[]>(_followsKey, [])
@@ -68,20 +80,32 @@ async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): 
       const acct = accounts.find(x => x.username === a.username)
       if (!acct) return { code: 'NOT_FOUND', message: 'User not found' }
       if (acct.password !== a.password) return { code: 'AUTH_FAILED', message: 'Incorrect password' }
-      return { id: acct.id, username: acct.username }
+      const token = crypto.randomUUID()
+      sessions.push({ token, account_id: acct.id })
+      _save(_sessionsKey, sessions)
+      return { id: acct.id, username: acct.username, token }
+    }
+    case 'logout': {
+      const idx = sessions.findIndex(s => s.token === a.token)
+      if (idx >= 0) sessions.splice(idx, 1)
+      _save(_sessionsKey, sessions)
+      return { ok: true }
     }
     case 'list_accounts':
       return accounts.map(x => ({ id: x.id, username: x.username }))
     case 'save_draft': {
+      const accountId = _resolveToken(a, sessions) || ''
       const id: string = (a.id as string) || crypto.randomUUID()
-      const draft: MockDraft = { id, account_id: a.account_id as string || '', title: (a.title as string) || '', content: (a.content as string) || '', format: (a.format as string) || 'markdown', updated_at: new Date().toISOString() }
+      const draft: MockDraft = { id, account_id: accountId, title: (a.title as string) || '', content: (a.content as string) || '', format: (a.format as string) || 'markdown', updated_at: new Date().toISOString() }
       const idx = drafts.findIndex(x => x.id === id)
       if (idx >= 0) drafts[idx] = draft; else drafts.push(draft)
       _save(_draftsKey, drafts)
       return draft
     }
-    case 'list_drafts':
-      return drafts.filter(x => x.account_id === a.account_id).sort((x, y) => y.updated_at.localeCompare(x.updated_at)).map(x => ({ id: x.id, title: x.title, updated_at: x.updated_at }))
+    case 'list_drafts': {
+      const accountId = _resolveToken(a, sessions) || ''
+      return drafts.filter(x => x.account_id === accountId).sort((x, y) => y.updated_at.localeCompare(x.updated_at)).map(x => ({ id: x.id, title: x.title, updated_at: x.updated_at }))
+    }
     case 'get_draft': {
       const d = drafts.find(x => x.id === a.id)
       return d || { code: 'NOT_FOUND', message: 'Draft not found' }
@@ -99,54 +123,65 @@ async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): 
       return cache[a.id as string] || null
     // ── Follows ──────────────────────────────────────────────────────────
     case 'follow_user': {
-      const exists = follows.find(x => x.follower_id === a.follower_id && x.followed_id === a.followed_id)
+      const accountId = _resolveToken(a, sessions) || ''
+      const exists = follows.find(x => x.follower_id === accountId && x.followed_id === a.followed_id)
       if (!exists) {
-        follows.push({ follower_id: a.follower_id as string, followed_id: a.followed_id as string, created_at: new Date().toISOString() })
+        follows.push({ follower_id: accountId, followed_id: a.followed_id as string, created_at: new Date().toISOString() })
         _save(_followsKey, follows)
       }
       return { ok: true }
     }
     case 'unfollow_user': {
-      _save(_followsKey, follows.filter(x => !(x.follower_id === a.follower_id && x.followed_id === a.followed_id)))
+      const accountId = _resolveToken(a, sessions) || ''
+      _save(_followsKey, follows.filter(x => !(x.follower_id === accountId && x.followed_id === a.followed_id)))
       return { ok: true }
     }
     case 'is_following': {
-      const f = follows.find(x => x.follower_id === a.follower_id && x.followed_id === a.followed_id)
+      const accountId = _resolveToken(a, sessions) || ''
+      const f = follows.find(x => x.follower_id === accountId && x.followed_id === a.followed_id)
       return { following: !!f }
     }
     case 'get_followers': {
-      const ids = follows.filter(x => x.followed_id === a.user_id).map(x => x.follower_id)
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      const ids = follows.filter(x => x.followed_id === targetId).map(x => x.follower_id)
       return accounts.filter(acct => ids.includes(acct.id)).map(x => ({ id: x.id, username: x.username }))
     }
     case 'get_following': {
-      const ids = follows.filter(x => x.follower_id === a.user_id).map(x => x.followed_id)
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      const ids = follows.filter(x => x.follower_id === targetId).map(x => x.followed_id)
       return accounts.filter(acct => ids.includes(acct.id)).map(x => ({ id: x.id, username: x.username }))
     }
     case 'get_follower_count': {
-      return { count: follows.filter(x => x.followed_id === a.user_id).length }
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      return { count: follows.filter(x => x.followed_id === targetId).length }
     }
     case 'get_following_count': {
-      return { count: follows.filter(x => x.follower_id === a.user_id).length }
+      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
+      return { count: follows.filter(x => x.follower_id === targetId).length }
     }
     // ── Bookmarks ────────────────────────────────────────────────────────
     case 'add_bookmark': {
-      const bm = bookmarks.find(x => x.user_id === a.user_id && x.article_id === a.article_id)
+      const accountId = _resolveToken(a, sessions) || ''
+      const bm = bookmarks.find(x => x.user_id === accountId && x.article_id === a.article_id)
       if (!bm) {
-        bookmarks.push({ user_id: a.user_id as string, article_id: a.article_id as string, created_at: new Date().toISOString() })
+        bookmarks.push({ user_id: accountId, article_id: a.article_id as string, created_at: new Date().toISOString() })
         _save(_bookmarksKey, bookmarks)
       }
       return { ok: true }
     }
     case 'remove_bookmark': {
-      _save(_bookmarksKey, bookmarks.filter(x => !(x.user_id === a.user_id && x.article_id === a.article_id)))
+      const accountId = _resolveToken(a, sessions) || ''
+      _save(_bookmarksKey, bookmarks.filter(x => !(x.user_id === accountId && x.article_id === a.article_id)))
       return { ok: true }
     }
     case 'is_bookmarked': {
-      const bm = bookmarks.find(x => x.user_id === a.user_id && x.article_id === a.article_id)
+      const accountId = _resolveToken(a, sessions) || ''
+      const bm = bookmarks.find(x => x.user_id === accountId && x.article_id === a.article_id)
       return { bookmarked: !!bm }
     }
     case 'get_bookmarks': {
-      const bms = bookmarks.filter(x => x.user_id === a.user_id)
+      const accountId = _resolveToken(a, sessions) || ''
+      const bms = bookmarks.filter(x => x.user_id === accountId)
       return bms.map(b => ({ user_id: b.user_id, article_id: b.article_id, created_at: b.created_at }))
     }
     // ── Git commands ────────────────────────────────────────────────────
@@ -204,22 +239,28 @@ export interface LoginParams {
 
 export interface SaveDraftParams {
   id?: string
-  account_id: string
+  token?: string
+  account_id?: string  // backward compat
   title?: string
   content?: string
   format?: string
 }
 
 export interface ListDraftsParams {
-  account_id: string
+  token?: string
+  account_id?: string  // backward compat — _invoke auto-replaces with token
 }
 
 export interface GetDraftParams {
   id: string
+  token?: string
+  account_id?: string  // backward compat
 }
 
 export interface DeleteDraftParams {
   id: string
+  token?: string
+  account_id?: string  // backward compat
 }
 
 export interface CacheArticleParams {
@@ -232,26 +273,31 @@ export interface GetCachedArticleParams {
 }
 
 export interface FollowUserParams {
-  follower_id: string
+  token?: string
+  follower_id?: string  // backward compat — _invoke replaces with token
   followed_id: string
 }
 
 export interface IsFollowingParams {
-  follower_id: string
+  token?: string
+  follower_id?: string  // backward compat
   followed_id: string
 }
 
 export interface GetFollowListParams {
-  user_id: string
+  token?: string
+  user_id?: string  // backward compat — used to query followers of another user
 }
 
 export interface BookmarkParams {
-  user_id: string
+  token?: string
+  user_id?: string  // backward compat
   article_id: string
 }
 
 export interface GetBookmarksParams {
-  user_id: string
+  token?: string
+  user_id?: string  // backward compat
 }
 
 // ── Git params ─────────────────────────────────────────────────────────
@@ -335,6 +381,12 @@ function getInvoke(): ((cmd: string, args?: Record<string, unknown>) => Promise<
   return tauriWindow.__TAURI__?.core?.invoke ?? null
 }
 
+// ── Shared session token (module-level — shared across all useTauri() calls) ──
+// Set by useUserStore after login, used by _invoke to authenticate Tauri commands.
+// Must be module-level, not per-instance, because useUserStore and every page
+// component call useTauri() independently — they must share the same token.
+let _sessionToken: string | null = null
+
 // ── Composable ────────────────────────────────────────────────────────
 
 export function useTauri() {
@@ -345,7 +397,27 @@ export function useTauri() {
 
   const isBrowserLocal = computed(() => !isTauri.value && isBrowserLocalActive())
 
+  /** Store a session token for authenticating subsequent Tauri commands. */
+  function setSessionToken(token: string | null) {
+    _sessionToken = token
+  }
+
+  /** Current session token, if any. */
+  function getSessionToken(): string | null {
+    return _sessionToken
+  }
+
   async function _invoke<T>(command: string, args?: Record<string, unknown>): Promise<T | { error: string } | null> {
+    // If a session token is set, add it alongside existing args. We do NOT
+    // delete account_id/follower_id/user_id — the backend (both Rust and
+    // browser-local mock) resolves token first and falls back to bare IDs.
+    // This preserves backward compat when the token hasn't been restored yet
+    // (e.g., page refresh before login, or existing users upgrading).
+    let resolvedArgs = args
+    if (_sessionToken && args && !('token' in args)) {
+      resolvedArgs = { ...args, token: _sessionToken }
+    }
+
     // Real Tauri IPC
     if (isTauri.value) {
       const invokeFn = getInvoke()
@@ -353,7 +425,7 @@ export function useTauri() {
 
       try {
         // Tauri 2.x uses named arguments: invoke(cmd, { paramName: args })
-        const result = await invokeFn(command, args ? { params: args } : undefined)
+        const result = await invokeFn(command, resolvedArgs ? { params: resolvedArgs } : undefined)
 
         // Check if Rust returned an AppError (serialized as { code, message }).
         if (result && typeof result === 'object' && 'code' in result && 'message' in result) {
@@ -375,7 +447,7 @@ export function useTauri() {
     // Browser-local backend (browser-only)
     if (isBrowserLocal.value) {
       try {
-        const result = await browserLocalInvoke(command, args)
+        const result = await browserLocalInvoke(command, resolvedArgs)
         // Check if mock returned an error shape.
         if (result && typeof result === 'object' && 'code' in result && 'message' in result) {
           const err = result as unknown as { code: string; message: string }
@@ -394,6 +466,8 @@ export function useTauri() {
   return {
     isTauri,
     isBrowserLocal,
+    setSessionToken,
+    getSessionToken,
 
     // Auth
     async createAccount(params: CreateAccountParams) {
@@ -404,6 +478,9 @@ export function useTauri() {
     },
     async listAccounts() {
       return _invoke<AccountSummary[]>('list_accounts')
+    },
+    async logout(params: { token: string }) {
+      return _invoke<{ ok: boolean }>('logout', params as unknown as Record<string, unknown>)
     },
 
     // Drafts

@@ -134,6 +134,8 @@ cd frontend && npm run tauri dev
 
 Every article is an independent Git repository. Fork, edit, merge, rollback — complete version history, forever.
 
+**Save = Commit.** In the editor, saving triggers a Git commit. Each save captures a versioned snapshot. Download filenames embed the commit hash (e.g., `My_Article-a1b2c3d.html`). Downloads are disabled until the first save, ensuring every download is tied to a specific committed version.
+
 ### Five-Dimensional Scoring · 五维评分（O/R/C/P/I）
 
 | Dim | Name | Measures |

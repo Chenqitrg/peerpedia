@@ -1,5 +1,5 @@
 """User API schemas."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -36,7 +36,7 @@ class UserProfile(BaseModel):
     followers_count: int = 0
     following_count: int = 0
     article_count: int = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UserCreate(BaseModel):

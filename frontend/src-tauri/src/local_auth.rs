@@ -16,10 +16,53 @@ pub struct Account {
     pub username: String,
 }
 
+/// Account information plus a session token for authenticating subsequent commands.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountWithToken {
+    pub id: String,
+    pub username: String,
+    pub token: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountSummary {
     pub id: String,
     pub username: String,
+}
+
+// ── Session management ──────────────────────────────────────────────────
+
+/// Create a session token for a given account. Returns the token string.
+fn create_session(conn: &Connection, account_id: &str) -> Result<String, AppError> {
+    let token = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO sessions (token, account_id) VALUES (?1, ?2)",
+        rusqlite::params![token, account_id],
+    )?;
+    Ok(token)
+}
+
+/// Verify a session token and return the associated account_id.
+/// Returns AuthFailed if the token is invalid or expired.
+pub fn verify_session(conn: &Connection, token: &str) -> Result<String, AppError> {
+    let result = conn.query_row(
+        "SELECT account_id FROM sessions WHERE token = ?1",
+        [token],
+        |row| row.get::<_, String>(0),
+    );
+    match result {
+        Ok(account_id) => Ok(account_id),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Err(AppError::AuthFailed(
+            "Invalid or expired session token".into(),
+        )),
+        Err(e) => Err(AppError::from(e)),
+    }
+}
+
+/// Remove a session token (logout).
+pub fn logout_session(conn: &Connection, token: &str) -> Result<(), AppError> {
+    conn.execute("DELETE FROM sessions WHERE token = ?1", [token])?;
+    Ok(())
 }
 
 /// Create a new local account. Returns an error if the username already exists.
@@ -66,8 +109,13 @@ pub fn create_account(
     }
 }
 
-/// Authenticate a user by username and password. Returns the account on success.
-pub fn login(conn: &Connection, username: &str, password: &str) -> Result<Account, AppError> {
+/// Authenticate a user by username and password.
+/// Returns the account with a session token on success.
+pub fn login(
+    conn: &Connection,
+    username: &str,
+    password: &str,
+) -> Result<AccountWithToken, AppError> {
     let username = username.trim();
     if username.is_empty() || password.is_empty() {
         return Err(AppError::AuthFailed(
@@ -92,9 +140,11 @@ pub fn login(conn: &Connection, username: &str, password: &str) -> Result<Accoun
             let valid = verify(password, &password_hash)
                 .map_err(|e| AppError::AuthFailed(e.to_string()))?;
             if valid {
-                Ok(Account {
+                let token = create_session(conn, &id)?;
+                Ok(AccountWithToken {
                     id,
                     username: uname,
+                    token,
                 })
             } else {
                 Err(AppError::AuthFailed("Incorrect password".into()))
@@ -171,8 +221,36 @@ mod tests {
     fn test_login_correct_password() {
         let conn = setup();
         create_account(&conn, "bob", "correcthorse", "", "Bob").unwrap();
-        let account = login(&conn, "bob", "correcthorse").unwrap();
-        assert_eq!(account.username, "bob");
+        let result = login(&conn, "bob", "correcthorse").unwrap();
+        assert_eq!(result.username, "bob");
+        assert!(!result.token.is_empty());
+        // Token should be verifiable.
+        let account_id = verify_session(&conn, &result.token).unwrap();
+        assert_eq!(account_id, result.id);
+    }
+
+    #[test]
+    fn test_verify_session_invalid_token() {
+        let conn = setup();
+        let result = verify_session(&conn, "nonexistent-token");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::AuthFailed(_)));
+    }
+
+    #[test]
+    fn test_login_logout_verify_sequence() {
+        let conn = setup();
+        create_account(&conn, "carol", "secret", "", "Carol").unwrap();
+        let result = login(&conn, "carol", "secret").unwrap();
+
+        // Token works
+        assert!(verify_session(&conn, &result.token).is_ok());
+
+        // After logout, token no longer works
+        logout_session(&conn, &result.token).unwrap();
+        let verify = verify_session(&conn, &result.token);
+        assert!(verify.is_err());
+        assert!(matches!(verify.unwrap_err(), AppError::AuthFailed(_)));
     }
 
     #[test]

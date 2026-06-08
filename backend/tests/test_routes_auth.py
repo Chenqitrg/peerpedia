@@ -18,6 +18,7 @@ from peerpedia_core.storage.db.engine import get_session
 def client(db_engine):
     from peerpedia_api import deps
     from peerpedia_api.main import app
+
     def override_db():
         session = get_session(db_engine)
         try:
@@ -28,6 +29,7 @@ def client(db_engine):
     from fastapi.testclient import TestClient
     with TestClient(app) as c:
         yield c
+    app.dependency_overrides.clear()
     app.dependency_overrides.clear()
 
 

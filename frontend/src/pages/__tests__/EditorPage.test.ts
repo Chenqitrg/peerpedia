@@ -54,6 +54,12 @@ describe('EditorPage', () => {
     setActivePinia(createPinia())
     localStorage.clear()
     _isTauri = false
+    vi.clearAllMocks()
+    mockGitHistory.mockResolvedValue([])
+    mockGitInit.mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' })
+    mockGitCommit.mockResolvedValue({ hash: 'abc5678', message: 'Update' })
+    mockSaveDraft.mockResolvedValue({ id: 'draft-99', account_id: 'u1', title: '', content: '', format: 'markdown', updated_at: '2026-06-07' })
+    mockGetDraft.mockResolvedValue(null)
   })
 
   it('renders editor page with title input', async () => {
@@ -192,5 +198,93 @@ describe('EditorPage', () => {
     expect(callArgs.content).toBe('# Hello World')
     expect(callArgs.commit_message).toBe('Initial draft')
     expect(callArgs.author).toBe('Alice Chen')
+  })
+
+  // Regression: second and subsequent saves must trigger gitCommit, not gitInit
+  it('saveDraft triggers gitCommit (not gitInit) when repo already exists', async () => {
+    _isTauri = true
+    // Simulate existing repo by returning a history entry
+    mockGitHistory.mockResolvedValue([{ hash: 'abc1234', message: 'Initial', author: 'alice', timestamp: '2026-01-01' }])
+
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    vm.title = 'Updated Article'
+    vm.content = '# Updated Content'
+    vm.commitMsg = 'Second draft'
+    await vm.saveDraft()
+
+    // Verify gitCommit was called (not gitInit)
+    expect(mockGitCommit).toHaveBeenCalled()
+    expect(mockGitInit).not.toHaveBeenCalled()
+    const callArgs = mockGitCommit.mock.calls[0][0]
+    expect(callArgs.article_id).toBe('draft-99')
+    expect(callArgs.content).toBe('# Updated Content')
+    expect(callArgs.commit_message).toBe('Second draft')
+  })
+
+  // Regression: commit message popup must open when save clicked without message in local mode
+  it('opens commit message popup when commitMsg is empty in Tauri mode', async () => {
+    _isTauri = true
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    // No commit message set
+    vm.commitMsg = ''
+    expect(vm.showCommitPopup).toBe(false)
+
+    // Clicking save should open the popup instead of saving
+    await vm.handleSaveDraft()
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(vm.showCommitPopup).toBe(true)
+    // saveDraft should NOT have been called
+    expect(mockSaveDraft).not.toHaveBeenCalled()
+  })
+
+  // Regression: confirmSaveWithCommit sets commit message and saves
+  it('confirmSaveWithCommit saves after setting commit message', async () => {
+    _isTauri = true
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    vm.title = 'Article'
+    vm.content = '# Content'
+    vm.tempCommitMsg = 'My commit message'
+    vm.showCommitPopup = true
+
+    await vm.confirmSaveWithCommit()
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(vm.showCommitPopup).toBe(false)
+    expect(vm.commitMsg).toBe('My commit message')
+    expect(mockSaveDraft).toHaveBeenCalled()
   })
 })

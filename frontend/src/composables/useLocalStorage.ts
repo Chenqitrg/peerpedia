@@ -1,3 +1,24 @@
+// ── Error message extraction ─────────────────────────────────────────────
+// Shared across all pages/composables — eliminates repeated try/catch patterns.
+
+/** Extract a user-facing message from any thrown value (API error, Error, etc.). */
+export function extractErrorMessage(e: unknown): string {
+  if (e && typeof e === 'object') {
+    const err = e as Record<string, unknown>
+    // FastAPI error detail
+    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+    if (detail) return detail
+    // Axios interceptor adds .userMessage
+    const userMsg = (err as { userMessage?: string }).userMessage
+    if (userMsg) return userMsg
+    // Standard Error.message
+    const msg = (err as { message?: string }).message
+    if (msg) return msg
+  }
+  return ''
+}
+
+
 // Typed localStorage utility — the single abstraction that owns all
 // localStorage access. Callers wrap in ref()/Pinia stores where reactive
 // state matters; this module only provides safe serialized I/O.

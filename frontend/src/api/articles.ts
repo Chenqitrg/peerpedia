@@ -8,12 +8,12 @@ export interface ArticleListParams {
   size?: number
 }
 
-export async function getArticles(params?: ArticleListParams) {
+export async function getArticles(params?: ArticleListParams): Promise<{articles: import('./types').ArticleSummary[], total: number, page: number, size: number}> {
   const res = await apiClient.get('/articles', { params })
   return res.data
 }
 
-export async function getArticle(id: string) {
+export async function getArticle(id: string): Promise<import('./types').ArticleDetail> {
   const res = await apiClient.get(`/articles/${id}`)
   return res.data
 }
@@ -23,17 +23,17 @@ export async function getArticleSource(id: string): Promise<{ content: string; f
   return res.data
 }
 
-export async function createArticle(body: ArticleCreatePayload) {
+export async function createArticle(body: ArticleCreatePayload): Promise<import('./types').ArticleDetail> {
   const res = await apiClient.post('/articles', body)
   return res.data
 }
 
-export async function getHistory(id: string) {
+export async function getHistory(id: string): Promise<import('./types').ArticleHistory> {
   const res = await apiClient.get(`/articles/${id}/history`)
   return res.data
 }
 
-export async function forkArticle(id: string) {
+export async function forkArticle(id: string): Promise<{id: string; forked_from: string; status: string}> {
   const res = await apiClient.post(`/articles/${id}/fork`)
   return res.data
 }
@@ -48,17 +48,17 @@ export async function rollbackArticle(id: string, hash: string) {
   return res.data
 }
 
-export async function updateArticle(id: string, body: ArticleUpdatePayload) {
+export async function updateArticle(id: string, body: ArticleUpdatePayload): Promise<import('./types').ArticleDetail> {
   const res = await apiClient.put(`/articles/${id}`, body)
   return res.data
 }
 
-export async function extendSink(id: string, body: { extra_days: number }) {
+export async function extendSink(id: string, body: { extra_days: number }): Promise<import('./types').ArticleDetail> {
   const res = await apiClient.put(`/articles/${id}/sink-extension`, body)
   return res.data
 }
 
-export async function getCitations(id: string) {
+export async function getCitations(id: string): Promise<import('./types').CitationGraph> {
   const res = await apiClient.get(`/articles/${id}/citations`)
   return res.data
 }
