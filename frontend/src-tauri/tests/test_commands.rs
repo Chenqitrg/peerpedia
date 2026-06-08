@@ -51,6 +51,44 @@ fn test_full_account_flow() {
 }
 
 #[test]
+fn test_token_list_drafts_flow() {
+    /// Reproduce the user-page drafts bug: login → get token → resolve token →
+    /// list drafts via resolved account_id. This is exactly what the frontend
+    /// does after a page refresh.
+    let conn = setup();
+
+    // Create account + login to get token
+    let account =
+        peerpedia::local_auth::create_account(&conn, "writer", "pass", "", "Writer").unwrap();
+    let logged = peerpedia::local_auth::login(&conn, "writer", "pass").unwrap();
+
+    // Save a draft using raw account_id (simulates initial save)
+    let draft = peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "My Draft",
+        "# Hello",
+        "markdown",
+    )
+    .unwrap();
+    assert_eq!(draft.account_id, account.id);
+
+    // Simulate page refresh: resolve token → account_id → list drafts
+    // This is what the frontend does after restoreSession
+    let resolved_id = peerpedia::local_auth::verify_session(&conn, &logged.token).unwrap();
+    assert_eq!(resolved_id, account.id);
+
+    let drafts = peerpedia::local_store::list_drafts(&conn, &resolved_id).unwrap();
+    assert_eq!(
+        drafts.len(),
+        1,
+        "should find draft via token-resolved account_id"
+    );
+    assert_eq!(drafts[0].title, "My Draft");
+}
+
+#[test]
 fn test_full_draft_flow() {
     let conn = setup();
 
