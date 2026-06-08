@@ -158,6 +158,50 @@ describe('UserPage', () => {
     }
   })
 
+  // TDD: delete button on own article card (web mode — server provides articles)
+  it('shows delete button on own article card', async () => {
+    tauriState.isTauri = false
+    tauriState.isBrowserLocal = false
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    // Make this viewer match the article's author so is_own_article=true
+    userStore.viewer = { id: 'test-user' } as any
+
+    const UserPage = (await import('../UserPage.vue')).default
+    const wrapper = mount(UserPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 200))
+
+    const deleteBtn = wrapper.find('[aria-label="Delete article"]')
+    expect(deleteBtn.exists()).toBe(true)
+  })
+
+  // TDD: clicking delete shows confirmation dialog
+  it('clicking delete shows confirmation and confirm/cancel buttons', async () => {
+    tauriState.isTauri = false
+    tauriState.isBrowserLocal = false
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'test-user' } as any
+
+    const UserPage = (await import('../UserPage.vue')).default
+    const wrapper = mount(UserPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 200))
+
+    const deleteBtn = wrapper.find('[aria-label="Delete article"]')
+    expect(deleteBtn.exists()).toBe(true)
+    await deleteBtn.trigger('click')
+    await new Promise(r => setTimeout(r, 50))
+
+    // Confirmation dialog should appear with Delete and Cancel buttons
+    expect(wrapper.text()).toMatch(/Confirm/i)
+  })
+
   it('loads Tauri local drafts when in browser-local mode on own profile', async () => {
     // This test reproduces the bug: UserPage should show drafts from local
     // storage in browser-local mode when viewing own profile.

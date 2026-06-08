@@ -6,7 +6,11 @@
         ? 'flex-1 w-full px-2 pt-24 pb-2'
         : 'flex-1 w-full max-w-content mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12'"
     >
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <keep-alive include="EditorPage">
+          <component :is="Component" :key="route.path" />
+        </keep-alive>
+      </router-view>
     </main>
     <AuthModal />
   </div>

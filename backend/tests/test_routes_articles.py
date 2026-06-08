@@ -447,3 +447,132 @@ class TestDownloadEndpoints:
         """PDF download for non-existent article returns 404."""
         resp = client.get("/api/v1/articles/nonexistent/download/pdf")
         assert resp.status_code == 404
+
+
+class TestDeleteArticle:
+    """Tests for DELETE /articles/{id} and core delete_article()."""
+
+    @pytest.fixture
+    def owned_article(self, db_engine):
+        """Create an article owned by the client's auth user (test_articles_auth)."""
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, User
+
+        s = get_session(db_engine)
+        auth_user = s.query(User).filter(User.username == "test_articles_auth").first()
+        a = Article(status="draft", authors=[auth_user.id])
+        s.add(a)
+        s.commit()
+        aid = a.id
+        s.close()
+        return aid
+
+    def test_delete_article_removes_from_db(self, client, seed_user, db_engine):
+        """Core: delete_article() removes article row from database."""
+        from peerpedia_core.storage.db.crud_article import delete_article, get_article
+        from peerpedia_core.storage.db.engine import get_session
+
+        s = get_session(db_engine)
+        a = Article(status="draft", authors=[seed_user])
+        s.add(a)
+        s.commit()
+        article_id = a.id
+        s.close()
+
+        s2 = get_session(db_engine)
+        delete_article(s2, article_id)
+        s2.close()
+
+        s3 = get_session(db_engine)
+        assert get_article(s3, article_id) is None
+        s3.close()
+
+    def test_delete_article_removes_git_repo(self, client, seed_user, db_engine):
+        """Core: delete_article() removes the git repository directory."""
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import User
+        from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
+
+        # Get the auth user's ID so the article is owned by the authenticated user
+        s = get_session(db_engine)
+        auth_user = s.query(User).filter(User.username == "test_articles_auth").first()
+        auth_id = auth_user.id
+        s.close()
+
+        create_body = {
+            "authors": [auth_id],
+            "content": "# Test\n\nContent.",
+            "format": "markdown",
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        assert resp.status_code == 201
+        article_id = resp.json()["id"]
+
+        repo_path = DEFAULT_ARTICLES_DIR / article_id
+        assert repo_path.exists()
+        assert (repo_path / ".git").is_dir()
+
+        del_resp = client.delete(f"/api/v1/articles/{article_id}")
+        assert del_resp.status_code == 204
+
+        assert not repo_path.exists()
+
+    def test_delete_endpoint_returns_204(self, client, owned_article):
+        """DELETE /articles/{id} returns 204 on success."""
+        resp = client.delete(f"/api/v1/articles/{owned_article}")
+        assert resp.status_code == 204
+
+    def test_delete_endpoint_requires_auth(self, client, owned_article):
+        """DELETE /articles/{id} returns 401 without authentication."""
+        from peerpedia_api import deps
+        app = client.app
+        old = app.dependency_overrides.get(deps.require_user)
+        try:
+            app.dependency_overrides.pop(deps.require_user, None)
+            resp = client.delete(f"/api/v1/articles/{owned_article}")
+            assert resp.status_code == 401
+        finally:
+            if old is not None:
+                app.dependency_overrides[deps.require_user] = old
+
+    def test_delete_nonexistent_article(self, client):
+        """DELETE /articles/nonexistent returns 404."""
+        resp = client.delete("/api/v1/articles/nonexistent")
+        assert resp.status_code == 404
+
+    def test_delete_article_verify_gone(self, client, owned_article):
+        """After DELETE, GET returns 404."""
+        del_resp = client.delete(f"/api/v1/articles/{owned_article}")
+        assert del_resp.status_code == 204
+
+        get_resp = client.get(f"/api/v1/articles/{owned_article}")
+        assert get_resp.status_code == 404
+
+    def test_delete_non_author_forbidden(self, client, owned_article, db_engine):
+        """Only article authors can delete; others get 403."""
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import User
+
+        s = get_session(db_engine)
+        other = User(username="other_user", password_hash="",
+                      name="Other", anonymous_name="anon_other", affiliation="X")
+        s.add(other)
+        s.commit()
+        other_id = other.id
+        s.close()
+
+        from peerpedia_api import deps
+        s2 = get_session(db_engine)
+        other_obj = s2.get(User, other_id)
+        app = client.app
+        old = app.dependency_overrides.get(deps.require_user)
+        try:
+            app.dependency_overrides[deps.require_user] = lambda: other_obj
+            resp = client.delete(f"/api/v1/articles/{owned_article}")
+            assert resp.status_code == 403
+        finally:
+            if old is not None:
+                app.dependency_overrides[deps.require_user] = old
+            s2.close()

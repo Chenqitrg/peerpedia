@@ -60,10 +60,17 @@ function close() {
   mobileOpen.value = false
 }
 
+function newArticle() {
+  close()
+  router.push('/edit?new=1')
+}
+
 function handleSearch(e: Event) {
   e.preventDefault()
   if (searchQuery.value.trim()) {
-    router.push(`/search?q=${encodeURIComponent(searchQuery.value.trim())}`)
+    const q = encodeURIComponent(searchQuery.value.trim())
+    const local = tauri.isTauri.value || tauri.isBrowserLocal.value ? '&mode=local' : ''
+    router.push(`/search?q=${q}${local}`)
     searchQuery.value = ''
     close()
   }
@@ -164,16 +171,16 @@ function handleLogout() {
           <Bookmark class="w-4 h-4" stroke-width="2" />
         </router-link>
 
-        <router-link
-          to="/edit"
+        <button
           class="flex items-center justify-center w-8 h-8 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="t('nav.newArticle')"
-          @click="close"
+          :data-tooltip="t('nav.newArticle')"
+          @click="newArticle"
         >
           <FilePlus class="w-4 h-4" stroke-width="2" />
-        </router-link>
+        </button>
 
         <router-link
           v-if="canRead('schools')"
@@ -318,7 +325,7 @@ function handleLogout() {
         <router-link to="/schools" class="nav-link-mobile" @click="close">{{ t('nav.schools') }}</router-link>
         <router-link to="/pool" class="nav-link-mobile" @click="close">{{ t('nav.pool') }}</router-link>
         <router-link to="/bookmarks" class="nav-link-mobile" @click="close">{{ t('nav.bookmarks') }}</router-link>
-        <router-link to="/edit" class="nav-link-mobile" @click="close">{{ t('nav.newArticle') }}</router-link>
+        <button class="nav-link-mobile" @click="newArticle">{{ t('nav.newArticle') }}</button>
         <button class="nav-link-mobile text-left" @click="handleLogout">{{ t('nav.logout') }}</button>
       </template>
       <button v-else class="nav-link-mobile text-left" @click="openAuth">{{ t('nav.signIn') }}</button>

@@ -113,6 +113,16 @@ async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): 
     case 'delete_draft':
       _save(_draftsKey, drafts.filter(x => x.id !== a.id))
       return { ok: true }
+    case 'delete_article':
+      // Remove draft + git history + cache entry
+      _save(_draftsKey, drafts.filter(x => x.id !== (a.id as string)))
+      const gitKey = `_t_git_${a.id}`
+      remove(gitKey)
+      if (cache[a.id as string]) {
+        delete cache[a.id as string]
+        _save(_cacheKey, cache)
+      }
+      return { ok: true }
     case 'cache_article': {
       const entry: MockCacheEntry = { id: a.id as string, json: a.article_json as string, cached_at: new Date().toISOString() }
       cache[a.id as string] = entry
@@ -218,6 +228,57 @@ async function browserLocalInvoke(cmd: string, args?: Record<string, unknown>): 
       const draft = drafts.find(x => x.id === a.article_id)
       return (draft?.content) || ''
     }
+    case 'compile_typst': {
+      // Mock: return a simple SVG placeholder
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="#0d1117" rx="8"/><text x="20" y="40" fill="#c9d1d9" font-family="monospace" font-size="14">Typst compiled (mock)</text><text x="20" y="65" fill="#8b949e" font-family="monospace" font-size="12">Content: ' + ((a.content as string) || '').substring(0, 50) + '...</text></svg>'
+    }
+    case 'search_drafts': {
+      const q = ((a.q as string) || '').toLowerCase().trim()
+      const accountId = _resolveToken(a, sessions) || ''
+      let results = drafts.filter(x => x.account_id === accountId)
+      if (q) {
+        results = results.filter(x =>
+          x.title.toLowerCase().includes(q) || x.content.toLowerCase().includes(q)
+        )
+        // Sort by relevance: exact title > title starts with > title contains > content contains
+        results.sort((a, b) => {
+          const ta = a.title.toLowerCase(), tb = b.title.toLowerCase()
+          const ca = a.content.toLowerCase(), cb = b.content.toLowerCase()
+          const ascore = ta === q ? 100 : ta.startsWith(q) ? 50 : ta.includes(q) ? 10 : ca.includes(q) ? 1 : 0
+          const bscore = tb === q ? 100 : tb.startsWith(q) ? 50 : tb.includes(q) ? 10 : cb.includes(q) ? 1 : 0
+          return bscore - ascore
+        })
+      }
+      return results.map(x => ({ id: x.id, title: x.title, content: x.content, updated_at: x.updated_at }))
+    }
+    case 'search_cached_articles': {
+      const q = ((a.q as string) || '').toLowerCase().trim()
+      const values = Object.values(cache) as MockCacheEntry[]
+      if (!q) {
+        return values.map(e => {
+          const parsed = JSON.parse(e.json)
+          return { id: e.id, title: parsed.title || '', updated_at: parsed.updated_at || e.cached_at }
+        })
+      }
+      const matched: { id: string; title: string; updated_at: string; _score: number }[] = []
+      for (const e of values) {
+        try {
+          const parsed = JSON.parse(e.json)
+          const title = (parsed.title || '').toLowerCase()
+          const content = (parsed.content_preview || '').toLowerCase()
+          let score = 0
+          if (title === q) score = 100
+          else if (title.startsWith(q)) score = 50
+          else if (title.includes(q)) score = 10
+          else if (content.includes(q)) score = 1
+          if (score > 0) {
+            matched.push({ id: e.id, title: parsed.title || '', updated_at: parsed.updated_at || e.cached_at, _score: score })
+          }
+        } catch { /* skip corrupt cache entries */ }
+      }
+      matched.sort((a, b) => b._score - a._score)
+      return matched.map(({ id, title, updated_at }) => ({ id, title, updated_at }))
+    }
     default:
       return { ok: true }
   }
@@ -261,6 +322,12 @@ export interface DeleteDraftParams {
   id: string
   token?: string
   account_id?: string  // backward compat
+}
+
+export interface DeleteArticleParams {
+  id: string
+  token?: string
+  account_id?: string
 }
 
 export interface CacheArticleParams {
@@ -496,6 +563,9 @@ export function useTauri() {
     async deleteDraft(params: DeleteDraftParams) {
       return _invoke<{ ok: boolean }>('delete_draft', params as unknown as Record<string, unknown>)
     },
+    async deleteArticle(params: DeleteArticleParams) {
+      return _invoke<{ ok: boolean }>('delete_article', params as unknown as Record<string, unknown>)
+    },
 
     // Article cache
     async cacheArticle(params: CacheArticleParams) {
@@ -554,6 +624,22 @@ export function useTauri() {
     },
     async gitShow(params: GitShowParams) {
       return _invoke<string>('git_show', params as unknown as Record<string, unknown>)
+    },
+    async gitDiff(params: { article_id: string; hash1: string; hash2: string }) {
+      return _invoke<{ files: string[]; hunks: { old_start: number; old_lines: number; new_start: number; new_lines: number; header: string; lines: { line_type: 'add' | 'del' | 'ctx'; content: string; old_lineno: number | null; new_lineno: number | null }[] }[] }>('git_diff', params as unknown as Record<string, unknown>)
+    },
+
+    // Search
+    async searchDrafts(params: { q: string; account_id?: string; token?: string }) {
+      return _invoke<{ id: string; title: string; content: string; updated_at: string }[]>('search_drafts', params as unknown as Record<string, unknown>)
+    },
+    async searchCachedArticles(params: { q: string }) {
+      return _invoke<{ id: string; title: string; updated_at: string }[]>('search_cached_articles', params as unknown as Record<string, unknown>)
+    },
+
+    // Compile
+    async compileTypst(params: { content: string; format: string }) {
+      return _invoke<string>('compile_typst', params as unknown as Record<string, unknown>)
     },
   }
 }
