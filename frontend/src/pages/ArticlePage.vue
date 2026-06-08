@@ -394,6 +394,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
     <!-- Back button -->
     <button
       class="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink mb-4 transition-colors duration-200"
+      aria-label="Back"
       @click="goBack"
     >
       <ArrowLeft class="w-4 h-4" stroke-width="2" />
