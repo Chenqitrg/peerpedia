@@ -25,6 +25,7 @@ fn main() {
             commands::list_drafts,
             commands::get_draft,
             commands::delete_draft,
+            commands::delete_article,
             commands::cache_article,
             commands::get_cached_article,
             commands::record_visit,
@@ -35,6 +36,10 @@ fn main() {
             commands::git_commit,
             commands::git_history,
             commands::git_show,
+            commands::git_diff,
+            commands::search_drafts,
+            commands::search_cached_articles,
+            commands::compile_typst,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PeerPedia");

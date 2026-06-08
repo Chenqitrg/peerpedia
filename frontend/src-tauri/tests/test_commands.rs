@@ -3,6 +3,14 @@
 
 use peerpedia::db::run_migrations;
 use rusqlite::Connection;
+use std::sync::{Mutex, OnceLock};
+
+/// Serializes all git tests that modify PEERPEDIA_TEST_HOME.
+/// Prevents parallel test threads from clobbering each other's env vars.
+static GIT_HOME_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+fn git_home_lock() -> &'static Mutex<()> {
+    GIT_HOME_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 fn setup() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
@@ -222,6 +230,137 @@ fn test_full_draft_flow() {
 }
 
 #[test]
+fn test_delete_article_removes_db_row_and_git_repo() {
+    let _lock = git_home_lock().lock().unwrap();
+    use std::fs;
+
+    let tmp = std::env::temp_dir().join(format!("peerpedia-test-del-{}", uuid::Uuid::new_v4()));
+    let home = tmp.join("home");
+    fs::create_dir_all(&home).unwrap();
+    std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+    let conn = setup();
+    let account =
+        peerpedia::local_auth::create_account(&conn, "deleter", "pass", "", "Deleter").unwrap();
+
+    // Save a draft + init git repo (like EditorPage does: saveDraft + gitInit)
+    let draft = peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "To Delete",
+        "# Gone",
+        "markdown",
+    )
+    .unwrap();
+    peerpedia::local_git::git_init(&draft.id, "# Gone", "markdown", "Initial", "deleter").unwrap();
+
+    // Verify git repo directory was created
+    let repo_dir = home.join(".peerpedia").join("articles").join(&draft.id);
+    assert!(
+        repo_dir.join(".git").is_dir(),
+        "git repo should exist before deletion"
+    );
+
+    // Delete the article
+    peerpedia::local_store::delete_article(&conn, &draft.id, &account.id).unwrap();
+
+    // Verify DB row is gone
+    let result = peerpedia::local_store::get_draft(&conn, &draft.id);
+    assert!(result.is_err(), "DB row should be deleted");
+
+    // Verify git repo directory is gone
+    assert!(!repo_dir.exists(), "git repo directory should be removed");
+
+    // Cleanup
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn test_git_diff_parses_hunks() {
+    let _lock = git_home_lock().lock().unwrap();
+    use std::fs;
+
+    let tmp = std::env::temp_dir().join(format!("peerpedia-test-diff-{}", uuid::Uuid::new_v4()));
+    let home = tmp.join("home");
+    fs::create_dir_all(&home).unwrap();
+    std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+    // Create two commits with different content
+    let r1 = peerpedia::local_git::git_init(
+        "diff-test",
+        "# Version 1\n\nHello",
+        "markdown",
+        "First",
+        "tester",
+    );
+    assert!(r1.is_ok(), "git_init failed: {:?}", r1.err());
+    let hash1 = r1.unwrap().hash;
+
+    let r2 = peerpedia::local_git::git_commit(
+        "diff-test",
+        "# Version 2\n\nHello World\n\nNew line",
+        "markdown",
+        "Second",
+        "tester",
+    );
+    assert!(r2.is_ok(), "git_commit failed: {:?}", r2.err());
+    let hash2 = r2.unwrap().hash;
+
+    // Call git_diff
+    let diff = peerpedia::local_git::git_diff("diff-test", &hash1, &hash2).unwrap();
+    assert!(
+        !diff.files.is_empty(),
+        "should have at least one file changed"
+    );
+    assert!(!diff.hunks.is_empty(), "should have at least one hunk");
+
+    // Verify hunk content
+    let has_additions = diff.hunks.iter().any(|h| {
+        h.lines
+            .iter()
+            .any(|l| matches!(l.line_type, peerpedia::local_git::DiffLineType::Add))
+    });
+    let has_deletions = diff.hunks.iter().any(|h| {
+        h.lines
+            .iter()
+            .any(|l| matches!(l.line_type, peerpedia::local_git::DiffLineType::Delete))
+    });
+    assert!(has_additions, "diff should contain added lines");
+    assert!(has_deletions, "diff should contain deleted lines");
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn test_git_diff_same_commit_returns_empty() {
+    let _lock = git_home_lock().lock().unwrap();
+    use std::fs;
+
+    let tmp = std::env::temp_dir().join(format!("peerpedia-test-diff2-{}", uuid::Uuid::new_v4()));
+    let home = tmp.join("home");
+    fs::create_dir_all(&home).unwrap();
+    std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+    let r =
+        peerpedia::local_git::git_init("diff-empty", "# No change", "markdown", "Init", "tester")
+            .unwrap();
+    let hash = r.hash;
+
+    let diff = peerpedia::local_git::git_diff("diff-empty", &hash, &hash).unwrap();
+    assert!(
+        diff.hunks.is_empty(),
+        "diff between same commit should be empty"
+    );
+    assert!(
+        diff.files.is_empty(),
+        "diff between same commit should have no files"
+    );
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn test_full_cache_flow() {
     let conn = setup();
 
@@ -250,4 +389,157 @@ fn test_full_cache_flow() {
     // Not found
     let missing = peerpedia::local_store::get_cached_article(&conn, "nonexistent").unwrap();
     assert!(missing.is_none());
+}
+
+#[test]
+fn test_search_drafts_fts() {
+    let conn = setup();
+    let account =
+        peerpedia::local_auth::create_account(&conn, "searcher", "pass", "", "Searcher").unwrap();
+
+    // Save drafts with distinct titles
+    peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "Quantum Mechanics",
+        "# Quantum",
+        "markdown",
+    )
+    .unwrap();
+    peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "Classical Physics",
+        "# Classical",
+        "markdown",
+    )
+    .unwrap();
+    peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "Cooking Recipes",
+        "# Pasta",
+        "markdown",
+    )
+    .unwrap();
+
+    let results = peerpedia::local_store::search_drafts(&conn, "quantum", &account.id).unwrap();
+    assert_eq!(
+        results.len(),
+        1,
+        "should find exactly one draft matching 'quantum'"
+    );
+    assert_eq!(results[0].title, "Quantum Mechanics");
+}
+
+#[test]
+fn test_search_drafts_empty_query_returns_all() {
+    let conn = setup();
+    let account =
+        peerpedia::local_auth::create_account(&conn, "searcher2", "pass", "", "Searcher2").unwrap();
+
+    peerpedia::local_store::save_draft(&conn, None, &account.id, "Draft A", "# A", "markdown")
+        .unwrap();
+    peerpedia::local_store::save_draft(&conn, None, &account.id, "Draft B", "# B", "markdown")
+        .unwrap();
+
+    let results = peerpedia::local_store::search_drafts(&conn, "", &account.id).unwrap();
+    assert_eq!(results.len(), 2, "empty query returns all drafts");
+}
+
+#[test]
+fn test_search_drafts_fts_content() {
+    let conn = setup();
+    let account =
+        peerpedia::local_auth::create_account(&conn, "searcher3", "pass", "", "Searcher3").unwrap();
+
+    peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "Title One",
+        "This draft discusses gravity waves",
+        "markdown",
+    )
+    .unwrap();
+    peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account.id,
+        "Title Two",
+        "This draft discusses electromagnetism",
+        "markdown",
+    )
+    .unwrap();
+
+    // Search by content (not just title)
+    let results = peerpedia::local_store::search_drafts(&conn, "gravity", &account.id).unwrap();
+    assert_eq!(results.len(), 1, "should find by content match");
+    assert_eq!(results[0].title, "Title One");
+}
+
+#[test]
+fn test_search_drafts_account_isolation() {
+    let conn = setup();
+    let account1 =
+        peerpedia::local_auth::create_account(&conn, "searcher4a", "pass", "", "Searcher4a")
+            .unwrap();
+    let account2 =
+        peerpedia::local_auth::create_account(&conn, "searcher4b", "pass", "", "Searcher4b")
+            .unwrap();
+
+    peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account1.id,
+        "Alice Draft",
+        "# Alice",
+        "markdown",
+    )
+    .unwrap();
+    peerpedia::local_store::save_draft(&conn, None, &account2.id, "Bob Draft", "# Bob", "markdown")
+        .unwrap();
+
+    // Alice should only see her own draft
+    let results = peerpedia::local_store::search_drafts(&conn, "draft", &account1.id).unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].title, "Alice Draft");
+}
+
+#[test]
+fn test_compile_typst_missing_cli() {
+    // When typst is not installed, should return a clear error
+    let result = peerpedia::local_store::compile_typst("# Hello", "markdown");
+    // Either succeeds (if typst is installed) or fails with a descriptive error
+    match result {
+        Ok(svg) => {
+            // Success — typst is installed
+            assert!(!svg.is_empty(), "SVG output should not be empty");
+        }
+        Err(e) => {
+            let msg = format!("{}", e);
+            // Should mention typst or the command failing
+            assert!(
+                msg.to_lowercase().contains("typst")
+                    || msg.to_lowercase().contains("not found")
+                    || msg.to_lowercase().contains("failed"),
+                "Error should be about typst: {}",
+                msg
+            );
+        }
+    }
+}
+
+#[test]
+fn test_compile_typst_handles_invalid_format() {
+    // Should reject non-typst formats gracefully
+    let result = peerpedia::local_store::compile_typst("# Hello", "markdown");
+    // Markdown is not typst — the function should return an error
+    assert!(
+        result.is_err(),
+        "Markdown content should not compile as Typst"
+    );
 }

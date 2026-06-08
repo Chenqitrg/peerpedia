@@ -2,20 +2,17 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { getHistory, getDiff, rollbackArticle } from '../api/articles'
+import { getHistory, rollbackArticle } from '../api/articles'
+import { useTauri, type CommitEntry } from '../composables/useTauri'
+import DiffView from '../components/DiffView.vue'
+import type { DiffResult } from '../components/DiffView.vue'
 import { useAsyncResource } from '../composables/useAsyncResource'
-import { useTauri } from '../composables/useTauri'
 import ErrorState from '../components/ErrorState.vue'
 import ScoreBadges from '../components/ScoreBadges.vue'
-import type { CommitInfo, ArticleDiff, ArticleHistory } from '../api/types'
-import type { CommitEntry } from '../composables/useTauri'
+import type { ArticleHistory } from '../api/types'
 import {
-  GitCommitHorizontal,
   GitBranch,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
   ArrowLeft,
 } from 'lucide-vue-next'
 
@@ -27,7 +24,7 @@ const tauri = useTauri()
 
 const selectedHash1 = ref<string | null>(null)
 const selectedHash2 = ref<string | null>(null)
-const diffResult = ref<ArticleDiff | null>(null)
+const diffResult = ref<DiffResult | null>(null)
 const diffLoading = ref(false)
 const rollingBack = ref<string | null>(null)
 const rollbackError = ref('')
@@ -82,14 +79,90 @@ async function loadDiff() {
   if (!selectedHash1.value || !selectedHash2.value) return
   diffLoading.value = true
   try {
-    const data = await getDiff(id, selectedHash1.value, selectedHash2.value)
-    diffResult.value = data
+    if (isLocal.value) {
+      // In local mode, use Tauri's structured git_diff
+      const data = await tauri.gitDiff({
+        article_id: id,
+        hash1: selectedHash1.value,
+        hash2: selectedHash2.value,
+      })
+      if (data && !('error' in data)) {
+        diffResult.value = data as unknown as DiffResult
+      } else {
+        diffResult.value = null
+      }
+    } else {
+      // Web mode: fetch REST diff, parse into DiffResult format
+      const { getDiff } = await import('../api/articles')
+      const data = await getDiff(id, selectedHash1.value!, selectedHash2.value!)
+      if (data?.diff_text) {
+        diffResult.value = parseUnifiedDiff(data.diff_text, data.files || [])
+      } else {
+        diffResult.value = null
+      }
+    }
   } catch (e) {
     console.error('Failed to load diff:', e)
     diffResult.value = null
   } finally {
     diffLoading.value = false
   }
+}
+
+/** Parse `git diff` unified output into structured DiffResult for the DiffView component. */
+function parseUnifiedDiff(diffText: string, files: string[]): DiffResult {
+  const hunks: DiffResult['hunks'] = []
+  let currentHunk: DiffResult['hunks'][number] | null = null
+  let oldLine = 0
+  let newLine = 0
+
+  for (const line of diffText.split('\n')) {
+    const hunkMatch = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/)
+    if (hunkMatch) {
+      if (currentHunk) hunks.push(currentHunk)
+      const oldStart = parseInt(hunkMatch[1])
+      const newStart = parseInt(hunkMatch[3])
+      oldLine = oldStart
+      newLine = newStart
+      currentHunk = {
+        old_start: oldStart,
+        old_lines: parseInt(hunkMatch[2] || '1'),
+        new_start: newStart,
+        new_lines: parseInt(hunkMatch[4] || '1'),
+        header: (hunkMatch[5] || '').trim(),
+        lines: [],
+      }
+    } else if (currentHunk) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        currentHunk.lines.push({
+          line_type: 'add',
+          content: line.slice(1),
+          old_lineno: null,
+          new_lineno: newLine,
+        })
+        newLine++
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        currentHunk.lines.push({
+          line_type: 'del',
+          content: line.slice(1),
+          old_lineno: oldLine,
+          new_lineno: null,
+        })
+        oldLine++
+      } else if (!line.startsWith('diff --git') && !line.startsWith('index ') && !line.startsWith('---') && !line.startsWith('+++')) {
+        currentHunk.lines.push({
+          line_type: 'ctx',
+          content: line,
+          old_lineno: oldLine,
+          new_lineno: newLine,
+        })
+        oldLine++
+        newLine++
+      }
+    }
+  }
+  if (currentHunk) hunks.push(currentHunk)
+  return { files, hunks }
 }
 
 async function handleRollback(hash: string) {
@@ -223,13 +296,7 @@ function goBack() {
         <h3 class="text-sm font-heading font-semibold text-ink mb-3">
           {{ t('history.diff') }}: {{ String(selectedHash1).substring(0, 7) }} → {{ String(selectedHash2).substring(0, 7) }}
         </h3>
-        <div
-          v-if="diffResult.diff_text"
-          class="bg-[#0d1117] border border-divider rounded-lg p-4 overflow-x-auto"
-        >
-          <pre class="text-xs font-mono text-ink leading-relaxed whitespace-pre-wrap">{{ diffResult.diff_text }}</pre>
-        </div>
-        <p v-else class="text-xs text-ink-muted">{{ t('history.noDiff') }}</p>
+        <DiffView :diff="diffResult" />
       </div>
 
       <!-- Loading diff -->

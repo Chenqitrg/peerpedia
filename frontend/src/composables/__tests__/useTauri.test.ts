@@ -533,3 +533,233 @@ describe('useTauri — session token sharing', () => {
     expect(drafts[0].title).toBe('Test Draft')
   })
 })
+
+describe('useTauri — browserLocal searchCachedArticles', () => {
+  beforeEach(() => {
+    delete (window as any).__TAURI__
+    localStorage.clear()
+    localStorage.setItem('peerpedia_browser_local', '1')
+  })
+
+  it('returns articles matching query by title', async () => {
+    const tauri = useTauri()
+    await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'Quantum Mechanics', content_preview: 'Intro to QM' }) })
+    await tauri.cacheArticle({ id: 'a2', article_json: JSON.stringify({ title: 'Classical Physics', content_preview: 'Newtonian' }) })
+    await tauri.cacheArticle({ id: 'a3', article_json: JSON.stringify({ title: 'Quantum Computing', content_preview: 'Qubits' }) })
+
+    const results = await tauri.searchCachedArticles({ q: 'quantum' })
+    expect(Array.isArray(results)).toBe(true)
+    expect(results.length).toBe(2)
+    expect(results.map(r => r.id).sort()).toEqual(['a1', 'a3'])
+  })
+
+  it('returns articles matching query by content_preview', async () => {
+    const tauri = useTauri()
+    await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'Article One', content_preview: 'About deep learning' }) })
+    await tauri.cacheArticle({ id: 'a2', article_json: JSON.stringify({ title: 'Article Two', content_preview: 'About physics' }) })
+
+    const results = await tauri.searchCachedArticles({ q: 'deep learning' })
+    expect(results.length).toBe(1)
+    expect(results[0].id).toBe('a1')
+  })
+
+  it('returns all cached articles when query is empty', async () => {
+    const tauri = useTauri()
+    await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'A' }) })
+    await tauri.cacheArticle({ id: 'a2', article_json: JSON.stringify({ title: 'B' }) })
+
+    const results = await tauri.searchCachedArticles({ q: '' })
+    expect(results.length).toBe(2)
+  })
+
+  it('returns empty array when nothing matches', async () => {
+    const tauri = useTauri()
+    await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'Physics' }) })
+
+    const results = await tauri.searchCachedArticles({ q: 'biology' })
+    expect(results).toEqual([])
+  })
+
+  it('returns null in Web mode', async () => {
+    localStorage.clear()
+    const tauri = useTauri()
+    const results = await tauri.searchCachedArticles({ q: 'test' })
+    expect(results).toBeNull()
+  })
+
+  it('includes updated_at in results', async () => {
+    const tauri = useTauri()
+    await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'Test Article', updated_at: '2026-06-01T00:00:00Z' }) })
+
+    const results = await tauri.searchCachedArticles({ q: 'test' })
+    expect(results[0]).toHaveProperty('id', 'a1')
+    expect(results[0]).toHaveProperty('title', 'Test Article')
+    expect(results[0]).toHaveProperty('updated_at')
+  })
+})
+
+describe('useTauri — searchDrafts via account_id (SearchPage flow)', () => {
+  beforeEach(() => {
+    delete (window as any).__TAURI__
+    localStorage.clear()
+    localStorage.setItem('peerpedia_browser_local', '1')
+  })
+
+  it('🔴 BUG REPRO: searchDrafts finds draft by account_id from viewer', async () => {
+    // Simulate SearchPage flow: login → create draft → search via account_id
+    const tauri = useTauri()
+
+    // Step 1: Create account
+    const acct = await tauri.createAccount({ username: 'alice', password: 'secret' }) as any
+    expect(acct.id).toBeTruthy()
+    const accountId = acct.id
+
+    // Step 2: Login (sets session token)
+    await tauri.login({ username: 'alice', password: 'secret' })
+
+    // Step 3: Create a draft (uses the session token to scope to account)
+    await tauri.saveDraft({
+      account_id: accountId,
+      title: 'Quantum Mechanics Draft',
+      content: '# Quantum Mechanics\n\nIntroduction to QM.',
+      format: 'markdown',
+    })
+
+    // Step 4: Search — exactly what SearchPage does in local mode
+    // SearchPage passes userStore.viewer?.id as account_id
+    const results = await tauri.searchDrafts({
+      q: 'quantum',
+      account_id: accountId,
+    })
+
+    // Should find the draft by title
+    expect(Array.isArray(results)).toBe(true)
+    expect(results.length).toBe(1)
+    expect(results[0].title).toBe('Quantum Mechanics Draft')
+  })
+
+  it('🔴 BUG REPRO: searchDrafts finds draft when q is empty (browse all)', async () => {
+    const tauri = useTauri()
+    const acct = await tauri.createAccount({ username: 'bob', password: 'secret' }) as any
+    await tauri.login({ username: 'bob', password: 'secret' })
+    await tauri.saveDraft({
+      account_id: acct.id,
+      title: 'General Relativity Notes',
+      content: 'Einstein field equations.',
+      format: 'markdown',
+    })
+
+    const results = await tauri.searchDrafts({ q: '', account_id: acct.id })
+    expect(Array.isArray(results)).toBe(true)
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    expect(results.some((r: any) => r.title === 'General Relativity Notes')).toBe(true)
+  })
+
+  it('searchDrafts finds draft by account_id without session token', async () => {
+    const tauri = useTauri()
+    // Create account but DON'T login (no session token set)
+    const acct = await tauri.createAccount({ username: 'carol', password: 'secret' }) as any
+    // Create draft directly with account_id (like saveDraft mock would)
+    // Save draft explicitly sets the account_id
+    await tauri.saveDraft({
+      account_id: acct.id,
+      title: 'Cosmology Notes',
+      content: 'Dark energy.',
+      format: 'markdown',
+    })
+
+    // Now search with account_id but WITHOUT session token
+    // This simulates SearchPage: userStore.viewer?.id as account_id
+    const results = await tauri.searchDrafts({ q: 'cosmology', account_id: acct.id })
+    expect(Array.isArray(results)).toBe(true)
+    expect(results.length).toBe(1)
+    expect(results[0].title).toBe('Cosmology Notes')
+  })
+})
+
+describe('useTauri — browserLocal deleteArticle', () => {
+  beforeEach(() => {
+    delete (window as any).__TAURI__
+    localStorage.clear()
+    localStorage.setItem('peerpedia_browser_local', '1')
+  })
+
+  it('🔴 BUG: deleteArticle removes draft from listDrafts', async () => {
+    const tauri = useTauri()
+    // Create account and draft
+    const acct = await tauri.createAccount({ username: 'deluser', password: 'pass' }) as any
+    await tauri.login({ username: 'deluser', password: 'pass' })
+    await tauri.saveDraft({
+      account_id: acct.id,
+      title: 'To Be Deleted',
+      content: 'Delete me.',
+      format: 'markdown',
+    })
+
+    // Verify draft exists
+    let drafts = await tauri.listDrafts({ account_id: acct.id })
+    expect(drafts.length).toBe(1)
+
+    // Delete it
+    const result = await tauri.deleteArticle({ id: drafts[0].id, account_id: acct.id })
+    expect(result).toEqual({ ok: true })
+
+    // Verify it's gone
+    drafts = await tauri.listDrafts({ account_id: acct.id })
+    expect(drafts.length).toBe(0)
+  })
+
+  it('🔴 RECURSIVE: deleted article is fully removed — no draft, no git, no cache', async () => {
+    const tauri = useTauri()
+    const acct = await tauri.createAccount({ username: 'rectest', password: 'pass' }) as any
+    await tauri.login({ username: 'rectest', password: 'pass' })
+    await tauri.saveDraft({
+      account_id: acct.id,
+      title: 'Recursive Delete Test',
+      content: '# Recursive\n\nThis article should be fully deleted.',
+      format: 'markdown',
+    })
+
+    // 1. Verify draft exists
+    const draftsBefore = await tauri.listDrafts({ account_id: acct.id })
+    expect(draftsBefore.length).toBe(1)
+    const draftId = (draftsBefore as any[])[0].id
+
+    // 2. Verify draft can be retrieved individually
+    const draft = await tauri.getDraft({ id: draftId })
+    expect(draft).toHaveProperty('id', draftId)
+    expect(draft).toHaveProperty('title', 'Recursive Delete Test')
+
+    // 3. Cache the article (simulating browsing)
+    await tauri.cacheArticle({ id: draftId, article_json: JSON.stringify({ title: 'Recursive Delete Test' }) })
+    const cachedBefore = await tauri.getCachedArticle({ id: draftId })
+    expect(cachedBefore).toHaveProperty('id', draftId)
+
+    // 4. Init git history for the draft
+    await tauri.gitInit({ article_id: draftId, content: '# Recursive', format: 'markdown', commit_message: 'init', author: 'rectest' })
+    const historyBefore = await tauri.gitHistory({ article_id: draftId })
+    expect(Array.isArray(historyBefore)).toBe(true)
+    expect((historyBefore as any[]).length).toBeGreaterThanOrEqual(1)
+
+    // 5. DELETE
+    const result = await tauri.deleteArticle({ id: draftId, account_id: acct.id })
+    expect(result).toEqual({ ok: true })
+
+    // 6. Verify draft is gone from list
+    const draftsAfter = await tauri.listDrafts({ account_id: acct.id })
+    expect(draftsAfter.length).toBe(0)
+
+    // 7. Verify getDraft returns error (not found)
+    const draftAfter = await tauri.getDraft({ id: draftId })
+    expect(draftAfter).toHaveProperty('error')
+
+    // 8. Verify cache entry is removed
+    const cachedAfter = await tauri.getCachedArticle({ id: draftId })
+    expect(cachedAfter).toBeNull()
+
+    // 9. Verify git history is cleaned up
+    const historyAfter = await tauri.gitHistory({ article_id: draftId })
+    expect(Array.isArray(historyAfter)).toBe(true)
+    expect((historyAfter as any[]).length).toBe(0)
+  })
+})

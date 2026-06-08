@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException
 from peerpedia_core.config.params import params
 from peerpedia_core.storage.db.crud_article import (
     create_article,
+    delete_article,
     get_article,
     list_articles,
     set_sink_start,
@@ -264,3 +265,18 @@ def api_update_article(
     db.commit()
 
     return build_article_detail(db, a.id)
+
+
+@router.delete("/{article_id}", status_code=204)
+def api_delete_article(
+    article_id: str,
+    current_user: User = Depends(deps.require_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Delete an article. Only authors can delete their own articles."""
+    a = get_article(db, article_id)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if current_user.id not in (a.authors or []):
+        raise HTTPException(status_code=403, detail="Only authors can delete their articles")
+    delete_article(db, article_id)

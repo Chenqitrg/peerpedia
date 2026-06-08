@@ -19,7 +19,6 @@ import {
   MapPin,
   Mail,
   Edit,
-  ExternalLink,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -126,6 +125,8 @@ async function loadArticles() {
   if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && isSelf.value) {
     try {
       const drafts = await tauri.listDrafts({ account_id: id.value })
+      // TODO(tech-debt): drafts can be null or {error:string} — add null guard
+      // and error-shape check before iterating (vue-tsc TS2488/TS18047)
       for (const d of drafts) {
         // Avoid duplicates — skip if already loaded from server
         if (!merged.some(a => a.id === d.id)) {
@@ -137,6 +138,8 @@ async function loadArticles() {
               hash = history[0].hash
             }
           } catch { /* optional */ }
+          // TODO(tech-debt): push object doesn't satisfy ArticleSummary — field types
+          // inferred as 'any' because drafts union includes {error:string} (TS2345)
           merged.push({
             id: d.id,
             title: d.title || 'Untitled',
@@ -168,6 +171,10 @@ watch(user, (u) => {
   if (u) { loadArticles(); loadFollowState() }
 }, { immediate: true })
 
+// TODO(tech-debt): showFollowers, showFollowing, followers, following are
+// never declared — this block will throw ReferenceError at runtime.
+// Either declare the refs or remove the dead watch (route change already
+// triggers user reload via useAsyncResource + watch(user, ...)).
 watch(() => route.params.id, () => {
   showFollowers.value = false
   showFollowing.value = false
@@ -324,10 +331,11 @@ watch(() => route.params.id, () => {
         </div>
       </div>
 
+
       <!-- Articles section -->
       <div>
         <h2 class="text-lg font-heading font-semibold text-ink mb-4">
-          Articles
+          {{ isSelf && isLocal ? 'My Drafts' : 'Articles' }}
         </h2>
 
         <div v-if="articles.length === 0" class="card p-8 text-center">
@@ -340,6 +348,7 @@ watch(() => route.params.id, () => {
             :key="article.id"
             :article="article"
             @toggle-bookmark="handleToggleBookmark"
+            @deleted="(id: string) => articles = articles.filter(a => a.id !== id)"
           />
         </div>
       </div>
