@@ -104,6 +104,30 @@ onMounted(() => {
   }
 })
 
+// When NavBar navigates to /edit?new=1, reset editor state for a fresh start.
+// The keep-alive cache preserves the component across navigations, so this watch
+// is the signal that distinguishes "New Article" from "resume editing".
+watch(() => route.query.new, (val) => {
+  if (val === '1') {
+    title.value = ''
+    content.value = ''
+    previewHtml.value = ''
+    commitHash.value = ''
+    savedContent.value = ''
+    savedTitle.value = ''
+    commitMsg.value = ''
+    scores.value = { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 }
+    keywords.value = ''
+    categories.value = ''
+    abstract.value = ''
+    contributions.value = {}
+    currentDraftId.value = undefined
+    remove(DRAFT_ID_KEY.value)
+    remove(DRAFT_KEY.value)
+    router.replace({ path: '/edit' })
+  }
+}, { immediate: true })
+
 async function loadExistingArticle() {
   // 1. Try REST API first.
   try {

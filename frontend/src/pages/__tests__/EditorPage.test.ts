@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-const { mockPush, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft } = vi.hoisted(() => ({
+const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft } = vi.hoisted(() => ({
   mockPush: vi.fn(),
+  mockReplace: vi.fn(),
+  mockRoute: { params: { id: undefined } as any, query: {} as Record<string, string | undefined> },
   mockSaveDraft: vi.fn().mockResolvedValue({ id: 'draft-99', account_id: 'u1', title: '', content: '', format: 'markdown', updated_at: '2026-06-07' }),
   mockGitInit: vi.fn().mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' }),
   mockGitCommit: vi.fn().mockResolvedValue({ hash: 'abc5678', message: 'Update' }),
@@ -17,8 +19,8 @@ const RouterLinkStub = {
 }
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockPush, back: vi.fn() }),
-  useRoute: () => ({ params: { id: undefined } }),
+  useRouter: () => ({ push: mockPush, back: vi.fn(), replace: mockReplace }),
+  useRoute: () => mockRoute,
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
@@ -55,6 +57,8 @@ describe('EditorPage', () => {
     localStorage.clear()
     _isTauri = false
     vi.clearAllMocks()
+    mockRoute.params = { id: undefined } as any
+    mockRoute.query = {}
     mockGitHistory.mockResolvedValue([])
     mockGitInit.mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' })
     mockGitCommit.mockResolvedValue({ hash: 'abc5678', message: 'Update' })
@@ -391,5 +395,59 @@ describe('EditorPage', () => {
     expect(vm.showCommitPopup).toBe(false)
     expect(vm.commitMsg).toBe('My commit message')
     expect(mockSaveDraft).toHaveBeenCalled()
+  })
+
+  // Regression: editor resets state when activated with query.new=1 (NavBar "New Article")
+  it('resets editor state and cleans URL when activated with query.new=1', async () => {
+    _isTauri = true
+    mockRoute.query = { new: '1' }
+
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    // Pre-populate localStorage with stale draft — should be cleared on reset
+    localStorage.setItem('editor-draft-id-u1-new', 'old-draft-id')
+    localStorage.setItem('editor-draft-u1-new', JSON.stringify({ title: 'Old Draft', content: '# Old content' }))
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 200))
+    const vm = wrapper.vm as any
+
+    // State should be reset
+    expect(vm.title).toBe('')
+    expect(vm.content).toBe('')
+    expect(vm.currentDraftId).toBeUndefined()
+    // Stale localStorage keys should be removed
+    expect(localStorage.getItem('editor-draft-id-u1-new')).toBeNull()
+    expect(localStorage.getItem('editor-draft-u1-new')).toBeNull()
+    // URL should be cleaned from /edit?new=1 to /edit
+    expect(mockReplace).toHaveBeenCalledWith({ path: '/edit' })
+  })
+
+  // Regression: editor does NOT trigger reset when activated without query.new.
+  // With keep-alive in App.vue, the cached EditorPage is reactivated on back-navigation
+  // via onActivated — no re-mount, no onMounted clear. The query.new guard ensures
+  // only explicit "New Article" clicks (/edit?new=1) trigger a reset.
+  it('does not reset editor when activated without query.new', async () => {
+    _isTauri = true
+    mockRoute.query = {} // no new query param — back navigation
+
+    // Pre-populate localStorage with a valid draft
+    localStorage.setItem('editor-draft-id-u1-new', 'draft-99')
+    localStorage.setItem('editor-draft-u1-new', JSON.stringify({ title: 'Saved Draft', content: '# Content' }))
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 200))
+
+    // Without query.new, router.replace must NOT be called
+    expect(mockReplace).not.toHaveBeenCalled()
   })
 })

@@ -56,7 +56,7 @@ describe('NavBar', () => {
     expect(wrapper.find('input').exists()).toBe(false)
   })
 
-  it('New Article link goes to /edit for fresh editor', () => {
+  it('New Article link navigates to /edit?new=1 for fresh editor', () => {
     const user = { id: 'u1', username: 'test', name: 'Test' }
     localStorage.setItem('viewer', JSON.stringify(user))
     localStorage.setItem('token', 'test-token')
@@ -65,10 +65,12 @@ describe('NavBar', () => {
     const wrapper = mount(NavBar, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    const newArticleLink = wrapper.find('a[href="/edit"]')
-    expect(newArticleLink.exists()).toBe(true)
-    // Clicking this should navigate to /edit with no ID → fresh editor
-    expect(newArticleLink.attributes('href')).toBe('/edit')
+    // Find the "New Article" button by aria-label (i18n key: nav.newArticle)
+    const newArticleBtn = wrapper.find('button[aria-label="写文章"], button[aria-label="New Article"]')
+    expect(newArticleBtn.exists()).toBe(true)
+    // Clicking this should navigate to /edit?new=1
+    newArticleBtn.trigger('click')
+    expect(mockPush).toHaveBeenCalledWith('/edit?new=1')
   })
 
   it('shows nav links when logged in', () => {
@@ -84,7 +86,7 @@ describe('NavBar', () => {
     expect(wrapper.find('a[href="/pool"]').exists()).toBe(true)
     // Should show action links
     expect(wrapper.find('a[href="/bookmarks"]').exists()).toBe(true)
-    expect(wrapper.find('a[href="/edit"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="写文章"], button[aria-label="New Article"]').exists()).toBe(true)
   })
 })
 
