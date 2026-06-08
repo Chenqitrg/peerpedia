@@ -428,3 +428,52 @@ describe('useTauri — browserLocal error handling', () => {
     expect(result).toEqual({ ok: true })
   })
 })
+
+describe('useTauri — session token sharing', () => {
+  beforeEach(() => {
+    delete (window as any).__TAURI__
+    localStorage.clear()
+    localStorage.setItem('peerpedia_browser_local', '1')
+  })
+
+  it('setSessionToken on one instance is visible to another instance', () => {
+    const tauriA = useTauri()
+    tauriA.setSessionToken('shared-token')
+
+    const tauriB = useTauri()
+    expect(tauriB.getSessionToken()).toBe('shared-token')
+  })
+
+  it('setSessionToken(null) clears token across instances', () => {
+    const tauriA = useTauri()
+    tauriA.setSessionToken('shared-token')
+
+    const tauriB = useTauri()
+    tauriB.setSessionToken(null)
+
+    const tauriC = useTauri()
+    expect(tauriC.getSessionToken()).toBeNull()
+  })
+
+  it('session token is injected into listDrafts args replacing account_id', async () => {
+    // Simulate the real flow: useUserStore sets token, UserPage calls listDrafts
+    const tauriA = useTauri()
+    tauriA.setSessionToken('user-session-token')
+
+    // Create an account so the list_drafts lookup works
+    await tauriA.createAccount({ username: 'alice', password: 'secret' })
+    const loginResult = await tauriA.login({ username: 'alice', password: 'secret' })
+    const accountId = (loginResult as any).id
+
+    // Save a draft under this account
+    await tauriA.saveDraft({ account_id: accountId, title: 'My Draft', content: '# Hello', format: 'markdown' })
+
+    // Now create a SECOND tauri instance (simulating UserPage)
+    const tauriB = useTauri()
+    // listDrafts with account_id — should be replaced with token by _invoke
+    const drafts = await tauriB.listDrafts({ account_id: accountId })
+    expect(Array.isArray(drafts)).toBe(true)
+    expect(drafts).toHaveLength(1)
+    expect((drafts as any[])[0].title).toBe('My Draft')
+  })
+})
