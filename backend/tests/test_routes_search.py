@@ -8,14 +8,12 @@ from peerpedia_core.storage.db.engine import get_session
 def client(db_engine):
     from peerpedia_api import deps
     from peerpedia_api.main import app
-
     def override_db():
         session = get_session(db_engine)
         try:
             yield session
         finally:
             session.close()
-
     app.dependency_overrides[deps.get_db] = override_db
     with TestClient(app) as c:
         yield c

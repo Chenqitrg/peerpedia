@@ -14,7 +14,7 @@ use crate::error::AppError;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
-const CURRENT_SCHEMA_VERSION: i32 = 2;
+const CURRENT_SCHEMA_VERSION: i32 = 3;
 
 /// Resolve the database path: ~/.peerpedia/peerpedia.db
 fn get_db_path() -> Result<PathBuf, AppError> {
@@ -117,6 +117,16 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
                 );",
             )?;
         }
+        3 => {
+            tx.execute_batch(
+                "CREATE TABLE IF NOT EXISTS sessions (
+                    token       TEXT PRIMARY KEY,
+                    account_id  TEXT NOT NULL,
+                    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                    FOREIGN KEY (account_id) REFERENCES local_accounts(id) ON DELETE CASCADE
+                );",
+            )?;
+        }
         _ => {
             // Unknown migration — rollback and report.
             return Err(AppError::DatabaseError(format!(
@@ -155,15 +165,23 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        assert_eq!(v, 2);
+        assert_eq!(v, 3);
 
-        // Verify tables exist by inserting and querying.
+        // Create account first (FK target for sessions).
         conn.execute(
             "INSERT INTO local_accounts (id, username, password_hash) VALUES ('a1', 'alice', 'hash')",
             [],
         )
         .unwrap();
 
+        // Verify sessions table was created.
+        conn.execute(
+            "INSERT INTO sessions (token, account_id) VALUES ('tok1', 'a1')",
+            [],
+        )
+        .unwrap();
+
+        // Verify tables exist by inserting and querying.
         conn.execute(
             "INSERT INTO drafts (id, account_id, title, content) VALUES ('d1', 'a1', 'Title', 'Body')",
             [],
@@ -193,8 +211,8 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
-        // Two version rows (v1, v2), not duplicated on re-run.
-        assert_eq!(count, 2);
+        // Three version rows (v1, v2, v3), not duplicated on re-run.
+        assert_eq!(count, 3);
     }
 
     #[test]

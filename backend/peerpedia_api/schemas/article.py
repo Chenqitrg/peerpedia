@@ -1,5 +1,5 @@
 """Article API schemas — request/response Pydantic models."""
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -63,11 +63,6 @@ class AuthorInfo(BaseModel):
     expertise: list[str] = []
 
 
-class AuthorContributions(BaseModel):
-    """Per-author 5-dim contribution ratios. Keys are author IDs."""
-    pass  # typed as dict[str, FiveDimScoresIn] in practice
-
-
 # ── Output schemas ───────────────────────────────────────────────────────
 
 class ArticleSummary(BaseModel):
@@ -87,7 +82,7 @@ class ArticleSummary(BaseModel):
     sink_duration_days: Optional[int] = None
     is_bookmarked: bool = False
     is_own_article: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ArticleDetail(BaseModel):
@@ -109,8 +104,8 @@ class ArticleDetail(BaseModel):
     review_count: int = 0
     is_bookmarked: bool = False
     is_own_article: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ── Input schemas ────────────────────────────────────────────────────────

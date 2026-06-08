@@ -9,6 +9,8 @@ from peerpedia_core.storage.db.models import Article, User
 def client(db_engine):
     from peerpedia_api import deps
     from peerpedia_api.main import app
+    from peerpedia_core.storage.db.engine import get_session
+    from peerpedia_core.storage.db.models import User
 
     def override_db():
         session = get_session(db_engine)
@@ -17,7 +19,20 @@ def client(db_engine):
         finally:
             session.close()
 
+    s = get_session(db_engine)
+    _u = User(username="test_articles_auth", password_hash="",
+               name="TestAuthor", anonymous_name="anon", affiliation="U")
+    s.add(_u)
+    s.commit()
+    _uid = _u.id
+    _user_obj = s.get(User, _uid)
+    s.close()
+
+    def override_require_user():
+        return _user_obj
+
     app.dependency_overrides[deps.get_db] = override_db
+    app.dependency_overrides[deps.require_user] = override_require_user
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

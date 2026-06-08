@@ -46,3 +46,4 @@ frontend/dist/
 .vite/
 backend/.vite/
 frontend/src-tauri/target/
+.reasonix/

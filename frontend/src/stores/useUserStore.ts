@@ -19,6 +19,7 @@ export const useUserStore = defineStore('user', () => {
 
   const localAccount = ref<Account | null>(null)
   const localAccounts = ref<AccountSummary[]>([])
+  const localToken = ref<string | null>(null)  // Session token from Tauri login
   const isTauriMode = ref(false)
   const isBrowserLocal = ref(false)
 
@@ -27,6 +28,17 @@ export const useUserStore = defineStore('user', () => {
   // Detect Tauri / dev mock mode on store initialization.
   isTauriMode.value = tauri.isTauri.value
   isBrowserLocal.value = tauri.isBrowserLocal.value
+
+  // Restore session token immediately (sync) from localStorage, before any
+  // async operation or component mount. Without this, page components that
+  // load data during setup will call Tauri commands with a null token.
+  if (isLocalMode()) {
+    const savedToken = loadString('peerpedia_local_token')
+    if (savedToken) {
+      localToken.value = savedToken
+      tauri.setSessionToken(savedToken)
+    }
+  }
 
   // Local mode: real Tauri desktop app OR browser dev mock.
   function isLocalMode() {
@@ -45,7 +57,11 @@ export const useUserStore = defineStore('user', () => {
     const result = await tauri.login({ username, password })
     if (!result) throw new Error('Tauri unavailable')
     if ('error' in result) throw new Error(result.error)
-    localAccount.value = result as Account
+    const acctWithToken = result as { id: string; username: string; token: string }
+    localAccount.value = { id: acctWithToken.id, username: acctWithToken.username }
+    localToken.value = acctWithToken.token
+    tauri.setSessionToken(acctWithToken.token)
+    saveString('peerpedia_local_token', acctWithToken.token)
     // Create a minimal viewer profile and persist to localStorage
     // so the router guard recognizes the user as authenticated.
     const profile = {
@@ -100,6 +116,19 @@ export const useUserStore = defineStore('user', () => {
     viewer.value = profile
     saveJSON('viewer', profile)
 
+    // Login to get a session token for subsequent Tauri commands.
+    try {
+      const loginResult = await tauri.login({ username, password })
+      if (loginResult && !('error' in loginResult)) {
+        const acct = loginResult as { id: string; username: string; token: string }
+        localToken.value = acct.token
+        tauri.setSessionToken(acct.token)
+        saveString('peerpedia_local_token', acct.token)
+      }
+    } catch {
+      // OK to continue without local token
+    }
+
     // Try to register on backend so authenticated API calls work when server is up.
     // Only save the token — keep the local profile as viewer to avoid ID mismatches.
     try {
@@ -126,8 +155,11 @@ export const useUserStore = defineStore('user', () => {
     viewer.value = null
     token.value = null
     localAccount.value = null
+    localToken.value = null
+    tauri.setSessionToken(null)
     remove('viewer')
     remove('token')
+    remove('peerpedia_local_token')
     // Clear stale draft data to prevent cross-user leaks.
     remove('peerpedia_draft')
     if (uid) {
@@ -161,6 +193,12 @@ export const useUserStore = defineStore('user', () => {
   async function restoreSession() {
     if (isLocalMode()) {
       await loadLocalAccounts()
+      // Restore session token from localStorage (survives page refresh).
+      const savedToken = loadString('peerpedia_local_token')
+      if (savedToken) {
+        localToken.value = savedToken
+        tauri.setSessionToken(savedToken)
+      }
       return
     }
     const t = token.value
@@ -183,6 +221,7 @@ export const useUserStore = defineStore('user', () => {
     intendedRoute,
     localAccount,
     localAccounts,
+    localToken,
     isTauriMode,
     isBrowserLocal,
     login,

@@ -8,12 +8,8 @@ from sqlalchemy.types import String
 
 from peerpedia_api import deps
 from peerpedia_api.helpers import (
-    get_commit_count,
-    get_commit_hash,
-    get_content_preview,
-    resolve_authors,
+    build_article_summary,
 )
-from peerpedia_api.schemas.article import ArticleSummary
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -43,25 +39,6 @@ def _read_source(article_id: str) -> str:
         if f.exists():
             return f.read_text().lower()
     return ""
-
-
-def _build_summary(db: Session, a: Article) -> dict:
-    """Build an ArticleSummary dict from an Article ORM object."""
-    return ArticleSummary(
-        id=a.id,
-        title=a.title or "",
-        status=a.status,
-        authors=resolve_authors(db, a.authors or []),
-        content_preview=get_content_preview(a.id),
-        commit_hash=get_commit_hash(a.id),
-        fork_count=a.fork_count or 0,
-        forked_from=a.forked_from,
-        commit_count=get_commit_count(a.id),
-        score=a.score,
-        is_bookmarked=False,
-        is_own_article=False,
-        created_at=a.created_at,
-    ).model_dump()
 
 
 @router.get("")
@@ -155,7 +132,7 @@ def search(
             total = query.count() + 1  # at least one source-only match exists
 
     # ── Build summaries ───────────────────────────────────────────────
-    summaries = [_build_summary(db, a) for a in results]
+    summaries = [build_article_summary(db, a).model_dump() for a in results]
 
     return {
         "articles": summaries,

@@ -19,6 +19,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::create_account,
             commands::login,
+            commands::logout,
             commands::list_accounts,
             commands::save_draft,
             commands::list_drafts,

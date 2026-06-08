@@ -9,6 +9,7 @@ from peerpedia_core.storage.db.models import Article, User
 def client(db_engine):
     from peerpedia_api import deps
     from peerpedia_api.main import app
+
     def override_db():
         session = get_session(db_engine)
         try:
@@ -89,7 +90,7 @@ class TestReviewSubmit:
                            headers=auth_header(uid))
         assert resp.status_code == 404
 
-    def test_review_populates_article_score(self, client, db_engine):
+    def test_review_populates_article_score(self, client, db_engine, auth_header):
         """After submitting a review, the article's score should be computed."""
         # Create a user and article via API (creates git repo + self-review)
         from peerpedia_core.storage.db.engine import get_session
@@ -108,7 +109,7 @@ class TestReviewSubmit:
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
                             "pedagogy": 3, "impact": 3},
         }
-        resp = client.post("/api/v1/articles", json=create_body)
+        resp = client.post("/api/v1/articles", json=create_body, headers=auth_header(uid))
         assert resp.status_code == 201
         article_id = resp.json()["id"]
         # The article should already have a score from the self-review
@@ -135,7 +136,7 @@ class TestReviewSubmit:
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
                             "pedagogy": 3, "impact": 3},
         }
-        resp = client.post("/api/v1/articles", json=create_body)
+        resp = client.post("/api/v1/articles", json=create_body, headers=auth_header(uid))
         article_id = resp.json()["id"]
 
         # Get the commit hash from history
@@ -169,7 +170,7 @@ class TestReviewSubmit:
             "self_review": {"originality": 4, "rigor": 4, "completeness": 4,
                             "pedagogy": 4, "impact": 4},
         }
-        client.put(f"/api/v1/articles/{article_id}", json=edit_body)
+        client.put(f"/api/v1/articles/{article_id}", json=edit_body, headers=auth_header(uid))
 
         # Get new commit hash
         history2 = client.get(f"/api/v1/articles/{article_id}/history").json()
@@ -212,11 +213,11 @@ class TestReviewSubmit:
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
                             "pedagogy": 3, "impact": 3},
         }
-        resp = client.post("/api/v1/articles", json=create_body)
+        resp = client.post("/api/v1/articles", json=create_body, headers=auth_header(uid))
         article_id = resp.json()["id"]
 
         # Edit WITHOUT self-review (commit B, no reviews for latest commit)
-        client.put(f"/api/v1/articles/{article_id}", json={"content": "# V2"})
+        client.put(f"/api/v1/articles/{article_id}", json={"content": "# V2"}, headers=auth_header(uid))
 
         # Get commit B hash (latest, no reviews)
         history = client.get(f"/api/v1/articles/{article_id}/history").json()

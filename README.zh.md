@@ -161,6 +161,8 @@ npm run tauri dev    # → 启动 Tauri 窗口
 - Fork → 修改 → Merge Proposal 工作流
 - 不可篡改的审计记录
 
+**保存即提交（Save = Commit）。** 编辑器中每次保存触发一次 Git 提交。下载文件名包含提交哈希（如 `My_Article-a1b2c3d.html`）。首次保存前下载按钮禁用，确保每次下载对应一个已提交的版本。
+
 ### 五维评分
 
 所有评审使用五个维度：

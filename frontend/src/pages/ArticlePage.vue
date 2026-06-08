@@ -175,7 +175,8 @@ async function loadArticle(articleId: string) {
 
       const draft = await tauri.getDraft({ id: articleId })
       if (draft && !('error' in draft)) {
-        article.value = buildArticleFromDraft(draft as any)
+        const draftData = draft as { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
+        article.value = buildArticleFromDraft(draftData)
         const { parseMarkdown } = await import('../utils/markdown')
         compiledHtml.value = parseMarkdown(draft.content || '')
         // Populate commit hash from local git
@@ -190,11 +191,15 @@ async function loadArticle(articleId: string) {
     }
 
     // 3. Neither source worked — show error.
-    const status = e?.response?.status
-    if (status === 404) {
-      errorMessage.value = 'Article not found.'
+    if (isOffline) {
+      errorMessage.value = 'Could not open article. Try saving a draft first.'
     } else {
-      errorMessage.value = e.userMessage || 'Failed to load article. Is the server running?'
+      const status = e?.response?.status
+      if (status === 404) {
+        errorMessage.value = 'Article not found.'
+      } else {
+        errorMessage.value = e.userMessage || 'Failed to load article. Is the server running?'
+      }
     }
   }
 }
@@ -234,10 +239,12 @@ async function loadCompiledContent() {
   }
 
   // Web mode: server returns pre-compiled HTML with katex spans.
+  // In Tauri mode, compiled_output from buildArticleFromDraft is raw markdown
+  // and was already handled above. This path only runs for server articles.
   let html = ''
   if (article.value.compiled_output) {
     html = article.value.compiled_output
-  } else {
+  } else if (!tauri.isTauri.value) {
     try {
       const src = await getArticleSource(id)
       const result = await compilePreview({ content: src.content, format: src.format as 'markdown' | 'typst' })
@@ -319,6 +326,16 @@ async function handleReply(reviewId: string) {
   }
 }
 
+function goBack() {
+  // In Tauri/local mode the history stack is minimal, so avoid router.back()
+  // which can loop between ArticlePage and HistoryPage.
+  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    router.push('/')
+  } else {
+    router.back()
+  }
+}
+
 function goToHistory() {
   router.push(`/articles/${id}/history`)
 }
@@ -377,7 +394,8 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
     <!-- Back button -->
     <button
       class="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink mb-4 transition-colors duration-200"
-      @click="router.back()"
+      aria-label="Back"
+      @click="goBack"
     >
       <ArrowLeft class="w-4 h-4" stroke-width="2" />
       {{ t('common.back') }}

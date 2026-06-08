@@ -69,6 +69,7 @@ Phase 1 desktop is fully offline-capable:
 - **Network status**: `useNetworkStatus` with Wifi/WifiOff icon. Starts offline, flips online on first successful ping — no 60s window where offline features incorrectly appear accessible.
 - **Network-blocked features**: `useOffline` permanently blocks pool, schools, and search.network in local/Tauri mode. These features show a disabled state (grayed icons with tooltip), not an error after navigation.
 - **Save = Git commit**: every draft save creates or updates a local Git repository (`local_git.rs`). Commit history is available offline via `git log`.
+- **Download = committed artifact**: download filenames embed the 7-char commit hash (e.g., `Title-a1b2c3d.html`). Downloads are disabled until the first save — every downloaded file is tied to a committed version. Source downloads use `FileCode` icon, compiled downloads use `FileDown` icon. In the article page, labels are shown; in the editor toolbar, icons only with instant tooltips.
 - **Local accounts**: bcrypt + SQLite, multi-account switching, no server required.
 - **Client-side compilation**: Markdown → HTML via `marked` + KaTeX. The compilation pipeline (protect math → parse markdown → restore math → render KaTeX) runs entirely in the browser.
 
