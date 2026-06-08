@@ -244,13 +244,17 @@ peerpedia/
 │   │   └── stores/            # Pinia 状态
 │   └── src-tauri/             # Tauri Rust backend
 │       └── src/
-│           ├── main.rs        # Tauri entry
-│           ├── commands.rs    # IPC handlers
-│           ├── local_auth.rs  # 本地账号 CRUD + bcrypt
-│           └── local_store.rs # 草稿 + 文章缓存 SQLite
+│           ├── main.rs        # Tauri entry — 注册 IPC handlers
+│           ├── commands.rs    # IPC handlers — token-auth via resolve_account()
+│           ├── db.rs          # SQLite 迁移 (schema v1→v3)
+│           ├── error.rs       # AppError 枚举 (5 变体, IPC 序列化)
+│           ├── lib.rs         # Crate root — AppState { db: Mutex<Connection> }
+│           ├── local_auth.rs  # 本地账号 CRUD + bcrypt + 会话令牌
+│           ├── local_git.rs   # 本地 Git 操作 (init/commit/history/show)
+│           └── local_store.rs # 草稿 + 文章缓存 + 浏览历史
 ├── backend/                   # FastAPI server
 │   └── peerpedia_api/
-│       ├── routes/            # REST endpoints
+│       ├── routes/            # REST endpoints (articles/ 是包: _crud, _git, _publish)
 │       ├── schemas/           # Pydantic models
 │       └── tests/             # Integration tests
 ├── core/                      # Business logic
@@ -270,13 +274,16 @@ peerpedia/
 ## 测试
 
 ```bash
-# 后端
+# 后端 (291 测试)
 source .venv/bin/activate
-python -m pytest backend/ -q
+python -m pytest backend/ core/ -q
 
-# 前端
+# 前端 (284 测试)
 cd frontend
 npm test -- --run
+
+# Rust (62 测试)
+cd frontend/src-tauri && cargo test
 ```
 
 ---

@@ -40,7 +40,7 @@ Phase 2+（社区 — Web）
 | 后端 | Rust (rusqlite, bcrypt, libgit2) | Python 3.12+, FastAPI, SQLAlchemy |
 | 存储 | SQLite + Git 仓库（本地） | SQLite + Git 仓库（服务器） |
 | 编译 | Markdown: 客户端 (marked + KaTeX). Typst: Tauri sidecar | Markdown: 客户端 (marked + KaTeX). Typst: 服务端编译 |
-| 认证 | bcrypt + SQLite（本地账号） | JWT（bcrypt, 24h 过期） |
+| 认证 | bcrypt + 会话令牌（本地账号） | JWT + `require_user` 守卫（bcrypt, 24h 过期） |
 | 数学 | KaTeX | KaTeX |
 
 ### 2.3 真相源（Source of Truth）
@@ -74,7 +74,39 @@ Phase 1 桌面版完全离线可用：
 - **客户端编译**：Markdown → HTML 通过 `marked` + KaTeX 在浏览器内完成。编译管线（保护数学 → 解析 Markdown → 恢复数学 → 渲染 KaTeX）全程本地运行。
 
 核心 composables：`useNetworkStatus`、`useOffline`、`useTauri`、`useDraftPersistence`。
-核心 Rust 模块：`local_auth`、`local_store`、`local_git`。
+核心 Rust 模块：`local_auth`、`local_store`、`local_git`、`error`（AppError）、`db`（迁移）。
+
+### 2.5 Rust 后端 — 本地 SQLite 数据表（5 张）
+
+Tauri 桌面版使用独立的 SQLite 数据库（`~/.peerpedia/peerpedia.db`），通过版本迁移管理：
+
+| 版本 | 表 | 说明 |
+|---------|--------|-------------|
+| v1 | `local_accounts`, `drafts`, `article_cache` | 初始 schema |
+| v2 | `browsing_history` | 浏览记录，`UNIQUE(account_id, article_id)` |
+| v3 | `sessions` | 本地认证会话令牌（FK → local_accounts） |
+
+迁移系统（`db.rs`）使用 `schema_version` 表，按顺序在事务内执行迁移。幂等——每次启动安全运行。
+
+### 2.6 安全架构
+
+**Web（FastAPI）— JWT + `require_user` 守卫：**
+- `get_current_user()` 从 `Authorization` 请求头提取 Bearer token，解码 JWT，返回 `User` 或 `None`。
+- `require_user()` 包装 `get_current_user()`，未认证时返回 401。所有写端点均使用此守卫。
+- `create_token()` 编码 `{ sub: user_id, iat, exp }`，HS256 算法，24h 过期。
+
+**桌面端（Tauri IPC）— 会话令牌：**
+- 登录返回 `AccountWithToken { id, username, token }` —— token 为 UUID v4，存入 `sessions` SQLite 表（migration v3）。
+- 每个访问用户数据的 IPC 命令通过 `resolve_account()` 验证令牌，调用 `verify_session()` 查询 sessions 表。
+- `lock_db()` 模式取代了裸 `Mutex::lock().unwrap()` —— 在锁毒化时返回清晰错误而非崩溃。
+- 会话令牌在应用重启后依然有效（持久化 SQLite）。通过模块级 `_sessionToken` 变量在 `useTauri.ts` 中跨实例共享。
+
+**前端——自动令牌注入：**
+- `useTauri().setSessionToken()` 在模块级存储令牌，所有 composable 实例共享。
+- `_invoke` 函数自动将 `token` 注入 IPC 参数中，同时保留 `account_id` 向后兼容。
+- 令牌持久化到 `localStorage`（`peerpedia_local_token`），在 store 初始化时同步恢复。
+
+核心 Rust 模块：`local_auth`（bcrypt + 会话）、`commands.rs`（resolve_account）。
 
 ---
 
@@ -299,33 +331,37 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 
 ### 6.1 REST 端点
 
-| 方法 | 路径 | 说明 |
-|--------|------|------|
-| POST | `/api/v1/auth/register` | 注册 |
-| POST | `/api/v1/auth/login` | 登录（返回 JWT） |
-| GET | `/api/v1/articles` | 文章列表（状态/作者/分页筛选） |
-| POST | `/api/v1/articles` | 创建文章（Git commit + DB 元数据） |
-| GET | `/api/v1/articles/{id}` | 文章详情 |
-| PUT | `/api/v1/articles/{id}` | 更新文章 |
-| GET | `/api/v1/articles/{id}/source` | 原始 Markdown/Typst 源码 |
-| GET | `/api/v1/articles/{id}/history` | Git 提交历史 |
-| GET | `/api/v1/articles/{id}/diff/{h1}/{h2}` | 逐行对比 |
-| POST | `/api/v1/articles/{id}/fork` | Fork 文章 |
-| POST | `/api/v1/articles/{id}/publish` | 发布到沉淀池 |
-| GET | `/api/v1/articles/{id}/reviews` | 评审列表 |
-| POST | `/api/v1/articles/{id}/reviews` | 提交/更新评审 |
-| POST | `/api/v1/articles/{id}/reviews/{rid}/messages` | 发送讨论回复 |
-| GET | `/api/v1/articles/{id}/citations` | 引用图 |
-| POST | `/api/v1/citations/click` | 记录引用点击 |
-| POST | `/api/v1/articles/{id}/merge-proposals` | 创建合并提案 |
-| GET | `/api/v1/search` | 全文搜索 |
-| POST | `/api/v1/compile-preview` | 编译 Markdown/Typst → HTML/SVG |
-| GET | `/api/v1/users` | 用户列表 |
-| GET | `/api/v1/users/{id}` | 用户资料 + 关注/信誉 |
-| POST | `/api/v1/users/{id}/follow` | 关注用户 |
-| DELETE | `/api/v1/users/{id}/follow` | 取消关注 |
-| GET | `/api/v1/pool` | 沉淀池动态 |
-| GET | `/api/v1/feed` | 关注动态 |
+> **认证说明：** 标注 🔒 的端点需要 `Authorization: Bearer <JWT>` 请求头。未认证请求返回 401。
+
+| 方法 | 路径 | 认证 | 说明 |
+|--------|------|------|------|
+| POST | `/api/v1/auth/register` | — | 注册 |
+| POST | `/api/v1/auth/login` | — | 登录（返回 JWT） |
+| GET | `/api/v1/auth/me` | 🔒 | 当前用户信息 |
+| GET | `/api/v1/articles` | — | 文章列表（状态/作者/分页筛选） |
+| POST | `/api/v1/articles` | 🔒 | 创建文章（Git commit + DB 元数据） |
+| GET | `/api/v1/articles/{id}` | — | 文章详情 |
+| PUT | `/api/v1/articles/{id}` | 🔒 | 更新文章 |
+| GET | `/api/v1/articles/{id}/source` | — | 原始 Markdown/Typst 源码 |
+| GET | `/api/v1/articles/{id}/history` | — | Git 提交历史 |
+| GET | `/api/v1/articles/{id}/diff/{h1}/{h2}` | — | 逐行对比 |
+| POST | `/api/v1/articles/{id}/fork` | 🔒 | Fork 文章 |
+| POST | `/api/v1/articles/{id}/publish` | 🔒 | 发布到沉淀池 |
+| GET | `/api/v1/articles/{id}/reviews` | — | 评审列表 |
+| POST | `/api/v1/articles/{id}/reviews` | 🔒 | 提交/更新评审 |
+| POST | `/api/v1/articles/{id}/reviews/{rid}/messages` | 🔒 | 发送讨论回复 |
+| GET | `/api/v1/articles/{id}/citations` | — | 引用图 |
+| POST | `/api/v1/citations/click` | — | 记录引用点击 |
+| POST | `/api/v1/articles/{id}/merge-proposals` | 🔒 | 创建合并提案 |
+| POST | `/api/v1/articles/{id}/sink-extension` | 🔒 | 延长沉淀时间 |
+| GET | `/api/v1/search` | — | 全文搜索 |
+| POST | `/api/v1/compile-preview` | — | 编译 Markdown/Typst → HTML/SVG |
+| GET | `/api/v1/users` | — | 用户列表 |
+| GET | `/api/v1/users/{id}` | — | 用户资料 + 关注/信誉 |
+| POST | `/api/v1/users/{id}/follow` | 🔒 | 关注用户 |
+| DELETE | `/api/v1/users/{id}/follow` | 🔒 | 取消关注 |
+| GET | `/api/v1/pool` | — | 沉淀池动态 |
+| GET | `/api/v1/feed` | — | 关注动态 |
 
 ### 6.2 P0 重构 API 变更
 
@@ -345,9 +381,9 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 
 | 套件 | 测试数 | 框架 |
 |-------|-------|-----------|
-| 后端 | 120 | pytest |
-| 前端 | 252 | vitest |
-| Rust | 53 | cargo test |
+| 后端 | 291 | pytest |
+| 前端 | 284 | vitest（jsdom + mock localStorage） |
+| Rust | 62 | cargo test |
 
 ### 7.2 CI 流水线
 
@@ -398,4 +434,5 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 ---
 
-*最后更新: 2026-06-07 · 120 后端测试 · 252 前端测试 · 53 Rust 测试 · 9 个 DB 实体*
+*最后更新: 2026-06-08 · 291 后端测试 · 284 前端测试 · 62 Rust 测试 · 9 个 DB 实体*
+*P0 重构：会话令牌认证、articles.py 拆分为包、删除死代码（common.py、AuthorContributions）、datetime.utcnow 迁移、类型安全（源码中 as any 归零）*

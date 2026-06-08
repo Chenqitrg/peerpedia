@@ -63,7 +63,7 @@ Phase 2+（Web — 社区协作）
 | Backend (Desktop) | Rust, rusqlite, bcrypt, libgit2 |
 | Storage | SQLite + Git repositories |
 | Compilation | Markdown: client-side (marked + KaTeX). Typst: Tauri sidecar CLI |
-| Auth | JWT (Web) / bcrypt + SQLite (Desktop) |
+| Auth | JWT + `require_user` guard (Web) / bcrypt + session tokens (Desktop) |
 | Source of Truth | Git = Source of Truth, DB = Index |
 
 ### DB Schema · 数据模型（9 entities）
@@ -180,15 +180,17 @@ peerpedia/
 │   │   └── stores/             # Pinia (user, article, pool, review)
 │   └── src-tauri/              # Tauri Rust backend
 │       └── src/
-│           ├── main.rs         # Tauri entry
-│           ├── commands.rs     # IPC handlers
-│           ├── db.rs           # SQLite database layer
-│           ├── local_auth.rs   # Local account CRUD + bcrypt
-│           ├── local_git.rs    # Local Git operations (init/commit/history)
-│           └── local_store.rs  # Drafts + article cache
+│           ├── main.rs         # Tauri entry — registers IPC handlers
+│           ├── commands.rs     # IPC handlers — token-auth via resolve_account()
+│           ├── db.rs           # SQLite migrations (schema v1→v3: accounts, drafts, cache, history, sessions)
+│           ├── error.rs        # Shared AppError enum (5 variants, IPC serialization)
+│           ├── lib.rs          # Crate root — AppState { db: Mutex<Connection> }
+│           ├── local_auth.rs   # Local account CRUD + bcrypt + session tokens
+│           ├── local_git.rs    # Local Git operations (init/commit/history/show)
+│           └── local_store.rs  # Drafts + article cache + browsing history
 ├── backend/                    # FastAPI server
 │   └── peerpedia_api/
-│       ├── routes/             # 12 route modules
+│       ├── routes/             # 12 route modules (articles/ is a package: _crud, _git, _publish)
 │       ├── schemas/            # Pydantic request/response models
 │       └── tests/              # Integration tests
 ├── core/                       # Business logic
@@ -211,13 +213,13 @@ peerpedia/
 ## Testing · 测试
 
 ```bash
-# Backend (120 tests)
+# Backend (291 tests)
 python -m pytest backend/tests/ core/tests/ -q
 
-# Frontend (252 tests)
+# Frontend (284 tests)
 cd frontend && npx vitest run
 
-# Rust (53 tests)
+# Rust (62 tests)
 cd frontend/src-tauri && cargo test
 ```
 

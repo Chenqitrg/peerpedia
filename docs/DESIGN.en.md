@@ -40,7 +40,7 @@ Phase 2+ (Web — community)
 | Backend | Rust (rusqlite, bcrypt, libgit2) | Python 3.12+, FastAPI, SQLAlchemy |
 | Storage | SQLite + Git repos (local) | SQLite + Git repos (server) |
 | Compilation | Markdown: client-side (marked + KaTeX). Typst: Tauri sidecar | Markdown: client-side (marked + KaTeX). Typst: server compiler |
-| Auth | bcrypt + SQLite (local accounts) | JWT (bcrypt, 24h expiry) |
+| Auth | bcrypt + session tokens (local accounts) | JWT + `require_user` guard (bcrypt, 24h expiry) |
 | Math | KaTeX | KaTeX |
 
 ### 2.3 Source of Truth
@@ -74,7 +74,39 @@ Phase 1 desktop is fully offline-capable:
 - **Client-side compilation**: Markdown → HTML via `marked` + KaTeX. The compilation pipeline (protect math → parse markdown → restore math → render KaTeX) runs entirely in the browser.
 
 Key composables: `useNetworkStatus`, `useOffline`, `useTauri`, `useDraftPersistence`.
-Key Rust modules: `local_auth`, `local_store`, `local_git`.
+Key Rust modules: `local_auth`, `local_store`, `local_git`, `error` (AppError), `db` (migrations).
+
+### 2.5 Rust Backend — Local SQLite Schema (5 tables)
+
+The Tauri desktop uses its own SQLite database (`~/.peerpedia/peerpedia.db`) with schema migrations:
+
+| Version | Tables | Description |
+|---------|--------|-------------|
+| v1 | `local_accounts`, `drafts`, `article_cache` | Initial schema |
+| v2 | `browsing_history` | Visit tracking with `UNIQUE(account_id, article_id)` |
+| v3 | `sessions` | Session tokens for local auth (FK → local_accounts) |
+
+The migration system (`db.rs`) uses a `schema_version` table and applies migrations in order within transactions. Idempotent — safe to run on every startup.
+
+### 2.6 Security Architecture
+
+**Web (FastAPI) — JWT + `require_user` guard:**
+- `get_current_user()` extracts Bearer token from `Authorization` header, decodes JWT, returns `User` or `None`.
+- `require_user()` wraps `get_current_user()` and raises 401 if unauthenticated. Every mutating endpoint uses this guard.
+- `create_token()` encodes `{ sub: user_id, iat, exp }` with HS256, 24h expiry.
+
+**Desktop (Tauri IPC) — Session tokens:**
+- Login returns `AccountWithToken { id, username, token }` — token is a UUID v4 stored in the `sessions` SQLite table (migration v3).
+- Every IPC command that accesses user data validates the token via `resolve_account()`, which calls `verify_session()` on the sessions table.
+- `lock_db()` pattern replaces raw `Mutex::lock().unwrap()` — returns a clear `AppError::DatabaseError` on poison instead of panicking.
+- Session tokens survive app restart (persistent SQLite). Cross-instance sharing via module-level `_sessionToken` in `useTauri.ts`.
+
+**Frontend — automatic token injection:**
+- `useTauri().setSessionToken()` stores the token at module level, shared across all composable instances.
+- The `_invoke` function auto-injects `token` into IPC args, replacing `account_id` for backward compat.
+- Token is persisted to `localStorage` (`peerpedia_local_token`) and restored synchronously during store init.
+
+Key Rust modules: `local_auth` (bcrypt + sessions), `commands.rs` (resolve_account).
 
 ---
 
@@ -299,33 +331,37 @@ Compile output is **never** stored in the database. The compile endpoint generat
 
 ### 6.1 REST Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/auth/register` | Register |
-| POST | `/api/v1/auth/login` | Login (returns JWT) |
-| GET | `/api/v1/articles` | List articles (status, author, page filters) |
-| POST | `/api/v1/articles` | Create article (Git commit + DB metadata) |
-| GET | `/api/v1/articles/{id}` | Article detail |
-| PUT | `/api/v1/articles/{id}` | Update article |
-| GET | `/api/v1/articles/{id}/source` | Raw Markdown/Typst source |
-| GET | `/api/v1/articles/{id}/history` | Git commit history |
-| GET | `/api/v1/articles/{id}/diff/{h1}/{h2}` | Side-by-side diff |
-| POST | `/api/v1/articles/{id}/fork` | Fork article |
-| POST | `/api/v1/articles/{id}/publish` | Publish to pool |
-| GET | `/api/v1/articles/{id}/reviews` | List reviews |
-| POST | `/api/v1/articles/{id}/reviews` | Submit/update review |
-| POST | `/api/v1/articles/{id}/reviews/{rid}/messages` | Post thread reply |
-| GET | `/api/v1/articles/{id}/citations` | Citation graph |
-| POST | `/api/v1/citations/click` | Record citation click |
-| POST | `/api/v1/articles/{id}/merge-proposals` | Create merge proposal |
-| GET | `/api/v1/search` | Full-text search |
-| POST | `/api/v1/compile-preview` | Compile Markdown/Typst → HTML/SVG |
-| GET | `/api/v1/users` | List users |
-| GET | `/api/v1/users/{id}` | User profile + follow/rep |
-| POST | `/api/v1/users/{id}/follow` | Follow user |
-| DELETE | `/api/v1/users/{id}/follow` | Unfollow user |
-| GET | `/api/v1/pool` | Sedimentation pool feed |
-| GET | `/api/v1/feed` | Activity feed |
+> **Auth note:** All endpoints marked with 🔒 require `Authorization: Bearer <JWT>` header. Routes use `require_user()` dependency to enforce this. Unauthenticated requests receive 401.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/auth/register` | — | Register |
+| POST | `/api/v1/auth/login` | — | Login (returns JWT) |
+| GET | `/api/v1/auth/me` | 🔒 | Current user profile |
+| GET | `/api/v1/articles` | — | List articles (status, author, page filters) |
+| POST | `/api/v1/articles` | 🔒 | Create article (Git commit + DB metadata) |
+| GET | `/api/v1/articles/{id}` | — | Article detail |
+| PUT | `/api/v1/articles/{id}` | 🔒 | Update article |
+| GET | `/api/v1/articles/{id}/source` | — | Raw Markdown/Typst source |
+| GET | `/api/v1/articles/{id}/history` | — | Git commit history |
+| GET | `/api/v1/articles/{id}/diff/{h1}/{h2}` | — | Side-by-side diff |
+| POST | `/api/v1/articles/{id}/fork` | 🔒 | Fork article |
+| POST | `/api/v1/articles/{id}/publish` | 🔒 | Publish to pool |
+| GET | `/api/v1/articles/{id}/reviews` | — | List reviews |
+| POST | `/api/v1/articles/{id}/reviews` | 🔒 | Submit/update review |
+| POST | `/api/v1/articles/{id}/reviews/{rid}/messages` | 🔒 | Post thread reply |
+| GET | `/api/v1/articles/{id}/citations` | — | Citation graph |
+| POST | `/api/v1/citations/click` | — | Record citation click |
+| POST | `/api/v1/articles/{id}/merge-proposals` | 🔒 | Create merge proposal |
+| POST | `/api/v1/articles/{id}/sink-extension` | 🔒 | Extend pool duration |
+| GET | `/api/v1/search` | — | Full-text search |
+| POST | `/api/v1/compile-preview` | — | Compile Markdown/Typst → HTML/SVG |
+| GET | `/api/v1/users` | — | List users |
+| GET | `/api/v1/users/{id}` | — | User profile + follow/rep |
+| POST | `/api/v1/users/{id}/follow` | 🔒 | Follow user |
+| DELETE | `/api/v1/users/{id}/follow` | 🔒 | Unfollow user |
+| GET | `/api/v1/pool` | — | Sedimentation pool feed |
+| GET | `/api/v1/feed` | — | Activity feed |
 
 ### 6.2 Key API Changes (P0 Refactor)
 
@@ -345,9 +381,9 @@ Compile output is **never** stored in the database. The compile endpoint generat
 
 | Suite | Tests | Framework |
 |-------|-------|-----------|
-| Backend | 120 | pytest |
-| Frontend | 252 | vitest |
-| Rust | 53 | cargo test |
+| Backend | 291 | pytest |
+| Frontend | 284 | vitest (jsdom + mock localStorage) |
+| Rust | 62 | cargo test |
 
 ### 7.2 CI Pipeline
 
@@ -398,4 +434,5 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-07 · 120 backend tests · 252 frontend tests · 53 Rust tests · 9 DB entities*
+*Last updated: 2026-06-08 · 291 backend tests · 284 frontend tests · 62 Rust tests · 9 DB entities*
+*P0 refactor: session token auth, articles.py package split, dead code removed (common.py, AuthorContributions), datetime.utcnow migrated, type safety (as any → 0 in source)*
