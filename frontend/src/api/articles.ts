@@ -82,3 +82,7 @@ export async function rejectMergeProposal(id: string, pid: string) {
   const res = await apiClient.post(`/articles/${id}/merge-proposals/${pid}/reject`)
   return res.data
 }
+
+export async function deleteArticle(id: string): Promise<void> {
+  await apiClient.delete(`/articles/${id}`)
+}

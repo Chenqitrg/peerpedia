@@ -104,6 +104,30 @@ onMounted(() => {
   }
 })
 
+// When NavBar navigates to /edit?new=1, reset editor state for a fresh start.
+// The keep-alive cache preserves the component across navigations, so this watch
+// is the signal that distinguishes "New Article" from "resume editing".
+watch(() => route.query.new, (val) => {
+  if (val === '1') {
+    title.value = ''
+    content.value = ''
+    previewHtml.value = ''
+    commitHash.value = ''
+    savedContent.value = ''
+    savedTitle.value = ''
+    commitMsg.value = ''
+    scores.value = { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 }
+    keywords.value = ''
+    categories.value = ''
+    abstract.value = ''
+    contributions.value = {}
+    currentDraftId.value = undefined
+    remove(DRAFT_ID_KEY.value)
+    remove(DRAFT_KEY.value)
+    router.replace({ path: '/edit' })
+  }
+}, { immediate: true })
+
 async function loadExistingArticle() {
   // 1. Try REST API first.
   try {
@@ -230,10 +254,25 @@ async function handleCompile() {
   try {
     if (format.value === 'markdown') {
       previewHtml.value = parseMarkdown(content.value)
+    } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      // Typst: use Tauri local compilation
+      const result = await tauri.compileTypst({
+        content: content.value,
+        format: format.value,
+      })
+      if (result && typeof result === 'string') {
+        // Success: SVG string returned — render in preview area
+        previewHtml.value = `<div class="typst-preview">${result}</div>`
+      } else {
+        // Failure: show the actual error both in the preview area and error bar
+        const errMsg = (result && typeof result === 'object' && 'error' in result)
+          ? (result as { error: string }).error
+          : 'Compilation failed'
+        previewHtml.value = `<div class="typst-preview-error text-[#d73a49] p-4 font-mono text-sm">${errMsg}</div>`
+        errorMsg.value = errMsg
+      }
     } else {
-      // Typst: requires Tauri sidecar (Slice 2) for local compilation.
-      // Web: on-going — no browser-native Typst→HTML path yet.
-      previewHtml.value = '<p class="text-ink-muted text-sm">Typst preview available in Tauri desktop (Slice 2). Write in Markdown for live preview.</p>'
+      previewHtml.value = '<p class="text-ink-muted text-sm">Typst preview available in Tauri desktop mode. Use Markdown for browser preview.</p>'
     }
   } catch (e: any) {
     errorMsg.value = e.message || 'Compile failed'

@@ -4,8 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
 import type { ArticleSummary } from '../api/types'
-import { forkArticle } from '../api/articles'
+import { forkArticle, deleteArticle } from '../api/articles'
 import ScoreBadges from './ScoreBadges.vue'
+import { ref } from 'vue'
+import { useTauri } from '../composables/useTauri'
 import {
   FileText,
   Users,
@@ -15,14 +17,42 @@ import {
   History,
   Edit,
   GitFork,
+  Trash2,
 } from 'lucide-vue-next'
 
 const props = defineProps<{
   article: ArticleSummary
 }>()
 
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
+const tauriDelete = useTauri()
+
+async function handleDelete() {
+  if (deleting.value) return
+  deleting.value = true
+  try {
+    if (tauriDelete.isTauri.value || tauriDelete.isBrowserLocal.value) {
+      const result = await tauriDelete.deleteArticle({
+        id: props.article.id,
+        account_id: props.article.authors?.[0]?.id || '',
+      })
+      if (result && 'error' in result) return
+    } else {
+      await deleteArticle(props.article.id)
+    }
+    emit('deleted', props.article.id)
+    showDeleteConfirm.value = false
+  } catch {
+    // Error handled silently — article remains visible
+  } finally {
+    deleting.value = false
+  }
+}
+
 const emit = defineEmits<{
   (e: 'toggleBookmark', articleId: string, currentlyBookmarked: boolean): void
+  (e: 'deleted', articleId: string): void
 }>()
 
 const router = useRouter()
@@ -182,7 +212,7 @@ async function goToFork() {
         </router-link>
 
         <button
-          v-if="article.is_own_article"
+          v-if="article.is_own_article && !showDeleteConfirm"
           class="flex items-center justify-center w-7 h-7 rounded
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
@@ -192,6 +222,36 @@ async function goToFork() {
         >
           <Edit class="w-3.5 h-3.5" stroke-width="2" />
         </button>
+
+        <template v-if="article.is_own_article">
+          <button
+            v-if="!showDeleteConfirm"
+            class="flex items-center justify-center w-7 h-7 rounded
+                   text-ink-muted hover:text-danger hover:bg-danger/10
+                   transition-colors duration-200"
+            aria-label="Delete article"
+            data-tooltip="Delete"
+            @click="showDeleteConfirm = true"
+          >
+            <Trash2 class="w-3.5 h-3.5" stroke-width="2" />
+          </button>
+          <div v-else class="flex items-center gap-1">
+            <span class="text-xs text-ink-muted">Confirm?</span>
+            <button
+              class="px-2 py-1 text-xs font-semibold bg-danger text-white rounded hover:brightness-110 transition-all"
+              :disabled="deleting"
+              @click="handleDelete"
+            >
+              {{ deleting ? '...' : 'Delete' }}
+            </button>
+            <button
+              class="px-2 py-1 text-xs text-ink-muted hover:text-ink rounded hover:bg-[#21262d] transition-colors"
+              @click="showDeleteConfirm = false"
+            >
+              Cancel
+            </button>
+          </div>
+        </template>
 
         <button
           class="flex items-center justify-center w-7 h-7 rounded

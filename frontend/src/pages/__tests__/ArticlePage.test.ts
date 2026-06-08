@@ -18,6 +18,8 @@ vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
+const mockDeleteArticle = vi.fn().mockResolvedValue({ ok: true })
+
 const mockCreateMergeProposal = vi.fn().mockResolvedValue({
   id: 'merge-1',
   fork_article_id: 'fork-article-1',
@@ -28,6 +30,27 @@ const mockCreateMergeProposal = vi.fn().mockResolvedValue({
 })
 
 const mockGetMergeProposals = vi.fn().mockResolvedValue({ proposals: [] })
+
+vi.mock('../../composables/useTauri', () => ({
+  useTauri: () => ({
+    isTauri: { value: false },
+    isBrowserLocal: { value: true },
+    deleteArticle: mockDeleteArticle,
+    getSessionToken: vi.fn(() => null),
+    setSessionToken: vi.fn(),
+    listDrafts: vi.fn().mockResolvedValue([]),
+    login: vi.fn(),
+    listAccounts: vi.fn().mockResolvedValue([]),
+    gitHistory: vi.fn().mockResolvedValue([]),
+    isFollowing: vi.fn().mockResolvedValue({ following: false }),
+    getCachedArticle: vi.fn().mockResolvedValue(null),
+    getDraft: vi.fn().mockResolvedValue(null),
+    compileTypst: vi.fn(),
+    saveDraft: vi.fn(),
+    searchDrafts: vi.fn().mockResolvedValue([]),
+    searchCachedArticles: vi.fn().mockResolvedValue([]),
+  }),
+}))
 
 vi.mock('../../api/articles', () => ({
   getArticle: vi.fn().mockResolvedValue({
@@ -410,5 +433,129 @@ describe('ArticlePage', () => {
 
     // Should show error message to user
     expect(wrapper.text()).toMatch(/Merge proposal failed|merge.*failed/i)
+  })
+})
+
+describe('ArticlePage — delete', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    mockPush.mockClear()
+    mockDeleteArticle.mockClear()
+    vi.resetModules()
+    // Re-apply the useTauri mock after reset
+    vi.doMock('../../composables/useTauri', () => ({
+      useTauri: () => ({
+        isTauri: { value: false },
+        isBrowserLocal: { value: true },
+        deleteArticle: mockDeleteArticle,
+        getSessionToken: vi.fn(() => null),
+        setSessionToken: vi.fn(),
+        listDrafts: vi.fn().mockResolvedValue([]),
+        login: vi.fn(),
+        listAccounts: vi.fn().mockResolvedValue([]),
+        gitHistory: vi.fn().mockResolvedValue([]),
+        isFollowing: vi.fn().mockResolvedValue({ following: false }),
+        getCachedArticle: vi.fn().mockResolvedValue(null),
+        getDraft: vi.fn().mockResolvedValue(null),
+        compileTypst: vi.fn(),
+        saveDraft: vi.fn(),
+        searchDrafts: vi.fn().mockResolvedValue([]),
+        searchCachedArticles: vi.fn().mockResolvedValue([]),
+      }),
+    }))
+  })
+
+  it('shows delete button on own article', async () => {
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+
+    const deleteBtn = wrapper.find('[aria-label="Delete article"]')
+    expect(deleteBtn.exists()).toBe(true)
+  })
+
+  it('clicking delete shows confirmation with Delete and Cancel buttons', async () => {
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+
+    const deleteBtn = wrapper.find('[aria-label="Delete article"]')
+    await deleteBtn.trigger('click')
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(wrapper.text()).toMatch(/Delete|Cancel/)
+  })
+
+  it('confirming delete calls deleteArticle and navigates to user profile', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen' } as any
+
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+
+    // Click delete to show confirmation
+    const deleteBtn = wrapper.find('[aria-label="Delete article"]')
+    await deleteBtn.trigger('click')
+    await new Promise(r => setTimeout(r, 10))
+
+    // Find and click the confirm Delete button
+    const confirmBtn = wrapper.find('button:not([aria-label])')
+    const allButtons = wrapper.findAll('button')
+    let deleteConfirm: any = null
+    for (const btn of allButtons) {
+      if (btn.text().trim() === 'Delete' && !btn.attributes('aria-label')) {
+        deleteConfirm = btn
+        break
+      }
+    }
+    expect(deleteConfirm).not.toBeNull()
+    await deleteConfirm!.trigger('click')
+    await new Promise(r => setTimeout(r, 50))
+
+    // Verify deleteArticle was called
+    expect(mockDeleteArticle).toHaveBeenCalledWith({
+      id: 'test-article-1',
+      account_id: 'u1',
+    })
+
+    // Verify navigation to user profile
+    expect(mockPush).toHaveBeenCalledWith('/user/u1')
+  })
+
+  it('cancel does not delete', async () => {
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+
+    // Click delete to show confirmation
+    const deleteBtn = wrapper.find('[aria-label="Delete article"]')
+    await deleteBtn.trigger('click')
+    await new Promise(r => setTimeout(r, 10))
+
+    // Find and click Cancel
+    const allButtons = wrapper.findAll('button')
+    let cancelBtn: any = null
+    for (const btn of allButtons) {
+      if (btn.text().trim() === 'Cancel') {
+        cancelBtn = btn
+        break
+      }
+    }
+    expect(cancelBtn).not.toBeNull()
+    await cancelBtn!.trigger('click')
+    await new Promise(r => setTimeout(r, 10))
+
+    // deleteArticle should NOT have been called
+    expect(mockDeleteArticle).not.toHaveBeenCalled()
   })
 })

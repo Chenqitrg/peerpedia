@@ -119,4 +119,11 @@ describe('articles API', () => {
     await rejectMergeProposal('abc', 'pid1')
     expect(mockClient.post).toHaveBeenCalledWith('/articles/abc/merge-proposals/pid1/reject')
   })
+
+  it('deleteArticle calls DELETE /articles/{id}', async () => {
+    const { deleteArticle } = await import('../articles')
+    mockClient.delete.mockResolvedValue({ data: undefined, status: 204 })
+    await deleteArticle('abc')
+    expect(mockClient.delete).toHaveBeenCalledWith('/articles/abc')
+  })
 })
