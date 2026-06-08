@@ -50,6 +50,21 @@ describe('NavBar', () => {
     expect(wrapper.find('input').exists()).toBe(false)
   })
 
+  it('New Article link goes to /edit for fresh editor', () => {
+    const user = { id: 'u1', username: 'test', name: 'Test' }
+    localStorage.setItem('viewer', JSON.stringify(user))
+    localStorage.setItem('token', 'test-token')
+    setActivePinia(createPinia())
+
+    const wrapper = mount(NavBar, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    const newArticleLink = wrapper.find('a[href="/edit"]')
+    expect(newArticleLink.exists()).toBe(true)
+    // Clicking this should navigate to /edit with no ID → fresh editor
+    expect(newArticleLink.attributes('href')).toBe('/edit')
+  })
+
   it('shows nav links when logged in', () => {
     const user = { id: 'u1', username: 'test', name: 'Test' }
     localStorage.setItem('viewer', JSON.stringify(user))
