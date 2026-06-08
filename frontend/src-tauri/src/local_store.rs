@@ -204,11 +204,17 @@ pub fn search_drafts(
     Ok(results)
 }
 
-/// Delete an article entirely: removes the DB row AND the git repository directory.
-/// This is the full "delete article" operation used by the frontend.
+/// Delete an article entirely: removes DB rows (drafts, cache, history) AND the
+/// git repository directory. Does NOT fail if the article is not a draft — it may
+/// exist only in the article_cache (e.g., offline-cached server articles).
 pub fn delete_article(conn: &Connection, id: &str, _account_id: &str) -> Result<(), AppError> {
-    // Remove the DB row first.
-    delete_draft(conn, id)?;
+    // Remove from drafts if present (ignore NotFound — article may be cache-only)
+    let _ = conn.execute("DELETE FROM drafts WHERE id = ?1", [id]);
+
+    // Also clean article_cache and browsing_history so the article doesn't
+    // reappear from these tables after deletion.
+    let _ = conn.execute("DELETE FROM article_cache WHERE id = ?1", [id]);
+    let _ = conn.execute("DELETE FROM browsing_history WHERE article_id = ?1", [id]);
 
     // Remove the git repository directory.
     let repo_path = crate::local_git::repo_path(id)?;

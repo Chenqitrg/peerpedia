@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
 import type { ArticleSummary } from '../api/types'
-import { forkArticle } from '../api/articles'
+import { forkArticle, deleteArticle } from '../api/articles'
 import ScoreBadges from './ScoreBadges.vue'
 import { ref } from 'vue'
 import { useTauri } from '../composables/useTauri'
@@ -33,9 +33,15 @@ async function handleDelete() {
   deleting.value = true
   try {
     if (tauriDelete.isTauri.value || tauriDelete.isBrowserLocal.value) {
-      await tauriDelete.deleteArticle({ id: props.article.id, account_id: '' })
-      emit('deleted', props.article.id)
+      const result = await tauriDelete.deleteArticle({
+        id: props.article.id,
+        account_id: props.article.authors?.[0]?.id || '',
+      })
+      if (result && 'error' in result) return
+    } else {
+      await deleteArticle(props.article.id)
     }
+    emit('deleted', props.article.id)
     showDeleteConfirm.value = false
   } catch {
     // Error handled silently — article remains visible
