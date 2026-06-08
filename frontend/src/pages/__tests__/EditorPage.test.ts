@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft } = vi.hoisted(() => ({
+const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft, mockCompileTypst } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockReplace: vi.fn(),
   mockRoute: { params: { id: undefined } as any, query: {} as Record<string, string | undefined> },
@@ -11,6 +11,7 @@ const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCom
   mockGitCommit: vi.fn().mockResolvedValue({ hash: 'abc5678', message: 'Update' }),
   mockGitHistory: vi.fn().mockResolvedValue([]),
   mockGetDraft: vi.fn().mockResolvedValue(null),
+  mockCompileTypst: vi.fn().mockResolvedValue('<svg xmlns="http://www.w3.org/2000/svg"><text>Typst SVG output</text></svg>'),
 }))
 
 const RouterLinkStub = {
@@ -48,6 +49,7 @@ vi.mock('@/composables/useTauri', () => ({
     gitInit: mockGitInit,
     gitCommit: mockGitCommit,
     gitHistory: mockGitHistory,
+    compileTypst: mockCompileTypst,
   }),
 }))
 
@@ -64,6 +66,7 @@ describe('EditorPage', () => {
     mockGitCommit.mockResolvedValue({ hash: 'abc5678', message: 'Update' })
     mockSaveDraft.mockResolvedValue({ id: 'draft-99', account_id: 'u1', title: '', content: '', format: 'markdown', updated_at: '2026-06-07' })
     mockGetDraft.mockResolvedValue(null)
+    mockCompileTypst.mockResolvedValue('<svg xmlns="http://www.w3.org/2000/svg"><text>Typst SVG output</text></svg>')
   })
 
   it('renders editor page with title input', async () => {
@@ -449,5 +452,70 @@ describe('EditorPage', () => {
 
     // Without query.new, router.replace must NOT be called
     expect(mockReplace).not.toHaveBeenCalled()
+  })
+
+  // Typst: compile preview renders SVG in Tauri mode
+  it('compiles Typst to SVG and renders in preview area in Tauri mode', async () => {
+    _isTauri = true
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    // Set Typst content and format
+    vm.format = 'typst'
+    vm.content = '= Hello\nSome *typst* content.'
+
+    // Trigger compilation via the handleCompile button path
+    await vm.handleCompile()
+    await new Promise(r => setTimeout(r, 50))
+
+    // Verify compileTypst was called with correct params
+    expect(mockCompileTypst).toHaveBeenCalledWith({
+      content: '= Hello\nSome *typst* content.',
+      format: 'typst',
+    })
+
+    // Verify previewHtml contains the SVG output
+    expect(vm.previewHtml).toContain('<svg')
+    expect(vm.previewHtml).toContain('typst-preview')
+    expect(vm.previewHtml).toContain('Typst SVG output')
+  })
+
+  // Typst: compilation error is rendered in the preview area (not just error bar)
+  it('shows compilation error in preview area when Typst compile fails', async () => {
+    _isTauri = true
+    mockCompileTypst.mockResolvedValue({ error: 'typst: command not found' })
+
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    vm.format = 'typst'
+    vm.content = '= Bad Typst'
+
+    await vm.handleCompile()
+    await new Promise(r => setTimeout(r, 50))
+
+    // Error should be shown in the preview area (typst-preview-error)
+    expect(vm.previewHtml).toContain('typst-preview-error')
+    expect(vm.previewHtml).toContain('typst: command not found')
+    // Also set in error bar
+    expect(vm.errorMsg).toContain('typst')
   })
 })
