@@ -463,6 +463,26 @@ fn cache_article_with_limit(
 
 // ── Typst Compilation ────────────────────────────────────────────────────
 
+/// Locate the `typst` binary, trying common installation paths in order.
+/// The Tauri app may not inherit the user's shell PATH on macOS.
+fn find_typst_binary() -> String {
+    let candidates = [
+        "typst",                   // system PATH
+        "/opt/homebrew/bin/typst", // Homebrew Apple Silicon
+        "/usr/local/bin/typst",    // Homebrew Intel
+        &format!(
+            "{}/.cargo/bin/typst",
+            std::env::var("HOME").unwrap_or_default()
+        ),
+    ];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() || path == &"typst" {
+            return path.to_string();
+        }
+    }
+    "typst".to_string() // fallback — will fail with "command not found"
+}
+
 /// Compile Typst content to SVG string using the `typst` CLI.
 ///
 /// Writes content to a temp `.typ` file, runs `typst compile --format svg`,
@@ -488,7 +508,11 @@ pub fn compile_typst(content: &str, format: &str) -> Result<String, AppError> {
 
     std::fs::write(&input_path, content)?;
 
-    let mut child = std::process::Command::new("typst")
+    // Try common typst installation paths — the Tauri app bundle may not
+    // inherit the user's shell PATH, so `typst` alone may fail.
+    let typst_bin = find_typst_binary();
+
+    let mut child = std::process::Command::new(&typst_bin)
         .args([
             "compile",
             input_path.to_str().unwrap_or("input.typ"),

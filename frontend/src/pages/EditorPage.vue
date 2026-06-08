@@ -256,15 +256,20 @@ async function handleCompile() {
       previewHtml.value = parseMarkdown(content.value)
     } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
       // Typst: use Tauri local compilation
-      const svg = await tauri.compileTypst({
+      const result = await tauri.compileTypst({
         content: content.value,
         format: format.value,
       })
-      if (svg && !('error' in svg)) {
-        // Wrap SVG for display in the preview area
-        previewHtml.value = `<div class="typst-preview">${svg}</div>`
+      if (result && typeof result === 'string') {
+        // Success: SVG string returned — render in preview area
+        previewHtml.value = `<div class="typst-preview">${result}</div>`
       } else {
-        errorMsg.value = 'Compilation failed'
+        // Failure: show the actual error both in the preview area and error bar
+        const errMsg = (result && typeof result === 'object' && 'error' in result)
+          ? (result as { error: string }).error
+          : 'Compilation failed'
+        previewHtml.value = `<div class="typst-preview-error text-[#d73a49] p-4 font-mono text-sm">${errMsg}</div>`
+        errorMsg.value = errMsg
       }
     } else {
       previewHtml.value = '<p class="text-ink-muted text-sm">Typst preview available in Tauri desktop mode. Use Markdown for browser preview.</p>'
