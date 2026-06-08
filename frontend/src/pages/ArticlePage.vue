@@ -326,6 +326,16 @@ async function handleReply(reviewId: string) {
   }
 }
 
+function goBack() {
+  // In Tauri/local mode the history stack is minimal, so avoid router.back()
+  // which can loop between ArticlePage and HistoryPage.
+  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    router.push('/')
+  } else {
+    router.back()
+  }
+}
+
 function goToHistory() {
   router.push(`/articles/${id}/history`)
 }
@@ -384,7 +394,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
     <!-- Back button -->
     <button
       class="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink mb-4 transition-colors duration-200"
-      @click="router.back()"
+      @click="goBack"
     >
       <ArrowLeft class="w-4 h-4" stroke-width="2" />
       {{ t('common.back') }}
