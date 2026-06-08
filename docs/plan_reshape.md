@@ -14,7 +14,20 @@
 | **Frontend** | Delete button on UserPage article cards + ArticlePage. Confirmation dialog. Optimistic removal from list. |
 | **Testing** | Rust: `test_delete_article_removes_git_repo`. Vitest: click delete → confirm → article disappears. |
 
-### 2. Diff View · 差异对比 (P0)
+### 2. Forward / Share Paper · 转发论文 (P0)
+
+Share any article (draft, published, or arXiv) to someone else via a portable file or link.
+
+| Layer | Implementation |
+|-------|---------------|
+| **Rust** | `export_article(conn, id)` — bundles article source + metadata + git history into a single `.peerpedia` package (SQLite + optional compiled HTML). New Tauri commands: `export_article(id) → path`, `import_article(path) → article_id`. |
+| **Frontend** | "Share" button on ArticlePage + UserPage article cards. Options: **Export file** (`.peerpedia` → save dialog), **Copy deep link** (`peerpedia://<hash>` for future P2P), **Send via OS share sheet** (Tauri `share` plugin). For web mode: generate a unique share URL via backend. |
+| **Format** | `.peerpedia` file is a SQLite database containing: `meta` table (title, author, timestamp, original source), `content` table (source markdown/typst, compiled HTML), optional `git` blob (compressed git history for forked articles). Compact: even with full git history, typically <1 MB. |
+| **Import** | Double-click `.peerpedia` file → Tauri registers file handler → imports into local library → opens in editor. Or "Import" button in UserPage file picker. |
+| **Web mode** | Backend generates a short-lived share URL: `peerpedia.org/s/<share-code>`. Recipient opens in browser → reads online or downloads `.peerpedia` for offline. Share codes expire after 30 days. |
+| **Testing** | Rust: export → verify `.peerpedia` contains correct data → import → verify article restored. Vitest: click share → export dialog opens. |
+
+### 3. Diff View · 差异对比 (P0)
 
 | Layer | Implementation |
 |-------|---------------|
@@ -22,7 +35,7 @@
 | **Frontend** | New `DiffView.vue` component with split-pane layout. Highlighted insertions (green) / deletions (red). Line numbers. Scroll sync between panes. |
 | **Testing** | Rust: verify diff parsing. Vitest: component renders correct hunks. |
 
-### 3. Typst Compile · Typst 编译 (P0)
+### 4. Typst Compile · Typst 编译 (P0)
 
 | Layer | Implementation |
 |-------|---------------|
@@ -30,7 +43,7 @@
 | **Frontend** | Compile button shows progress spinner. Error messages rendered inline below editor. On success, auto-open preview pane with rendered SVG/HTML. |
 | **Testing** | Rust: mock typst CLI output. Vitest: compile button → spinner → result. |
 
-### 4. Editor Experience · 编辑器体验 (P0)
+### 5. Editor Experience · 编辑器体验 (P0)
 
 | Requirement | Approach |
 |-------------|----------|
@@ -39,7 +52,7 @@
 | **Auto-complete & indentation** | CodeMirror plugins: `@codemirror/autocomplete` for Markdown references (`[title](`), Typst functions. `@codemirror/indent` for smart indent. |
 | **Auto-save** | Debounced save (2s after last keystroke) via `useDraftPersistence`. Indicator shows "Saving…" / "Saved" / "Unsaved changes". |
 
-### 5. Distribute & Get Feedback · 分发与评测 (P0)
+### 6. Distribute & Get Feedback · 分发与评测 (P0)
 
 | Task | Details |
 |------|---------|
@@ -48,7 +61,7 @@
 | **Onboarding** | First-launch tutorial overlay. Sample articles pre-loaded. Clear "What is PeerPedia?" tooltip. |
 | **Feedback channel** | GitHub Issues template for bug reports + feature requests. In-app "Send feedback" link. |
 
-### 6. Draft Search · 草稿搜索 (P0)
+### 7. Draft Search · 草稿搜索 (P0)
 
 | Layer | Implementation |
 |-------|---------------|
@@ -56,7 +69,7 @@
 | **Frontend** | Search bar in UserPage header. Typeahead dropdown showing matching drafts. Results grouped by title match vs content match. |
 | **Testing** | Rust: insert draft → FTS query returns it. Vitest: type in search → results appear. |
 
-### 7. arXiv Mirror · arXiv 镜像 (P1)
+### 8. arXiv Mirror · arXiv 镜像 (P1)
 
 | Layer | Implementation |
 |-------|---------------|
@@ -64,14 +77,14 @@
 | **Frontend** | "Browse arXiv" page — newest papers, search by categories (astro-ph, quant-ph, cs.AI…). Each card: title, authors, abstract, link to PDF. Community scoring (Phase 2 feature, show placeholder). |
 | **Offline** | Cache last N papers locally. "Download for offline reading" button on each card. |
 
-### 8. Tags / Categories · 分类标签 (P1)
+### 9. Tags / Categories · 分类标签 (P1)
 
 | Layer | Implementation |
 |-------|---------------|
 | **Schema** | New `tags` table: `(id, name, color)`. Join table `article_tags: (article_id, tag_id)`. Same pattern as `article_authors`. |
 | **Frontend** | Tag editor in ArticlePage sidebar. Multi-select autocomplete. Color-coded badges. Filter by tag on UserPage. |
 
-### 9. AI Agent (Exploratory · 探索中)
+### 10. AI Agent (Exploratory · 探索中)
 
 | Aspect | Consideration |
 |--------|--------------|
