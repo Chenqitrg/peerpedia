@@ -160,8 +160,12 @@ pub struct GetDraftParams {
 
 #[tauri::command]
 pub fn get_draft(state: State<'_, AppState>, params: GetDraftParams) -> Result<Draft, AppError> {
-    let conn = lock_db(&state)?;
-    let draft = local_store::get_draft(&conn, &params.id)?;
+    // Scope the first lock so conn is dropped before resolve_account,
+    // which also calls lock_db. std::sync::Mutex is not reentrant.
+    let draft = {
+        let conn = lock_db(&state)?;
+        local_store::get_draft(&conn, &params.id)?
+    }; // conn dropped here, lock released
 
     // When token is provided, verify ownership.
     if let Some(ref token) = params.token {
