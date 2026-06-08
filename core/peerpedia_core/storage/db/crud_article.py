@@ -78,6 +78,45 @@ def set_sink_start(session: Session, article_id: str, duration_days: int) -> Art
     return a
 
 
+def delete_article(session: Session, article_id: str) -> None:
+    """Delete an article from the database and remove its git repository.
+
+    Cascades to related records: reviews, bookmarks, citations, merge_proposals.
+    Raises ValueError if the article does not exist.
+    """
+    import shutil
+    from pathlib import Path
+
+    from peerpedia_core.storage.db.models import (
+        Bookmark,
+        Citation,
+        MergeProposal,
+        Review,
+    )
+    from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
+
+    a = session.get(Article, article_id)
+    if a is None:
+        raise ValueError(f"Article {article_id} not found")
+
+    # Delete related records
+    session.query(Review).filter(Review.article_id == article_id).delete()
+    session.query(Bookmark).filter(Bookmark.article_id == article_id).delete()
+    session.query(Citation).filter(
+        (Citation.from_article_id == article_id) | (Citation.to_article_id == article_id)
+    ).delete()
+    session.query(MergeProposal).filter(
+        (MergeProposal.fork_article_id == article_id) | (MergeProposal.target_article_id == article_id)
+    ).delete()
+
+    session.delete(a)
+    session.commit()
+
+    repo_path = Path(DEFAULT_ARTICLES_DIR) / article_id
+    if repo_path.exists():
+        shutil.rmtree(str(repo_path))
+
+
 def extend_sink(session: Session, article_id: str, extra_days: int, max_days: int = 180) -> Article:
     """Author extends sink time. Can be called repeatedly up to max_days.
 

@@ -523,7 +523,7 @@ describe('ArticlePage — delete', () => {
     // Verify deleteArticle was called
     expect(mockDeleteArticle).toHaveBeenCalledWith({
       id: 'test-article-1',
-      account_id: '',
+      account_id: 'u1',
     })
 
     // Verify navigation to user profile

@@ -3,7 +3,7 @@ import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
-import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, createMergeProposal } from '../api/articles'
+import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, createMergeProposal, deleteArticle } from '../api/articles'
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
@@ -56,7 +56,13 @@ async function handleDeleteArticle() {
   deleting.value = true
   try {
     if (tauriDelete.isTauri.value || tauriDelete.isBrowserLocal.value) {
-      await tauriDelete.deleteArticle({ id: article.value.id, account_id: '' })
+      const result = await tauriDelete.deleteArticle({
+        id: article.value.id,
+        account_id: article.value.authors?.[0]?.id || '',
+      })
+      if (result && 'error' in result) return
+    } else {
+      await deleteArticle(article.value.id)
     }
     showDeleteConfirm.value = false
     router.push(`/user/${userStore.viewer?.id}`)
