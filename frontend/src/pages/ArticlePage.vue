@@ -246,8 +246,11 @@ async function loadArticle(articleId: string) {
 // ── Lifecycle ───────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  await loadArticle(id)
-  loading.value = false
+  try {
+    await loadArticle(id)
+  } finally {
+    loading.value = false
+  }
 })
 
 watch(() => route.params.id, async (newId) => {
@@ -261,8 +264,11 @@ watch(() => route.params.id, async (newId) => {
   activeTab.value = 'body'
   isFromCache.value = false
   cachedAt.value = null
-  await loadArticle(newId as string)
-  loading.value = false
+  try {
+    await loadArticle(newId as string)
+  } finally {
+    loading.value = false
+  }
 })
 
 async function loadCompiledContent() {

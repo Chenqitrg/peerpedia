@@ -47,6 +47,7 @@ async function makeRouter() {
       { path: '/edit', component: () => import('../pages/EditorPage.vue'), meta: { requiresAuth: false } },
       { path: '/edit/:id', component: () => import('../pages/EditorPage.vue'), meta: { requiresAuth: false } },
       { path: '/article/:id', component: () => import('../pages/ArticlePage.vue') },
+      { path: '/user/:id', component: { template: '<div class="user-page">User Profile</div>' } },
     ],
   })
   await r.push('/')
@@ -426,5 +427,58 @@ describe('Tab Identity Specification', () => {
     const final = tabTitles(wrp)
     expect(final).toEqual(original)
     expect(new Set(final).size).toBe(3)
+  })
+
+  // ── REGRESSION: Article→Editor→User→Article flow ─────────────
+  // Bug report: open article → new article → user page → select another
+  // article → last article stuck at "Loading..."
+
+  it('REGRESSION: article loads after navigating article→editor→user→article', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Step 1: Open an existing article
+    await rou.push('/article/art-a')
+    await settle()
+    await expand(wrp)
+    expect(tabTitles(wrp).some((t: string) => t !== 'Loading...')).toBe(true)
+
+    // Step 2: New article (navbar "+" button)
+    await rou.push('/edit')
+    await settle()
+
+    // Step 3: Go to user profile page (non-tab route)
+    await rou.push('/user/u1')
+    await settle()
+
+    // Step 4: Select another article from user page
+    await rou.push('/article/art-b')
+    await settle()
+
+    // The last article must NOT be stuck at "Loading..."
+    await expand(wrp)
+    const titles = tabTitles(wrp)
+    const loadingTitles = titles.filter((t: string) => t === 'Loading...')
+    expect(loadingTitles.length).toBe(0)
+
+    // Both article tabs must show loaded titles
+    expect(titles.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('REGRESSION: article content renders after article→editor→user→article flow', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    await rou.push('/article/art-a')
+    await settle()
+    await rou.push('/edit')
+    await settle()
+    await rou.push('/user/u1')
+    await settle()
+    await rou.push('/article/art-b')
+    await settle()
+
+    // Article page should show compiled content, not stuck at loading
+    const html = wrp.html()
+    // The article body content from the API mock should be present
+    expect(html).toContain('prose-custom')
   })
 })
