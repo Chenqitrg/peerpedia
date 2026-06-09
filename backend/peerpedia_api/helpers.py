@@ -29,13 +29,13 @@ def resolve_authors(db: Session, author_ids: list[str]) -> list[AuthorInfo]:
 
 # ── Git metadata (combined to avoid double git-log) ──────────────────────────
 
-def _repo_path(article_id: str) -> Path:
+def repo_path(article_id: str) -> Path:
     return DEFAULT_ARTICLES_DIR / article_id
 
 
 def get_commit_hash(article_id: str) -> str:
     """Get HEAD commit hash for an article, or empty string."""
-    rp = _repo_path(article_id)
+    rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         return ""
     commits = get_commit_history(rp, max_count=1)
@@ -44,18 +44,19 @@ def get_commit_hash(article_id: str) -> str:
 
 def get_content_preview(article_id: str, max_chars: int = 200) -> str:
     """Get first ~max_chars characters of article source content."""
-    rp = _repo_path(article_id)
+    rp = repo_path(article_id)
     for ext in [".md", ".typ"]:
         f = rp / f"article{ext}"
         if f.exists():
-            text = f.read_text()
+            with open(f) as fh:
+                text = fh.read(max_chars + 1)
             return text[:max_chars] + ("..." if len(text) > max_chars else "")
     return ""
 
 
 def get_commit_count(article_id: str) -> int:
     """Get total number of commits for an article."""
-    rp = _repo_path(article_id)
+    rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         return 0
     return len(get_commit_history(rp))
@@ -63,7 +64,7 @@ def get_commit_count(article_id: str) -> int:
 
 def get_git_meta(article_id: str) -> tuple[str, int]:
     """Get both HEAD hash (short) and commit count from a single git-log call."""
-    rp = _repo_path(article_id)
+    rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         return "", 0
     commits = get_commit_history(rp)

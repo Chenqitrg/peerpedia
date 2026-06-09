@@ -542,7 +542,6 @@ class TestCitationCRUD:
         create_or_update_citation(session, a1.id, a2.id, forward=0.1, backward=0.1)
         c = get_citation(session, a1.id, a2.id)
         assert c.forward_prob == 0.1
-        # 更新
         create_or_update_citation(session, a1.id, a2.id, forward=0.9, backward=0.05)
         c2 = get_citation(session, a1.id, a2.id)
         assert c2.forward_prob == 0.9

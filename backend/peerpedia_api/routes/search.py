@@ -16,7 +16,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 VALID_SORTS = {"newest", "score"}
 
 # Max number of articles to scan source files for text-search fallback.
-# Only scanned when compiled_output is NULL and SQL title search didn't match.
+# Only scanned when SQL title search didn't match.
 _MAX_SOURCE_SCAN = 50
 
 
@@ -59,7 +59,7 @@ def search(
     - Pagination: SQL LIMIT/OFFSET with accurate total count
 
     Source file fallback: when a text query is provided, articles that don't
-    match via title/compiled_output are checked against their source files.
+    match via title are checked against their source files.
     This is limited to _MAX_SOURCE_SCAN candidates to avoid scanning every
     article in the database.
     """
@@ -100,8 +100,7 @@ def search(
 
     # ── File-based source fallback ────────────────────────────────────
     # Only activated when text query is provided and SQL results are
-    # fewer than requested (suggesting some matches may be in source files
-    # whose compiled_output is NULL).
+    # fewer than requested (suggesting some matches may be in source files).
     if q_lower and len(results) < size:
         # Gather IDs we already have (SQL matches).
         already = {a.id for a in results}

@@ -22,22 +22,27 @@ def get_article(session: Session, article_id: str) -> Article | None:
 
 
 def list_articles(session: Session, status: str | None = None,
-                  author_id: str | None = None) -> list[Article]:
+                  author_id: str | None = None,
+                  limit: int | None = None, offset: int = 0) -> list[Article]:
     q = session.query(Article)
     if status:
         q = q.filter(Article.status == status)
     if author_id:
         q = q.filter(Article.authors.contains(author_id))
-    return q.order_by(Article.created_at.desc()).all()
+    q = q.order_by(Article.created_at.desc())
+    if limit is not None:
+        q = q.limit(limit).offset(offset)
+    return q.all()
 
 
-def update_article_status(session: Session, article_id: str, new_status: str) -> Article:
-    a = session.get(Article, article_id)
-    if a is None:
-        raise ValueError(f"Article {article_id} not found")
-    a.status = new_status
-    session.commit()
-    return a
+def count_articles(session: Session, status: str | None = None,
+                   author_id: str | None = None) -> int:
+    q = session.query(Article)
+    if status:
+        q = q.filter(Article.status == status)
+    if author_id:
+        q = q.filter(Article.authors.contains(author_id))
+    return q.count()
 
 
 def update_article_compiled(
@@ -53,6 +58,15 @@ def update_article_compiled(
     a.compiled_format = html_format
     a.compiled_output = output
     a.compiled_pages = pages
+    session.commit()
+    return a
+
+
+def update_article_status(session: Session, article_id: str, new_status: str) -> Article:
+    a = session.get(Article, article_id)
+    if a is None:
+        raise ValueError(f"Article {article_id} not found")
+    a.status = new_status
     session.commit()
     return a
 
