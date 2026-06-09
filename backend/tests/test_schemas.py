@@ -170,7 +170,6 @@ class TestArticleDetailEdgeCases:
     """ArticleDetail with null optional fields."""
 
     def test_detail_with_null_sink_eta_and_days(self):
-        from datetime import datetime, timezone
         from peerpedia_api.schemas.article import ArticleDetail
 
         now = datetime.now(timezone.utc)
@@ -189,7 +188,6 @@ class TestArticleDetailEdgeCases:
         assert d["score"] is None
 
     def test_detail_with_zero_counts(self):
-        from datetime import datetime, timezone
         from peerpedia_api.schemas.article import ArticleDetail
 
         now = datetime.now(timezone.utc)
@@ -209,7 +207,6 @@ class TestUserProfileEdgeCases:
     """UserProfile with empty/null optional fields."""
 
     def test_user_profile_with_empty_expertise(self):
-        from datetime import datetime, timezone
         from peerpedia_api.schemas.user import UserProfile
 
         now = datetime.now(timezone.utc)
@@ -227,7 +224,6 @@ class TestUserProfileEdgeCases:
         assert u.reputation == {}
 
     def test_user_profile_with_full_reputation(self):
-        from datetime import datetime, timezone
         from peerpedia_api.schemas.user import UserProfile
 
         now = datetime.now(timezone.utc)

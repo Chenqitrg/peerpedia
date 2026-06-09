@@ -636,7 +636,6 @@ class TestArticleLifecycle:
         }
         resp = client.post("/api/v1/articles", json=create_body)
         article_id = resp.json()["id"]
-        original_sink_eta = resp.json()["sink_eta"]
 
         # Edit with publish flag
         edit_body = {

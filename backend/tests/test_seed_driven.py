@@ -406,9 +406,7 @@ class TestSeedScenarios:
             "username": "feynman", "password": "666666",
         })
         assert resp.status_code == 200
-        token = resp.json()["token"]
         feynman_id = resp.json()["user"]["id"]
-        headers = {"Authorization": f"Bearer {token}"}
 
         # Get following list
         resp2 = client.get(f"/api/v1/users/{feynman_id}/following")

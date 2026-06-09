@@ -469,8 +469,8 @@ class TestReviewErrorPaths:
 
     def test_post_thread_message_nonexistent_review_returns_404(self, client, auth_header, db_engine):
         from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, User
         s = get_session(db_engine)
-        from peerpedia_core.storage.db.models import User, Article
         u = User(username="err_thread", password_hash="", name="线程测试", anonymous_name="anon_th")
         a = Article(status="sedimentation", authors=[u.id])
         s.add_all([u, a])

@@ -13,7 +13,6 @@ Philosophy per docs/test_requirement.md:
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import Article, User
 
 
 @pytest.fixture
