@@ -32,6 +32,120 @@ vi.mock('vue', async () => {
 
 import { useEditorTab, useArticleTab } from '../useTabIntegration'
 
+// ── Regression: path normalization ──────────────────────────────
+// The router defines both /article/:id and /articles/:id. openTab normalizes
+// /articles/ → /article/ before storing. The composables must do the same,
+// otherwise updateTab targets a tab id that doesn't exist (titles stay
+// "Loading…" forever, tab switching has no visible effect).
+//
+// These tests use vi.resetModules() so we can override the hoisted useRoute
+// mock with a /articles/ path.
+
+describe('Path normalization regression', () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    setActivePinia(createPinia())
+  })
+
+  it('useArticleTab normalizes /articles/ to /article/ when updating title', async () => {
+    const localUpdateTab = vi.fn()
+    const localTabs = vi.fn().mockReturnValue([])
+
+    vi.doMock('vue-router', () => ({
+      useRoute: () => ({ path: '/articles/quantum-physics' }),
+    }))
+    vi.doMock('@/stores/useTabStore', () => ({
+      useTabStore: () => ({
+        updateTab: localUpdateTab,
+        tabs: localTabs(),
+      }),
+    }))
+    vi.doMock('vue', async () => {
+      const actual = await vi.importActual('vue')
+      return {
+        ...actual,
+        onDeactivated: vi.fn(),
+        onActivated: vi.fn(),
+      }
+    })
+
+    const { useArticleTab: uat } = await import('../useTabIntegration')
+    const articleTitle = ref('Quantum Physics')
+    uat(articleTitle, ref(null))
+
+    await vi.waitFor(() => {
+      expect(localUpdateTab).toHaveBeenCalledWith('/article/quantum-physics', {
+        title: 'Quantum Physics',
+      })
+    })
+  })
+
+  it('useEditorTab normalizes /articles/ to /article/ for title+dirty sync', async () => {
+    const localUpdateTab = vi.fn()
+    const localTabs = vi.fn().mockReturnValue([])
+
+    vi.doMock('vue-router', () => ({
+      useRoute: () => ({ path: '/articles/my-draft' }),
+    }))
+    vi.doMock('@/stores/useTabStore', () => ({
+      useTabStore: () => ({
+        updateTab: localUpdateTab,
+        tabs: localTabs(),
+      }),
+    }))
+    vi.doMock('vue', async () => {
+      const actual = await vi.importActual('vue')
+      return {
+        ...actual,
+        onDeactivated: vi.fn(),
+        onActivated: vi.fn(),
+      }
+    })
+
+    const { useEditorTab: uet } = await import('../useTabIntegration')
+    uet(ref('My Draft'), ref(false), ref(null))
+
+    await vi.waitFor(() => {
+      expect(localUpdateTab).toHaveBeenCalledWith('/article/my-draft', {
+        dirty: true,
+        title: 'My Draft',
+      })
+    })
+  })
+
+  it('does not normalize /edit paths (no /edits/ route exists)', async () => {
+    const localUpdateTab = vi.fn()
+    const localTabs = vi.fn().mockReturnValue([])
+
+    vi.doMock('vue-router', () => ({
+      useRoute: () => ({ path: '/edit/some-draft' }),
+    }))
+    vi.doMock('@/stores/useTabStore', () => ({
+      useTabStore: () => ({
+        updateTab: localUpdateTab,
+        tabs: localTabs(),
+      }),
+    }))
+    vi.doMock('vue', async () => {
+      const actual = await vi.importActual('vue')
+      return {
+        ...actual,
+        onDeactivated: vi.fn(),
+        onActivated: vi.fn(),
+      }
+    })
+
+    const { useArticleTab: uat } = await import('../useTabIntegration')
+    uat(ref('Draft Title'), ref(null))
+
+    await vi.waitFor(() => {
+      expect(localUpdateTab).toHaveBeenCalledWith('/edit/some-draft', {
+        title: 'Draft Title',
+      })
+    })
+  })
+})
+
 describe('useTabIntegration', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
