@@ -1,0 +1,234 @@
+/**
+ * Tab Identity — Behavior Specification
+ *
+ * When switching between tabs, each tab must retain its own identity
+ * (title, content). Switching must not cause tab titles to merge or
+ * overwrite each other.
+ */
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
+import { nextTick } from 'vue'
+
+// ── Mocks (I/O boundary only) ───────────────────────────────────
+
+vi.mock('../../api/articles', () => ({
+  getArticle: vi.fn(async (id: string) => ({ id, title: 'Article-'+id, status: 'published', authors: [], fork_count: 0, forked_from: null, commit_count: 1, commit_hash: 'abc', compiled_format: 'html', compiled_output: '<p>'+id+'</p>', compiled_pages: 1, score: {}, sink_eta: null, days_remaining: null, sink_duration_days: 30, review_count: 0, is_bookmarked: false, is_own_article: false, created_at: '', updated_at: '' })),
+  getArticleSource: vi.fn(async () => ({ content: '#', format: 'markdown' })),
+  getHistory: vi.fn(async () => ({ commits: [] })), forkArticle: vi.fn(), extendSink: vi.fn(),
+  createMergeProposal: vi.fn(), getMergeProposals: vi.fn(async () => ({ proposals: [] })),
+  deleteArticle: vi.fn(), compilePreview: vi.fn(async () => '<p>P</p>'),
+}))
+vi.mock('../../api/reviews', () => ({ getReviews: vi.fn(async () => []), createReview: vi.fn(), postReviewMessage: vi.fn() }))
+vi.mock('../../api/compile', () => ({ compilePreview: vi.fn(async () => '<p>P</p>') }))
+vi.mock('../../api/auth', () => ({ login: vi.fn(), register: vi.fn(), getMe: vi.fn(async () => ({ user: {} })) }))
+vi.mock('../../stores/useUserStore', () => ({
+  useUserStore: () => ({ viewer: { id: 'u1', name: 'A' }, token: 'x', showAuthModal: false, intendedRoute: null,
+    isTauriMode: false, isBrowserLocal: false, restoreSession: vi.fn(async () => {}), login: vi.fn(), register: vi.fn(), logout: vi.fn() }),
+}))
+// Mock article store so EditorPage loads article data for /edit/:id routes.
+// EditorPage reads articleStore.currentArticle after calling fetchArticle().
+let _currentArticle: any = null
+vi.mock('../../stores/useArticleStore', () => ({
+  useArticleStore: () => ({
+    get currentArticle() { return _currentArticle },
+    fetchArticle: vi.fn(async (id: string) => {
+      _currentArticle = { id, title: 'Loaded-'+id, commit_hash: 'abc' }
+    }),
+    saveDraft: vi.fn(),
+  }),
+}))
+vi.mock('../../composables/useTauri', () => ({
+  useTauri: () => ({ isTauri: { value: false }, isBrowserLocal: { value: false }, saveDraft: vi.fn(), getDraft: vi.fn().mockResolvedValue(null), listDrafts: vi.fn().mockResolvedValue([]), deleteDraft: vi.fn(), gitInit: vi.fn(), gitCommit: vi.fn(), gitHistory: vi.fn().mockResolvedValue([]), compileTypst: vi.fn(), getSessionToken: vi.fn(() => null), setSessionToken: vi.fn(), login: vi.fn(), listAccounts: vi.fn().mockResolvedValue([]), isFollowing: vi.fn(), getCachedArticle: vi.fn().mockResolvedValue(null), searchDrafts: vi.fn().mockResolvedValue([]), searchCachedArticles: vi.fn().mockResolvedValue([]), deleteArticle: vi.fn() }),
+}))
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+async function makeRouter() {
+  const r = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: { template: '<div>Home</div>' } },
+      // Use real EditorPage so useEditorTab composable is active
+      { path: '/edit', component: () => import('../pages/EditorPage.vue'), meta: { requiresAuth: false } },
+      { path: '/edit/:id', component: () => import('../pages/EditorPage.vue'), meta: { requiresAuth: false } },
+      { path: '/article/:id', component: () => import('../pages/ArticlePage.vue') },
+    ],
+  })
+  await r.push('/')
+  await r.isReady()
+  return r
+}
+
+async function mountApp() {
+  localStorage.clear()
+  localStorage.setItem('viewer', JSON.stringify({ id: 'u1', name: 'A' }))
+  localStorage.setItem('peerpedia_token', 'x')
+
+  const router = await makeRouter()
+  const pinia = createPinia()
+  setActivePinia(pinia)
+
+  const { default: App } = await import('../App.vue')
+  const wrapper = mount(App, {
+    global: {
+      plugins: [router, pinia],
+      stubs: {
+        NavBar: { template: '<nav>Nav</nav>' },
+        AuthModal: { template: '<div />' },
+        CodeEditor: {
+          template: '<textarea class="cm-editor" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)"></textarea>',
+          props: ['modelValue', 'format', 'placeholder'],
+          emits: ['update:modelValue'],
+        },
+        DownloadButton: { template: '<button />' },
+        SelfReviewPanel: { template: '<div />' },
+        ReviewPanel: { template: '<div />' },
+        ScoreBadges: { template: '<div />' },
+      },
+    },
+  })
+
+  return { wrapper, router }
+}
+
+async function settle() {
+  await flushPromises()
+  await nextTick()
+  await new Promise(r => setTimeout(r, 300))
+  await flushPromises()
+}
+
+function tabTitles(w: any): string[] {
+  const items = w.findAll('.tab-drawer-item')
+  return items.map((i: any) => i.find('.tab-drawer-item-title').text())
+}
+
+function activeTabTitle(w: any): string | null {
+  const items = w.findAll('.tab-drawer-item')
+  for (const item of items) {
+    if (item.classes().includes('tab-drawer-item--active')) {
+      return item.find('.tab-drawer-item-title').text()
+    }
+  }
+  return null
+}
+
+async function expand(w: any) {
+  await w.find('.tab-drawer-edges').trigger('mouseenter')
+  await nextTick()
+}
+
+// ═════════════════════════════════════════════════════════════════
+// SPECIFICATION: Tab Identity
+// ═════════════════════════════════════════════════════════════════
+
+describe('Tab Identity Specification', () => {
+  let wrp: any, rou: any
+  afterEach(() => { if (wrp) wrp.unmount() })
+
+  // ── IDENTITY-1: Two editor tabs get distinct titles ───────────
+
+  it('IDENTITY-1: two editor tabs show distinct titles after loading', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Open editor for article-1 (title loaded from mocked article store)
+    await rou.push('/edit/article-1')
+    await settle()
+
+    // Open editor for article-2
+    await rou.push('/edit/article-2')
+    await settle()
+
+    // Two tabs exist
+    await expand(wrp)
+    const titles = tabTitles(wrp)
+    expect(titles.length).toBe(2)
+    // Titles must be distinct (Loaded-article-1 vs Loaded-article-2)
+    expect(titles[0]).not.toBe(titles[1])
+  })
+
+  // ── IDENTITY-2: Switch away and back — title persists ──────────
+
+  it('IDENTITY-2: tab title persists after switching away and back', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    await rou.push('/edit/article-1')
+    await settle()
+    await rou.push('/edit/article-2')
+    await settle()
+
+    // Record title of tab A
+    await expand(wrp)
+    const titleABefore = tabTitles(wrp)[0]
+
+    // Switch to tab A, then back to tab B
+    await wrp.findAll('.tab-drawer-item')[0].trigger('click')  // → A
+    await settle()
+    await expand(wrp)
+    await wrp.findAll('.tab-drawer-item')[1].trigger('click')  // → B
+    await settle()
+
+    // Tab A must still show its original title
+    await expand(wrp)
+    expect(tabTitles(wrp)[0]).toBe(titleABefore)
+  })
+
+  // ── IDENTITY-3: Both titles survive round-trip switching ──────
+
+  it('IDENTITY-3: round-trip switching preserves both titles', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    await rou.push('/edit/article-1')
+    await settle()
+    await rou.push('/edit/article-2')
+    await settle()
+
+    await expand(wrp)
+    const before = tabTitles(wrp)
+
+    // B→A→B→A→B
+    for (let i = 0; i < 2; i++) {
+      await wrp.findAll('.tab-drawer-item')[0].trigger('click')
+      await settle()
+      await expand(wrp)
+      await wrp.findAll('.tab-drawer-item')[1].trigger('click')
+      await settle()
+    }
+
+    await expand(wrp)
+    const after = tabTitles(wrp)
+    expect(after.length).toBe(2)
+    expect(after[0]).toBe(before[0])
+    expect(after[1]).toBe(before[1])
+    expect(after[0]).not.toBe(after[1])
+  })
+
+  // ── IDENTITY-4: Content preserved across switches ─────────────
+
+  it('IDENTITY-4: editor content is preserved when switching tabs', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    await rou.push('/edit/article-1')
+    await settle()
+    await wrp.find('.cm-editor').setValue('Content for A')
+    await settle()
+
+    await rou.push('/edit/article-2')
+    await settle()
+    await wrp.find('.cm-editor').setValue('Content for B')
+    await settle()
+
+    // Content is B
+    expect((wrp.find('.cm-editor').element as HTMLTextAreaElement).value).toBe('Content for B')
+
+    // Switch to A
+    await expand(wrp)
+    await wrp.findAll('.tab-drawer-item')[0].trigger('click')
+    await settle()
+
+    // Content must be A — NOT B
+    expect((wrp.find('.cm-editor').element as HTMLTextAreaElement).value).toBe('Content for A')
+  })
+})
