@@ -1,0 +1,120 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { loadJSON, saveJSON } from '../composables/useLocalStorage'
+
+export interface Tab {
+  id: string
+  type: 'editor' | 'article'
+  title: string
+  dirty: boolean
+  icon: 'edit' | 'eye'
+  status: 'draft' | 'published' | 'sedimentation'
+  scrollTop?: number
+  cursorPosition?: number
+}
+
+const STORAGE_KEY = 'peerpedia_tabs'
+
+export const useTabStore = defineStore('tab', () => {
+  const tabs = ref<Tab[]>([])
+  const activeTabId = ref<string | null>(null)
+
+  function persist(): void {
+    saveJSON(STORAGE_KEY, {
+      tabs: tabs.value.map(t => ({
+        id: t.id, type: t.type, title: t.title,
+        icon: t.icon, status: t.status,
+        scrollTop: t.scrollTop, cursorPosition: t.cursorPosition,
+      })),
+      activeTabId: activeTabId.value,
+    })
+  }
+
+  function findTab(routePath: string): Tab | undefined {
+    return tabs.value.find(t => t.id === routePath)
+  }
+
+  function getAdjacentTabId(closedId: string): string | null {
+    const idx = tabs.value.findIndex(t => t.id === closedId)
+    if (idx === -1) return null
+    if (idx < tabs.value.length - 1) return tabs.value[idx + 1].id
+    if (idx > 0) return tabs.value[idx - 1].id
+    return null
+  }
+
+  function openTab(to: { path: string; params: Record<string, string> }): void {
+    const routePath = to.path.startsWith('/articles/')
+      ? to.path.replace('/articles/', '/article/')
+      : to.path
+    if (!routePath.startsWith('/edit') && !routePath.startsWith('/article')) return
+
+    const existing = findTab(routePath)
+    if (existing) { activeTabId.value = routePath; persist(); return }
+
+    const type = routePath.startsWith('/edit') ? 'editor' : 'article'
+    const status = type === 'editor' ? 'draft' : 'published'
+    tabs.value.push({
+      id: routePath, type,
+      title: type === 'editor' ? 'Untitled' : 'Loading...',
+      dirty: false,
+      icon: type === 'editor' ? 'edit' : 'eye',
+      status,
+    })
+    activeTabId.value = routePath
+    persist()
+  }
+
+  function activateTab(tabId: string): void {
+    const router = useRouter()
+    activeTabId.value = tabId
+    persist()
+    router.push(tabId)
+  }
+
+  function updateTab(tabId: string, patch: Partial<Pick<Tab, 'title' | 'dirty' | 'status' | 'scrollTop' | 'cursorPosition'>>): void {
+    const tab = findTab(tabId)
+    if (!tab) return
+    if (patch.title !== undefined) tab.title = patch.title
+    if (patch.dirty !== undefined) tab.dirty = patch.dirty
+    if (patch.status !== undefined) tab.status = patch.status
+    if (patch.scrollTop !== undefined) tab.scrollTop = patch.scrollTop
+    if (patch.cursorPosition !== undefined) tab.cursorPosition = patch.cursorPosition
+    persist()
+  }
+
+  function closeTab(tabId: string): { shouldPrompt: boolean } {
+    const tab = findTab(tabId)
+    if (!tab) return { shouldPrompt: false }
+    if (tab.dirty) return { shouldPrompt: true }
+    removeTab(tabId)
+    return { shouldPrompt: false }
+  }
+
+  function removeTab(tabId: string): void {
+    const nextTabId = getAdjacentTabId(tabId)
+    const wasActive = activeTabId.value === tabId
+    tabs.value = tabs.value.filter(t => t.id !== tabId)
+
+    if (wasActive) {
+      if (nextTabId) {
+        activeTabId.value = nextTabId
+        useRouter().push(nextTabId)
+      } else {
+        activeTabId.value = null
+        useRouter().push('/')
+      }
+    }
+    persist()
+  }
+
+  function restoreTabs(): void {
+    const saved = loadJSON<{ tabs: Tab[]; activeTabId: string | null }>(STORAGE_KEY)
+    if (!saved?.tabs?.length) return
+    tabs.value = saved.tabs.map(t => ({ ...t, dirty: false }))
+    activeTabId.value = saved.activeTabId
+    if (saved.activeTabId) useRouter().push(saved.activeTabId)
+  }
+
+  return { tabs, activeTabId, openTab, activateTab, updateTab, closeTab, removeTab, restoreTabs }
+})
