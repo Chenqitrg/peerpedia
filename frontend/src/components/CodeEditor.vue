@@ -3,7 +3,8 @@ import { shallowRef, computed } from 'vue'
 import { Codemirror } from 'vue-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
-import type { EditorView } from 'codemirror'
+import { EditorView } from 'codemirror'
+import type { Extension } from '@codemirror/state'
 
 const props = defineProps<{
   modelValue: string
@@ -17,11 +18,9 @@ const emit = defineEmits<{
 
 const codemirrorView = shallowRef<EditorView>()
 
-const extensions = computed(() => {
-  const exts: any[] = [oneDark]
-  if (props.format === 'markdown') {
-    exts.push(markdown())
-  }
+const extensions = computed<Extension[]>(() => {
+  const exts: Extension[] = [oneDark]
+  exts.push(markdown())
   return exts
 })
 
@@ -37,15 +36,26 @@ defineExpose({ codemirrorView })
 </script>
 
 <template>
-  <Codemirror
-    v-if="format === 'markdown'"
-    :model-value="modelValue"
-    :extensions="extensions"
-    :placeholder="placeholder"
-    :indent-with-tab="true"
-    :tab-size="2"
-    @ready="onReady"
-    @update:model-value="onUpdate"
-  />
+  <div v-if="format === 'markdown'" class="flex-1 w-full font-mono cm-wrapper">
+    <Codemirror
+      :model-value="modelValue"
+      :extensions="extensions"
+      :placeholder="placeholder"
+      :indent-with-tab="true"
+      :tab-size="2"
+      @ready="onReady"
+      @update:model-value="onUpdate"
+    />
+  </div>
   <slot v-else name="typst-fallback" />
 </template>
+
+<style>
+/* Override oneDark background to match app page bg */
+.cm-wrapper .cm-editor {
+  background: #0d1117;
+}
+.cm-wrapper .cm-editor .cm-scroller {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+</style>
