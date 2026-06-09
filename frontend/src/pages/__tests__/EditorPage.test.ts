@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft, mockCompileTypst } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockReplace: vi.fn(),
-  mockRoute: { params: { id: undefined } as any, path: '/edit', query: {} as Record<string, string | undefined> },
+  mockRoute: { params: { id: undefined } as any, path: '/edit', fullPath: '/edit', query: {} as Record<string, string | undefined> },
   mockSaveDraft: vi.fn().mockResolvedValue({ id: 'draft-99', account_id: 'u1', title: '', content: '', format: 'markdown', updated_at: '2026-06-07' }),
   mockGitInit: vi.fn().mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' }),
   mockGitCommit: vi.fn().mockResolvedValue({ hash: 'abc5678', message: 'Update' }),
@@ -67,6 +67,7 @@ describe('EditorPage', () => {
     vi.clearAllMocks()
     mockRoute.params = { id: undefined } as any
     mockRoute.query = {}
+    mockRoute.fullPath = '/edit'
     mockGitHistory.mockResolvedValue([])
     mockGitInit.mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' })
     mockGitCommit.mockResolvedValue({ hash: 'abc5678', message: 'Update' })
@@ -410,6 +411,7 @@ describe('EditorPage', () => {
   it('resets editor state when activated with query.new=1', async () => {
     _isTauri = true
     mockRoute.query = { new: '1' }
+    mockRoute.fullPath = '/edit?new=1'
 
     const { useUserStore } = await import('../../stores/useUserStore')
     setActivePinia(createPinia())
@@ -443,6 +445,7 @@ describe('EditorPage', () => {
   it('does not reset editor when activated without query.new', async () => {
     _isTauri = true
     mockRoute.query = {} // no new query param — back navigation
+    mockRoute.fullPath = '/edit'
 
     // Pre-populate localStorage with a valid draft
     localStorage.setItem('editor-draft-id-u1-new', 'draft-99')

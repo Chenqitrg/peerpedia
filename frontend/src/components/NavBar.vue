@@ -62,7 +62,9 @@ function close() {
 
 function newArticle() {
   close()
-  router.push('/edit?new=1')
+  // Generate unique path per click so each "New Article" creates an
+  // independent editor tab (VSCode behavior: Cmd+N always = new file).
+  router.push(`/edit?new=1&_t=${Date.now()}`)
 }
 
 function handleSearch(e: Event) {

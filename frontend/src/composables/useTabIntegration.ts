@@ -16,7 +16,7 @@ function normalizePath(path: string): string {
 export function useEditorTab(title: Ref<string>, isClean: Ref<boolean>, contentEl: Ref<HTMLElement | null>) {
   const route = useRoute()
   const tabStore = useTabStore()
-  const tabId = normalizePath(route.path)
+  const tabId = normalizePath(route.fullPath)
 
   watch([isClean, title], ([clean, t]) => {
     tabStore.updateTab(tabId, { dirty: !clean, title: t || 'Untitled' })
@@ -42,7 +42,7 @@ export function useEditorTab(title: Ref<string>, isClean: Ref<boolean>, contentE
 export function useArticleTab(articleTitle: Ref<string | undefined>, contentEl: Ref<HTMLElement | null>) {
   const route = useRoute()
   const tabStore = useTabStore()
-  const tabId = normalizePath(route.path)
+  const tabId = normalizePath(route.fullPath)
 
   watch(articleTitle, (title) => {
     if (title) tabStore.updateTab(tabId, { title })

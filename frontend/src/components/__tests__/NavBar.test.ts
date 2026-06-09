@@ -68,9 +68,9 @@ describe('NavBar', () => {
     // Find the "New Article" button by aria-label (i18n key: nav.newArticle)
     const newArticleBtn = wrapper.find('button[aria-label="写文章"], button[aria-label="New Article"]')
     expect(newArticleBtn.exists()).toBe(true)
-    // Clicking this should navigate to /edit?new=1
+    // Clicking this should navigate to /edit?new=1&_t=<timestamp>
     newArticleBtn.trigger('click')
-    expect(mockPush).toHaveBeenCalledWith('/edit?new=1')
+    expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/edit\?new=1&_t=\d+$/))
   })
 
   it('shows nav links when logged in', () => {

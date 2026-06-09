@@ -10,7 +10,7 @@ const mockUpdateTab = vi.fn()
 const mockTabs = vi.fn()
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ path: '/edit/test-article' }),
+  useRoute: () => ({ path: '/edit/test-article', fullPath: '/edit/test-article' }),
 }))
 
 vi.mock('@/stores/useTabStore', () => ({
@@ -52,7 +52,7 @@ describe('Path normalization regression', () => {
     const localTabs = vi.fn().mockReturnValue([])
 
     vi.doMock('vue-router', () => ({
-      useRoute: () => ({ path: '/articles/quantum-physics' }),
+      useRoute: () => ({ path: '/articles/quantum-physics', fullPath: '/articles/quantum-physics' }),
     }))
     vi.doMock('@/stores/useTabStore', () => ({
       useTabStore: () => ({
@@ -85,7 +85,7 @@ describe('Path normalization regression', () => {
     const localTabs = vi.fn().mockReturnValue([])
 
     vi.doMock('vue-router', () => ({
-      useRoute: () => ({ path: '/articles/my-draft' }),
+      useRoute: () => ({ path: '/articles/my-draft', fullPath: '/articles/my-draft' }),
     }))
     vi.doMock('@/stores/useTabStore', () => ({
       useTabStore: () => ({
@@ -118,7 +118,7 @@ describe('Path normalization regression', () => {
     const localTabs = vi.fn().mockReturnValue([])
 
     vi.doMock('vue-router', () => ({
-      useRoute: () => ({ path: '/edit/some-draft' }),
+      useRoute: () => ({ path: '/edit/some-draft', fullPath: '/edit/some-draft' }),
     }))
     vi.doMock('@/stores/useTabStore', () => ({
       useTabStore: () => ({
