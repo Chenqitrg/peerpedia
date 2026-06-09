@@ -10,18 +10,19 @@ from peerpedia_core.storage.db.engine import get_engine, get_session
 from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
 
-_engine = None
-_JWT_SECRET = os.environ.get("JWT_SECRET", "peerpedia-dev-secret")
+_JWT_SECRET = os.environ.get("JWT_SECRET")
 _JWT_EXPIRY = 86400  # 24 hours
+
+if not _JWT_SECRET:
+    import warnings
+    warnings.warn("JWT_SECRET not set — using insecure default for development only")
+    _JWT_SECRET = "peerpedia-dev-secret"
 
 
 def get_db():
-    """Yield a database session. Engine is cached across requests."""
-    global _engine
-    if _engine is None:
-        db_path = os.environ.get("PEERPEDIA_DB", "sqlite:///peerpedia.db")
-        _engine = get_engine(db_path)
-    session = get_session(_engine)
+    """Yield a database session. SQLAlchemy's internal registry handles engine reuse."""
+    db_path = os.environ.get("PEERPEDIA_DB", "sqlite:///peerpedia.db")
+    session = get_session(get_engine(db_path))
     try:
         yield session
     finally:
