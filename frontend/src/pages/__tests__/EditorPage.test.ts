@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft, mockCompileTypst } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockReplace: vi.fn(),
-  mockRoute: { params: { id: undefined } as any, query: {} as Record<string, string | undefined> },
+  mockRoute: { params: { id: undefined } as any, path: '/edit', query: {} as Record<string, string | undefined> },
   mockSaveDraft: vi.fn().mockResolvedValue({ id: 'draft-99', account_id: 'u1', title: '', content: '', format: 'markdown', updated_at: '2026-06-07' }),
   mockGitInit: vi.fn().mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' }),
   mockGitCommit: vi.fn().mockResolvedValue({ hash: 'abc5678', message: 'Update' }),

@@ -101,6 +101,17 @@ const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
 
+// Path normalized to match tab store ids (same logic as useTabIntegration)
+const myEditorPath = route.path.startsWith('/articles/')
+  ? route.path.replace('/articles/', '/article/')
+  : route.path
+
+function onSaveAndClose(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (detail?.tabId !== myEditorPath) return  // not for this instance
+  handleSaveDraft()
+}
+
 onMounted(() => {
   if (isEdit.value) {
     loadExistingArticle()
@@ -114,10 +125,12 @@ onMounted(() => {
     currentDraftId.value = undefined
   }
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('tab-save-and-close', onSaveAndClose)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('tab-save-and-close', onSaveAndClose)
 })
 
 // Cmd+S / Ctrl+S → compile preview (only when editor area is focused)

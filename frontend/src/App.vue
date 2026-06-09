@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import AuthModal from './components/AuthModal.vue'
@@ -89,13 +89,23 @@ function discardClose() {
 
 async function saveAndClose() {
   showCloseDialog.value = false
-  if (!closingTabId.value) return
-  tabStore.activeTabId = closingTabId.value
-  router.push(closingTabId.value)
+  const tabId = closingTabId.value
+  if (!tabId) return
+
+  // Navigate to the dirty tab so its EditorPage instance becomes active
+  tabStore.activeTabId = tabId
+  await router.push(tabId)
+  await nextTick()
+
+  // Dispatch save event — EditorPage listens and calls handleSaveDraft(),
+  // which opens the commit dialog (Tauri) or saves directly (web).
+  window.dispatchEvent(new CustomEvent('tab-save-and-close', { detail: { tabId } }))
+
+  // Watch for save completion — when dirty becomes false, close the tab
   const unwatch = watch(() => {
-    const tab = tabStore.tabs.find(t => t.id === closingTabId.value)
-    if (tab && !tab.dirty && closingTabId.value) {
-      tabStore.removeTab(closingTabId.value)
+    const tab = tabStore.tabs.find(t => t.id === tabId)
+    if (tab && !tab.dirty) {
+      tabStore.removeTab(tabId)
       closingTabId.value = null
       unwatch()
     }
