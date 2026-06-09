@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def seed_user(db_engine):
 @pytest.fixture
 def seed_article(db_engine, seed_user):
     s = get_session(db_engine)
-    a = Article(status="published", authors=[seed_user], fork_count=0)
+    a = Article(status="published", fork_count=0)
     s.add(a)
     s.commit()
     aid = a.id
@@ -206,7 +206,7 @@ class TestUpdateArticle:
         from peerpedia_core.storage.db.models import Article
 
         s = get_session(db_engine)
-        a = Article(status="draft", authors=[seed_user])
+        a = Article(status="draft")
         s.add(a)
         s.commit()
         aid = a.id
@@ -376,7 +376,7 @@ class TestPagination:
         s.add(u)
         s.commit()
         for i in range(5):
-            s.add(Article(status="published", authors=[u.id]))
+            s.add(Article(status="published"))
         s.commit()
         s.close()
 
@@ -424,8 +424,7 @@ class TestDownloadEndpoints:
     def test_download_source_typst(self, client, seed_user):
         """Download source file for a Typst article."""
         aid = self._create_article_with_content(
-            client, seed_user, "= Introduction\nSome text.", fmt="typst",
-        )
+            client, seed_user, "= Introduction\nSome text.", fmt="typst")
         resp = client.get(f"/api/v1/articles/{aid}/download/source")
         assert resp.status_code == 200
         assert "Introduction" in resp.text
@@ -451,8 +450,7 @@ class TestDownloadEndpoints:
     def test_download_repo_returns_tar_gz(self, client, seed_user):
         """Download repo bundle returns a valid tar.gz with git history."""
         aid = self._create_article_with_content(
-            client, seed_user, "# Test\n\nContent.", fmt="markdown",
-        )
+            client, seed_user, "# Test\n\nContent.", fmt="markdown")
         resp = client.get(f"/api/v1/articles/{aid}/download/repo")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/gzip"
@@ -485,8 +483,10 @@ class TestDeleteArticle:
 
         s = get_session(db_engine)
         auth_user = s.query(User).filter(User.username == "test_articles_auth").first()
-        a = Article(status="draft", authors=[auth_user.id])
+        a = Article(status="draft")
         s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=auth_user.id, position=0))
         s.commit()
         aid = a.id
         s.close()
@@ -498,7 +498,7 @@ class TestDeleteArticle:
         from peerpedia_core.storage.db.engine import get_session
 
         s = get_session(db_engine)
-        a = Article(status="draft", authors=[seed_user])
+        a = Article(status="draft")
         s.add(a)
         s.commit()
         article_id = a.id
@@ -691,8 +691,7 @@ class TestSinkExtension:
         # Extend by 10 days
         ext_resp = client.put(
             f"/api/v1/articles/{article_id}/sink-extension",
-            json={"extra_days": 10},
-        )
+            json={"extra_days": 10})
         assert ext_resp.status_code == 200
         assert ext_resp.json()["sink_duration_days"] > original_duration
 
@@ -710,8 +709,7 @@ class TestSinkExtension:
         for bad_days in [0, -1]:
             ext_resp = client.put(
                 f"/api/v1/articles/{article_id}/sink-extension",
-                json={"extra_days": bad_days},
-            )
+                json={"extra_days": bad_days})
             assert ext_resp.status_code == 422, \
                 f"extra_days={bad_days} should be rejected, got {ext_resp.status_code}"
 

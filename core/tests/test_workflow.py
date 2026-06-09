@@ -118,9 +118,12 @@ class TestPerCommitScoring:
         return u
 
     def _make_article(self, session, authors):
-        from peerpedia_core.storage.db.models import Article
-        a = Article(authors=authors, status="sedimentation")
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor
+        a = Article(status="sedimentation")
         session.add(a)
+        session.flush()
+        for pos, aid in enumerate(authors):
+            session.add(ArticleAuthor(article_id=a.id, author_id=aid, position=pos))
         session.commit()
         return a
 

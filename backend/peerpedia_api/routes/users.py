@@ -1,6 +1,6 @@
 """User API routes."""
 from fastapi import APIRouter, Depends, HTTPException
-from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.crud_article import get_articles_by_author
 from peerpedia_core.storage.db.crud_user import (
     create_user,
     follow_user,
@@ -26,13 +26,13 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("", response_model=list[UserSummary])
 def api_list_users(db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import Article
+    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = list_users(db)
     out = []
     for u in users:
-        article_count = db.query(Article).filter(
-            Article.authors.contains([u.id])
-        ).count()
+        article_count = db.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(ArticleAuthor.author_id == u.id).count()
         out.append(UserSummary(
             id=u.id, name=u.name, anonymous_name=u.anonymous_name,
             affiliation=u.affiliation, expertise=u.expertise,
@@ -72,7 +72,7 @@ def api_get_user(user_id: str, db: Session = Depends(deps.get_db)):
     u = get_user(db, user_id)
     if u is None:
         raise HTTPException(status_code=404, detail="User not found")
-    articles = [a for a in list_articles(db) if user_id in a.authors]
+    articles = get_articles_by_author(db, user_id)
     return UserProfile(
         id=u.id, username=u.username or "", name=u.name,
         anonymous_name=u.anonymous_name or "",
@@ -122,13 +122,13 @@ def api_update_user(user_id: str, body: UserUpdate,
 
 @router.get("/{user_id}/followers", response_model=list[UserSummary])
 def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import Article
+    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = get_followers(db, user_id)
     out = []
     for u in users:
-        article_count = db.query(Article).filter(
-            Article.authors.contains([u.id])
-        ).count()
+        article_count = db.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(ArticleAuthor.author_id == u.id).count()
         out.append(UserSummary(
             id=u.id, name=u.name, affiliation=u.affiliation,
             expertise=u.expertise,
@@ -139,13 +139,13 @@ def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
 
 @router.get("/{user_id}/following", response_model=list[UserSummary])
 def api_get_following(user_id: str, db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import Article
+    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = get_following(db, user_id)
     out = []
     for u in users:
-        article_count = db.query(Article).filter(
-            Article.authors.contains([u.id])
-        ).count()
+        article_count = db.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(ArticleAuthor.author_id == u.id).count()
         out.append(UserSummary(
             id=u.id, name=u.name, affiliation=u.affiliation,
             expertise=u.expertise,

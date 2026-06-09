@@ -1,8 +1,62 @@
 """Article CRUD operations."""
 from sqlalchemy.orm import Session
 
-from peerpedia_core.storage.db.models import Article
+from peerpedia_core.storage.db.models import Article, ArticleAuthor
 
+# ── Author helpers (join table) ───────────────────────────────────────────
+
+def add_article_authors(session: Session, article_id: str, author_ids: list[str]) -> None:
+    """Insert ArticleAuthor rows for an article."""
+    for pos, author_id in enumerate(author_ids):
+        session.add(ArticleAuthor(
+            article_id=article_id,
+            author_id=author_id,
+            position=pos,
+        ))
+
+
+def get_author_ids(session: Session, article_id: str) -> list[str]:
+    """Get all author IDs for an article (ordered by position)."""
+    rows = (
+        session.query(ArticleAuthor)
+        .filter(ArticleAuthor.article_id == article_id)
+        .order_by(ArticleAuthor.position)
+        .all()
+    )
+    return [r.author_id for r in rows]
+
+
+def get_author_ids_batch(session: Session, article_ids: list[str]) -> dict[str, list[str]]:
+    """Batch get author IDs for multiple articles.
+
+    Returns dict mapping article_id → ordered list of author_ids.
+    Articles with no authors get an empty list.
+    """
+    result: dict[str, list[str]] = {aid: [] for aid in article_ids}
+    if not article_ids:
+        return result
+    rows = (
+        session.query(ArticleAuthor)
+        .filter(ArticleAuthor.article_id.in_(article_ids))
+        .order_by(ArticleAuthor.article_id, ArticleAuthor.position)
+        .all()
+    )
+    for r in rows:
+        result[r.article_id].append(r.author_id)
+    return result
+
+
+def get_articles_by_author(session: Session, author_id: str) -> list[Article]:
+    """Return all articles where *author_id* is an author."""
+    return (
+        session.query(Article)
+        .join(ArticleAuthor, Article.id == ArticleAuthor.article_id)
+        .filter(ArticleAuthor.author_id == author_id)
+        .all()
+    )
+
+
+# ── CRUD ──────────────────────────────────────────────────────────────────
 
 def create_article(
     session: Session,
@@ -10,9 +64,11 @@ def create_article(
     status: str = "draft",
     **kwargs,
 ) -> Article:
-    """Create a new article record."""
-    a = Article(status=status, authors=authors, **kwargs)
+    """Create a new article record with author rows in the join table."""
+    a = Article(status=status, **kwargs)
     session.add(a)
+    session.flush()  # ensure a.id is available
+    add_article_authors(session, a.id, authors)
     session.commit()
     return a
 
@@ -28,7 +84,9 @@ def list_articles(session: Session, status: str | None = None,
     if status:
         q = q.filter(Article.status == status)
     if author_id:
-        q = q.filter(Article.authors.contains(author_id))
+        q = q.join(ArticleAuthor, Article.id == ArticleAuthor.article_id).filter(
+            ArticleAuthor.author_id == author_id
+        )
     q = q.order_by(Article.created_at.desc())
     if limit is not None:
         q = q.limit(limit).offset(offset)
@@ -41,7 +99,9 @@ def count_articles(session: Session, status: str | None = None,
     if status:
         q = q.filter(Article.status == status)
     if author_id:
-        q = q.filter(Article.authors.contains(author_id))
+        q = q.join(ArticleAuthor, Article.id == ArticleAuthor.article_id).filter(
+            ArticleAuthor.author_id == author_id
+        )
     return q.count()
 
 
@@ -95,7 +155,8 @@ def set_sink_start(session: Session, article_id: str, duration_days: int) -> Art
 def delete_article(session: Session, article_id: str) -> None:
     """Delete an article from the database and remove its git repository.
 
-    Cascades to related records: reviews, bookmarks, citations, merge_proposals.
+    Cascades to related records: article_authors, reviews, bookmarks,
+    citations, merge_proposals.
     Raises ValueError if the article does not exist.
     """
     import shutil
@@ -114,6 +175,7 @@ def delete_article(session: Session, article_id: str) -> None:
         raise ValueError(f"Article {article_id} not found")
 
     # Delete related records
+    session.query(ArticleAuthor).filter(ArticleAuthor.article_id == article_id).delete()
     session.query(Review).filter(Review.article_id == article_id).delete()
     session.query(Bookmark).filter(Bookmark.article_id == article_id).delete()
     session.query(Citation).filter(

@@ -19,8 +19,12 @@ def _make_user(session: Session, name: str) -> User:
 
 
 def _make_article(session: Session, authors: list[str], **kw) -> Article:
-    a = Article(authors=authors, **kw)
+    from peerpedia_core.storage.db.models import ArticleAuthor
+    a = Article(**kw)
     session.add(a)
+    session.flush()
+    for pos, aid in enumerate(authors):
+        session.add(ArticleAuthor(article_id=a.id, author_id=aid, position=pos))
     session.commit()
     return a
 
@@ -39,7 +43,8 @@ class TestArticleCRUD:
         article = create_article(session, authors=[user.id], status="draft")
         assert article.id is not None
         assert article.status == "draft"
-        assert article.authors == [user.id]
+        from peerpedia_core.storage.db.crud_article import get_author_ids
+        assert get_author_ids(session, article.id) == [user.id]
         session.close()
 
     def test_get_article(self, engine):
