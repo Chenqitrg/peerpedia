@@ -1117,3 +1117,77 @@ Manual test checklist (from design spec §11):
 git add -A && git commit -m "chore: final integration adjustments for tab system
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
+
+---
+
+## NOT in Scope
+
+| Item | Rationale |
+|------|-----------|
+| Tab drag-and-drop reordering | Separate UX feature; vertical drawer makes reordering less critical |
+| Tab context menu (close others, close all) | Listed as future in spec; "Close All" header button covers the 80% case |
+| Ctrl+Tab quick switcher | Future enhancement; browser tab switching already works |
+| Split panes for side-by-side editing | Separate feature with significantly more complexity |
+| Pinned tabs / tab groups | Premature for MVP; gather usage data first |
+
+## What Already Exists
+
+| Existing | How the plan reuses it |
+|----------|----------------------|
+| `KeepAlive` in App.vue (already caches EditorPage) | Expanded to include ArticlePage — zero new infrastructure |
+| `useDraftPersistence` composable | Each EditorPage instance uses it independently; unchanged |
+| `useLocalStorage` (loadJSON/saveJSON) | Tab store persistence uses the same utility |
+| `router.afterEach` guard pattern (auth guard exists) | New guard for tab registration follows same pattern |
+| `useCommitFlow` composable (commit popup pattern) | Close confirmation dialog follows same popup positioning |
+| lucide-vue-next icons (already in project) | TabDrawer uses Edit, Eye, X — all already in the bundle |
+
+## Failure Modes
+
+| Codepath | Failure | Tested? | Error handling | User impact |
+|----------|---------|---------|---------------|-------------|
+| removeTab: close last tab | navigate to `/` while tabs are empty | ✅ tested | Router handles `/` gracefully | User sees home page |
+| restoreTabs: corrupt localStorage JSON | JSON.parse throws | ❌ gap | loadJSON catches errors → returns null → restoreTabs returns early | Silent — no tabs restored, user starts fresh |
+| closeTab: dirty + navigate to tab | KeepAlive doesn't activate in time | ❌ gap | None currently | Dialog never appears — user stuck (FIXED by moving dialog to App.vue) |
+| TabDrawer: rapid hover/unhover | collapseTimer fires after mouse has re-entered | ❌ gap | onDrawerEnter clears timer | Drawer flickers closed then open (cosmetic) |
+| EditorPage: saveDraft fails during Save & Close | Network error or git failure | ❌ gap | errorMsg set but tab not closed | User sees error on now-inactive tab (FIXED by moving dialog to App.vue) |
+
+## Parallelization
+
+| Step | Modules touched | Depends on |
+|------|----------------|------------|
+| Task 1: useTabStore | stores/ | — |
+| Task 2: TabDrawer | components/ | Task 1 (imports store) |
+| Task 3: App.vue | App.vue, main.ts | Task 1, Task 2 |
+| Task 4: EditorPage | pages/EditorPage.vue | Task 1 |
+| Task 5: ArticlePage | pages/ArticlePage.vue | Task 1 |
+
+**Lanes:**
+- Lane A: Task 1 → Task 2 → Task 3 (sequential, shared store dependency)
+- Lane B: Task 4 (independent of Task 2/3, depends only on Task 1)
+- Lane C: Task 5 (independent of Task 2/3/4, depends only on Task 1)
+
+**Execution order:** Launch A + B + C in parallel after Task 1 completes. Task 2 and Task 3 must be sequential. Task 6 (integration) runs after all lanes merge.
+
+## Review-Driven Plan Changes
+
+Based on findings D1-D5, these changes must be applied to the plan before implementation:
+
+- [ ] **C1 (D1) — Move close dialog to App.vue**: Remove `pendingCloseTabId` watcher and close confirmation dialog from EditorPage. Instead, `onCloseTab` in App.vue directly shows the dialog. On "Save & Close", call `draftPersistence.save()` with the tab's last-known state from the store. Eliminates the multi-hop pattern.
+- [ ] **C2 (D2) — Remove openTab from components**: Delete `tabStore.openTab()` calls from EditorPage.onMounted and ArticlePage.onMounted. The `router.afterEach` guard in App.vue is the single source of truth.
+- [ ] **C3 (D3) — Extract to useTabIntegration.ts**: Create `frontend/src/composables/useTabIntegration.ts` with `useEditorTab(title, isClean, routePath)` and `useArticleTab(articleTitle, routePath)`. Each returns reactive state needed by the parent page.
+- [ ] **C4 (D4) — Add removeTab edge case tests**: Add tests for (a) closing a background (non-active) tab and (b) active tab with only a left neighbor.
+- [ ] **C5 (D5) — Add close flow integration test**: Component test that simulates the full flow: TabDrawer emits close-tab → dialog appears → "Save & Close" click → saveDraft called → tab removed.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 5 issues, 0 critical gaps |
+
+**UNRESOLVED:** 0 (all 5 issues resolved — user accepted all recommendations)
+
+**VERDICT:** ENG CLEARED — ready to implement after applying review-driven plan changes C1-C5 above.
+
+---
+
+*Review completed 2026-06-09. 5 findings, 5 accepted, 5 plan changes required.*
