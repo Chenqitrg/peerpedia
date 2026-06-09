@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-07 · All implemented features · Architecture debt resolved
+> 2026-06-09 · All implemented features · Architecture debt resolved · Plan remediation merged (git-first architecture compliance)
 
 ---
 
@@ -347,8 +347,8 @@ Compile output is **never** stored in the database. The compile endpoint generat
 
 | Suite | Tests | Framework |
 |-------|-------|-----------|
-| Backend | 120 | pytest |
-| Frontend | 319 | vitest |
+| Backend | 353 | pytest |
+| Frontend | 341 | vitest |
 | Rust | 16 | cargo test |
 
 ### 7.2 CI Pipeline
@@ -439,4 +439,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-09 · 120 backend tests · 327 frontend tests · 16 Rust tests · 9 DB entities*
+*Last updated: 2026-06-09 · 353 backend tests · 341 frontend tests · 16 Rust tests · 9 DB entities*
