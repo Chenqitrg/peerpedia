@@ -429,7 +429,8 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           <button
             class="flex items-center justify-center w-8 h-8 rounded-lg
                    text-ink-muted hover:text-ink hover:bg-[#21262d]
-                   transition-colors duration-200"
+                   transition-colors duration-200
+                   disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-ink-muted"
             :aria-label="t('editor.saveDraft')"
             :data-tooltip="t('editor.saveDraft')"
             :disabled="submitting || isClean"
