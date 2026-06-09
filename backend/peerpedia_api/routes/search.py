@@ -16,7 +16,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 VALID_SORTS = {"newest", "score"}
 
 # Max number of articles to scan source files for text-search fallback.
-# Only scanned when compiled_output is NULL and SQL title search didn't match.
+# Only scanned when SQL title search didn't match.
 _MAX_SOURCE_SCAN = 50
 
 
@@ -105,7 +105,7 @@ def search(
         already = {a.id for a in results}
 
         # Get candidates: articles matching status + category but NOT the
-        # title/compiled_output SQL condition.
+        # title SQL condition.
         fallback = base
         if sort_lower == "newest":
             fallback = fallback.order_by(Article.created_at.desc())
