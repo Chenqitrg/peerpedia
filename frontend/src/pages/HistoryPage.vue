@@ -56,6 +56,29 @@ const commits = computed(() => history.value?.commits ?? [])
 
 const sortedCommits = computed(() => [...commits.value].reverse())
 
+// ── Range selection (Ctrip-style) ──────────────────────────────────
+// When both hashes are selected, highlight all commits between them.
+
+const rangeIndices = computed<{ start: number; end: number } | null>(() => {
+  if (!selectedHash1.value || !selectedHash2.value) return null
+  const idx1 = sortedCommits.value.findIndex(c => c.hash === selectedHash1.value)
+  const idx2 = sortedCommits.value.findIndex(c => c.hash === selectedHash2.value)
+  if (idx1 === -1 || idx2 === -1) return null
+  const start = Math.min(idx1, idx2)
+  const end = Math.max(idx1, idx2)
+  return { start, end }
+})
+
+function isRangeCommit(idx: number): boolean {
+  if (!rangeIndices.value) return false
+  return idx >= rangeIndices.value.start && idx <= rangeIndices.value.end
+}
+
+function isRangeEdge(idx: number): boolean {
+  if (!rangeIndices.value) return false
+  return idx === rangeIndices.value.start || idx === rangeIndices.value.end
+}
+
 function toggleCommitSelect(hash: string) {
   if (!selectedHash1.value) {
     selectedHash1.value = hash
@@ -220,22 +243,36 @@ function goBack() {
           <div
             v-for="(commit, idx) in sortedCommits"
             :key="commit.hash"
-            class="flex items-start gap-3 py-2.5"
-            :class="idx < sortedCommits.length - 1 ? 'border-b border-divider' : ''"
+            class="flex items-start gap-3 py-2.5 transition-colors duration-200"
+            :class="{
+              'border-b border-divider': idx < sortedCommits.length - 1 && !isRangeCommit(idx + 1),
+              'border-b border-accent/30': isRangeCommit(idx) && idx < sortedCommits.length - 1 && isRangeCommit(idx + 1),
+              'bg-accent/[0.04]': isRangeCommit(idx),
+            }"
           >
             <!-- Timeline dot -->
             <div class="flex flex-col items-center shrink-0 pt-0.5">
+              <!-- Selection hint: first pick gets a smaller inner ring -->
               <div
-                class="w-3 h-3 rounded-full border-2 cursor-pointer transition-colors"
-                :class="commit.hash === selectedHash1 || commit.hash === selectedHash2
-                  ? 'bg-accent border-accent'
-                  : 'bg-card border-ink-muted hover:border-accent'"
+                class="w-3 h-3 rounded-full border-2 cursor-pointer transition-all duration-200 relative"
+                :class="{
+                  // Both selected: range edge dots
+                  'bg-accent border-accent ring-2 ring-accent/30': isRangeEdge(idx),
+                  // Single selection (only one picked)
+                  'bg-accent border-accent': commit.hash === selectedHash1 && !selectedHash2,
+                  // Inside range (not edge)
+                  'bg-accent/60 border-accent/60': isRangeCommit(idx) && !isRangeEdge(idx),
+                  // Unselected
+                  'bg-card border-ink-muted hover:border-accent': commit.hash !== selectedHash1 && commit.hash !== selectedHash2,
+                }"
                 :data-tooltip="`Select ${commit.hash.substring(0, 7)}`"
                 @click="toggleCommitSelect(commit.hash)"
               />
+              <!-- Connecting line -->
               <div
                 v-if="idx < sortedCommits.length - 1"
-                class="w-0.5 h-6 bg-divider"
+                class="w-0.5 h-6 transition-colors duration-200"
+                :class="isRangeCommit(idx) && isRangeCommit(idx + 1) ? 'bg-accent/50' : 'bg-divider'"
               />
             </div>
 
@@ -286,9 +323,31 @@ function goBack() {
       <!-- Selected commits info -->
       <div
         v-if="selectedHash1 && !selectedHash2"
-        class="card p-4 mb-6 text-center text-sm text-ink-muted"
+        class="card p-4 mb-6 text-center text-sm"
       >
-        {{ t('history.selectSecondCommit') }}
+        <span class="inline-flex items-center gap-2 text-ink-muted">
+          <span class="w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-accent/30 inline-block" />
+          {{ t('history.selectSecondCommit') }}
+        </span>
+      </div>
+      <div
+        v-if="selectedHash1 && selectedHash2"
+        class="card p-3 mb-6 text-center text-xs text-ink-muted flex items-center justify-center gap-3"
+      >
+        <span class="inline-flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-accent/30" />
+          <span class="font-mono">{{ selectedHash1.substring(0, 7) }}</span>
+        </span>
+        <span class="text-ink-muted/50">→</span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-accent/30" />
+          <span class="font-mono">{{ selectedHash2.substring(0, 7) }}</span>
+        </span>
+        <button
+          class="ml-3 text-ink-muted hover:text-ink transition-colors"
+          @click="selectedHash1 = null; selectedHash2 = null; diffResult = null"
+          aria-label="Clear selection"
+        >✕</button>
       </div>
 
       <!-- Diff viewer -->
