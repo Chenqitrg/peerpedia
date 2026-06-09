@@ -613,6 +613,14 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               :commit-hash="commitHash"
               show-label
             />
+            <DownloadButton
+              format="repo"
+              :content="''"
+              :article-id="article?.id"
+              :filename="article?.title"
+              :commit-hash="commitHash"
+              show-label
+            />
 
             <button
               v-if="isOwnArticle && article.status === 'sedimentation'"

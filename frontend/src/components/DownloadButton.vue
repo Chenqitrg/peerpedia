@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader, FileDown, FileCode } from 'lucide-vue-next'
+import { Loader, FileDown, FileCode, Package } from 'lucide-vue-next'
 import { parseMarkdown } from '../utils/markdown'
 import { compileDownload } from '../api/compile'
 
 const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
-  format: 'source' | 'compiled'
+  format: 'source' | 'compiled' | 'repo'
   content: string
   contentFormat?: string
   filename?: string
   commitHash?: string
+  articleId?: string
   disabled?: boolean
   disabledReason?: string
   showLabel?: boolean
@@ -27,6 +28,7 @@ const downloading = ref(false)
 const tooltipText = computed(() => {
   if (props.disabled && props.disabledReason) return props.disabledReason
   if (props.showLabel) return undefined
+  if (props.format === 'repo') return 'Download repo (.git bundle)'
   if (props.format === 'source') {
     return props.contentFormat === 'typst' ? 'Download source (.typ)' : 'Download source (.md)'
   }
@@ -47,6 +49,14 @@ async function handleDownload() {
       || 'article'
 
     const hashSuffix = props.commitHash ? `-${props.commitHash.slice(0, 7)}` : ''
+
+    if (props.format === 'repo') {
+      // Download git repo bundle — open backend endpoint
+      if (props.articleId) {
+        window.open(`/api/v1/articles/${props.articleId}/download/repo`, '_blank')
+      }
+      return
+    }
 
     if (props.format === 'compiled' && props.contentFormat === 'typst') {
       // Typst: call server to compile → PDF, then download the blob
@@ -93,9 +103,11 @@ async function handleDownload() {
 
 <template>
   <button
-    :aria-label="format === 'source'
-      ? (contentFormat === 'typst' ? 'Download source (.typ)' : 'Download source (.md)')
-      : (contentFormat === 'typst' ? 'Download compiled (.pdf)' : 'Download compiled (.html)')"
+    :aria-label="format === 'repo'
+      ? 'Download repo (.git bundle)'
+      : format === 'source'
+        ? (contentFormat === 'typst' ? 'Download source (.typ)' : 'Download source (.md)')
+        : (contentFormat === 'typst' ? 'Download compiled (.pdf)' : 'Download compiled (.html)')"
     :data-tooltip="tooltipText"
     :disabled="downloading || disabled"
     class="flex items-center gap-1 rounded-md transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-ink-muted"
@@ -107,8 +119,9 @@ async function handleDownload() {
     <Loader v-if="downloading" class="w-4 h-4 animate-spin" stroke-width="2" />
     <template v-else>
       <FileCode v-if="format === 'source'" class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
-      <FileDown v-else class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
-      <span v-if="showLabel">{{ format === 'source' ? t('download.source') : t('download.compiled') }}</span>
+      <FileDown v-else-if="format === 'compiled'" class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
+      <Package v-else class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
+      <span v-if="showLabel">{{ format === 'repo' ? 'Repo' : format === 'source' ? t('download.source') : t('download.compiled') }}</span>
     </template>
   </button>
 </template>
