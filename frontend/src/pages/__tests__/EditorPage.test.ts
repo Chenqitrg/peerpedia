@@ -373,8 +373,8 @@ describe('EditorPage', () => {
     expect(localStorage.getItem('editor-draft-id-u1-new')).toBeNull()
     expect(localStorage.getItem('editor-draft-u1-new')).toBeNull()
   })
-  // Regression: confirmSaveWithCommit sets commit message and saves
-  it('confirmSaveWithCommit saves after setting commit message', async () => {
+  // Regression: confirmCommit sets commit message and saves
+  it('confirmCommit saves after setting commit message', async () => {
     _isTauri = true
     const { useUserStore } = await import('../../stores/useUserStore')
     setActivePinia(createPinia())
@@ -393,7 +393,7 @@ describe('EditorPage', () => {
     vm.tempCommitMsg = 'My commit message'
     vm.showCommitPopup = true
 
-    await vm.confirmSaveWithCommit()
+    await vm.confirmCommit()
     await flushPromises()
 
     expect(vm.showCommitPopup).toBe(false)
@@ -579,7 +579,7 @@ describe('EditorPage', () => {
 
     // Complete first save via popup
     vm.tempCommitMsg = 'First commit'
-    await vm.confirmSaveWithCommit()
+    await vm.confirmCommit()
     await flushPromises()
     expect(vm.showCommitPopup).toBe(false)
 

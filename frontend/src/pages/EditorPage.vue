@@ -8,6 +8,7 @@ const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.v
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
+import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
@@ -236,90 +237,89 @@ async function restoreDraft() {
   }
 }
 
-async function saveDraft() {
-  const accountId = userStore.viewer?.id || 'local'
-  const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
+/** Git-backed save for Tauri/local mode — git is source of truth (DESIGN.md §2.3). */
+async function persistToGit(accountId: string, author: string, msg: string): Promise<boolean> {
+  const existingId = currentDraftId.value
 
-  // In Tauri/local mode: git is the source of truth (DESIGN.md §2.3).
-  // Every save is a git commit. Errors are surfaced, not swallowed.
-  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-    const msg = commitMsg.value.trim() || 'Save draft'
+  if (!existingId) {
+    // New draft — create persistence entry first to get an ID, then gitInit.
+    const result = await draftPersistence.save(
+      accountId, title.value, content.value, format.value, undefined,
+    )
+    if (!result || !result.id) { errorMsg.value = 'Failed to create draft'; return false }
+    currentDraftId.value = result.id
+    saveString(DRAFT_ID_KEY.value, result.id)
 
-    // For new drafts: get an ID from persistence first (needed for git article_id),
-    // then gitInit. For existing drafts: gitCommit first, then update persistence.
-    const existingId = currentDraftId.value
-
-    if (!existingId) {
-      // New draft — create persistence entry first to get an ID.
-      const result = await draftPersistence.save(
-        accountId, title.value, content.value, format.value, undefined,
-      )
-      if (!result || !result.id) { errorMsg.value = 'Failed to create draft'; return }
-      currentDraftId.value = result.id
-      saveString(DRAFT_ID_KEY.value, result.id)
-
-      try {
-        const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
-        if (r && 'hash' in r) commitHash.value = r.hash
-      } catch (e: unknown) {
-        errorMsg.value = e instanceof Error ? e.message : 'Git init failed — draft saved without version history'
-      }
-    } else {
-      // Existing draft — git commit FIRST (source of truth).
-      try {
-        const history = await tauri.gitHistory({ article_id: existingId })
-        const hasRepo = history && !('error' in history) && Array.isArray(history) && history.length > 0
-        if (hasRepo) {
-          const r = await tauri.gitCommit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
-          if (r && 'hash' in r) commitHash.value = r.hash
-          else { errorMsg.value = 'Git commit failed — draft not saved'; return }
-        } else {
-          const r = await tauri.gitInit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
-          if (r && 'hash' in r) commitHash.value = r.hash
-          else { errorMsg.value = 'Git init failed — draft not saved'; return }
-        }
-      } catch (e: unknown) {
-        errorMsg.value = e instanceof Error ? e.message : 'Git operation failed — draft not saved'
-        return
-      }
-
-      // Git succeeded — update the DB index.
-      await draftPersistence.save(
-        accountId, title.value, content.value, format.value, existingId,
-      )
+    try {
+      const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+      if (r && 'hash' in r) commitHash.value = r.hash
+    } catch (e: unknown) {
+      errorMsg.value = e instanceof Error ? e.message : 'Git init failed — draft saved without version history'
     }
-
-    commitMsg.value = ''
-    savedContent.value = content.value
-    savedTitle.value = title.value
-    savedMsg.value = true
-    setTimeout(() => { savedMsg.value = false }, 2000)
-    return
+    return true
   }
 
-  // Web mode: persist via REST API + localStorage fallback.
+  // Existing draft — git commit FIRST, then update DB index.
+  try {
+    const history = await tauri.gitHistory({ article_id: existingId })
+    const hasRepo = history && !('error' in history) && Array.isArray(history) && history.length > 0
+    if (hasRepo) {
+      const r = await tauri.gitCommit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
+      if (r && 'hash' in r) { commitHash.value = r.hash }
+      else { errorMsg.value = 'Git commit failed — draft not saved'; return false }
+    } else {
+      const r = await tauri.gitInit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
+      if (r && 'hash' in r) { commitHash.value = r.hash }
+      else { errorMsg.value = 'Git init failed — draft not saved'; return false }
+    }
+  } catch (e: unknown) {
+    errorMsg.value = e instanceof Error ? e.message : 'Git operation failed — draft not saved'
+    return false
+  }
+
+  // Git succeeded — update the DB index.
+  await draftPersistence.save(accountId, title.value, content.value, format.value, existingId)
+  return true
+}
+
+/** Persist via REST API + localStorage fallback (web mode). */
+async function persistToWeb(accountId: string) {
   const result = await draftPersistence.save(
-    accountId,
-    title.value,
-    content.value,
-    format.value,
-    currentDraftId.value,
+    accountId, title.value, content.value, format.value, currentDraftId.value,
   )
   if (result && result.id) {
     currentDraftId.value = result.id
     saveString(DRAFT_ID_KEY.value, result.id)
   }
-
-  // localStorage as offline session backup (editor state only, not canonical).
   saveJSON(DRAFT_KEY.value, {
     title: title.value, content: content.value, format: format.value,
     scores: scores.value, keywords: keywords.value,
     categories: categories.value, abstract: abstract.value,
   })
+}
+
+function markSaved() {
   savedContent.value = content.value
   savedTitle.value = title.value
   savedMsg.value = true
   setTimeout(() => { savedMsg.value = false }, 2000)
+}
+
+async function saveDraft() {
+  const accountId = userStore.viewer?.id || 'local'
+  const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
+
+  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    const msg = commitMsg.value.trim() || 'Save draft'
+    const ok = await persistToGit(accountId, author, msg)
+    if (!ok) return
+    commitMsg.value = ''
+    markSaved()
+    return
+  }
+
+  await persistToWeb(accountId)
+  markSaved()
 }
 
 async function handleCompile() {
@@ -356,25 +356,14 @@ async function handleCompile() {
   }
 }
 
-// Commit message popup
-const showCommitPopup = ref(false)
-const tempCommitMsg = ref('')
-
-function openCommitPopup() {
-  tempCommitMsg.value = commitMsg.value
-  showCommitPopup.value = true
-}
-
-async function confirmSaveWithCommit() {
-  commitMsg.value = tempCommitMsg.value.trim() || 'Save draft'
-  showCommitPopup.value = false
-  await saveDraft()
-}
+// Commit message popup — extracted to useCommitFlow composable
+const { showCommitPopup, tempCommitMsg, openCommitPopup, confirmCommit, cancelCommit } =
+  useCommitFlow((msg: string) => { commitMsg.value = msg; saveDraft() })
 
 async function handleSaveDraft() {
   // In local mode, require a commit message
   if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && !commitMsg.value.trim()) {
-    openCommitPopup()
+    openCommitPopup(commitMsg.value)
     return
   }
   await saveDraft()
@@ -530,11 +519,11 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
               <div class="flex items-center gap-2">
                 <button
                   class="flex-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-lg py-1.5 transition-colors"
-                  @click="showCommitPopup = false"
+                  @click="cancelCommit()"
                 >{{ t('editor.cancel') }}</button>
                 <button
                   class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-1.5 hover:brightness-110 transition-all"
-                  @click="confirmSaveWithCommit"
+                  @click="confirmCommit"
                 >{{ t('editor.saveDraft') }}</button>
               </div>
             </div>
