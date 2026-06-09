@@ -56,11 +56,17 @@ async function handleDownload() {
     if (props.format === 'repo') {
       if (!props.articleId) return
       if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-        // Tauri/local: create tar.gz via Rust, then download from filesystem
-        const filePath = await tauri.exportArticle({ article_id: props.articleId })
-        if (filePath && typeof filePath === 'string' && !('error' in (filePath as any))) {
-          // Read the file via Tauri and trigger download
-          window.open(`file://${filePath}`, '_blank')
+        // Tauri/local: Rust creates tar.gz, returns base64 → blob download
+        const result = await tauri.exportArticle({ article_id: props.articleId })
+        if (result && typeof result === 'string') {
+          const binary = Uint8Array.from(atob(result), c => c.charCodeAt(0))
+          const blob = new Blob([binary], { type: 'application/gzip' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${base}${hashSuffix}.tar.gz`
+          a.click()
+          URL.revokeObjectURL(url)
         }
       } else {
         // Web mode: server endpoint

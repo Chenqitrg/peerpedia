@@ -147,8 +147,11 @@ pub fn git_commit(
 
 // ── Export ────────────────────────────────────────────────────────────────
 
-/// Create a tar.gz bundle of the article git repository and return the path.
+/// Create a tar.gz bundle of the article git repository and return base64-encoded bytes.
 pub fn export_article(article_id: &str) -> Result<String, AppError> {
+    use base64::Engine;
+    use std::io::Read;
+
     let rp = repo_path(article_id)?;
     if !rp.join(".git").is_dir() {
         return Err(AppError::NotFound(format!(
@@ -174,10 +177,17 @@ pub fn export_article(article_id: &str) -> Result<String, AppError> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        let _ = std::fs::remove_file(&tmp_path);
         return Err(AppError::IoError(format!("tar failed: {}", stderr)));
     }
 
-    Ok(tmp_path.to_str().unwrap_or("export.tar.gz").to_string())
+    let mut buf = Vec::new();
+    std::fs::File::open(&tmp_path)
+        .and_then(|mut f| f.read_to_end(&mut buf))
+        .map_err(|e| AppError::IoError(format!("Failed to read archive: {}", e)))?;
+    let _ = std::fs::remove_file(&tmp_path);
+
+    Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
 }
 
 // ── History ──────────────────────────────────────────────────────────────
