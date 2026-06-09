@@ -49,6 +49,7 @@ const previewHtml = ref('')
 const previewLoading = ref(false)
 const compiling = ref(false)
 const compileResult = ref<{ type: 'svg' | 'error'; content: string } | null>(null)
+const loadingArticle = ref(false)
 
 // Side panel
 const showSelfReview = ref(false)
@@ -145,6 +146,7 @@ watch(() => route.query.new, (val) => {
 }, { immediate: true })
 
 async function loadExistingArticle() {
+  loadingArticle.value = true
   // 1. Try REST API first.
   try {
     await articleStore.fetchArticle(editId.value!)
@@ -204,6 +206,8 @@ async function loadExistingArticle() {
       }
     }
     errorMsg.value = 'Failed to load article'
+  } finally {
+    loadingArticle.value = false
   }
 }
 
@@ -468,7 +472,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
     <!-- Top toolbar -->
     <div class="flex items-center justify-between px-4 py-2 bg-card border border-divider rounded-t-lg mb-0">
       <button
-        class="flex items-center justify-center w-8 h-8 rounded-lg
+        class="flex items-center justify-center w-9 h-9 rounded-lg
                text-ink-muted hover:text-ink hover:bg-[#21262d]
                transition-colors duration-200 shrink-0"
         aria-label="Back"
@@ -498,7 +502,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         <!-- Draft save -->
         <div class="relative">
           <button
-            class="flex items-center justify-center w-8 h-8 rounded-lg
+            class="flex items-center justify-center w-9 h-9 rounded-lg
                    text-ink-muted hover:text-ink hover:bg-[#21262d]
                    transition-colors duration-200
                    disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-ink-muted"
@@ -569,7 +573,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
 
         <!-- Toggle preview -->
         <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg
+          class="flex items-center justify-center w-9 h-9 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="showPreview ? 'Hide preview' : 'Show preview'"
@@ -582,7 +586,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
 
         <!-- Compile -->
         <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg
+          class="flex items-center justify-center w-9 h-9 rounded-lg
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('editor.compile')"
@@ -628,7 +632,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         <router-link
           v-if="isEdit || currentDraftId"
           :to="`/articles/${editId || currentDraftId}/history`"
-          class="flex items-center justify-center w-8 h-8 rounded-lg
+          class="flex items-center justify-center w-9 h-9 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="t('article.history')"
@@ -641,7 +645,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
 
         <!-- Publish to pool -->
         <button
-          class="flex items-center justify-center w-8 h-8 rounded-lg
+          class="flex items-center justify-center w-9 h-9 rounded-lg
                  transition-colors duration-200"
           :class="canWrite('editor.publish_pool')
             ? 'text-accent hover:text-accent hover:bg-accent/10'
@@ -665,12 +669,19 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
     </div>
 
     <!-- Split editor/preview -->
-    <div class="flex flex-1 border-x border-divider overflow-hidden">
+    <div class="flex flex-1 border-x border-divider overflow-hidden border-t">
       <!-- Editor area (left) -->
       <div
         class="flex flex-col"
         :style="{ width: showPreview ? `${splitRatio}%` : '100%' }"
       >
+        <!-- Loading skeleton -->
+        <div v-if="loadingArticle" class="flex-1 w-full bg-[#0d1117] p-4 animate-pulse">
+          <div class="h-4 bg-[#21262d] rounded w-3/4 mb-3" />
+          <div class="h-4 bg-[#21262d] rounded w-1/2 mb-3" />
+          <div class="h-4 bg-[#21262d] rounded w-5/6 mb-3" />
+          <div class="h-4 bg-[#21262d] rounded w-2/3" />
+        </div>
         <!-- CodeMirror for Markdown -->
         <CodeEditor
           v-if="format === 'markdown'"
