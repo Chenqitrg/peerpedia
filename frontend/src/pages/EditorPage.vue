@@ -358,7 +358,7 @@ async function handleCompile() {
 
 // Commit message popup — extracted to useCommitFlow composable
 const { showCommitPopup, tempCommitMsg, openCommitPopup, confirmCommit, cancelCommit } =
-  useCommitFlow((msg: string) => { commitMsg.value = msg; saveDraft() })
+  useCommitFlow(async (msg: string) => { commitMsg.value = msg; await saveDraft() })
 
 async function handleSaveDraft() {
   // In local mode, require a commit message
