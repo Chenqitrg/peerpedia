@@ -489,6 +489,40 @@ describe('EditorPage', () => {
     expect(vm.previewHtml).toContain('Typst SVG output')
   })
 
+  // Regression: save button is disabled when no unsaved changes (isClean)
+  it('disables save button when content has not changed', async () => {
+    _isTauri = true
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    const vm = wrapper.vm as any
+
+    // Initially: content and savedContent are both empty → isClean=true
+    expect(vm.isClean).toBe(true)
+
+    // Find the save button
+    const saveBtn = wrapper.find('button[aria-label="Save draft"], button[title="Save draft"]')
+    expect(saveBtn.exists()).toBe(true)
+    // Button should be disabled when isClean
+    expect(saveBtn.attributes('disabled')).toBeDefined()
+
+    // Type content → isClean becomes false → button enables
+    vm.content = '# New Content'
+    vm.title = 'New Title'
+    await new Promise(r => setTimeout(r, 50))
+    expect(vm.isClean).toBe(false)
+    // After content change, disabled should be removed
+    const saveBtn2 = wrapper.find('button[aria-label="Save draft"], button[title="Save draft"]')
+    expect(saveBtn2.attributes('disabled')).toBeUndefined()
+  })
+
   // Typst: compilation error is rendered in the preview area (not just error bar)
   it('shows compilation error in preview area when Typst compile fails', async () => {
     _isTauri = true

@@ -558,4 +558,58 @@ describe('ArticlePage — delete', () => {
     // deleteArticle should NOT have been called
     expect(mockDeleteArticle).not.toHaveBeenCalled()
   })
+
+  // Regression: Typst article renders via compileTypst in Tauri/local mode
+  it('compiles Typst article to SVG in local mode', async () => {
+    // Override getArticle to throw (simulate offline) and getDraft to return Typst draft
+    const { getArticle } = await import('../../api/articles')
+    const { useTauri } = await import('../../composables/useTauri')
+
+    vi.mocked(getArticle).mockRejectedValueOnce(new Error('offline'))
+    const tauriModule = { useTauri }
+    const mockCompileTypst = vi.fn().mockResolvedValue('<svg>Typst article body</svg>')
+    const mockGetDraft = vi.fn().mockResolvedValue({
+      id: 'typst-article-1',
+      account_id: 'u1',
+      title: 'Typst Paper',
+      content: '= Introduction\nSome *typst* content.',
+      format: 'typst',
+      updated_at: '2026-06-01',
+    })
+
+    // Re-mock useTauri for this test
+    vi.doMock('../../composables/useTauri', () => ({
+      useTauri: () => ({
+        isTauri: { value: true },
+        isBrowserLocal: { value: false },
+        deleteArticle: mockDeleteArticle,
+        getSessionToken: vi.fn(() => null),
+        setSessionToken: vi.fn(),
+        listDrafts: vi.fn().mockResolvedValue([]),
+        login: vi.fn(),
+        listAccounts: vi.fn().mockResolvedValue([]),
+        gitHistory: vi.fn().mockResolvedValue([]),
+        isFollowing: vi.fn().mockResolvedValue({ following: false }),
+        getCachedArticle: vi.fn().mockResolvedValue(null),
+        getDraft: mockGetDraft,
+        compileTypst: mockCompileTypst,
+        saveDraft: vi.fn(),
+        searchDrafts: vi.fn().mockResolvedValue([]),
+        searchCachedArticles: vi.fn().mockResolvedValue([]),
+      }),
+    }))
+
+    const { default: ArticlePage } = await import('../ArticlePage.vue')
+    const wrapper = mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    await new Promise(r => setTimeout(r, 100))
+
+    // compileTypst should have been called with Typst content
+    expect(mockCompileTypst).toHaveBeenCalledWith({
+      content: '= Introduction\nSome *typst* content.',
+      format: 'typst',
+    })
+  })
 })
