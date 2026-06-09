@@ -481,4 +481,45 @@ describe('Tab Identity Specification', () => {
     // The article body content from the API mock should be present
     expect(html).toContain('prose-custom')
   })
+
+  // ── SPEC: Two "New Article" clicks create two independent editors ─
+
+  it('SPEC: clicking New Article twice creates two tabs with independent content', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Click "New Article" (first time)
+    await rou.push('/edit?new=1')
+    await settle()
+    // Type content into first editor
+    const ta1 = wrp.find('.cm-editor')
+    expect(ta1.exists()).toBe(true)
+    await ta1.setValue('Content for first article')
+    await settle()
+
+    // Verify 1 tab exists
+    expect(wrp.findAll('.tab-drawer-edge').length).toBe(1)
+
+    // Click "New Article" again — must create a SECOND tab, not overwrite the first
+    await rou.push('/edit?new=1&_t=2')
+    await settle()
+
+    // Two tabs must exist
+    expect(wrp.findAll('.tab-drawer-edge').length).toBe(2)
+
+    // Type different content into second editor
+    const ta2 = wrp.find('.cm-editor')
+    expect(ta2.exists()).toBe(true)
+    await ta2.setValue('Content for second article')
+    await settle()
+
+    // Switch back to first tab
+    await expand(wrp)
+    const items = wrp.findAll('.tab-drawer-item')
+    expect(items.length).toBe(2)
+    await items[0].trigger('click')
+    await settle()
+
+    // First tab must still have its original content — NOT empty/NOT second content
+    expect((wrp.find('.cm-editor').element as HTMLTextAreaElement).value).toBe('Content for first article')
+  })
 })

@@ -14,36 +14,36 @@ describe('useTabStore', () => {
 
   describe('openTab', () => {
     it('adds editor tab for /edit route', () => {
-      const s = useTabStore(); s.openTab({ path: '/edit', params: {} })
+      const s = useTabStore(); s.openTab('/edit')
       expect(s.tabs[0]).toMatchObject({ type: 'editor', title: 'Untitled', dirty: false, status: 'draft' })
     })
 
     it('adds article tab for /article route', () => {
-      const s = useTabStore(); s.openTab({ path: '/article/abc', params: { id: 'abc' } })
+      const s = useTabStore(); s.openTab('/article/abc')
       expect(s.tabs[0]).toMatchObject({ type: 'article', icon: 'eye', status: 'published' })
     })
 
     it('normalizes /articles/ to /article/', () => {
-      const s = useTabStore(); s.openTab({ path: '/articles/abc', params: { id: 'abc' } })
+      const s = useTabStore(); s.openTab('/articles/abc')
       expect(s.tabs[0].id).toBe('/article/abc')
     })
 
     it('activates existing tab instead of duplicating', () => {
       const s = useTabStore()
-      s.openTab({ path: '/edit/abc', params: { id: 'abc' } })
-      s.openTab({ path: '/edit/abc', params: { id: 'abc' } })
+      s.openTab('/edit/abc')
+      s.openTab('/edit/abc')
       expect(s.tabs).toHaveLength(1)
     })
 
     it('ignores non-tab routes', () => {
-      const s = useTabStore(); s.openTab({ path: '/pool', params: {} })
+      const s = useTabStore(); s.openTab('/pool')
       expect(s.tabs).toHaveLength(0)
     })
   })
 
   describe('updateTab', () => {
     it('updates title, dirty, status, scrollTop, cursorPosition', () => {
-      const s = useTabStore(); s.openTab({ path: '/edit/abc', params: { id: 'abc' } })
+      const s = useTabStore(); s.openTab('/edit/abc')
       s.updateTab('/edit/abc', { title: 'Draft', dirty: true, status: 'sedimentation', scrollTop: 200, cursorPosition: 50 })
       expect(s.tabs[0].title).toBe('Draft')
       expect(s.tabs[0].dirty).toBe(true)
@@ -58,13 +58,13 @@ describe('useTabStore', () => {
 
   describe('closeTab', () => {
     it('removes clean tab', () => {
-      const s = useTabStore(); s.openTab({ path: '/article/1', params: { id: '1' } })
+      const s = useTabStore(); s.openTab('/article/1')
       expect(s.closeTab('/article/1')).toEqual({ shouldPrompt: false })
       expect(s.tabs).toHaveLength(0)
     })
 
     it('returns shouldPrompt for dirty tab', () => {
-      const s = useTabStore(); s.openTab({ path: '/edit/a', params: { id: 'a' } })
+      const s = useTabStore(); s.openTab('/edit/a')
       s.updateTab('/edit/a', { dirty: true })
       expect(s.closeTab('/edit/a')).toEqual({ shouldPrompt: true })
       expect(s.tabs).toHaveLength(1)
@@ -74,9 +74,9 @@ describe('useTabStore', () => {
   describe('removeTab', () => {
     it('navigates to right neighbor when closing active tab', () => {
       const s = useTabStore()
-      s.openTab({ path: '/edit/a', params: { id: 'a' } })
-      s.openTab({ path: '/edit/b', params: { id: 'b' } })
-      s.openTab({ path: '/edit/c', params: { id: 'c' } })
+      s.openTab('/edit/a')
+      s.openTab('/edit/b')
+      s.openTab('/edit/c')
       s.activateTab('/edit/b'); mockPush.mockClear()
       s.removeTab('/edit/b')
       expect(s.tabs.map(t => t.id)).toEqual(['/edit/a', '/edit/c'])
@@ -85,8 +85,8 @@ describe('useTabStore', () => {
 
     it('closing non-active tab does not navigate', () => {
       const s = useTabStore()
-      s.openTab({ path: '/edit/a', params: { id: 'a' } })
-      s.openTab({ path: '/edit/b', params: { id: 'b' } })
+      s.openTab('/edit/a')
+      s.openTab('/edit/b')
       s.activateTab('/edit/a'); mockPush.mockClear()
       s.removeTab('/edit/b')
       expect(s.tabs.map(t => t.id)).toEqual(['/edit/a'])
@@ -95,15 +95,15 @@ describe('useTabStore', () => {
 
     it('navigates to left neighbor when no right neighbor exists', () => {
       const s = useTabStore()
-      s.openTab({ path: '/edit/a', params: { id: 'a' } })
-      s.openTab({ path: '/edit/b', params: { id: 'b' } })
+      s.openTab('/edit/a')
+      s.openTab('/edit/b')
       s.activateTab('/edit/b'); mockPush.mockClear()
       s.removeTab('/edit/b')
       expect(mockPush).toHaveBeenCalledWith('/edit/a')
     })
 
     it('navigates to home when closing last tab', () => {
-      const s = useTabStore(); s.openTab({ path: '/edit/x', params: { id: 'x' } })
+      const s = useTabStore(); s.openTab('/edit/x')
       s.removeTab('/edit/x')
       expect(s.activeTabId).toBeNull()
       expect(mockPush).toHaveBeenCalledWith('/')

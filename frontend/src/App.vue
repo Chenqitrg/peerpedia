@@ -10,7 +10,7 @@
       >
         <router-view v-slot="{ Component, route }">
           <keep-alive :include="['EditorPage', 'ArticlePage']">
-            <component :is="Component" :key="route.path" />
+            <component :is="Component" :key="route.fullPath" />
           </keep-alive>
         </router-view>
       </main>
@@ -59,7 +59,10 @@ const isEditorPage = computed(() => route.path.startsWith('/edit'))
 
 router.afterEach((to) => {
   if (to.path.startsWith('/edit') || to.path.startsWith('/article') || to.path.startsWith('/articles')) {
-    tabStore.openTab({ path: to.path, params: to.params as Record<string, string> })
+    // Pass fullPath so editor tabs with different ?new=1&_t=X get unique ids.
+    // Article paths get normalized: /articles/foo → /article/foo.
+    const rawPath = to.fullPath
+    tabStore.openTab(rawPath)
   }
 })
 

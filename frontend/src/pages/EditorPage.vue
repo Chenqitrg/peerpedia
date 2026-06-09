@@ -164,7 +164,6 @@ watch(() => route.query.new, (val) => {
     currentDraftId.value = undefined
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
-    router.replace({ path: '/edit' })
   }
 }, { immediate: true })
 

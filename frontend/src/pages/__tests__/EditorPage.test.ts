@@ -407,7 +407,7 @@ describe('EditorPage', () => {
   })
 
   // Regression: editor resets state when activated with query.new=1 (NavBar "New Article")
-  it('resets editor state and cleans URL when activated with query.new=1', async () => {
+  it('resets editor state when activated with query.new=1', async () => {
     _isTauri = true
     mockRoute.query = { new: '1' }
 
@@ -434,8 +434,6 @@ describe('EditorPage', () => {
     // Stale localStorage keys should be removed
     expect(localStorage.getItem('editor-draft-id-u1-new')).toBeNull()
     expect(localStorage.getItem('editor-draft-u1-new')).toBeNull()
-    // URL should be cleaned from /edit?new=1 to /edit
-    expect(mockReplace).toHaveBeenCalledWith({ path: '/edit' })
   })
 
   // Regression: editor does NOT trigger reset when activated without query.new.

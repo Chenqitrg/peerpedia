@@ -51,25 +51,25 @@ export const useTabStore = defineStore('tab', () => {
     return null
   }
 
-  function openTab(to: { path: string; params: Record<string, string> }): void {
-    const routePath = to.path.startsWith('/articles/')
-      ? to.path.replace('/articles/', '/article/')
-      : to.path
-    if (!routePath.startsWith('/edit') && !routePath.startsWith('/article')) return
+  function openTab(rawPath: string): void {
+    // Normalize /articles/xxx → /article/xxx (preserve query params for uniqueness)
+    const normalized = rawPath.replace(/^\/articles\//, '/article/')
+    const basePath = normalized.split('?')[0]
+    if (!basePath.startsWith('/edit') && !basePath.startsWith('/article')) return
 
-    const existing = findTab(routePath)
-    if (existing) { activeTabId.value = routePath; persist(); return }
+    const existing = findTab(normalized)
+    if (existing) { activeTabId.value = normalized; persist(); return }
 
-    const type = routePath.startsWith('/edit') ? 'editor' : 'article'
+    const type = basePath.startsWith('/edit') ? 'editor' : 'article'
     const status = type === 'editor' ? 'draft' : 'published'
     tabs.value.push({
-      id: routePath, type,
+      id: normalized, type,
       title: type === 'editor' ? 'Untitled' : 'Loading...',
       dirty: false,
       icon: type === 'editor' ? 'edit' : 'eye',
       status,
     })
-    activeTabId.value = routePath
+    activeTabId.value = normalized
     persist()
   }
 
