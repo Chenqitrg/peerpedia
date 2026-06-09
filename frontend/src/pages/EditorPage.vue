@@ -552,6 +552,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         <DownloadButton
           format="repo"
           :content="content"
+          :article-id="editId || currentDraftId"
           :filename="title"
           :disabled="!hasSaved || !isClean || !content.trim()"
           :commit-hash="commitHash"
