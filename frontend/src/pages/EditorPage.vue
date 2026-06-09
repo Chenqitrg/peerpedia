@@ -114,9 +114,12 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
 })
 
-// Cmd+S / Ctrl+S → compile preview
+// Cmd+S / Ctrl+S → compile preview (only when editor area is focused)
 function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    // Ignore if focus is outside the editor (e.g., in a modal or other input)
+    const active = document.activeElement
+    if (active && !active.closest('.editor-page')) return
     e.preventDefault()
     handleCompile()
   }

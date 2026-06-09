@@ -21,8 +21,8 @@ Share any article via a portable file or link.
 
 | Requirement | Approach |
 |-------------|----------|
-| **Ctrl+S → compile** | Add keyboard shortcut. `Ctrl+S` (Cmd+S on Mac) triggers `handleCompile()`. Show "Compiled ✓" toast. |
-| **Syntax highlighting** | Integrate CodeMirror 6. Markdown mode + Typst mode. Line numbers, bracket matching. |
+| **✅ Ctrl+S → compile** | ⌘S / Ctrl+S triggers `handleCompile()`. Focus guard: only fires when editor area is focused. |
+| **✅ Syntax highlighting** | CodeMirror 6 with `@codemirror/lang-markdown` + `oneDark` theme. Bracket matching, auto-indent, dark scrollbar. |
 | **Auto-complete & indentation** | CodeMirror plugins for Markdown references, Typst functions, smart indent. |
 | **Auto-save** | Debounced save (2s after last keystroke) via `useDraftPersistence`. "Saving…" / "Saved" indicator. |
 | **✅ Save-as-commit** | 每个保存 = Git commit。Tauri 模式下每次保存都弹出提交信息窗口，`commitMsg` 在每次提交后清空。 |
@@ -75,6 +75,11 @@ Share any article via a portable file or link.
 | Commit message popup per save | #19 |
 | `danger` color + diff word highlighting | #17, #19 |
 | Mutex deadlock fix | `49fabeb` |
+| CodeMirror 6 Markdown editor | `f2f382f` (#26) |
+| Architecture remediation (git-first write, useTauri split, useCommitFlow) | #27 |
+| Design consistency fixes (7 issues) + accessibility | #27 |
+| Test improvements (setTimeout→flushPromises, +3 tests) | #27 |
+| Cmd+S focus guard | #28 |
 
 ---
 

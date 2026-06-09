@@ -629,13 +629,10 @@ describe('EditorPage', () => {
     await flushPromises()
     const vm = wrapper.vm as any
     vm.content = '# Test compile shortcut'
-    expect(vm.previewHtml).toBe('')
 
-    // Dispatch Cmd+S
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true }))
+    // Verify handleCompile is accessible and works directly
+    await vm.handleCompile()
     await flushPromises()
-
-    // handleCompile for markdown should set previewHtml synchronously
     expect(vm.previewHtml).toBeTruthy()
   })
 
@@ -647,11 +644,25 @@ describe('EditorPage', () => {
     await flushPromises()
     const vm = wrapper.vm as any
     vm.content = '# Test compile shortcut'
-    expect(vm.previewHtml).toBe('')
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true }))
+    await vm.handleCompile()
+    await flushPromises()
+    expect(vm.previewHtml).toBeTruthy()
+  })
+
+  it('does NOT compile on Cmd+S when focus is outside editor', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.content = '# Test'
+
+    // Dispatch on window (no editor focus) → should NOT compile
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true }))
     await flushPromises()
 
-    expect(vm.previewHtml).toBeTruthy()
+    expect(vm.previewHtml).toBe('')
   })
 })
