@@ -2,26 +2,34 @@ import { watch, onDeactivated, onActivated, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTabStore } from '../stores/useTabStore'
 
+/** Normalize route path to match the canonical form used by openTab. */
+function normalizePath(path: string): string {
+  if (path.startsWith('/articles/')) {
+    return path.replace('/articles/', '/article/')
+  }
+  return path
+}
+
 /**
  * EditorPage tab integration: syncs title + dirty state to tab store.
- * Returns a ref used by EditorPage to detect close-dialog trigger.
  */
 export function useEditorTab(title: Ref<string>, isClean: Ref<boolean>, contentEl: Ref<HTMLElement | null>) {
   const route = useRoute()
   const tabStore = useTabStore()
+  const tabId = normalizePath(route.path)
 
   watch([isClean, title], ([clean, t]) => {
-    tabStore.updateTab(route.path, { dirty: !clean, title: t || 'Untitled' })
+    tabStore.updateTab(tabId, { dirty: !clean, title: t || 'Untitled' })
   }, { immediate: true })
 
   // Session restore: save/restore scroll position
   onDeactivated(() => {
     if (contentEl.value) {
-      tabStore.updateTab(route.path, { scrollTop: contentEl.value.scrollTop })
+      tabStore.updateTab(tabId, { scrollTop: contentEl.value.scrollTop })
     }
   })
   onActivated(() => {
-    const tab = tabStore.tabs.find(t => t.id === route.path)
+    const tab = tabStore.tabs.find(t => t.id === tabId)
     if (tab?.scrollTop && contentEl.value) {
       contentEl.value.scrollTop = tab.scrollTop
     }
@@ -34,19 +42,20 @@ export function useEditorTab(title: Ref<string>, isClean: Ref<boolean>, contentE
 export function useArticleTab(articleTitle: Ref<string | undefined>, contentEl: Ref<HTMLElement | null>) {
   const route = useRoute()
   const tabStore = useTabStore()
+  const tabId = normalizePath(route.path)
 
   watch(articleTitle, (title) => {
-    if (title) tabStore.updateTab(route.path, { title })
+    if (title) tabStore.updateTab(tabId, { title })
   }, { immediate: true })
 
   // Session restore
   onDeactivated(() => {
     if (contentEl.value) {
-      tabStore.updateTab(route.path, { scrollTop: contentEl.value.scrollTop })
+      tabStore.updateTab(tabId, { scrollTop: contentEl.value.scrollTop })
     }
   })
   onActivated(() => {
-    const tab = tabStore.tabs.find(t => t.id === route.path)
+    const tab = tabStore.tabs.find(t => t.id === tabId)
     if (tab?.scrollTop && contentEl.value) {
       contentEl.value.scrollTop = tab.scrollTop
     }
