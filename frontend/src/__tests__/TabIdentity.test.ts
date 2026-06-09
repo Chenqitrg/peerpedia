@@ -224,4 +224,142 @@ describe('Tab Identity Specification', () => {
     // Content must be A — NOT B
     expect((wrp.find('.cm-editor').element as HTMLTextAreaElement).value).toBe('Content for A')
   })
+
+  // ── IDENTITY-5: Three editor tabs, switch many times, titles never merge ─
+
+  it('IDENTITY-5: three editor tabs with different titles never merge after multiple switches', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Open three editor tabs, each loads a distinct title from API
+    await rou.push('/edit/article-1')
+    await settle()
+    await rou.push('/edit/article-2')
+    await settle()
+    await rou.push('/edit/article-3')
+    await settle()
+
+    // Verify three tabs exist with three distinct titles
+    await expand(wrp)
+    const t0 = tabTitles(wrp)
+    expect(t0.length).toBe(3)
+    expect(new Set(t0).size).toBe(3) // all distinct
+
+    // Record the initial titles
+    const initial = [...t0]
+
+    // Switch pattern: 3→1→2→3→1→2→3 (many round trips)
+    for (const idx of [0, 1, 2, 0, 1, 2]) {
+      await expand(wrp)
+      const items = wrp.findAll('.tab-drawer-item')
+      await items[idx].trigger('click')
+      await settle()
+    }
+
+    // After all switching, three tabs must still be distinct and correct
+    await expand(wrp)
+    const final = tabTitles(wrp)
+    expect(final.length).toBe(3)
+    expect(final).toEqual(initial)       // each tab kept its title
+    expect(new Set(final).size).toBe(3)   // all still distinct
+  })
+
+  // ── IDENTITY-6: Three ARTICLE tabs, switch, titles never merge ──
+
+  it('IDENTITY-6: three article tabs with different titles never merge after switching', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Open three article pages
+    await rou.push('/article/art-a')
+    await settle()
+    await rou.push('/article/art-b')
+    await settle()
+    await rou.push('/article/art-c')
+    await settle()
+
+    await expand(wrp)
+    const initial = tabTitles(wrp)
+    expect(initial.length).toBe(3)
+
+    // Switch 3→1→2→3 many times
+    for (const idx of [0, 1, 2, 0, 1, 2]) {
+      await expand(wrp)
+      await wrp.findAll('.tab-drawer-item')[idx].trigger('click')
+      await settle()
+    }
+
+    await expand(wrp)
+    const final = tabTitles(wrp)
+    expect(final.length).toBe(3)
+    // If all titles are distinct, no merge happened
+    expect(new Set(final).size).toBe(initial.length)
+  })
+
+  // ── IDENTITY-8: Rapid switching before API resolves doesn't mix titles ─
+
+  it('IDENTITY-8: switching tabs rapidly while API is in-flight does not merge titles', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Open article A — but switch away BEFORE the settle() completes
+    await rou.push('/article/art-a')
+    await flushPromises() // let setup + onMounted start, but don't wait for API
+
+    // Rapidly switch to article B
+    await rou.push('/article/art-b')
+    await flushPromises()
+
+    // Rapidly switch to article C
+    await rou.push('/article/art-c')
+    await settle() // now wait for everything
+
+    // Then switch back through all of them rapidly
+    await expand(wrp)
+    const items = wrp.findAll('.tab-drawer-item')
+    expect(items.length).toBe(3)
+
+    // Click all three in quick succession (no settle between)
+    await items[0].trigger('click')
+    await items[1].trigger('click')
+    await items[2].trigger('click')
+    await items[0].trigger('click')
+    await settle()
+
+    // After everything settles, titles must be distinct
+    await expand(wrp)
+    const final = tabTitles(wrp)
+    expect(final.length).toBe(3)
+    expect(new Set(final).size).toBe(3)
+  })
+
+  // ── IDENTITY-7: Mix editor + article tabs, switch, titles never merge ─
+
+  it('IDENTITY-7: mixing editor and article tabs preserves all titles', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Open editor tab
+    await rou.push('/edit/article-1')
+    await settle()
+    // Open article tab
+    await rou.push('/article/art-x')
+    await settle()
+    // Open another editor tab
+    await rou.push('/edit/article-2')
+    await settle()
+
+    await expand(wrp)
+    const initial = tabTitles(wrp)
+    expect(initial.length).toBe(3)
+
+    // Switch around 10 times
+    for (let i = 0; i < 10; i++) {
+      await expand(wrp)
+      const items = wrp.findAll('.tab-drawer-item')
+      await items[i % 3].trigger('click')
+      await settle()
+    }
+
+    await expand(wrp)
+    const final = tabTitles(wrp)
+    // After all switching, every tab must still show its original title
+    expect(final).toEqual(initial)
+  })
 })
