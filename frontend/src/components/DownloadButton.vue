@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { Loader, FileDown, FileCode, Package } from 'lucide-vue-next'
 import { parseMarkdown } from '../utils/markdown'
 import { compileDownload } from '../api/compile'
+import { useTauri } from '../composables/useTauri'
 
 const { t } = useI18n()
 
@@ -22,6 +23,8 @@ const props = withDefaults(defineProps<{
   disabled: false,
   showLabel: false,
 })
+
+const tauri = useTauri()
 
 const downloading = ref(false)
 
@@ -51,8 +54,16 @@ async function handleDownload() {
     const hashSuffix = props.commitHash ? `-${props.commitHash.slice(0, 7)}` : ''
 
     if (props.format === 'repo') {
-      // Download git repo bundle — open backend endpoint
-      if (props.articleId) {
+      if (!props.articleId) return
+      if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+        // Tauri/local: create tar.gz via Rust, then download from filesystem
+        const filePath = await tauri.exportArticle({ article_id: props.articleId })
+        if (filePath && typeof filePath === 'string' && !('error' in (filePath as any))) {
+          // Read the file via Tauri and trigger download
+          window.open(`file://${filePath}`, '_blank')
+        }
+      } else {
+        // Web mode: server endpoint
         window.open(`/api/v1/articles/${props.articleId}/download/repo`, '_blank')
       }
       return

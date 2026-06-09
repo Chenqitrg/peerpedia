@@ -479,3 +479,15 @@ pub fn cache_article_full(
     local_store::cache_article_full(&conn, &params.id, &params.article_json)?;
     Ok(OkResponse { ok: true })
 }
+
+// ── Export command ──────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct ExportArticleParams {
+    pub article_id: String,
+}
+
+#[tauri::command]
+pub fn export_article(params: ExportArticleParams) -> Result<String, AppError> {
+    local_git::export_article(&params.article_id)
+}

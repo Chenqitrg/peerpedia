@@ -145,6 +145,41 @@ pub fn git_commit(
     })
 }
 
+// ── Export ────────────────────────────────────────────────────────────────
+
+/// Create a tar.gz bundle of the article git repository and return the path.
+pub fn export_article(article_id: &str) -> Result<String, AppError> {
+    let rp = repo_path(article_id)?;
+    if !rp.join(".git").is_dir() {
+        return Err(AppError::NotFound(format!(
+            "Git repo not found for article '{}'",
+            article_id
+        )));
+    }
+
+    let tmp_path = std::env::temp_dir().join(format!("peerpedia-{}.tar.gz", article_id));
+    let parent = rp.parent().unwrap_or(&rp);
+    let dirname = rp.file_name().unwrap_or(rp.as_os_str());
+
+    let output = Command::new("tar")
+        .args([
+            "-czf",
+            tmp_path.to_str().unwrap_or("export.tar.gz"),
+            "-C",
+            parent.to_str().unwrap_or("."),
+            dirname.to_str().unwrap_or("article"),
+        ])
+        .output()
+        .map_err(|e| AppError::IoError(format!("Failed to run tar: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::IoError(format!("tar failed: {}", stderr)));
+    }
+
+    Ok(tmp_path.to_str().unwrap_or("export.tar.gz").to_string())
+}
+
 // ── History ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

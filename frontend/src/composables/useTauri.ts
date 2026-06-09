@@ -641,5 +641,9 @@ export function useTauri() {
     async compileTypst(params: { content: string; format: string }) {
       return _invoke<string>('compile_typst', params as unknown as Record<string, unknown>)
     },
+    // Export
+    async exportArticle(params: { article_id: string }) {
+      return _invoke<string>('export_article', params as unknown as Record<string, unknown>)
+    },
   }
 }
