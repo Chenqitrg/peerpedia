@@ -462,6 +462,16 @@ pub fn compile_typst(params: CompileTypstParams) -> Result<String, AppError> {
     local_store::compile_typst(&params.content, &params.format)
 }
 
+#[derive(Deserialize)]
+pub struct CompileTypstPdfParams {
+    pub content: String,
+}
+
+#[tauri::command]
+pub fn compile_typst_pdf(params: CompileTypstPdfParams) -> Result<String, AppError> {
+    local_store::compile_typst_pdf(&params.content)
+}
+
 // ── Article full cache command ──────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]

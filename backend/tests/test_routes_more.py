@@ -443,3 +443,43 @@ class TestCompileEdgeCases:
         else:
             assert resp.status_code == 200
             assert "svg" in resp.json()["format"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Compile download regression tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestCompileDownload:
+    """Regression: compile-download endpoint returns downloadable files."""
+
+    def test_download_markdown_returns_html(self, client):
+        """Markdown compile-download returns HTML with correct Content-Type."""
+        resp = client.post("/api/v1/compile-download", json={
+            "content": "# Test\n\nHello world.",
+            "format": "markdown",
+        })
+        assert resp.status_code == 200
+        content_type = resp.headers.get("content-type", "")
+        assert "html" in content_type
+
+    def test_download_typst_returns_pdf(self, client):
+        """Typst compile-download returns PDF (or 500 if CLI missing)."""
+        import shutil
+        resp = client.post("/api/v1/compile-download", json={
+            "content": "= Hello\nThis is a test.",
+            "format": "typst",
+        })
+        if shutil.which("typst") is None:
+            assert resp.status_code == 500
+        else:
+            assert resp.status_code == 200
+            content_type = resp.headers.get("content-type", "")
+            assert "pdf" in content_type
+
+    def test_download_unsupported_format_returns_400(self, client):
+        """Unsupported format should return 400."""
+        resp = client.post("/api/v1/compile-download", json={
+            "content": "test",
+            "format": "unknown",
+        })
+        assert resp.status_code == 400

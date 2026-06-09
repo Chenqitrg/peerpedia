@@ -40,6 +40,7 @@ fn main() {
             commands::search_drafts,
             commands::search_cached_articles,
             commands::compile_typst,
+            commands::compile_typst_pdf,
             commands::export_article,
         ])
         .run(tauri::generate_context!())

@@ -154,4 +154,29 @@ describe('DownloadButton', () => {
     const blobArg = (URL.createObjectURL as any).mock.calls[0]?.[0]
     expect(blobArg?.type).toBe('application/gzip')
   })
+
+  // Regression: label shows PDF for Typst compiled, HTML for Markdown
+  it('shows PDF label for Typst compiled with showLabel', () => {
+    const wrapper = mount(DownloadButton, {
+      props: { format: 'compiled', content: '= Typst', contentFormat: 'typst', showLabel: true },
+    })
+    expect(wrapper.text()).toContain('PDF')
+    expect(wrapper.text()).not.toContain('HTML')
+  })
+
+  // Regression: label shows HTML for Markdown compiled with showLabel
+  it('shows HTML label for Markdown compiled with showLabel', () => {
+    const wrapper = mount(DownloadButton, {
+      props: { format: 'compiled', content: '# Hello', contentFormat: 'markdown', showLabel: true },
+    })
+    expect(wrapper.text()).toContain('HTML')
+  })
+
+  // Regression: source label shows Source for both formats
+  it('shows Source label for Typst source download', () => {
+    const wrapper = mount(DownloadButton, {
+      props: { format: 'source', content: '= Typst', contentFormat: 'typst', showLabel: true },
+    })
+    expect(wrapper.text()).toContain('Source')
+  })
 })
