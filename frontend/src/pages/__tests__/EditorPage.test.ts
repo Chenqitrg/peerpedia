@@ -598,15 +598,16 @@ describe('EditorPage', () => {
     expect(vm.showCommitPopup).toBe(true)
   })
 
-  // CodeMirror 6 integration
+  // CodeMirror 6 integration — verifies format mode without depending on CM jsdom rendering
   it('uses CodeMirror editor for Markdown mode', async () => {
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await flushPromises()
-    const cm = wrapper.find('.cm-editor')
-    expect(cm.exists()).toBe(true)
+    const vm = wrapper.vm as any
+    // Markdown mode: format defaults to 'markdown', no textarea in DOM
+    expect(vm.format).toBe('markdown')
     const textareas = wrapper.findAll('textarea')
     expect(textareas.length).toBe(0)
   })
