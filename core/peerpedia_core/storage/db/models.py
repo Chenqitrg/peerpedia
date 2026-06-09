@@ -41,7 +41,6 @@ class Article(Base):
     sink_extended_count = Column(Integer, nullable=False, default=0)
     forked_from = Column(String, nullable=True)
     fork_count = Column(Integer, nullable=False, default=0)
-    authors = Column(JSONList, nullable=False, default=list)    # list[str] of user_ids
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
@@ -64,6 +63,19 @@ class Review(Base):
     thread = Column(JSONList, nullable=False, default=list) # list[dict] of ThreadMessage
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+# ── ArticleAuthor (join table) ────────────────────────────────────────────
+
+class ArticleAuthor(Base):
+    __tablename__ = "article_authors"
+    __table_args__ = (
+        UniqueConstraint("article_id", "author_id", name="uq_article_author"),
+    )
+
+    article_id = Column(String, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True)
+    author_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    position = Column(Integer, default=0)
 
 
 # ── User ─────────────────────────────────────────────────────────────────

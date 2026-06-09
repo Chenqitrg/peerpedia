@@ -9,7 +9,7 @@ import shutil
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
 from peerpedia_core.storage.git_backend import (
     DEFAULT_ARTICLES_DIR,
     commit_article,
@@ -44,8 +44,10 @@ def article_with_history(db_engine):
              name="玄奘", anonymous_name="anon_xz", affiliation="大雁塔")
     s.add(u)
     s.commit()
-    a = Article(status="published", authors=[u.id])
+    a = Article(status="published")
     s.add(a)
+    s.flush()
+    s.add(ArticleAuthor(article_id=a.id, author_id=u.id, position=0))
     s.commit()
     aid = a.id
     uid = u.id

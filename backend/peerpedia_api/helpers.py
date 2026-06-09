@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any, Optional
 
+from peerpedia_core.storage.db.crud_article import get_author_ids
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked as _is_bookmarked
 from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
@@ -95,7 +96,7 @@ def build_article_summary(
     ghash, gcount = get_git_meta(a.id)
 
     if authors is None:
-        authors = resolve_authors(db, a.authors or [])
+        authors = resolve_authors(db, get_author_ids(db, a.id))
 
     if is_bookmarked is None and current_user is not None:
         uid = getattr(current_user, 'id', None)
@@ -103,7 +104,7 @@ def build_article_summary(
 
     if is_own_article is None and current_user is not None:
         user_id = getattr(current_user, 'id', None)
-        is_own_article = user_id in (a.authors or []) if user_id else False
+        is_own_article = user_id in get_author_ids(db, a.id) if user_id else False
 
     return ArticleSummary(
         id=a.id,

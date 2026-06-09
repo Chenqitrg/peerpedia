@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.db.models import Article, User, ArticleAuthor
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ class TestFeed:
         from peerpedia_core.storage.db.models import Follow
         s.add(Follow(follower_id=reader.id, followed_id=writer.id))
 
-        a = Article(status="published", authors=[writer.id])
+        a = Article(status="published")
         s.add(a)
         s.commit()
         s.close()
@@ -56,7 +56,7 @@ class TestSearch:
         s.add(u)
         s.commit()
         # search currently searches on title/abstract — placeholder until full-text index
-        a = Article(status="published", authors=[u.id])
+        a = Article(status="published")
         s.add(a)
         s.commit()
         s.close()
@@ -70,9 +70,9 @@ class TestSearch:
         u = User(username="user15", password_hash="", name="测试", anonymous_name="a")
         s.add(u)
         s.commit()
-        a1 = Article(status="published", authors=[u.id], title="Quantum Physics",
+        a1 = Article(status="published", title="Quantum Physics",
                       categories=["physics", "quantum"])
-        a2 = Article(status="published", authors=[u.id], title="Cell Biology",
+        a2 = Article(status="published", title="Cell Biology",
                       categories=["biology"])
         s.add_all([a1, a2])
         s.commit()
@@ -89,8 +89,8 @@ class TestSearch:
         u = User(username="user16", password_hash="", name="排序", anonymous_name="a")
         s.add(u)
         s.commit()
-        a1 = Article(status="published", authors=[u.id], title="Older Article")
-        a2 = Article(status="published", authors=[u.id], title="Newer Article")
+        a1 = Article(status="published", title="Older Article")
+        a2 = Article(status="published", title="Newer Article")
         s.add_all([a1, a2])
         s.commit()
         s.close()
@@ -149,7 +149,7 @@ class TestCitations:
         u = User(username="user15", password_hash="", name="作者", anonymous_name="a")
         s.add(u)
         s.commit()
-        a = Article(status="published", authors=[u.id])
+        a = Article(status="published")
         s.add(a)
         s.commit()
         s.close()
@@ -165,8 +165,8 @@ class TestCitations:
         u = User(username="user16", password_hash="", name="作者", anonymous_name="a")
         s.add(u)
         s.commit()
-        a1 = Article(status="published", authors=[u.id])
-        a2 = Article(status="published", authors=[u.id])
+        a1 = Article(status="published")
+        a2 = Article(status="published")
         s.add_all([a1, a2])
         s.commit()
         s.close()
@@ -184,16 +184,15 @@ class TestMerge:
         forker = User(username="user18", password_hash="", name="派生者", anonymous_name="a2")
         s.add_all([author, forker])
         s.commit()
-        original = Article(status="published", authors=[author.id])
-        fork = Article(status="draft", authors=[forker.id], forked_from=original.id)
+        original = Article(status="published")
+        fork = Article(status="draft", forked_from=original.id)
         s.add_all([original, fork])
         s.commit()
         s.close()
 
         resp = client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id},
-        )
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
         assert resp.status_code == 201
         data = resp.json()
         assert data["status"] == "open"
@@ -204,16 +203,15 @@ class TestMerge:
         forker = User(username="user20", password_hash="", name="派生者", anonymous_name="a2")
         s.add_all([author, forker])
         s.commit()
-        original = Article(status="published", authors=[author.id])
-        fork = Article(status="draft", authors=[forker.id], forked_from=original.id)
+        original = Article(status="published")
+        fork = Article(status="draft", forked_from=original.id)
         s.add_all([original, fork])
         s.commit()
         s.close()
 
         client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id},
-        )
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
         resp = client.get(f"/api/v1/articles/{original.id}/merge-proposals")
         assert resp.status_code == 200
         assert len(resp.json()["proposals"]) == 1
@@ -224,16 +222,15 @@ class TestMerge:
         forker = User(username="user22", password_hash="", name="派生", anonymous_name="a2")
         s.add_all([author, forker])
         s.commit()
-        original = Article(status="published", authors=[author.id])
-        fork = Article(status="draft", authors=[forker.id], forked_from=original.id)
+        original = Article(status="published")
+        fork = Article(status="draft", forked_from=original.id)
         s.add_all([original, fork])
         s.commit()
         s.close()
 
         r = client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id},
-        )
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
         pid = r.json()["id"]
 
         resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/accept")
@@ -246,16 +243,15 @@ class TestMerge:
         forker = User(username="user24", password_hash="", name="派生", anonymous_name="a2")
         s.add_all([author, forker])
         s.commit()
-        original = Article(status="published", authors=[author.id])
-        fork = Article(status="draft", authors=[forker.id], forked_from=original.id)
+        original = Article(status="published")
+        fork = Article(status="draft", forked_from=original.id)
         s.add_all([original, fork])
         s.commit()
         s.close()
 
         r = client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id},
-        )
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
         pid = r.json()["id"]
 
         resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/reject")
@@ -271,15 +267,14 @@ class TestMerge:
 
         resp = client.post(
             "/api/v1/articles/nonexistent-id/merge-proposals",
-            json={"fork_article_id": "irrelevant", "proposer_id": u.id},
-        )
+            json={"fork_article_id": "irrelevant", "proposer_id": u.id})
         assert resp.status_code == 404
 
     def test_accept_nonexistent_proposal_returns_404(self, client, db_engine):
         s = get_session(db_engine)
         u = User(username="user26", password_hash="", name="测试", anonymous_name="a1")
         s.add(u)
-        a = Article(status="published", authors=[u.id])
+        a = Article(status="published")
         s.add(a)
         s.commit()
         s.close()
@@ -293,9 +288,9 @@ class TestMerge:
         u = User(username="user27", password_hash="", name="测试", anonymous_name="a")
         s.add(u)
         s.commit()
-        a1 = Article(status="published", authors=[u.id], title="Article A",
+        a1 = Article(status="published", title="Article A",
                       categories=["math"])
-        a2 = Article(status="published", authors=[u.id], title="Article B",
+        a2 = Article(status="published", title="Article B",
                       categories=["physics"])
         s.add_all([a1, a2])
         s.commit()
@@ -312,10 +307,10 @@ class TestMerge:
         u = User(username="user28", password_hash="", name="排序测试", anonymous_name="a")
         s.add(u)
         s.commit()
-        low = Article(status="published", authors=[u.id], title="Low Score",
+        low = Article(status="published", title="Low Score",
                        score={"originality": 1, "rigor": 1, "completeness": 1,
                               "pedagogy": 1, "impact": 1})
-        high = Article(status="published", authors=[u.id], title="High Score",
+        high = Article(status="published", title="High Score",
                         score={"originality": 5, "rigor": 5, "completeness": 5,
                                "pedagogy": 5, "impact": 5})
         s.add_all([low, high])
@@ -338,8 +333,7 @@ class TestMerge:
         # Create 5 articles with distinct titles for pagination testing
         articles = []
         for i in range(5):
-            a = Article(status="published", authors=[u.id],
-                         title=f"Page Article {i+1}")
+            a = Article(status="published", title=f"Page Article {i+1}")
             articles.append(a)
         s.add_all(articles)
         s.commit()

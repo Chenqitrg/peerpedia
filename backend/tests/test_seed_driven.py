@@ -6,8 +6,10 @@ corresponding test catches it.
 """
 import pytest
 from peerpedia_core.storage.db.engine import get_engine, get_session
+from peerpedia_core.storage.db.crud_article import get_author_ids
 from peerpedia_core.storage.db.models import (
     Article,
+    ArticleAuthor,
     Bookmark,
     Citation,
     Follow,
@@ -131,7 +133,7 @@ class TestSeedSmoke:
         engine = get_engine(DB_URL)
         s = get_session(engine)
         articles = s.query(Article).all()
-        multi = [a for a in articles if len(a.authors or []) >= 2]
+        multi = [a for a in articles if len(get_author_ids(s, a.id)) >= 2]
         s.close()
         engine.dispose()
         assert len(multi) >= 2, f"Expected >= 2 multi-author articles, got {len(multi)}"
@@ -225,7 +227,7 @@ class TestForkMergeFlow:
         proposal_id = merge_resp.json()["id"]
 
         # Accept merge (as article author — need to login as parent author)
-        parent.authors[0] if parent.authors else None
+        get_author_ids(s, parent.id)[0] if parent else None
         resp2 = client.post(
             f"/api/v1/articles/{parent.id}/merge-proposals/{proposal_id}/accept",
         )
@@ -277,7 +279,9 @@ class TestCitationGraph:
         engine = get_engine(DB_URL)
         s = get_session(engine)
         b = s.query(User).filter(User.username == "bohr").first()
-        a = s.query(Article).filter(Article.authors.contains([b.id])).first()
+        a = s.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(ArticleAuthor.author_id == b.id).first()
         s.close()
         engine.dispose()
         assert a is not None

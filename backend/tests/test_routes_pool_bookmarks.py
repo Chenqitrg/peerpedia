@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.db.models import Article, User, ArticleAuthor
 
 
 @pytest.fixture
@@ -40,8 +40,7 @@ class TestPool:
         s.add(u)
         s.commit()
         from datetime import datetime, timezone
-        a = Article(status="sedimentation", authors=[u.id],
-                    sink_start=datetime.now(timezone.utc),
+        a = Article(status="sedimentation", sink_start=datetime.now(timezone.utc),
                     sink_duration_days=7)
         s.add(a)
         s.commit()
@@ -63,7 +62,7 @@ class TestBookmarks:
         author = User(username="user11", password_hash="", name="作者", anonymous_name="anon_a")
         s.add_all([u, author])
         s.commit()
-        a = Article(status="published", authors=[author.id])
+        a = Article(status="published")
         s.add(a)
         s.commit()
         uid, aid = u.id, a.id

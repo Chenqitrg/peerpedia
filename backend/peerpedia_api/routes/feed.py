@@ -1,6 +1,6 @@
 """Feed API route."""
 from fastapi import APIRouter, Depends
-from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.crud_article import get_author_ids_batch, list_articles
 from peerpedia_core.storage.db.crud_user import get_following
 from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
@@ -23,8 +23,11 @@ def get_feed(current_user: User | None = Depends(deps.get_current_user),
         following = get_following(db, current_user.id)
         followed_ids = [u.id for u in following]
         if followed_ids:
+            # Batch-resolve all author IDs
+            all_article_ids = [a.id for a in all_articles]
+            author_map = get_author_ids_batch(db, all_article_ids)
             feed_articles = [a for a in all_articles
-                             if any(aid in followed_ids for aid in (a.authors or []))
+                             if any(aid in followed_ids for aid in author_map.get(a.id, []))
                              and a.status in ("sedimentation", "published")]
         else:
             feed_articles = []
@@ -34,17 +37,18 @@ def get_feed(current_user: User | None = Depends(deps.get_current_user),
     feed_articles.sort(key=lambda a: a.created_at, reverse=True)
 
     # Batch-resolve all author IDs for efficiency
+    feed_article_ids = [a.id for a in feed_articles]
+    author_map = get_author_ids_batch(db, feed_article_ids)
     all_author_ids: set[str] = set()
-    for a in feed_articles:
-        for aid in (a.authors or []):
-            all_author_ids.add(aid)
+    for aids in author_map.values():
+        all_author_ids.update(aids)
     author_cache = {aid: resolve_authors(db, [aid])[0] for aid in all_author_ids}
 
     summaries = [
         build_article_summary(
             db, a,
             current_user=current_user,
-            authors=[author_cache[aid] for aid in (a.authors or []) if aid in author_cache],
+            authors=[author_cache[aid] for aid in author_map.get(a.id, []) if aid in author_cache],
         )
         for a in feed_articles
     ]

@@ -1,6 +1,6 @@
 """Sedimentation pool API routes."""
 from fastapi import APIRouter, Depends
-from peerpedia_core.storage.db.crud_article import list_articles
+from peerpedia_core.storage.db.crud_article import get_author_ids, list_articles
 from peerpedia_core.storage.db.crud_user import get_followers, get_following
 from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
@@ -35,7 +35,7 @@ def get_pool(
 
     summaries = []
     for a in articles:
-        if follow_circle is not None and not any(aid in follow_circle for aid in (a.authors or [])):
+        if follow_circle is not None and not any(aid in follow_circle for aid in get_author_ids(db, a.id)):
             continue
 
         # Compute sink ETA inline (same logic as helpers.compute_sink but kept local

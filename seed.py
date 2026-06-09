@@ -21,7 +21,10 @@ sys.path.insert(0, str(Path(__file__).parent / "backend"))
 
 def seed(db_url: str, articles_dir: Path):
     from peerpedia_core.storage.db.crud_article import (
+        add_article_authors,
         create_article,
+        get_author_ids,
+        get_articles_by_author,
         set_sink_start,
         update_article_status,
     )
@@ -32,6 +35,7 @@ def seed(db_url: str, articles_dir: Path):
     from peerpedia_core.storage.db.engine import get_engine, init_db
     from peerpedia_core.storage.db.models import (
         Article,
+        ArticleAuthor,
         Bookmark,
         Citation,
         Follow,
@@ -794,11 +798,15 @@ $$
         print(f"  Article (new): {ad['title'][:55]}... [{status}]")
 
     a_articles = session.query(Article).all()
+    # Batch-resolve article authors from the join table
+    all_article_ids = [a.id for a in a_articles]
+    from peerpedia_core.storage.db.crud_article import get_author_ids_batch
+    author_id_map = get_author_ids_batch(session, all_article_ids)
     article_map = {}
     for a in a_articles:
         author_name = None
         for name, user in users.items():
-            if user.id in (a.authors or []):
+            if user.id in author_id_map.get(a.id, []):
                 author_name = name
                 break
         if author_name:
@@ -836,8 +844,10 @@ program and data. This is the von Neumann architecture.""",
         if parent is None:
             print(f"  Fork skipped: parent {parent_name} not found")
             continue
-        existing = session.query(Article).filter(
-            Article.forked_from == parent.id, Article.authors.contains([forker.id])
+        existing = session.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(
+            Article.forked_from == parent.id, ArticleAuthor.author_id == forker.id
         ).first()
         if existing:
             print(f"  Fork (existing): {forker_name} → {parent.title[:30]}...")
@@ -977,8 +987,10 @@ program and data. This is the von Neumann architecture.""",
         author = users[author_name]
         reviewer = users[reviewer_name]
         # Find any article by this author
-        articles = session.query(Article).filter(
-            Article.authors.contains([author.id])
+        articles = session.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(
+            ArticleAuthor.author_id == author.id
         ).all()
         if not articles:
             continue
@@ -1350,8 +1362,10 @@ program and data. This is the von Neumann architecture.""",
         author = users[author_name]
         reviewer = users[reviewer_name]
         # Find the right article: by title if specified, else first by author
-        articles = session.query(Article).filter(
-            Article.authors.contains([author.id])
+        articles = session.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(
+            ArticleAuthor.author_id == author.id
         ).all()
         if not articles:
             continue
@@ -1433,8 +1447,10 @@ program and data. This is the von Neumann architecture.""",
     for user_name, author_name in bookmark_specs:
         user = users[user_name]
         author = users[author_name]
-        articles = session.query(Article).filter(
-            Article.authors.contains([author.id])
+        articles = session.query(Article).join(
+            ArticleAuthor, Article.id == ArticleAuthor.article_id
+        ).filter(
+            ArticleAuthor.author_id == author.id
         ).all()
         if not articles:
             continue

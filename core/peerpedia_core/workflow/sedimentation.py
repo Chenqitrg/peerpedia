@@ -62,6 +62,7 @@ def publish_ready_articles(session: Session) -> int:
 
     Returns the number of articles published in this call.
     """
+    from peerpedia_core.storage.db.crud_article import get_author_ids
     from peerpedia_core.storage.db.crud_review import get_reviews_for_article
     from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
     from peerpedia_core.workflow.reputation import compute_author_reputation
@@ -99,7 +100,7 @@ def publish_ready_articles(session: Session) -> int:
 
         # Check for community reviews and apply penalty if none
         all_reviews = get_reviews_for_article(session, article.id)
-        authors = article.authors or []
+        authors = get_author_ids(session, article.id)
         community_reviews = [r for r in all_reviews if r.reviewer_id not in authors]
         if len(community_reviews) == 0:
             score = apply_no_review_penalty(score)

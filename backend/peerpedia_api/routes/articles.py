@@ -16,6 +16,7 @@ from peerpedia_core.storage.db.crud_article import (
     delete_article,
     extend_sink,
     get_article,
+    get_author_ids,
     increment_fork_count,
     list_articles,
     set_sink_start,
@@ -101,7 +102,8 @@ def build_article_detail(
     reviews = get_reviews_for_article(db, article_id)
     sink_eta, days_remaining = compute_sink(a)
     distinct_reviewers = len({(r.reviewer_id, r.scope) for r in reviews})
-    authors = resolve_authors(db, a.authors or [])
+    author_ids = get_author_ids(db, a.id)
+    authors = resolve_authors(db, author_ids)
     return ArticleDetail(
         id=a.id,
         title=a.title or "",
@@ -120,7 +122,7 @@ def build_article_detail(
         sink_duration_days=getattr(a, "sink_duration_days", None),
         review_count=distinct_reviewers,
         is_bookmarked=is_bookmarked(db, current_user.id, a.id) if current_user else False,
-        is_own_article=current_user.id in (a.authors or []) if current_user else False,
+        is_own_article=current_user.id in author_ids if current_user else False,
         created_at=a.created_at,
         updated_at=a.updated_at,
     )
@@ -226,7 +228,8 @@ def api_update_article(
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=400, detail="Article repo not found")
 
-    author = a.authors[0] if a.authors else "unknown"
+    author_ids = get_author_ids(db, article_id)
+    author = author_ids[0] if author_ids else "unknown"
     commit_msg = body.commit_message or "Edit article"
 
     if body.content is not None:
@@ -290,7 +293,7 @@ def api_delete_article(
     a = get_article(db, article_id)
     if a is None:
         raise HTTPException(status_code=404, detail="Article not found")
-    if current_user.id not in (a.authors or []):
+    if current_user.id not in get_author_ids(db, article_id):
         raise HTTPException(status_code=403, detail="Only authors can delete their articles")
     delete_article(db, article_id)
 
@@ -363,7 +366,7 @@ def api_has_forked(
     """Check if a user has already forked this article."""
     all_articles = list_articles(db)
     for a in all_articles:
-        if a.forked_from == article_id and current_user.id in (a.authors or []):
+        if a.forked_from == article_id and current_user.id in get_author_ids(db, a.id):
             return {"has_forked": True, "fork_article_id": a.id}
     return {"has_forked": False, "fork_article_id": None}
 
@@ -388,9 +391,10 @@ def api_rollback(
     if article:
         set_sink_start(db, article_id, params.sink.edit_article_default_days)
         neutral = 3.0
+        rollback_author_ids = get_author_ids(db, article_id)
         create_review(
             db, article_id=article_id, commit_hash=new_hash,
-            reviewer_id=article.authors[0] if article.authors else "system",
+            reviewer_id=rollback_author_ids[0] if rollback_author_ids else "system",
             scope="pool",
             scores={"originality": neutral, "rigor": neutral,
                     "completeness": neutral, "pedagogy": neutral, "impact": neutral},
