@@ -21,9 +21,9 @@ Share any article via a portable file or link.
 
 | Requirement | Approach |
 |-------------|----------|
-| **Ctrl+S → compile** | Add keyboard shortcut. `Ctrl+S` (Cmd+S on Mac) triggers `handleCompile()`. Show "Compiled ✓" toast. |
-| **Syntax highlighting** | Integrate CodeMirror 6. Markdown mode + Typst mode. Line numbers, bracket matching. |
-| **Auto-complete & indentation** | CodeMirror plugins for Markdown references, Typst functions, smart indent. |
+| **✅ Ctrl+S → compile** | ⌘S / Ctrl+S triggers `handleCompile()`. Tooltip shows shortcut hint on compile button. |
+| **✅ Syntax highlighting** | CodeMirror 6 with `@codemirror/lang-markdown` + `oneDark` theme. Bracket matching, auto-indent. Typst mode keeps textarea for now. |
+| **Auto-complete & indentation** | CodeMirror plugins for Markdown references, Typst functions, smart indent. Deferred. |
 | **Auto-save** | Debounced save (2s after last keystroke) via `useDraftPersistence`. "Saving…" / "Saved" indicator. |
 | **✅ Save-as-commit** | 每个保存 = Git commit。Tauri 模式下每次保存都弹出提交信息窗口，`commitMsg` 在每次提交后清空。 |
 | **✅ Save button state** | 无未保存更改时保存按钮变灰（`disabled:opacity-30`），`isClean` 计算属性比对内容/标题。 |

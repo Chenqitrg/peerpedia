@@ -1,6 +1,6 @@
 # PeerPedia（知诸网）— 设计文档
 
-> 2026-06-07 · 全部已实现功能 · 架构债已修复
+> 2026-06-09 · 全部已实现功能 · JSON→join table 迁移完成 · CodeMirror 6 编辑器
 
 ---
 
@@ -345,8 +345,8 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 
 | 套件 | 测试数 | 框架 |
 |-------|-------|-----------|
-| 后端 | 120 | pytest |
-| 前端 | 319 | vitest |
+| 后端 | 353 | pytest |
+| 前端 | 337 | vitest |
 | Rust | 16 | cargo test |
 
 ### 7.2 CI 流水线
@@ -400,6 +400,7 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 | P0 | Typst 编译（PDF 下载） | ✅ |
 | P0 | 草稿搜索（FTS5） | ✅ |
 | P0 | 编辑器体验（keep-alive、分栏、保存按钮状态、每次保存需提交信息） | ✅ |
+| P1 | CodeMirror 6 Markdown 编辑器（语法高亮、自动缩进、括号匹配、⌘S 编译） | ✅ |
 | P0 | 软件分发与用户评测 | ⬜ |
 | P1 | arXiv 镜像与评分 | ⬜ |
 | P1 | 分类标签 | ⬜ |
@@ -428,4 +429,4 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 ---
 
-*最后更新: 2026-06-09 · 120 后端测试 · 327 前端测试 · 16 Rust 测试 · 9 个 DB 实体*
+*最后更新: 2026-06-09 · 353 后端测试 · 337 前端测试 · 16 Rust 测试 · 9 个 DB 实体*
