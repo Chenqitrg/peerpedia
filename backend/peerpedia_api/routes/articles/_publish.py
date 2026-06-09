@@ -126,3 +126,30 @@ def api_download_pdf(article_id: str):
                         },
                     )
     raise HTTPException(status_code=404, detail="Source file not found")
+
+
+@router.get("/{article_id}/download/repo")
+def api_download_repo(article_id: str):
+    """Export the entire article git repository as a tar.gz bundle."""
+    import tarfile
+    import tempfile
+
+    from fastapi.responses import FileResponse
+
+    rp = repo_path(article_id)
+    if not (rp / ".git").is_dir():
+        raise HTTPException(status_code=404, detail="Git repo not found")
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False)
+    try:
+        with tarfile.open(tmp.name, "w:gz") as tar:
+            tar.add(str(rp), arcname=article_id)
+    except Exception:
+        Path(tmp.name).unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="Failed to create archive")
+
+    return FileResponse(
+        tmp.name,
+        media_type="application/gzip",
+        filename=f"{article_id}.tar.gz",
+    )
