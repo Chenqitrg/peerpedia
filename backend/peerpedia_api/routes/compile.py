@@ -1,10 +1,9 @@
 """Compile API route."""
-import io
 import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 router = APIRouter(tags=["compile"])
@@ -105,16 +104,15 @@ def compile_download(body: CompileRequest):
     try:
         if format_lower == "markdown":
             html = _compile_markdown(body.content)
-            html_bytes = html.encode("utf-8")
-            return StreamingResponse(
-                io.BytesIO(html_bytes),
+            return Response(
+                content=html.encode("utf-8"),
                 media_type="text/html",
                 headers={"Content-Disposition": "attachment; filename=article.html"},
             )
         elif format_lower == "typst":
             pdf_bytes = _compile_typst_pdf(body.content)
-            return StreamingResponse(
-                io.BytesIO(pdf_bytes),
+            return Response(
+                content=pdf_bytes,
                 media_type="application/pdf",
                 headers={"Content-Disposition": "attachment; filename=article.pdf"},
             )

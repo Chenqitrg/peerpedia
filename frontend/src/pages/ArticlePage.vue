@@ -42,6 +42,8 @@ const compiledHtml = ref('')
 const loading = ref(true)
 const errorMessage = ref('')
 const activeTab = ref<'body' | 'comments'>('body')
+const articleFormat = ref<'markdown' | 'typst'>('markdown')
+const articleSourceContent = ref('')
 const isForked = ref(false)
 
 const id = route.params.id as string
@@ -274,6 +276,9 @@ async function loadCompiledContent() {
       return
     }
   }
+  articleFormat.value = srcFormat as 'markdown' | 'typst'
+  articleSourceContent.value = srcContent
+
   const isTypst = srcFormat === 'typst'
 
   // ── Typst articles ────────────────────────────────────────────────
@@ -601,14 +606,16 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
 
             <DownloadButton
               format="source"
-              :content="article?.compiled_output || ''"
+              :content="articleSourceContent"
+              :content-format="articleFormat"
               :filename="article?.title"
               :commit-hash="commitHash"
               show-label
             />
             <DownloadButton
               format="compiled"
-              :content="article?.compiled_output || ''"
+              :content="articleSourceContent"
+              :content-format="articleFormat"
               :filename="article?.title"
               :commit-hash="commitHash"
               show-label
@@ -616,6 +623,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             <DownloadButton
               format="repo"
               :content="''"
+              :content-format="articleFormat"
               :article-id="article?.id"
               :filename="article?.title"
               :commit-hash="commitHash"
