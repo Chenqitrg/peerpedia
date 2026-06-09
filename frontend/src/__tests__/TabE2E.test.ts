@@ -53,7 +53,7 @@ function registerArticle(id: string, overrides: Partial<any> = {}) {
 registerArticle('article-a')
 registerArticle('article-b')
 
-vi.mock('../../api/articles', () => ({
+vi.mock('@/api/articles', () => ({
   getArticle: vi.fn(async (id: string) => {
     if (mockArticles[id]) return { ...mockArticles[id] }
     throw new Error('Article not found')
@@ -68,18 +68,18 @@ vi.mock('../../api/articles', () => ({
   compilePreview: vi.fn(async () => '<p>Preview</p>'),
 }))
 
-vi.mock('../../api/reviews', () => ({
+vi.mock('@/api/reviews', () => ({
   getReviews: vi.fn(async () => []),
   createReview: vi.fn(),
   postReviewMessage: vi.fn(),
 }))
 
-vi.mock('../../api/compile', () => ({
+vi.mock('@/api/compile', () => ({
   compilePreview: vi.fn(async () => '<p>Preview</p>'),
 }))
 
 // Mock auth API — prevents restoreSession() from hanging
-vi.mock('../../api/auth', () => ({
+vi.mock('@/api/auth', () => ({
   login: vi.fn(),
   register: vi.fn(),
   getMe: vi.fn(async () => ({
@@ -88,7 +88,7 @@ vi.mock('../../api/auth', () => ({
 }))
 
 // Mock user store — skip network calls in restoreSession
-vi.mock('../../stores/useUserStore', () => ({
+vi.mock('@/stores/useUserStore', () => ({
   useUserStore: () => ({
     viewer: { id: 'u1', name: 'Alice Chen', username: 'alice' },
     token: 'test-token-xxx',
@@ -104,7 +104,7 @@ vi.mock('../../stores/useUserStore', () => ({
 }))
 
 // Mock useTauri — prevents native API calls in jsdom
-vi.mock('../../composables/useTauri', () => ({
+vi.mock('@/composables/useTauri', () => ({
   useTauri: () => ({
     isTauri: { value: false },
     isBrowserLocal: { value: false },
