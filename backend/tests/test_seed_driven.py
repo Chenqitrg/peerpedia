@@ -369,3 +369,136 @@ class TestSchools:
         data = resp.json()
         assert data["username"] == "einstein"
         assert data["article_count"] >= 1
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9. Seed-driven scenario tests — exercise real user actions with seeded data
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestSeedScenarios:
+    """Exercise real scenarios against the seeded database."""
+
+    def test_login_as_einstein_then_list_own_articles(self, client):
+        """Login as einstein → list articles filtered by author_id = self."""
+        # Login
+        resp = client.post("/api/v1/auth/login", json={
+            "username": "einstein", "password": "666666",
+        })
+        assert resp.status_code == 200
+        token = resp.json()["token"]
+        einstein_id = resp.json()["user"]["id"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # List articles by einstein
+        resp2 = client.get(f"/api/v1/articles?author_id={einstein_id}", headers=headers)
+        assert resp2.status_code == 200
+        data = resp2.json()
+        # Einstein should have at least 1 article in the seed
+        assert len(data["articles"]) >= 1
+        # All articles should have einstein as an author
+        for article in data["articles"]:
+            author_ids = [a["id"] for a in article["authors"]]
+            assert einstein_id in author_ids
+
+    def test_login_as_feynman_then_check_following(self, client):
+        """Login as feynman → check who they follow."""
+        resp = client.post("/api/v1/auth/login", json={
+            "username": "feynman", "password": "666666",
+        })
+        assert resp.status_code == 200
+        token = resp.json()["token"]
+        feynman_id = resp.json()["user"]["id"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Get following list
+        resp2 = client.get(f"/api/v1/users/{feynman_id}/following")
+        assert resp2.status_code == 200
+        following = resp2.json()
+        # Feynman follows at least 1 person in the seed
+        assert len(following) >= 1
+        # Each entry should have required fields
+        for user in following:
+            assert "id" in user
+            assert "name" in user
+            assert "article_count" in user
+            assert "reputation" in user
+
+    def test_published_article_has_non_null_score(self, client):
+        """Every published article in the seed should have a score."""
+        engine = get_engine(DB_URL)
+        s = get_session(engine)
+        published = s.query(Article).filter(Article.status == "published").limit(5).all()
+        s.close()
+        engine.dispose()
+
+        for article in published:
+            resp = client.get(f"/api/v1/articles/{article.id}")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["score"] is not None, \
+                f"Published article {article.title} has null score"
+
+    def test_sedimentation_article_has_future_sink_eta(self, client):
+        """Sedimentation articles should have sink_eta in the future or pool metrics."""
+        engine = get_engine(DB_URL)
+        s = get_session(engine)
+        sed = s.query(Article).filter(Article.status == "sedimentation").first()
+        s.close()
+        engine.dispose()
+
+        if sed is None:
+            pytest.skip("No sedimentation articles in seed")
+        resp = client.get(f"/api/v1/articles/{sed.id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "sedimentation"
+        assert "sink_eta" in data
+        assert "days_remaining" in data
+
+    def test_user_profile_counts_are_consistent(self, client):
+        """User profile's follower/following/article counts match the data."""
+        engine = get_engine(DB_URL)
+        s = get_session(engine)
+        u = s.query(User).filter(User.username == "curie").first()
+        s.close()
+        engine.dispose()
+
+        resp = client.get(f"/api/v1/users/{u.id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["username"] == "curie"
+        assert isinstance(data["followers_count"], int)
+        assert isinstance(data["following_count"], int)
+        assert isinstance(data["article_count"], int)
+        assert data["article_count"] >= 1
+
+    def test_bookmark_seed_article(self, client):
+        """Bookmark a seeded article and verify it appears in bookmarks list."""
+        engine = get_engine(DB_URL)
+        s = get_session(engine)
+        article = s.query(Article).filter(Article.status == "published").first()
+        # Login as a random seed user
+        resp = client.post("/api/v1/auth/login", json={
+            "username": "turing", "password": "666666",
+        })
+        token = resp.json()["token"]
+        s.close()
+        engine.dispose()
+
+        headers = {"Authorization": f"Bearer {token}"}
+        # Bookmark the article
+        bm_resp = client.post(
+            f"/api/v1/bookmarks?article_id={article.id}",
+            headers=headers,
+        )
+        assert bm_resp.status_code == 201
+        assert bm_resp.json()["bookmarked"] is True
+
+        # Verify in bookmarks list
+        list_resp = client.get("/api/v1/bookmarks", headers=headers)
+        assert list_resp.status_code == 200
+        bm_article_ids = {b["article_id"] for b in list_resp.json()["bookmarks"]}
+        assert article.id in bm_article_ids
+
+        # Clean up — remove the bookmark
+        client.delete(f"/api/v1/bookmarks/{article.id}", headers=headers)

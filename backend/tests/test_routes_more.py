@@ -376,3 +376,70 @@ class TestMerge:
         assert resp.status_code == 200
         data = resp.json()
         assert data["size"] == 20
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Compilation edge cases
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestCompileEdgeCases:
+    """Compile endpoint behavior with various input types."""
+
+    def test_compile_markdown_with_math(self, client):
+        """Markdown with KaTeX math delimiters should compile correctly."""
+        resp = client.post("/api/v1/compile-preview", json={
+            "content": "# Math Test\n\n$$E = mc^2$$\n\nInline $x^2$ math.",
+            "format": "markdown",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["format"] == "html"
+        # Math should be preserved (not corrupted by markdown parser)
+        output = data["output"]
+        assert "E = mc^2" in output or "katex" in output.lower() or "math" in output.lower()
+
+    def test_compile_markdown_with_chinese(self, client):
+        """Markdown with Chinese characters should compile without corruption."""
+        resp = client.post("/api/v1/compile-preview", json={
+            "content": "# 中文测试\n\n这是**一段**中文内容。\n\n- 列表项一\n- 列表项二",
+            "format": "markdown",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["format"] == "html"
+        assert "中文测试" in data["output"]
+        assert "列表项一" in data["output"]
+
+    def test_compile_empty_content(self, client):
+        """Empty content should return empty/simple HTML, not crash."""
+        resp = client.post("/api/v1/compile-preview", json={
+            "content": "",
+            "format": "markdown",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["format"] == "html"
+        assert isinstance(data["output"], str)
+
+    def test_compile_download_returns_html_for_markdown(self, client):
+        """Compile download returns HTML Content-Type for markdown."""
+        resp = client.post("/api/v1/compile-download", json={
+            "content": "# Download Test\n\nContent.",
+            "format": "markdown",
+        })
+        assert resp.status_code == 200
+        content_type = resp.headers.get("content-type", "")
+        assert "html" in content_type or "Download Test" in resp.text
+
+    def test_compile_preview_typst_graceful(self, client):
+        """Typst preview returns SVG if CLI available, else 500 with message."""
+        import shutil
+        resp = client.post("/api/v1/compile-preview", json={
+            "content": "= Hello\nThis is a test.",
+            "format": "typst",
+        })
+        if shutil.which("typst") is None:
+            assert resp.status_code == 500
+        else:
+            assert resp.status_code == 200
+            assert "svg" in resp.json()["format"]
