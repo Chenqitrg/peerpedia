@@ -254,9 +254,46 @@ watch(() => route.params.id, async (newId) => {
 async function loadCompiledContent() {
   if (!article.value) return
   const isLocal = tauri.isTauri.value || tauri.isBrowserLocal.value
+  const fmt = article.value.compiled_format || 'markdown'
+  const isTypst = fmt === 'typst' || fmt === 'svg' || fmt === 'typst-svg' || fmt === 'typst-pdf'
 
-  // In local mode, compiled_output is raw markdown from buildArticleFromDraft.
-  // Use the full parseMarkdown pipeline instead of renderMathInHtml.
+  // ── Typst articles ────────────────────────────────────────────────
+  if (isTypst) {
+    if (isLocal) {
+      // Local mode: use Tauri IPC to compile Typst → SVG
+      const raw = article.value.compiled_output || ''
+      if (raw) {
+        try {
+          const result = await tauri.compileTypst({ content: raw, format: 'typst' })
+          if (result && typeof result === 'string') {
+            compiledHtml.value = `<div class="typst-preview">${result}</div>`
+          } else if (result && typeof result === 'object' && 'error' in result) {
+            compiledHtml.value = `<div class="typst-preview-error text-[#d73a49] p-4 font-mono text-sm">${(result as { error: string }).error}</div>`
+          }
+        } catch {
+          compiledHtml.value = ''
+        }
+      }
+      return
+    }
+
+    // Web mode: request SVG via compile-preview API
+    try {
+      const src = await getArticleSource(id)
+      const result = await compilePreview({ content: src.content, format: 'typst' })
+      // SVG output — skip renderMathInHtml (it's SVG, not HTML with KaTeX)
+      if (result.format === 'svg') {
+        compiledHtml.value = result.output
+      } else {
+        compiledHtml.value = result.output
+      }
+    } catch {
+      compiledHtml.value = ''
+    }
+    return
+  }
+
+  // ── Markdown articles (existing flow) ─────────────────────────────
   if (isLocal) {
     const raw = article.value.compiled_output || ''
     if (raw) {
@@ -267,12 +304,10 @@ async function loadCompiledContent() {
   }
 
   // Web mode: server returns pre-compiled HTML with katex spans.
-  // In Tauri mode, compiled_output from buildArticleFromDraft is raw markdown
-  // and was already handled above. This path only runs for server articles.
   let html = ''
   if (article.value.compiled_output) {
     html = article.value.compiled_output
-  } else if (!tauri.isTauri.value) {
+  } else {
     try {
       const src = await getArticleSource(id)
       const result = await compilePreview({ content: src.content, format: src.format as 'markdown' | 'typst' })
