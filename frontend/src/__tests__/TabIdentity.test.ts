@@ -522,4 +522,87 @@ describe('Tab Identity Specification', () => {
     // First tab must still have its original content — NOT empty/NOT second content
     expect((wrp.find('.cm-editor').element as HTMLTextAreaElement).value).toBe('Content for first article')
   })
+
+  // ── REGRESSION: fullPath vs path mismatch blocks title sync ─────
+  // Bug: useEditorTab used route.path (/edit) but store uses fullPath
+  // (/edit?new=1&_t=2). findTab returned undefined → updateTab silently
+  // did nothing → both tabs forever showed "Untitled".
+
+  it('REGRESSION: two new editor tabs each show their typed title in drawer', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Create first new article tab
+    await rou.push('/edit?new=1')
+    await settle()
+
+    // Type a title into the title input
+    const titleInput1 = wrp.find('input[placeholder="Article title..."]')
+    expect(titleInput1.exists()).toBe(true)
+    await titleInput1.setValue('Quantum Mechanics')
+    await settle()
+
+    // Create second new article tab
+    await rou.push('/edit?new=1&_t=2')
+    await settle()
+
+    // Type a different title
+    const titleInput2 = wrp.find('input[placeholder="Article title..."]')
+    expect(titleInput2.exists()).toBe(true)
+    await titleInput2.setValue('General Relativity')
+    await settle()
+
+    // Both tabs must exist
+    await expand(wrp)
+    const titles = tabTitles(wrp)
+    expect(titles.length).toBe(2)
+
+    // Neither tab should show "Untitled" — titles must reflect what user typed
+    expect(titles).toContain('Quantum Mechanics')
+    expect(titles).toContain('General Relativity')
+    expect(titles[0]).not.toBe(titles[1])
+  })
+
+  // ── SPEC: Two NavBar "New Article" clicks create independent tabs ─
+  // The NavBar newArticle() always pushes /edit?new=1 — the same path.
+  // The tab system must detect re-navigation to a "new article" path
+  // that already has a dirty/used tab and create a fresh tab instead
+  // of silently activating the existing one.
+  // Users expect each "New Article" click = a new blank editor.
+
+  it('SPEC: clicking New Article twice from NavBar creates two independent tabs', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // First click "New Article" (NavBar pushes /edit?new=1&_t=<timestamp>)
+    const t1 = Date.now()
+    await rou.push(`/edit?new=1&_t=${t1}`)
+    await settle()
+
+    // Type a title in the first editor
+    const titleInput1 = wrp.find('input[placeholder="Article title..."]')
+    expect(titleInput1.exists()).toBe(true)
+    await titleInput1.setValue('Quantum Mechanics')
+    await settle()
+
+    // Verify first tab shows the typed title
+    await expand(wrp)
+    expect(tabTitles(wrp)).toContain('Quantum Mechanics')
+    expect(wrp.findAll('.tab-drawer-edge').length).toBe(1)
+
+    // Second click "New Article" (NavBar pushes a new unique timestamp)
+    const t2 = Date.now() + 1000
+    await rou.push(`/edit?new=1&_t=${t2}`)
+    await settle()
+
+    // User sees: TWO tabs in the drawer (a new blank editor was created)
+    const edges = wrp.findAll('.tab-drawer-edge')
+    expect(edges.length).toBe(2)
+
+    // The first tab must still show its original title
+    await expand(wrp)
+    const titles = tabTitles(wrp)
+    expect(titles).toContain('Quantum Mechanics')
+
+    // The second tab must be a fresh editor, not showing first tab's title
+    expect(titles[1]).not.toBe('Quantum Mechanics')
+  })
 })

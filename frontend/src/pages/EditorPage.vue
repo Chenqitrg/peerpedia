@@ -101,10 +101,10 @@ const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
 
-// Path normalized to match tab store ids (same logic as useTabIntegration)
-const myEditorPath = route.path.startsWith('/articles/')
-  ? route.path.replace('/articles/', '/article/')
-  : route.path
+// Path normalized to match tab store ids (must use fullPath to match store tab ids)
+const myEditorPath = route.fullPath.startsWith('/articles/')
+  ? route.fullPath.replace('/articles/', '/article/')
+  : route.fullPath
 
 function onSaveAndClose(e: Event) {
   const detail = (e as CustomEvent).detail
