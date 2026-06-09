@@ -277,7 +277,7 @@ async function loadCompiledContent() {
   const isTypst = srcFormat === 'typst'
 
   // ── Typst articles ────────────────────────────────────────────────
-  if (srcFormat === 'typst') {
+  if (isTypst) {
     if (isLocal) {
       try {
         const result = await tauri.compileTypst({ content: srcContent, format: 'typst' })
