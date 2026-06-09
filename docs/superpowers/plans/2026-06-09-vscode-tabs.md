@@ -1129,6 +1129,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 | Ctrl+Tab quick switcher | Future enhancement; browser tab switching already works |
 | Split panes for side-by-side editing | Separate feature with significantly more complexity |
 | Pinned tabs / tab groups | Premature for MVP; gather usage data first |
+| Ctrl+P tab search | Deferred (CEO E1) — evaluate after gathering tab count data |
+| Auto-save on tab switch | Deferred (CEO E3) — needs git-friendly design first |
+| Cmd+Click background tab | Deferred (CEO E5) — evaluate after tab system ships |
 
 ## What Already Exists
 
@@ -1186,17 +1189,25 @@ Based on design review passes 1-7:
 - [ ] **D-C2 (D3) — Use Tailwind tokens instead of hardcoded hex colors**: Replace `#161b22` → `bg-card`, `#30363d` → `border-divider`, `#58a6ff` → `bg-accent` / `text-accent`, `#8b949e` → `text-ink-muted`, `#e6edf3` → `text-ink`, `#21262d` → Tailwind `bg-[#21262d]` (or define a new token). All in TabDrawer.vue scoped styles.
 - [ ] **D-C3 (D4) — Add focus-visible styles to tab items**: Add `focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-[-2px] focus-visible:rounded` to `.tab-drawer-item`. Tab buttons are already `<button>` elements so Tab-key focus works natively.
 
+## CEO Review — Scope Expansions
+
+Accepted from scope expansion ceremony:
+
+- [ ] **CEO-C1 (E2) — Color-coded tab edges by article status**: Add `status` field to `Tab` interface (`'draft' | 'published' | 'sedimentation'`). Collapsed tab edges use status-based color: `draft` → `bg-accent` (blue), `published` → `bg-success` (green), `sedimentation` → `bg-warning` (yellow). Active tab edge gets a brighter variant of its status color. Update `openTab()` to derive status from route type. Update TabDrawer.vue collapsed-edge CSS.
+- [ ] **CEO-C2 (E4) — Session restore with scroll position**: On `onDeactivated`, EditorPage and ArticlePage save `scrollTop` + `cursorPosition` to the tab store. On `onActivated`, restore them. Persisted to localStorage alongside other tab metadata. Requires adding `scrollTop?: number` and `cursorPosition?: number` to `Tab` interface. Update `persist()` and `restoreTabs()` to include these fields.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | SCOPE EXPANSION — 2 accepted, 3 deferred |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 5 issues, 0 critical gaps |
-| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | 4 passes reviewed, 3 design changes added |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | 7 passes, 3 design changes |
 
 **UNRESOLVED:** 0
 
-**VERDICT:** ENG CLEARED + DESIGN CLEARED — ready to implement after applying all plan changes (C1-C5 + D-C1 through D-C3).
+**VERDICT:** CEO CLEARED + ENG CLEARED + DESIGN CLEARED — ready to implement after applying all plan changes (C1-C5 + D-C1 through D-C3 + CEO-C1 through CEO-C2).
 
 ---
 
-*Reviews completed 2026-06-10. Eng: 5 findings, 5 accepted. Design: 7 passes, 3 plan changes.*
+*Reviews completed 2026-06-10. CEO: SCOPE EXPANSION, 2 accepted. Eng: 5 findings. Design: 3 changes.*
