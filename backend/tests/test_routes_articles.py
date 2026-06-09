@@ -457,7 +457,9 @@ class TestDownloadEndpoints:
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/gzip"
         # Verify it's a valid gzip that contains the article + .git
-        import gzip, tarfile, io
+        import io
+        import tarfile
+
         data = resp.content
         # gzip magic bytes
         assert data[:2] == b"\x1f\x8b"
