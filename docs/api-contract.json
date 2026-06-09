@@ -3,7 +3,7 @@
   "info": {
     "title": "PeerPedia API",
     "version": "0.1.0",
-    "description": "PeerPedia API — P0 architecture debt resolved (2026-06-07)"
+    "description": "PeerPedia API — Phase 1.5 (2026-06-09)"
   },
   "paths": {
     "/api/v1/auth/register": {
@@ -388,6 +388,22 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/v1/articles/{article_id}": {
+      "delete": {
+        "tags": ["articles"],
+        "summary": "Delete Article",
+        "description": "Delete an article: removes DB row, git repo directory, and all associated data (drafts, cache, history). Requires authentication.",
+        "operationId": "api_delete_article_api_v1_articles__article_id__delete",
+        "parameters": [
+          {"name": "article_id", "in": "path", "required": true, "schema": {"type": "string", "title": "Article Id"}},
+          {"name": "authorization", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"}}
+        ],
+        "responses": {
+          "200": {"description": "Article deleted"},
+          "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}
         }
       }
     },
@@ -1834,7 +1850,7 @@
           "compile"
         ],
         "summary": "Compile Preview",
-        "description": "Compile raw content and return rendered output.\n\n⛔ DEPRECATED (2026-06-06): Markdown compilation moved to client-side (frontend/src/utils/markdown.ts, marked + KaTeX). Typst compilation via Tauri sidecar (Slice 2). These endpoints are kept for backward compatibility only. Do not use in new code. Will be removed in a future version.",
+        "description": "Compile raw content and return rendered output.\n\nMarkdown: client-side preferred (marked + KaTeX), but server fallback available. Typst: Tauri sidecar (desktop) or server TypstBackend (web) — returns SVG for preview.",
         "operationId": "compile_preview_api_v1_compile_preview_post",
         "requestBody": {
           "content": {
@@ -1865,8 +1881,7 @@
               }
             }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/v1/compile-download": {
@@ -1875,7 +1890,7 @@
           "compile"
         ],
         "summary": "Compile Download",
-        "description": "Compile raw content and return as downloadable file.\n\nMarkdown → HTML file download, Typst → PDF file download.\n\n⛔ DEPRECATED (2026-06-06): Markdown compilation moved to client-side (frontend/src/utils/markdown.ts, marked + KaTeX). Typst compilation via Tauri sidecar (Slice 2). These endpoints are kept for backward compatibility only. Do not use in new code. Will be removed in a future version.",
+        "description": "Compile raw content and return as downloadable file.\n\nMarkdown → HTML file download, Typst → PDF file download (via TypstBackend).",
         "operationId": "compile_download_api_v1_compile_download_post",
         "requestBody": {
           "content": {
@@ -1906,8 +1921,7 @@
               }
             }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/health": {
@@ -2332,6 +2346,11 @@
               }
             ],
             "title": "Forked From"
+          },
+          "commit_hash": {
+            "type": "string",
+            "title": "Commit Hash",
+            "default": ""
           },
           "commit_count": {
             "type": "integer",

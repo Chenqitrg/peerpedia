@@ -26,8 +26,11 @@ arXiv solved **distribution**. But it didn't solve **filtering** — the problem
 
 ## Strategy · 策略
 
-**Phase 1 — Tauri Desktop（冷启动）**
+**Phase 1 — Tauri Desktop（冷启动）✅**
 A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. 5MB install, 30MB RAM. Useful alone — the key to cold-start users.
+
+**Phase 1.5 — Polish & Ship（打磨分发）🚧**
+Delete, diff view, Typst SVG preview, draft search, editor UX. Make the desktop app solid enough to distribute.
 
 **Phase 2 — Score arXiv（包围城市）**
 Community scoring layer on top of preprints. A quality filter that doesn't belong to any publisher.
@@ -40,10 +43,11 @@ When reputation + scoring infrastructure exists and people trust it, journals be
 ## Architecture · 架构
 
 ```
-Phase 1（Tauri Desktop — 离线写作）
+Phase 1 + 1.5（Tauri Desktop — 离线写作 + 打磨）
 ┌─────────────────────────────────────────────────────────┐
 │  Vue 3 → IPC → Rust → SQLite + Git（本地）                │
 │  离线写作 · 客户端编译 · 版本控制 · 浏览即缓存               │
+│  删除 · diff · Typst SVG · FTS5 搜索 · keep-alive         │
 └─────────────────────────────────────────────────────────┘
 
 Phase 2+（Web — 社区协作）
@@ -232,8 +236,9 @@ See [`docs/plan_reshape.md`](docs/plan_reshape.md) for the detailed engineering 
 | Phase | Focus | Status |
 |-------|-------|--------|
 | **1 — Desktop MVP** | Offline writing, local git, session auth, profile with drafts | ✅ Done |
-| **2 — Polish & Ship** | Delete articles, diff view, Typst compile, editor UX, distribution, draft search, arXiv mirror, tags | 🔜 In progress |
-| **3 — P2P Network** | Index server, content-addressed storage, peer-to-peer distribution | 🔮 Future |
+| **1.5 — Polish & Ship** | Delete, diff view, Typst SVG preview, FTS5 draft search, editor UX | 🚧 In progress |
+| **2 — Score arXiv** | Community scoring, sedimentation pool, reputation | 🔜 Next |
+| **3 — P2P Network** | Content-addressed storage, peer-to-peer distribution | 🔮 Future |
 
 ---
 

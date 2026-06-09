@@ -26,6 +26,7 @@ export default {
         },
         // Functional
         success: '#5c7c6e',
+        danger: '#d73a49',
         neutral: '#6e7b8c',
       },
       fontFamily: {
