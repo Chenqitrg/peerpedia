@@ -17,6 +17,15 @@ Share any article via a portable file or link.
 | **Format** | `.peerpedia` = SQLite DB containing `meta` table, `content` table, optional `git` blob. Typically <1 MB. |
 | **Testing** | Rust: export → import → verify article restored. |
 
+### Editor Experience · 编辑器体验 (P0)
+
+| Requirement | Approach |
+|-------------|----------|
+| **Ctrl+S → compile** | Add keyboard shortcut. `Ctrl+S` (Cmd+S on Mac) triggers `handleCompile()`. Show "Compiled ✓" toast. |
+| **Syntax highlighting** | Integrate CodeMirror 6. Markdown mode + Typst mode. Line numbers, bracket matching. |
+| **Auto-complete & indentation** | CodeMirror plugins for Markdown references, Typst functions, smart indent. |
+| **Auto-save** | Debounced save (2s after last keystroke) via `useDraftPersistence`. "Saving…" / "Saved" indicator. |
+
 ### Distribute & Get Feedback · 分发与评测 (P0)
 
 | Task | Details |
@@ -54,7 +63,7 @@ Share any article via a portable file or link.
 | Diff view (side-by-side) | `6164305` |
 | Draft search (FTS5) | `6164305` |
 | Typst SVG preview (▶ button) | `0d226ca` |
-| Editor UX (keep-alive, split pane) | `9640323` |
+| Editor UX (keep-alive, split pane — partial) | `9640323` |
 | Mutex deadlock fix | `49fabeb` |
 
 ---
