@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
@@ -103,7 +103,20 @@ onMounted(() => {
     remove(DRAFT_KEY.value)
     currentDraftId.value = undefined
   }
+  window.addEventListener('keydown', onKeydown)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
+
+// Cmd+S / Ctrl+S → compile preview
+function onKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault()
+    handleCompile()
+  }
+}
 
 // When NavBar navigates to /edit?new=1, reset editor state for a fresh start.
 // The keep-alive cache preserves the component across navigations, so this watch
@@ -522,7 +535,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('editor.compile')"
-          :data-tooltip="t('editor.compile')"
+          :data-tooltip="t('editor.compile') + ' (⌘S)'"
           :disabled="compiling || !content.trim()"
           @click="handleCompile"
         >
