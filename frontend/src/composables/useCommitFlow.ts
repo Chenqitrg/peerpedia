@@ -7,7 +7,7 @@
 
 import { ref } from 'vue'
 
-export function useCommitFlow(onConfirm: (message: string) => void) {
+export function useCommitFlow(onConfirm: (message: string) => Promise<void>) {
   const showCommitPopup = ref(false)
   const tempCommitMsg = ref('')
 
@@ -17,11 +17,11 @@ export function useCommitFlow(onConfirm: (message: string) => void) {
     showCommitPopup.value = true
   }
 
-  /** Confirm: trim message, call onConfirm, close popup. */
-  function confirmCommit() {
+  /** Confirm: trim message, await onConfirm, close popup. */
+  async function confirmCommit() {
     const msg = tempCommitMsg.value.trim() || 'Save draft'
     showCommitPopup.value = false
-    onConfirm(msg)
+    await onConfirm(msg)
   }
 
   /** Cancel and close the popup. */
