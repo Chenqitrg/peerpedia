@@ -126,4 +126,32 @@ describe('DownloadButton', () => {
     })
     expect(wrapper.attributes('aria-label')).toBe('Download compiled (.pdf)')
   })
+
+  // Regression: repo download creates blob URL in Tauri mode
+  it('downloads repo via blob URL in Tauri mode', async () => {
+    const mockExportArticle = vi.fn().mockResolvedValue(
+      'H4sIAAAAAAAA/8vJTElVKEstKk3NK1Eoz0gtSlUoSi3KSQUAoxhasBcAAAA='
+    )
+    // Re-mock useTauri with Tauri mode enabled + exportArticle mock
+    vi.doMock('../../composables/useTauri', () => ({
+      useTauri: () => ({
+        isTauri: { value: true },
+        isBrowserLocal: { value: false },
+        exportArticle: mockExportArticle,
+      }),
+    }))
+    // Force re-import to pick up new mock
+    vi.resetModules()
+    const { default: DownloadButtonFresh } = await import('../DownloadButton.vue')
+    const wrapper = mount(DownloadButtonFresh, {
+      props: { format: 'repo', content: '', articleId: 'test-1', filename: 'my-article' },
+    })
+    await wrapper.find('button').trigger('click')
+    await new Promise(r => setTimeout(r, 50))
+
+    expect(URL.createObjectURL).toHaveBeenCalled()
+    // The blob should be application/gzip
+    const blobArg = (URL.createObjectURL as any).mock.calls[0]?.[0]
+    expect(blobArg?.type).toBe('application/gzip')
+  })
 })

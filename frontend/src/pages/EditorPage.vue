@@ -548,6 +548,16 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           :commit-hash="commitHash"
           :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
         />
+        <!-- Download repo bundle -->
+        <DownloadButton
+          format="repo"
+          :content="content"
+          :article-id="editId || currentDraftId"
+          :filename="title"
+          :disabled="!hasSaved || !isClean || !content.trim()"
+          :commit-hash="commitHash"
+          :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+        />
 
         <!-- History — show after first save even for new articles -->
         <router-link

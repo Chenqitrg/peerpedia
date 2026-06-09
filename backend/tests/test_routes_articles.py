@@ -448,6 +448,31 @@ class TestDownloadEndpoints:
         resp = client.get("/api/v1/articles/nonexistent/download/pdf")
         assert resp.status_code == 404
 
+    def test_download_repo_returns_tar_gz(self, client, seed_user):
+        """Download repo bundle returns a valid tar.gz with git history."""
+        aid = self._create_article_with_content(
+            client, seed_user, "# Test\n\nContent.", fmt="markdown",
+        )
+        resp = client.get(f"/api/v1/articles/{aid}/download/repo")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/gzip"
+        # Verify it's a valid gzip that contains the article + .git
+        import io
+        import tarfile
+
+        data = resp.content
+        # gzip magic bytes
+        assert data[:2] == b"\x1f\x8b"
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+            names = tar.getnames()
+            assert any("article.md" in n for n in names)
+            assert any(".git" in n for n in names)
+
+    def test_download_repo_not_found(self, client):
+        """Repo download for non-existent article returns 404."""
+        resp = client.get("/api/v1/articles/nonexistent/download/repo")
+        assert resp.status_code == 404
+
 
 class TestDeleteArticle:
     """Tests for DELETE /articles/{id} and core delete_article()."""

@@ -38,7 +38,7 @@ Phase 2+（社区 — Web）
 | Shell | Tauri 2.x (Rust) | — |
 | 前端 | Vue 3 + TS + Vite + Tailwind | Vue 3 + TS + Vite + Tailwind |
 | 后端 | Rust (rusqlite, bcrypt, libgit2) | Python 3.12+, FastAPI, SQLAlchemy |
-| 存储 | SQLite + Git 仓库（本地） | SQLite + Git 仓库（服务器） |
+| 存储 | SQLite + Git 仓库（本地） | SQLite + Git 仓库（本地，服务器只存索引） |
 | 编译 | Markdown: 客户端 (marked + KaTeX). Typst: Tauri sidecar | Markdown: 客户端 (marked + KaTeX). Typst: 服务端编译 |
 | 认证 | bcrypt + SQLite（本地账号） | JWT（bcrypt, 24h 过期） |
 | 数学 | KaTeX | KaTeX |
