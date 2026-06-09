@@ -7,6 +7,7 @@ import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, crea
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useArticleTab } from '../composables/useTabIntegration'
 import { useReviewStore } from '../stores/useReviewStore'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
 import type { ArticleDetail, ReviewOut } from '../api/types'
@@ -47,6 +48,10 @@ const articleSourceContent = ref('')
 const isForked = ref(false)
 
 const id = route.params.id as string
+
+// Tab integration — syncs title to tab store
+const articleBodyRef = ref<HTMLElement | null>(null)
+useArticleTab(computed(() => article.value?.title), articleBodyRef)
 
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 
@@ -686,6 +691,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
       <!-- Tab content -->
       <div v-if="activeTab === 'body'" class="card p-6">
         <div
+          ref="articleBodyRef"
           v-if="compiledHtml"
           class="prose-custom max-w-none"
           v-html="compiledHtml"

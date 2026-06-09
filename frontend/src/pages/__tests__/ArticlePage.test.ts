@@ -123,6 +123,12 @@ vi.mock('../../api/reviews', () => ({
   postReviewMessage: vi.fn().mockResolvedValue({}),
 }))
 
+// Mock useTabIntegration
+const mockUseArticleTab = vi.fn()
+vi.mock('@/composables/useTabIntegration', () => ({
+  useArticleTab: mockUseArticleTab,
+}))
+
 describe('ArticlePage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -433,6 +439,15 @@ describe('ArticlePage', () => {
 
     // Should show error message to user
     expect(wrapper.text()).toMatch(/Merge proposal failed|merge.*failed/i)
+  })
+
+  it('calls useArticleTab for title sync', async () => {
+    const ArticlePage = (await import('../ArticlePage.vue')).default
+    mount(ArticlePage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+    expect(mockUseArticleTab).toHaveBeenCalled()
   })
 })
 
