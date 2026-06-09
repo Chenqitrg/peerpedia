@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
+import CodeEditor from '../components/CodeEditor.vue'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
@@ -606,14 +607,22 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         class="flex flex-col"
         :style="{ width: showPreview ? `${splitRatio}%` : '100%' }"
       >
+        <!-- CodeMirror for Markdown -->
+        <CodeEditor
+          v-if="format === 'markdown'"
+          v-model="content"
+          :format="format"
+          :placeholder="'# Title\n\nWrite your article in Markdown...'"
+          class="flex-1 w-full"
+        />
+        <!-- Plain textarea for Typst -->
         <textarea
+          v-else
           v-model="content"
           class="flex-1 w-full bg-[#0d1117] text-ink font-mono text-sm leading-relaxed
                  p-4 resize-none border-none focus:outline-none
                  placeholder:text-ink-muted/30"
-          :placeholder="format === 'markdown'
-            ? '# Title\n\nWrite your article in Markdown...'
-            : '= Title\n\nWrite your article in Typst...'"
+          placeholder="= Title\n\nWrite your article in Typst..."
           spellcheck="false"
         />
       </div>
