@@ -1178,16 +1178,25 @@ Based on findings D1-D5, these changes must be applied to the plan before implem
 - [ ] **C4 (D4) — Add removeTab edge case tests**: Add tests for (a) closing a background (non-active) tab and (b) active tab with only a left neighbor.
 - [ ] **C5 (D5) — Add close flow integration test**: Component test that simulates the full flow: TabDrawer emits close-tab → dialog appears → "Save & Close" click → saveDraft called → tab removed.
 
+## Design Review — Plan Changes
+
+Based on design review passes 1-7:
+
+- [ ] **D-C1 (D2) — Collapsed state: stacked tab edges instead of plain trigger strip**: Replace the 4px solid trigger strip with stacked 6px-wide tab edges visible on the left. Each tab gets one edge; active tab edge uses `bg-accent`, dirty tab edge adds an accent dot, clean tabs use `bg-ink-muted/20`. Like real folder tabs sticking out — user sees tab count at a glance. Update TabDrawer.vue template and CSS.
+- [ ] **D-C2 (D3) — Use Tailwind tokens instead of hardcoded hex colors**: Replace `#161b22` → `bg-card`, `#30363d` → `border-divider`, `#58a6ff` → `bg-accent` / `text-accent`, `#8b949e` → `text-ink-muted`, `#e6edf3` → `text-ink`, `#21262d` → Tailwind `bg-[#21262d]` (or define a new token). All in TabDrawer.vue scoped styles.
+- [ ] **D-C3 (D4) — Add focus-visible styles to tab items**: Add `focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-[-2px] focus-visible:rounded` to `.tab-drawer-item`. Tab buttons are already `<button>` elements so Tab-key focus works natively.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 5 issues, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | 4 passes reviewed, 3 design changes added |
 
-**UNRESOLVED:** 0 (all 5 issues resolved — user accepted all recommendations)
+**UNRESOLVED:** 0
 
-**VERDICT:** ENG CLEARED — ready to implement after applying review-driven plan changes C1-C5 above.
+**VERDICT:** ENG CLEARED + DESIGN CLEARED — ready to implement after applying all plan changes (C1-C5 + D-C1 through D-C3).
 
 ---
 
-*Review completed 2026-06-09. 5 findings, 5 accepted, 5 plan changes required.*
+*Reviews completed 2026-06-10. Eng: 5 findings, 5 accepted. Design: 7 passes, 3 plan changes.*
