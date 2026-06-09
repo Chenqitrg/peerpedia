@@ -1196,6 +1196,16 @@ Accepted from scope expansion ceremony:
 - [ ] **CEO-C1 (E2) — Color-coded tab edges by article status**: Add `status` field to `Tab` interface (`'draft' | 'published' | 'sedimentation'`). Collapsed tab edges use status-based color: `draft` → `bg-accent` (blue), `published` → `bg-success` (green), `sedimentation` → `bg-warning` (yellow). Active tab edge gets a brighter variant of its status color. Update `openTab()` to derive status from route type. Update TabDrawer.vue collapsed-edge CSS.
 - [ ] **CEO-C2 (E4) — Session restore with scroll position**: On `onDeactivated`, EditorPage and ArticlePage save `scrollTop` + `cursorPosition` to the tab store. On `onActivated`, restore them. Persisted to localStorage alongside other tab metadata. Requires adding `scrollTop?: number` and `cursorPosition?: number` to `Tab` interface. Update `persist()` and `restoreTabs()` to include these fields.
 
+## UI/UX Taste Review — Visual Alignment
+
+Based on ui-ux-pro-max database audit, align TabDrawer CSS with existing project patterns:
+
+- [ ] **UX-C1 — Transition durations**: Drawer slide `150ms` → `duration-200` (matches app standard). Tab item hover `100ms` → `duration-150` (closer to standard).
+- [ ] **UX-C2 — Drawer background**: Use `bg-[#0d1117]` (editor background) instead of `bg-card`. Drawer is chrome/navigation, not content — it should be darker like VSCode's sidebar.
+- [ ] **UX-C3 — Tab item typography and spacing**: `font-size: 13px` → `text-xs`, `padding: 6px 8px` → `py-1.5 px-2`. Matches existing utility text scale.
+- [ ] **UX-C4 — Drawer panel border-radius**: Add `rounded-r-lg` on the right edge. All panels in the app use `rounded-lg` — the drawer's left edge is flush with viewport, right edge gets the radius.
+- [ ] **UX-C5 — Stacked tab edge gaps**: Add `gap-[2px]` between collapsed tab edges for visual breathing room. Each 6px edge is distinguishable.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
@@ -1203,10 +1213,11 @@ Accepted from scope expansion ceremony:
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | SCOPE EXPANSION — 2 accepted, 3 deferred |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 5 issues, 0 critical gaps |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | 7 passes, 3 design changes |
+| Taste Review | `/ui-ux-pro-max` | Visual consistency | 1 | CLEAR | 5 CSS alignments with existing patterns |
 
 **UNRESOLVED:** 0
 
-**VERDICT:** CEO CLEARED + ENG CLEARED + DESIGN CLEARED — ready to implement after applying all plan changes (C1-C5 + D-C1 through D-C3 + CEO-C1 through CEO-C2).
+**VERDICT:** ALL CLEARED (CEO + ENG + DESIGN + TASTE) — ready to implement after applying all 15 plan changes.
 
 ---
 
