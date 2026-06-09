@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onDeactivated, watch, computed, reactive } from 'vue'
+import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
@@ -49,11 +49,10 @@ const isForked = ref(false)
 
 const id = route.params.id as string
 
-// With KeepAlive, deactivated instances still see route changes via useRoute().
-// Guard to prevent cached instances from reloading data when another tab navigates.
-const isActive = ref(true)
-onActivated(() => { isActive.value = true })
-onDeactivated(() => { isActive.value = false })
+// This component instance is ALWAYS for this specific article (enforced by
+// :key="route.path" in the router-view). Capture the id at setup — it never
+// changes for this instance.
+const myArticleId = id
 
 // Tab integration — syncs title to tab store
 const articleBodyRef = ref<HTMLElement | null>(null)
@@ -252,7 +251,10 @@ onMounted(async () => {
 })
 
 watch(() => route.params.id, async (newId) => {
-  if (!newId || !isActive.value) return
+  // With :key="route.path", this component instance owns exactly one article.
+  // When navigating to a different article, Vue fires this watch BEFORE
+  // onDeactivated — isActive guards don't work. Compare against the captured id.
+  if (!newId || newId !== myArticleId) return
   loading.value = true
   reviewStore.reviews = []
   compiledHtml.value = ''
