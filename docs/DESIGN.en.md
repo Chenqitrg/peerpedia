@@ -410,6 +410,7 @@ The detailed engineering plan is maintained in [`docs/plan_reshape.md`](plan_res
 | P0 | Typst compilation (PDF download) | ✅ |
 | P0 | Draft search (FTS5) | ✅ |
 | P0 | Editor UX (keep-alive, split pane, save states, per-save commit msg) | ✅ |
+| P1 | CodeMirror 6 Markdown editor (syntax highlight, auto-indent, bracket matching) | ✅ |
 | P0 | Distribute & user testing | ⬜ |
 | P1 | arXiv mirror with scoring | ⬜ |
 | P1 | Tags & categories | ⬜ |
