@@ -3,14 +3,6 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { loadJSON, saveJSON } from '../composables/useLocalStorage'
 
-/** Safe router navigation — useRouter() may return undefined outside component context. */
-function safePush(path: string): void {
-  try {
-    const router = useRouter()
-    if (router) router.push(path)
-  } catch { /* useRouter unavailable (e.g. during test cleanup) */ }
-}
-
 export interface Tab {
   id: string
   type: 'editor' | 'article'
@@ -27,6 +19,14 @@ const STORAGE_KEY = 'peerpedia_tabs'
 export const useTabStore = defineStore('tab', () => {
   const tabs = ref<Tab[]>([])
   const activeTabId = ref<string | null>(null)
+
+  // Capture router once during store setup — useRouter() must be called
+  // while the Pinia store is being initialized within a Vue app that has
+  // the router plugin installed. Storing the reference avoids calling
+  // useRouter() inside action callbacks where getCurrentInstance() may
+  // be unavailable.
+  let router: ReturnType<typeof useRouter> | null = null
+  try { router = useRouter() } catch { /* no router available */ }
 
   function persist(): void {
     saveJSON(STORAGE_KEY, {
@@ -76,7 +76,7 @@ export const useTabStore = defineStore('tab', () => {
   function activateTab(tabId: string): void {
     activeTabId.value = tabId
     persist()
-    safePush(tabId)
+    if (router) router.push(tabId)
   }
 
   function updateTab(tabId: string, patch: Partial<Pick<Tab, 'title' | 'dirty' | 'status' | 'scrollTop' | 'cursorPosition'>>): void {
@@ -106,10 +106,10 @@ export const useTabStore = defineStore('tab', () => {
     if (wasActive) {
       if (nextTabId) {
         activeTabId.value = nextTabId
-        safePush(nextTabId)
+        if (router) router.push(nextTabId)
       } else {
         activeTabId.value = null
-        safePush('/')
+        if (router) router.push('/')
       }
     }
     persist()
@@ -120,7 +120,7 @@ export const useTabStore = defineStore('tab', () => {
     if (!saved?.tabs?.length) return
     tabs.value = saved.tabs.map(t => ({ ...t, dirty: false }))
     activeTabId.value = saved.activeTabId
-    if (saved.activeTabId) safePush(saved.activeTabId)
+    if (saved.activeTabId && router) router.push(saved.activeTabId)
   }
 
   return { tabs, activeTabId, openTab, activateTab, updateTab, closeTab, removeTab, restoreTabs }
