@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft, mockCompileTypst } = vi.hoisted(() => ({
@@ -74,7 +74,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const titleInput = wrapper.find('input[type="text"], input[placeholder*="title" i], input[placeholder*="Title" i]')
     expect(titleInput.exists()).toBe(true)
   })
@@ -84,7 +84,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     expect(wrapper.text()).toMatch(/markdown|typst/i)
   })
 
@@ -93,7 +93,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     // Icon-only button — find by aria-label or title
     const publishBtn = wrapper.find('[aria-label="Publish"]')
     expect(publishBtn.exists()).toBe(true)
@@ -104,7 +104,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const saveBtn = wrapper.find('button[aria-label="Save draft"], button[title="Save draft"]')
     expect(saveBtn.exists()).toBe(true)
   })
@@ -114,7 +114,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const buttons = wrapper.findAll('button')
     expect(buttons.length).toBeGreaterThan(0)
   })
@@ -126,7 +126,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const html = wrapper.html()
     expect(html.length).toBeGreaterThan(0)
   })
@@ -141,12 +141,12 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     const publishBtn = wrapper.find('[aria-label="Publish"]')
     expect(publishBtn.exists()).toBe(true)
     await publishBtn.trigger('click')
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     expect(wrapper.text()).toMatch(/contribution|Contribution|slider/i)
   })
@@ -161,7 +161,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     const vm = wrapper.vm as any
 
@@ -190,7 +190,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     vm.title = 'Test Article'
@@ -222,7 +222,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     vm.currentDraftId = 'draft-99'  // simulate second save (draft already exists)
@@ -252,7 +252,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     // No commit message set
@@ -261,7 +261,7 @@ describe('EditorPage', () => {
 
     // Clicking save should open the popup instead of saving
     await vm.handleSaveDraft()
-    await new Promise(r => setTimeout(r, 10))
+    await flushPromises()
 
     expect(vm.showCommitPopup).toBe(true)
     // saveDraft should NOT have been called
@@ -274,7 +274,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     // Find DownloadButton instances — they should be disabled because hasSaved is false
     const sourceBtn = wrapper.find('[aria-label="Download source (.md)"]')
@@ -300,7 +300,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     // Before save: hasSaved is false
@@ -311,7 +311,7 @@ describe('EditorPage', () => {
     vm.content = '# Test Content'
     vm.commitMsg = 'First save'
     await vm.saveDraft()
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     // After save: hasSaved is true (currentDraftId is set)
     expect(vm.hasSaved).toBe(true)
@@ -330,7 +330,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     // Before save: no history link (isEdit=false, no currentDraftId)
@@ -341,7 +341,7 @@ describe('EditorPage', () => {
     vm.content = '# Test'
     vm.commitMsg = 'first'
     await vm.saveDraft()
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     // After save: history link should appear (currentDraftId is set)
     const historyLink = wrapper.find('[aria-label="History"]')
@@ -364,7 +364,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 200))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     expect(vm.currentDraftId).toBeUndefined()
@@ -385,7 +385,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     vm.title = 'Article'
@@ -394,7 +394,7 @@ describe('EditorPage', () => {
     vm.showCommitPopup = true
 
     await vm.confirmSaveWithCommit()
-    await new Promise(r => setTimeout(r, 10))
+    await flushPromises()
 
     expect(vm.showCommitPopup).toBe(false)
     expect(mockSaveDraft).toHaveBeenCalled()
@@ -418,7 +418,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 200))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     // State should be reset
@@ -448,7 +448,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 200))
+    await flushPromises()
 
     // Without query.new, router.replace must NOT be called
     expect(mockReplace).not.toHaveBeenCalled()
@@ -466,7 +466,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     // Set Typst content and format
@@ -475,7 +475,7 @@ describe('EditorPage', () => {
 
     // Trigger compilation via the handleCompile button path
     await vm.handleCompile()
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     // Verify compileTypst was called with correct params
     expect(mockCompileTypst).toHaveBeenCalledWith({
@@ -501,7 +501,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     // Initially: content and savedContent are both empty → isClean=true
@@ -516,7 +516,7 @@ describe('EditorPage', () => {
     // Type content → isClean becomes false → button enables
     vm.content = '# New Content'
     vm.title = 'New Title'
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     expect(vm.isClean).toBe(false)
     // After content change, disabled should be removed
     const saveBtn2 = wrapper.find('button[aria-label="Save draft"], button[title="Save draft"]')
@@ -537,14 +537,14 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     vm.format = 'typst'
     vm.content = '= Bad Typst'
 
     await vm.handleCompile()
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
 
     // Error should be shown via compileResult (template-rendered, not HTML string)
     expect(vm.compileResult).toBeDefined()
@@ -566,7 +566,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 50))
+    await flushPromises()
     const vm = wrapper.vm as any
 
     vm.title = 'Test'
@@ -574,13 +574,13 @@ describe('EditorPage', () => {
 
     // First save: commitMsg is empty → popup opens
     await vm.handleSaveDraft()
-    await new Promise(r => setTimeout(r, 10))
+    await flushPromises()
     expect(vm.showCommitPopup).toBe(true)
 
     // Complete first save via popup
     vm.tempCommitMsg = 'First commit'
     await vm.confirmSaveWithCommit()
-    await new Promise(r => setTimeout(r, 10))
+    await flushPromises()
     expect(vm.showCommitPopup).toBe(false)
 
     // Make more edits
@@ -588,7 +588,7 @@ describe('EditorPage', () => {
     // Consequence: commitMsg should have been cleared,
     // so handleSaveDraft opens the popup again
     await vm.handleSaveDraft()
-    await new Promise(r => setTimeout(r, 10))
+    await flushPromises()
     expect(vm.showCommitPopup).toBe(true)
   })
 
@@ -598,7 +598,7 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 100))
+    await flushPromises()
     const cm = wrapper.find('.cm-editor')
     expect(cm.exists()).toBe(true)
     const textareas = wrapper.findAll('textarea')
@@ -610,13 +610,48 @@ describe('EditorPage', () => {
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    await new Promise(r => setTimeout(r, 100))
+    await flushPromises()
     const vm = wrapper.vm as any
     vm.format = 'typst'
-    await new Promise(r => setTimeout(r, 100))
+    await flushPromises()
     const cm = wrapper.find('.cm-editor')
     expect(cm.exists()).toBe(false)
     const ta = wrapper.find('textarea')
     expect(ta.exists()).toBe(true)
+  })
+
+  // T7: Cmd+S / Ctrl+S keyboard shortcut triggers compile
+  it('triggers compile on Cmd+S (Mac) keyboard shortcut', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.content = '# Test compile shortcut'
+    expect(vm.previewHtml).toBe('')
+
+    // Dispatch Cmd+S
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true }))
+    await flushPromises()
+
+    // handleCompile for markdown should set previewHtml synchronously
+    expect(vm.previewHtml).toBeTruthy()
+  })
+
+  it('triggers compile on Ctrl+S (Windows/Linux) keyboard shortcut', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.content = '# Test compile shortcut'
+    expect(vm.previewHtml).toBe('')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true }))
+    await flushPromises()
+
+    expect(vm.previewHtml).toBeTruthy()
   })
 })
