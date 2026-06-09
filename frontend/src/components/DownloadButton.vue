@@ -151,7 +151,7 @@ async function handleDownload() {
       <FileCode v-if="format === 'source'" class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
       <FileDown v-else-if="format === 'compiled'" class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
       <Package v-else class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
-      <span v-if="showLabel">{{ format === 'repo' ? 'Repo' : format === 'source' ? t('download.source') : t('download.compiled') }}</span>
+      <span v-if="showLabel">{{ format === 'repo' ? 'Repo' : format === 'source' ? t('download.source') : (contentFormat === 'typst' ? 'PDF' : t('download.compiled')) }}</span>
     </template>
   </button>
 </template>
