@@ -205,8 +205,7 @@ async function loadArticle(articleId: string) {
       if (draft && !('error' in draft)) {
         const draftData = draft as { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
         article.value = buildArticleFromDraft(draftData)
-        const { parseMarkdown } = await import('../utils/markdown')
-        compiledHtml.value = parseMarkdown(draft.content || '')
+        await loadCompiledContent()
         // Populate commit hash from local git
         try {
           const history = await tauri.gitHistory({ article_id: articleId })
@@ -255,21 +254,30 @@ async function loadCompiledContent() {
   if (!article.value) return
   const isLocal = tauri.isTauri.value || tauri.isBrowserLocal.value
 
-  // Fetch source to determine format — compiled_format is never populated
-  // in the DB (compile output is on-demand per DESIGN.en.md §5.2).
-  let srcContent = ''
-  let srcFormat = 'markdown'
-  try {
-    const src = await getArticleSource(id)
-    srcContent = src.content
-    srcFormat = src.format
-  } catch {
-    compiledHtml.value = ''
-    return
+  let srcContent: string
+  let srcFormat: string
+
+  // In local/Tauri mode, content and format come from the draft cache
+  // (set by buildArticleFromDraft). No REST server available offline.
+  if (isLocal) {
+    srcContent = article.value.compiled_output || ''
+    srcFormat = article.value.compiled_format || 'markdown'
+  } else {
+    // Web mode: fetch source from server to determine real format.
+    // compiled_format is never populated in the DB (on-demand compile).
+    try {
+      const src = await getArticleSource(id)
+      srcContent = src.content
+      srcFormat = src.format
+    } catch {
+      compiledHtml.value = ''
+      return
+    }
   }
+  const isTypst = srcFormat === 'typst'
 
   // ── Typst articles ────────────────────────────────────────────────
-  if (srcFormat === 'typst') {
+  if (isTypst) {
     if (isLocal) {
       try {
         const result = await tauri.compileTypst({ content: srcContent, format: 'typst' })
