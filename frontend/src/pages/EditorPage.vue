@@ -11,6 +11,7 @@ import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
+import { useEditorTab } from '../composables/useTabIntegration'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
 import DownloadButton from '../components/DownloadButton.vue'
@@ -34,6 +35,7 @@ const router = useRouter()
 const articleStore = useArticleStore()
 const userStore = useUserStore()
 const { t } = useI18n()
+
 const { canWrite, getFallback } = useOffline()
 
 import { getArticleSource } from '../api/articles'
@@ -77,6 +79,10 @@ const isClean = computed(() => content.value === savedContent.value && title.val
  *  Uses currentDraftId (set after first successful save) instead of commitHash,
  *  because git commit may not always succeed (e.g., running before login). */
 const hasSaved = computed(() => !!currentDraftId.value || !!commitHash.value)
+
+// Tab integration — syncs dirty state + title to tab store (via composable)
+const editorAreaRef = ref<HTMLElement | null>(null)
+useEditorTab(title, isClean, editorAreaRef)
 
 // Split panel resize
 const { splitRatio, splitterEl, isDragging, onSplitterMouseDown } = useSplitPane()
@@ -664,6 +670,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
     <div class="flex flex-1 border-x border-divider overflow-hidden border-t">
       <!-- Editor area (left) -->
       <div
+        ref="editorAreaRef"
         class="flex flex-col"
         :style="{ width: showPreview ? `${splitRatio}%` : '100%' }"
       >

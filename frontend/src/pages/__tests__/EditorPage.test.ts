@@ -53,6 +53,12 @@ vi.mock('@/composables/useTauri', () => ({
   }),
 }))
 
+// Mock useTabIntegration
+const mockUseEditorTab = vi.fn()
+vi.mock('@/composables/useTabIntegration', () => ({
+  useEditorTab: mockUseEditorTab,
+}))
+
 describe('EditorPage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -664,5 +670,14 @@ describe('EditorPage', () => {
     await flushPromises()
 
     expect(vm.previewHtml).toBe('')
+  })
+
+  it('calls useEditorTab with title and isClean', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    expect(mockUseEditorTab).toHaveBeenCalled()
   })
 })
