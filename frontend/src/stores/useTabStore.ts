@@ -3,6 +3,14 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { loadJSON, saveJSON } from '../composables/useLocalStorage'
 
+/** Safe router navigation — useRouter() may return undefined outside component context. */
+function safePush(path: string): void {
+  try {
+    const router = useRouter()
+    if (router) router.push(path)
+  } catch { /* useRouter unavailable (e.g. during test cleanup) */ }
+}
+
 export interface Tab {
   id: string
   type: 'editor' | 'article'
@@ -66,10 +74,9 @@ export const useTabStore = defineStore('tab', () => {
   }
 
   function activateTab(tabId: string): void {
-    const router = useRouter()
     activeTabId.value = tabId
     persist()
-    router.push(tabId)
+    safePush(tabId)
   }
 
   function updateTab(tabId: string, patch: Partial<Pick<Tab, 'title' | 'dirty' | 'status' | 'scrollTop' | 'cursorPosition'>>): void {
@@ -99,10 +106,10 @@ export const useTabStore = defineStore('tab', () => {
     if (wasActive) {
       if (nextTabId) {
         activeTabId.value = nextTabId
-        useRouter().push(nextTabId)
+        safePush(nextTabId)
       } else {
         activeTabId.value = null
-        useRouter().push('/')
+        safePush('/')
       }
     }
     persist()
@@ -113,7 +120,7 @@ export const useTabStore = defineStore('tab', () => {
     if (!saved?.tabs?.length) return
     tabs.value = saved.tabs.map(t => ({ ...t, dirty: false }))
     activeTabId.value = saved.activeTabId
-    if (saved.activeTabId) useRouter().push(saved.activeTabId)
+    if (saved.activeTabId) safePush(saved.activeTabId)
   }
 
   return { tabs, activeTabId, openTab, activateTab, updateTab, closeTab, removeTab, restoreTabs }
