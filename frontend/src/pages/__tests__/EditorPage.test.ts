@@ -589,4 +589,32 @@ describe('EditorPage', () => {
     await new Promise(r => setTimeout(r, 10))
     expect(vm.showCommitPopup).toBe(true)
   })
+
+  // CodeMirror 6 integration
+  it('uses CodeMirror editor for Markdown mode', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+    const cm = wrapper.find('.cm-editor')
+    expect(cm.exists()).toBe(true)
+    const textareas = wrapper.findAll('textarea')
+    expect(textareas.length).toBe(0)
+  })
+
+  it('uses plain textarea for Typst mode', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+    const vm = wrapper.vm as any
+    vm.format = 'typst'
+    await new Promise(r => setTimeout(r, 100))
+    const cm = wrapper.find('.cm-editor')
+    expect(cm.exists()).toBe(false)
+    const ta = wrapper.find('textarea')
+    expect(ta.exists()).toBe(true)
+  })
 })

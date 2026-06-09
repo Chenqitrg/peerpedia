@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
+import CodeEditor from '../components/CodeEditor.vue'
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
@@ -102,7 +103,20 @@ onMounted(() => {
     remove(DRAFT_KEY.value)
     currentDraftId.value = undefined
   }
+  window.addEventListener('keydown', onKeydown)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
+
+// Cmd+S / Ctrl+S → compile preview
+function onKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault()
+    handleCompile()
+  }
+}
 
 // When NavBar navigates to /edit?new=1, reset editor state for a fresh start.
 // The keep-alive cache preserves the component across navigations, so this watch
@@ -521,7 +535,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
           :aria-label="t('editor.compile')"
-          :data-tooltip="t('editor.compile')"
+          :data-tooltip="t('editor.compile') + ' (⌘S)'"
           :disabled="compiling || !content.trim()"
           @click="handleCompile"
         >
@@ -606,14 +620,22 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         class="flex flex-col"
         :style="{ width: showPreview ? `${splitRatio}%` : '100%' }"
       >
+        <!-- CodeMirror for Markdown -->
+        <CodeEditor
+          v-if="format === 'markdown'"
+          v-model="content"
+          :format="format"
+          :placeholder="'# Title\n\nWrite your article in Markdown...'"
+          class="flex-1 w-full"
+        />
+        <!-- Plain textarea for Typst -->
         <textarea
+          v-else
           v-model="content"
           class="flex-1 w-full bg-[#0d1117] text-ink font-mono text-sm leading-relaxed
                  p-4 resize-none border-none focus:outline-none
                  placeholder:text-ink-muted/30"
-          :placeholder="format === 'markdown'
-            ? '# Title\n\nWrite your article in Markdown...'
-            : '= Title\n\nWrite your article in Typst...'"
+          placeholder="= Title\n\nWrite your article in Typst..."
           spellcheck="false"
         />
       </div>
