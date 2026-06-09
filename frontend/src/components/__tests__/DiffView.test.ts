@@ -50,4 +50,39 @@ describe('DiffView', () => {
     const wrapper = mount(DiffView, { props: { diff: sampleDiff } })
     expect(wrapper.text()).toContain('@@ -1,3 +1,4 @@')
   })
+
+  // Regression: deleted lines must have danger styling
+  it('applies danger class to deleted lines', () => {
+    const wrapper = mount(DiffView, { props: { diff: sampleDiff } })
+    // The '-' prefix on deleted lines should have text-danger class
+    const delPrefixes = wrapper.findAll('.text-danger')
+    expect(delPrefixes.length).toBeGreaterThan(0)
+  })
+
+  // Regression: added lines must have success styling
+  it('applies success class to added lines', () => {
+    const wrapper = mount(DiffView, { props: { diff: sampleDiff } })
+    const addPrefixes = wrapper.findAll('.text-success')
+    expect(addPrefixes.length).toBeGreaterThan(0)
+  })
+
+  // Regression: word-level diff highlighting within changed lines
+  it('highlights changed words in deletions and additions', () => {
+    const wordDiff: DiffResult = {
+      files: ['article.typ'],
+      hunks: [{
+        old_start: 1, old_lines: 1, new_start: 1, new_lines: 1,
+        header: '',
+        lines: [
+          { line_type: 'del', content: 'old version text here', old_lineno: 1, new_lineno: null },
+          { line_type: 'add', content: 'new version text here', old_lineno: null, new_lineno: 1 },
+        ],
+      }],
+    }
+    const wrapper = mount(DiffView, { props: { diff: wordDiff } })
+    const html = wrapper.html()
+    // Word-level diff should wrap changed words in spans
+    expect(html).toContain('diff-word-del')
+    expect(html).toContain('diff-word-add')
+  })
 })

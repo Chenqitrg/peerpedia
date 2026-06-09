@@ -110,4 +110,20 @@ describe('DownloadButton', () => {
     await wrapper.find('button').trigger('click')
     expect(URL.createObjectURL).not.toHaveBeenCalled()
   })
+
+  // Regression: Typst source downloads as .typ file
+  it('shows .typ aria-label for Typst source downloads', () => {
+    const wrapper = mount(DownloadButton, {
+      props: { format: 'source', content: '= Typst', contentFormat: 'typst' },
+    })
+    expect(wrapper.attributes('aria-label')).toBe('Download source (.typ)')
+  })
+
+  // Regression: Typst compiled downloads as .pdf
+  it('shows .pdf aria-label for Typst compiled downloads', () => {
+    const wrapper = mount(DownloadButton, {
+      props: { format: 'compiled', content: '= Typst', contentFormat: 'typst' },
+    })
+    expect(wrapper.attributes('aria-label')).toBe('Download compiled (.pdf)')
+  })
 })
