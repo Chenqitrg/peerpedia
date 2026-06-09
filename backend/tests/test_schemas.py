@@ -160,3 +160,103 @@ class TestArticleCreate:
         )
         assert a.title == "相对论讲义"
         assert a.categories == ["理论物理"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Schema edge case tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestArticleDetailEdgeCases:
+    """ArticleDetail with null optional fields."""
+
+    def test_detail_with_null_sink_eta_and_days(self):
+        from peerpedia_api.schemas.article import ArticleDetail
+
+        now = datetime.now(timezone.utc)
+        a = ArticleDetail(
+            id="a1", status="published",
+            authors=[],
+            fork_count=0, created_at=now, updated_at=now,
+            sink_eta=None, days_remaining=None,
+            forked_from=None,
+            score=None,
+            review_count=0,
+        )
+        d = a.model_dump()
+        assert d["sink_eta"] is None
+        assert d["days_remaining"] is None
+        assert d["score"] is None
+
+    def test_detail_with_zero_counts(self):
+        from peerpedia_api.schemas.article import ArticleDetail
+
+        now = datetime.now(timezone.utc)
+        a = ArticleDetail(
+            id="a_min", status="draft",
+            authors=[],
+            fork_count=0, created_at=now, updated_at=now,
+            review_count=0,
+        )
+        assert a.review_count == 0
+        assert a.fork_count == 0
+        assert a.is_bookmarked is False
+        assert a.is_own_article is False
+
+
+class TestUserProfileEdgeCases:
+    """UserProfile with empty/null optional fields."""
+
+    def test_user_profile_with_empty_expertise(self):
+        from peerpedia_api.schemas.user import UserProfile
+
+        now = datetime.now(timezone.utc)
+        u = UserProfile(
+            id="u1", name="测试",
+            affiliation="", expertise=[],
+            avatar_url=None, contact=None,
+            reputation={}, followers_count=0,
+            following_count=0, article_count=0,
+            created_at=now,
+        )
+        assert u.expertise == []
+        assert u.affiliation == ""
+        assert u.avatar_url is None
+        assert u.reputation == {}
+
+    def test_user_profile_with_full_reputation(self):
+        from peerpedia_api.schemas.user import UserProfile
+
+        now = datetime.now(timezone.utc)
+        u = UserProfile(
+            id="u2", name="专家",
+            expertise=["物理", "数学"],
+            reputation={"professionalism": 5.0, "objectivity": 4.5,
+                        "collaboration": 3.0, "pedagogy": 4.0},
+            followers_count=100, following_count=50,
+            article_count=12, created_at=now,
+        )
+        assert u.reputation["professionalism"] == 5.0
+        assert u.followers_count == 100
+
+
+class TestValidationEdgeCases:
+    """Validation of edge-case inputs."""
+
+    def test_scores_at_boundaries(self):
+        from peerpedia_api.schemas.article import FiveDimScoresOut
+
+        # All zeros — valid
+        s = FiveDimScoresOut(originality=0.0, rigor=0.0, completeness=0.0,
+                             pedagogy=0.0, impact=0.0)
+        assert s.originality == 0.0
+
+        # All fives — valid
+        s2 = FiveDimScoresOut(originality=5.0, rigor=5.0, completeness=5.0,
+                              pedagogy=5.0, impact=5.0)
+        assert s2.originality == 5.0
+
+        # Clamping
+        s3 = FiveDimScoresOut(originality=-10.0, rigor=99.0, completeness=5.0,
+                              pedagogy=2.5, impact=3.0)
+        assert s3.originality == 0.0  # clamped to 0
+        assert s3.rigor == 5.0        # clamped to 5

@@ -430,3 +430,81 @@ class TestPoolReviewFreeze:
         resp = client.post(f"/api/v1/articles/{aid}/reviews", json=body, headers=headers)
         assert resp.status_code == 403
         assert "frozen" in resp.json()["detail"].lower()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Review error path coverage
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestReviewErrorPaths:
+    """Verify error responses for edge cases in review endpoints."""
+
+    def test_submit_review_nonexistent_article_returns_404(self, client, auth_header, db_engine):
+        from peerpedia_core.storage.db.engine import get_session
+        s = get_session(db_engine)
+        from peerpedia_core.storage.db.models import User
+        u = User(username="err_rv", password_hash="", name="错误测试", anonymous_name="anon_err")
+        s.add(u)
+        s.commit()
+        uid = u.id
+        s.close()
+
+        body = {
+            "article_id": "nonexistent-article-id",
+            "commit_hash": "abc123",
+            "scope": "pool",
+            "scores": {"originality": 3, "rigor": 3, "completeness": 3,
+                       "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post(
+            "/api/v1/articles/nonexistent-article-id/reviews",
+            json=body,
+            headers=auth_header(uid),
+        )
+        assert resp.status_code == 404
+
+    def test_list_reviews_nonexistent_article_returns_404(self, client):
+        resp = client.get("/api/v1/articles/nonexistent-article-id/reviews")
+        assert resp.status_code == 404
+
+    def test_post_thread_message_nonexistent_review_returns_404(self, client, auth_header, db_engine):
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, User
+        s = get_session(db_engine)
+        u = User(username="err_thread", password_hash="", name="线程测试", anonymous_name="anon_th")
+        a = Article(status="sedimentation", authors=[u.id])
+        s.add_all([u, a])
+        s.commit()
+        uid = u.id
+        aid = a.id
+        s.close()
+
+        resp = client.post(
+            f"/api/v1/articles/{aid}/reviews/nonexistent-review-id/messages",
+            json={"content": "这条消息不应发送成功。"},
+            headers=auth_header(uid),
+        )
+        assert resp.status_code == 404
+
+    def test_post_thread_message_empty_content_rejected(self, client, auth_header, seeded):
+        """Empty thread message should be rejected with 422."""
+        # Create a review first
+        body = {
+            "article_id": seeded["article_id"],
+            "commit_hash": "h_empty",
+            "scope": "pool",
+            "scores": {"originality": 3, "rigor": 3, "completeness": 3,
+                       "pedagogy": 3, "impact": 3},
+        }
+        r = client.post(
+            f"/api/v1/articles/{seeded['article_id']}/reviews",
+            json=body,
+            headers=auth_header(seeded["reviewer_id"]),
+        ).json()
+
+        resp = client.post(
+            f"/api/v1/articles/{seeded['article_id']}/reviews/{r['id']}/messages",
+            json={"content": ""},
+            headers=auth_header(seeded["author_id"]),
+        )
+        assert resp.status_code == 422

@@ -601,3 +601,157 @@ class TestDeleteArticle:
             if old is not None:
                 app.dependency_overrides[deps.require_user] = old
             s2.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Article lifecycle — status transitions (sedimentation → published)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestArticleLifecycle:
+    """Verify article status transitions through the sedimentation pool."""
+
+    def test_create_article_enters_sedimentation(self, client, seed_user):
+        """New articles enter sedimentation, not draft."""
+        body = {
+            "authors": [seed_user],
+            "content": "# Test\n\nContent.",
+            "format": "markdown",
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201
+        assert resp.json()["status"] == "sedimentation"
+        assert resp.json()["sink_eta"] is not None
+        assert resp.json()["days_remaining"] is not None
+
+    def test_edit_re_enters_pool(self, client, seed_user):
+        """Editing an article should update sink_start and re-enter sedimentation."""
+        create_body = {
+            "authors": [seed_user],
+            "content": "# V1\n\nFirst.",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        article_id = resp.json()["id"]
+
+        # Edit with publish flag
+        edit_body = {
+            "content": "# V2\n\nUpdated.",
+            "self_review": {"originality": 4, "rigor": 4, "completeness": 4,
+                            "pedagogy": 4, "impact": 4},
+            "publish": True,
+        }
+        resp2 = client.put(f"/api/v1/articles/{article_id}", json=edit_body)
+        assert resp2.status_code == 200
+        assert resp2.json()["status"] == "sedimentation"
+
+    def test_publish_transitions_to_sedimentation(self, client, seed_user):
+        """Publish endpoint transitions article to sedimentation pool."""
+        create_body = {
+            "authors": [seed_user],
+            "content": "# To Publish",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        article_id = resp.json()["id"]
+
+        pub_resp = client.post(f"/api/v1/articles/{article_id}/publish")
+        assert pub_resp.status_code == 200
+        assert pub_resp.json()["status"] == "sedimentation"
+
+    def test_publish_nonexistent_article_returns_404(self, client):
+        resp = client.post("/api/v1/articles/nonexistent/publish")
+        assert resp.status_code == 404
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sink extension — extra pool time
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestSinkExtension:
+    """Verify sink extension API extends the sedimentation pool duration."""
+
+    def test_extend_sink_increases_duration(self, client, seed_user):
+        create_body = {
+            "authors": [seed_user],
+            "content": "# Sink Test",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        article_id = resp.json()["id"]
+        original_duration = resp.json()["sink_duration_days"]
+
+        # Extend by 10 days
+        ext_resp = client.put(
+            f"/api/v1/articles/{article_id}/sink-extension",
+            json={"extra_days": 10},
+        )
+        assert ext_resp.status_code == 200
+        assert ext_resp.json()["sink_duration_days"] > original_duration
+
+    def test_extend_sink_rejects_zero_or_negative(self, client, seed_user):
+        create_body = {
+            "authors": [seed_user],
+            "content": "# Sink Test 2",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        article_id = resp.json()["id"]
+
+        for bad_days in [0, -1]:
+            ext_resp = client.put(
+                f"/api/v1/articles/{article_id}/sink-extension",
+                json={"extra_days": bad_days},
+            )
+            assert ext_resp.status_code == 422, \
+                f"extra_days={bad_days} should be rejected, got {ext_resp.status_code}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Error path coverage — fork, has-forked, rollback
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestArticleErrorPaths:
+    """Verify error responses for article sub-routes."""
+
+    def test_fork_nonexistent_article_returns_404(self, client):
+        """Forking a nonexistent article returns 404. Auth is already overridden."""
+        resp = client.post("/api/v1/articles/nonexistent/fork")
+        assert resp.status_code == 404
+
+    def test_has_forked_without_auth_returns_401(self, client, seed_user):
+        """has-forked endpoint requires authentication."""
+        create_body = {
+            "authors": [seed_user],
+            "content": "# Forkable",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        article_id = resp.json()["id"]
+
+        # Without auth override, require_user dependency returns 401
+        from peerpedia_api import deps
+        app = client.app
+        old = app.dependency_overrides.get(deps.require_user)
+        try:
+            app.dependency_overrides.pop(deps.require_user, None)
+            resp2 = client.get(f"/api/v1/articles/{article_id}/has-forked")
+            assert resp2.status_code == 401
+        finally:
+            if old is not None:
+                app.dependency_overrides[deps.require_user] = old
+
+    def test_rollback_nonexistent_article_returns_404(self, client):
+        resp = client.post("/api/v1/articles/nonexistent/rollback/abc123")
+        assert resp.status_code == 404
