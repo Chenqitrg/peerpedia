@@ -159,5 +159,13 @@
   .prose-custom th {
     @apply bg-[#161b22] font-semibold;
   }
+
+  /* Diff word-level highlighting */
+  .diff-word-add {
+    @apply bg-success/30 text-success font-semibold rounded-sm px-0.5;
+  }
+  .diff-word-del {
+    @apply bg-danger/30 text-danger font-semibold rounded-sm px-0.5 line-through;
+  }
 }
 [data-tooltip]{position:relative}[data-tooltip]::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);padding:3px 8px;background:#30363d;color:#e6edf3;font-size:11px;line-height:1.4;border-radius:4px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 80ms;z-index:100}[data-tooltip]:hover::after{opacity:1;transition:opacity 80ms 50ms}
