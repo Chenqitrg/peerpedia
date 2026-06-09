@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
 
 
 @pytest.fixture
@@ -31,8 +31,10 @@ def seeded(db_engine):
     s.add_all([author, reviewer])
     s.commit()
 
-    article = Article(status="sedimentation", authors=[author.id])
+    article = Article(status="sedimentation")
     s.add(article)
+    s.flush()
+    s.add(ArticleAuthor(article_id=article.id, author_id=author.id, position=0))
     s.commit()
 
     s.close()
@@ -295,8 +297,7 @@ class TestThreadMessage:
         resp = client.post(
             f"/api/v1/articles/{seeded['article_id']}/reviews/{r['id']}/messages",
             json={"content": "谢谢指出，已修改。"},
-            headers=auth_header(seeded["author_id"]),
-        )
+            headers=auth_header(seeded["author_id"]))
         assert resp.status_code == 201
         assert resp.json()["status"] == "ok"
 
@@ -314,8 +315,7 @@ class TestThreadMessage:
         resp = client.post(
             f"/api/v1/articles/{seeded['article_id']}/reviews/{r['id']}/messages",
             json={"content": "更新一下我的评审意见。"},
-            headers=auth_header(seeded["reviewer_id"]),
-        )
+            headers=auth_header(seeded["reviewer_id"]))
         assert resp.status_code == 201
 
     def test_bystander_cannot_post_to_thread(self, client, seeded, db_engine, auth_header):
@@ -342,8 +342,7 @@ class TestThreadMessage:
         resp = client.post(
             f"/api/v1/articles/{seeded['article_id']}/reviews/{r['id']}/messages",
             json={"content": "我也来说两句。"},
-            headers=auth_header(bystander_id),
-        )
+            headers=auth_header(bystander_id))
         assert resp.status_code == 403
         assert "author and reviewer" in resp.json()["detail"].lower()
 
@@ -359,7 +358,7 @@ class TestPoolReviewFreeze:
         s.add_all([author, reviewer])
         s.commit()
         # Article that has already left the pool (published)
-        art = Article(status="published", authors=[author.id])
+        art = Article(status="published")
         s.add(art)
         s.commit()
         aid = art.id
@@ -378,7 +377,7 @@ class TestPoolReviewFreeze:
         assert resp.status_code == 201
 
         # Now change article to "sedimentation" and back to simulate: submit pool review in pool, then publish
-        art2 = Article(status="published", authors=[author.id])
+        art2 = Article(status="published")
         s2 = get_session(db_engine)
         s2.add(art2)
         s2.commit()
@@ -401,7 +400,7 @@ class TestPoolReviewFreeze:
         s.add_all([author, reviewer])
         s.commit()
         # Article in sedimentation (in pool)
-        art = Article(status="sedimentation", authors=[author.id])
+        art = Article(status="sedimentation")
         s.add(art)
         s.commit()
         aid = art.id
@@ -459,8 +458,7 @@ class TestReviewErrorPaths:
         resp = client.post(
             "/api/v1/articles/nonexistent-article-id/reviews",
             json=body,
-            headers=auth_header(uid),
-        )
+            headers=auth_header(uid))
         assert resp.status_code == 404
 
     def test_list_reviews_nonexistent_article_returns_404(self, client):
@@ -472,7 +470,7 @@ class TestReviewErrorPaths:
         from peerpedia_core.storage.db.models import Article, User
         s = get_session(db_engine)
         u = User(username="err_thread", password_hash="", name="线程测试", anonymous_name="anon_th")
-        a = Article(status="sedimentation", authors=[u.id])
+        a = Article(status="sedimentation")
         s.add_all([u, a])
         s.commit()
         uid = u.id
@@ -482,8 +480,7 @@ class TestReviewErrorPaths:
         resp = client.post(
             f"/api/v1/articles/{aid}/reviews/nonexistent-review-id/messages",
             json={"content": "这条消息不应发送成功。"},
-            headers=auth_header(uid),
-        )
+            headers=auth_header(uid))
         assert resp.status_code == 404
 
     def test_post_thread_message_empty_content_rejected(self, client, auth_header, seeded):
@@ -499,12 +496,10 @@ class TestReviewErrorPaths:
         r = client.post(
             f"/api/v1/articles/{seeded['article_id']}/reviews",
             json=body,
-            headers=auth_header(seeded["reviewer_id"]),
-        ).json()
+            headers=auth_header(seeded["reviewer_id"])).json()
 
         resp = client.post(
             f"/api/v1/articles/{seeded['article_id']}/reviews/{r['id']}/messages",
             json={"content": ""},
-            headers=auth_header(seeded["author_id"]),
-        )
+            headers=auth_header(seeded["author_id"]))
         assert resp.status_code == 422

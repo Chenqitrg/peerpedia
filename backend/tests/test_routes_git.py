@@ -26,12 +26,16 @@ def client(db_engine):
 def article_with_repo(db_engine):
     """Create user + article with git repo."""
     import tempfile
+
+    from peerpedia_core.storage.db.models import ArticleAuthor
     s = get_session(db_engine)
     u = User(username="user23", password_hash="", name="作者", anonymous_name="anon")
     s.add(u)
     s.commit()
-    a = Article(status="published", authors=[u.id])
+    a = Article(status="published")
     s.add(a)
+    s.flush()
+    s.add(ArticleAuthor(article_id=a.id, author_id=u.id, position=0))
     s.commit()
     aid = a.id
     uid = u.id

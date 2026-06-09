@@ -5,7 +5,20 @@ import pytest
 from peerpedia_api.deps import create_token
 from peerpedia_core.storage.db.engine import Base, get_engine, get_session, init_db
 from peerpedia_core.storage.db.models import *  # noqa: F401,F403 — register all models
-from peerpedia_core.storage.db.models import User  # noqa: F401 — explicit import for type checking
+from peerpedia_core.storage.db.models import Article, ArticleAuthor, User  # noqa: F401 — explicit imports
+from sqlalchemy.orm import Session
+
+
+def make_article(session: Session, /, *, authors: list | None = None, **kwargs):
+    """Create an Article with optional author rows in the join table."""
+    a = Article(**kwargs)
+    session.add(a)
+    session.flush()
+    if authors:
+        for pos, aid in enumerate(authors):
+            session.add(ArticleAuthor(article_id=a.id, author_id=aid, position=pos))
+    session.commit()
+    return a
 
 
 @pytest.fixture

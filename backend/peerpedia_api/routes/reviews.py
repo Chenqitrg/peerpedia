@@ -1,6 +1,6 @@
 """Review API routes."""
 from fastapi import APIRouter, Depends, HTTPException
-from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
 from peerpedia_core.storage.db.crud_review import (
     add_thread_message,
     create_review,
@@ -52,7 +52,8 @@ def list_reviews(article_id: str, db: Session = Depends(deps.get_db)):
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
     reviews = get_reviews_for_article(db, article_id)
-    return [_build_review_out(r, db, article.authors) for r in reviews]
+    article_author_ids = get_author_ids(db, article_id)
+    return [_build_review_out(r, db, article_author_ids) for r in reviews]
 
 
 @router.post("", status_code=201, response_model=ReviewOut)
@@ -92,9 +93,10 @@ def submit_review(article_id: str, body: ReviewCreate,
                 db.commit()
     # Update reputation for all authors of the reviewed article
     from peerpedia_core.workflow.reputation import compute_author_reputation
-    for author_id in article.authors:
+    article_author_ids = get_author_ids(db, article_id)
+    for author_id in article_author_ids:
         compute_author_reputation(db, author_id)
-    return _build_review_out(r, db, article.authors)
+    return _build_review_out(r, db, article_author_ids)
 
 
 @router.post("/{review_id}/messages", status_code=201, response_model=dict)
@@ -109,7 +111,7 @@ def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCrea
 
     # Permission: only article authors + the review's reviewer can reply
     article = get_article(db, article_id)
-    is_author = article is not None and current_user.id in article.authors
+    is_author = article is not None and current_user.id in get_author_ids(db, article_id)
     is_reviewer = r.reviewer_id == current_user.id
     if not (is_author or is_reviewer):
         raise HTTPException(

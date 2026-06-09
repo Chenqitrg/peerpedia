@@ -1,6 +1,6 @@
 """Bookmark API routes."""
 from fastapi import APIRouter, Depends, HTTPException
-from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
 from peerpedia_core.storage.db.crud_bookmark import (
     add_bookmark,
     get_bookmarks_for_user,
@@ -22,7 +22,7 @@ def list_bookmarks(current_user: User = Depends(deps.require_user),
     return {
         "bookmarks": [
             {"article_id": a.id, "title": a.title or "",
-             "authors": a.authors, "status": a.status,
+             "authors": get_author_ids(db, a.id), "status": a.status,
              "created_at": a.created_at.isoformat()}
             for a in articles
         ]

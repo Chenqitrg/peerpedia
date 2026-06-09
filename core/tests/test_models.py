@@ -27,13 +27,17 @@ def _make_user(session: Session, name: str, **kwargs) -> User:
 
 
 def _make_article(session: Session, **kwargs) -> Article:
+    from peerpedia_core.storage.db.models import ArticleAuthor
+    author_ids = kwargs.pop("authors", [])
     a = Article(
         status=kwargs.pop("status", "draft"),
         forked_from=kwargs.pop("forked_from", None),
-        authors=kwargs.pop("authors", []),
         **kwargs,
     )
     session.add(a)
+    session.flush()  # ensure a.id is available
+    for pos, aid in enumerate(author_ids):
+        session.add(ArticleAuthor(article_id=a.id, author_id=aid, position=pos))
     session.commit()
     return a
 
@@ -44,18 +48,19 @@ class TestArticle:
     """文章模型 — git 管内容，数据库管元数据"""
 
     def test_create_minimal(self, engine):
+        from peerpedia_core.storage.db.crud_article import get_author_ids
+        from peerpedia_core.storage.db.models import ArticleAuthor
         session = get_session(engine)
         user = _make_user(session, "testuser")
-        a = Article(
-            status="draft",
-            authors=[user.id],
-        )
+        a = Article(status="draft")
         session.add(a)
+        session.flush()
+        session.add(ArticleAuthor(article_id=a.id, author_id=user.id, position=0))
         session.commit()
 
         assert a.id is not None
         assert a.status == "draft"
-        assert a.authors == [user.id]
+        assert get_author_ids(session, a.id) == [user.id]
         assert a.score is None
         assert a.compiled_format is None
         assert a.sink_start is None
@@ -68,9 +73,7 @@ class TestArticle:
         session = get_session(engine)
         user = _make_user(session, "u1")
         for status in ("draft", "sedimentation", "published"):
-            a = Article(status=status, authors=[user.id])
-            session.add(a)
-            session.commit()
+            a = _make_article(session, status=status, authors=[user.id])
             assert a.status == status
         session.close()
 
@@ -80,9 +83,7 @@ class TestArticle:
         user = _make_user(session, "u3")
         score_dict = {"originality": 4.0, "rigor": 3.0, "completeness": 5.0,
                       "pedagogy": 2.0, "impact": 4.0}
-        a = Article(status="published", authors=[user.id], score=score_dict)
-        session.add(a)
-        session.commit()
+        a = _make_article(session, status="published", authors=[user.id], score=score_dict)
         a2 = session.get(Article, a.id)
         assert a2.score == score_dict
         assert a2.score["originality"] == 4.0
@@ -91,10 +92,8 @@ class TestArticle:
     def test_compiled_cache_for_html(self, engine):
         session = get_session(engine)
         user = _make_user(session, "u4")
-        a = Article(status="published", authors=[user.id],
-                    compiled_format="html", compiled_output="<h1>Test</h1>")
-        session.add(a)
-        session.commit()
+        a = _make_article(session, status="published", authors=[user.id],
+                          compiled_format="html", compiled_output="<h1>Test</h1>")
         a2 = session.get(Article, a.id)
         assert a2.compiled_format == "html"
         assert a2.compiled_output == "<h1>Test</h1>"
@@ -103,11 +102,9 @@ class TestArticle:
     def test_compiled_cache_for_svg(self, engine):
         session = get_session(engine)
         user = _make_user(session, "u5")
-        a = Article(status="published", authors=[user.id],
-                    compiled_format="svg", compiled_output=None,
-                    compiled_pages=["<svg>p1</svg>", "<svg>p2</svg>"])
-        session.add(a)
-        session.commit()
+        a = _make_article(session, status="published", authors=[user.id],
+                          compiled_format="svg", compiled_output=None,
+                          compiled_pages=["<svg>p1</svg>", "<svg>p2</svg>"])
         a2 = session.get(Article, a.id)
         assert a2.compiled_format == "svg"
         assert a2.compiled_pages == ["<svg>p1</svg>", "<svg>p2</svg>"]
@@ -117,7 +114,7 @@ class TestArticle:
         session = get_session(engine)
         user = _make_user(session, "u6")
         original = _make_article(session, status="published", authors=[user.id])
-        fork = Article(status="draft", forked_from=original.id, authors=[user.id])
+        fork = _make_article(session, status="draft", forked_from=original.id, authors=[user.id])
         session.add(fork)
         session.commit()
         assert fork.forked_from == original.id
@@ -131,9 +128,7 @@ class TestArticle:
         """Bug 6: Article.updated_at has onupdate so it refreshes on each commit."""
         session = get_session(engine)
         user = _make_user(session, "u7")
-        a = Article(status="draft", authors=[user.id])
-        session.add(a)
-        session.commit()
+        a = _make_article(session, status="draft", authors=[user.id])
         original_updated = a.updated_at
         # Mutate and commit
         a.status = "published"
@@ -234,7 +229,8 @@ class TestReview:
         )
         session.add(review)
         session.commit()
-        assert review.reviewer_id in article.authors  # 这就是自评
+        from peerpedia_core.storage.db.crud_article import get_author_ids
+        assert review.reviewer_id in get_author_ids(session, article.id)  # 这就是自评
         session.close()
 
     def test_review_updated_at_updates_on_change(self, engine):
