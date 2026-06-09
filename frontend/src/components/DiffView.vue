@@ -92,8 +92,9 @@ function highlightDeletedWords(delContent: string, addContent: string | null): s
   const addTokens = tokenize(addContent)
   const dp = lcsTable(delTokens, addTokens)
   const deleted = backtrackDeletions(delTokens, addTokens, dp)
-  // If every token is deleted (completely different), wrap entire line
-  if (deleted.size === delTokens.length) return `<span class="diff-word-del">${escapeHtml(delContent)}</span>`
+  // Only apply word-level highlighting when there's a meaningful partial diff
+  // (at least one token matches and at least one token differs)
+  if (deleted.size === 0) return escapeHtml(delContent)
   return delTokens.map((t, i) =>
     deleted.has(i) ? `<span class="diff-word-del">${escapeHtml(t)}</span>` : escapeHtml(t)
   ).join('')
@@ -107,8 +108,8 @@ function highlightAddedWords(addContent: string, delContent: string | null): str
   const delTokens = tokenize(delContent)
   const dp = lcsTable(delTokens, addTokens)
   const inserted = backtrackInsertions(delTokens, addTokens, dp)
-  // If every token is inserted (completely different), wrap entire line
-  if (inserted.size === addTokens.length) return `<span class="diff-word-add">${escapeHtml(addContent)}</span>`
+  // Only apply word-level highlighting when there's a meaningful partial diff
+  if (inserted.size === 0) return escapeHtml(addContent)
   return addTokens.map((t, i) =>
     inserted.has(i) ? `<span class="diff-word-add">${escapeHtml(t)}</span>` : escapeHtml(t)
   ).join('')
