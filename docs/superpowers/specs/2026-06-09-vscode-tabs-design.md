@@ -15,7 +15,7 @@ Currently, PeerPedia's editor supports only one article at a time. When an autho
 | Tab scope | Editor + Article pages | Covers the reference-while-writing workflow |
 | URL behavior | URL follows active tab | Enables refresh recovery, bookmarking, and shareable URLs |
 | Close dirty tab | Confirm dialog (Save / Discard / Cancel) | Matches VSCode behavior |
-| Tab bar position | Below NavBar | Closest to VSCode's toolbar+tab layout |
+| Tab bar position | Left sidebar, collapsed drawer, hover to expand | Academic authors open many articles with long titles — vertical layout shows full titles without truncation. Overlay mode avoids content reflow. |
 | Browser back/forward | Switch tab history | Matches browser tab mental model |
 
 ## 3. Architecture
@@ -23,7 +23,7 @@ Currently, PeerPedia's editor supports only one article at a time. When an autho
 ```
 App.vue
 ├── NavBar              (existing, unchanged)
-├── TabBar 🆕            VSCode-style tab bar
+├── TabDrawer 🆕         Left sidebar, collapsed → hover to expand overlay
 └── <router-view>        KeepAlive caches EditorPage + ArticlePage
     ├── EditorPage       (one cached instance per articleId)
     ├── ArticlePage      (one cached instance per articleId)
@@ -73,25 +73,64 @@ Fields: `tabs: Tab[]`, `activeTabId: string`.
 
 Persists tab list (metadata only, no content) to localStorage on every mutation. Content is restored separately via existing `useDraftPersistence` on component mount.
 
-### 6.2 New: `frontend/src/components/TabBar.vue`
+### 6.2 New: `frontend/src/components/TabDrawer.vue`
 
-VSCode-style horizontal tab bar. Visual spec:
+Left sidebar drawer with hover-to-expand interaction. Two visual states:
+
+**Collapsed (default):**
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  NavBar                                              [avatar]│
-├──────────────────────────────────────────────────────────────┤
-│  ● edit: Untitled   │  👁 量子力学导论   │  ● edit: 相对论   │
-├──────────────────────────────────────────────────────────────┤
-│  [editor / article content]                                  │
+┌──────────────────────────────────────┐
+│  NavBar                      [avatar]│
+├──────────────────────────────────────┤
+│▐│                                    │
+│▐│  [editor / article content]        │
+│▐│                                    │
+│▐│                                    │
+└──────────────────────────────────────┘
+ ↑ 3-4px trigger strip
+   (hover: bg-accent/30, cursor: col-resize-like)
 ```
 
-- Each tab: icon (lucide) + title text + dirty dot (●) + close button (× on hover)
-- Active tab: `bg-card` highlight + bottom border accent
-- Inactive tabs: muted, no bottom border
-- Scrollable horizontally if too many tabs (`overflow-x-auto`)
-- Dirty dot replaces close button icon when visible; close button shows on hover
-- Close button click → emit `close-tab` event with tab id
+**Expanded (hover):**
+
+```
+┌──┬───────────────────────────────────┐
+│  │ NavBar                    [avatar]│
+├──┼───────────────────────────────────┤
+│💰│ Untitled                          │
+│  │ ● 量子力学导论                     │
+│  │ 相对论笔记                         │
+│  │ 👁 弦理论综述                      │
+│  │ ● 超对称代数                       │
+│  │                                   │
+├──┤ [editor / article content]        │
+└──┴───────────────────────────────────┘
+ ↑ ~220px drawer
+   overlay on content
+```
+
+**Interaction spec:**
+
+- **Trigger strip**: 4px wide, full height of main area, left edge of viewport
+- **Expand**: `mouseenter` on trigger strip → drawer slides in (150ms ease-out)
+- **Collapse**: `mouseleave` on drawer → 200ms delay → drawer slides out (150ms ease-in). Delay prevents flicker when cursor briefly leaves.
+- **Overlay mode**: drawer renders on top of content via `absolute`/`fixed` positioning + `z-index`. Content area does NOT resize.
+- **Prevent misfire**: drawer stays expanded while cursor is inside the drawer panel, even if cursor briefly crosses the trigger strip gap.
+
+**Tab items:**
+
+- Each tab row: icon (lucide, 16px) + title text + dirty dot (●, accent color) + close button (×, visible on row hover)
+- Active tab: `bg-accent/15` background + `border-l-2 border-accent` left border
+- Inactive tabs: transparent background, no left border, muted text
+- Scrollable vertically if too many tabs (`overflow-y-auto`)
+- Full title shown (no truncation) — wraps to next line if necessary
+- Close button: `opacity-0` by default, `opacity-100` on row hover. Click → emit `close-tab(tabId)`.
+
+**Header area** (top of expanded drawer):
+
+- "Open Tabs" label + tab count badge
+- "Close All" button (closes all clean tabs, confirms on dirty ones)
 
 Props: none (reads from `useTabStore` directly).
 Emits: `close-tab(tabId)`.
@@ -100,9 +139,9 @@ Emits: `close-tab(tabId)`.
 
 Changes:
 
-1. **Import and render TabBar** between NavBar and `<main>`, only when `tabStore.tabs.length > 0`
+1. **Import and render TabDrawer** as an overlay between NavBar and `<main>`. The drawer is absolutely positioned on the left edge of the main area.
 2. **Expand KeepAlive**: `:include="['EditorPage', 'ArticlePage']"` (was `"EditorPage"` only)
-3. **Adjust main layout**: when tabs are visible, add a subtle border between TabBar and content area
+3. **Layout**: main content area uses relative positioning so the overlay drawer can position itself absolutely within it. Content area itself does NOT resize or reflow when drawer expands.
 4. **Restore tabs on mount**: call `tabStore.restoreTabs()` in `onMounted`
 
 No changes to NavBar, AuthModal, or other layout elements.
@@ -170,8 +209,10 @@ Caveat: unsaved content in editor tabs that were dirty before refresh IS preserv
 | Navigate away via browser back | Switch to previous tab (not close) |
 | Navigate to non-tab page (home, search, pool) | TabBar stays visible; active tab loses highlight |
 | Tauri offline mode | All tab state is local; no server dependency |
-| Very long title | Truncate with ellipsis at ~20 chars |
-| Too many tabs (>10) | Horizontal scroll; no tab minimum width below 120px |
+| Very long title | Shown in full — vertical layout allows text wrapping; no truncation needed |
+| Too many tabs (>20) | Vertical scroll within drawer; drawer height matches main area |
+| Drawer prevents content interaction | Overlay drawer is transparent to clicks when collapsed; only the 4px trigger strip captures hover |
+| Rapid hover/unhover flicker | 200ms collapse delay prevents drawer from closing on brief cursor exit |
 
 ## 10. Non-Goals (Out of Scope)
 
@@ -183,11 +224,13 @@ Caveat: unsaved content in editor tabs that were dirty before refresh IS preserv
 
 ## 11. Verification
 
-1. **Open multiple tabs**: Navigate to /edit → type content → click article link in NavBar → verify both appear as tabs
-2. **Switch without loss**: Type in editor tab → switch to article tab → switch back → content preserved
-3. **Dirty indicator**: Edit content without saving → verify dirty dot appears on editor tab → switch away → dot remains
-4. **Close clean tab**: × on article tab → tab closes, adjacent tab activates
-5. **Close dirty tab**: × on dirty editor tab → confirm dialog appears → "Save & Close" saves draft and closes → "Discard" closes without saving
-6. **Refresh recovery**: Open 3 tabs → refresh browser → all 3 tabs restored, last active tab focused
-7. **Existing tests**: All EditorPage and ArticlePage unit tests still pass (tab store is mocked)
-8. **Manual**: `cd frontend && npm run dev`, open multiple tabs, verify all behaviors above
+1. **Open multiple tabs**: Navigate to /edit → type content → click article link in NavBar → verify both appear in drawer
+2. **Drawer expand/collapse**: Hover left edge → drawer slides out over content. Move cursor away → 200ms delay → drawer slides in.
+3. **Drawer does not block content**: Click/interact with content area while drawer collapsed → works normally. Click content while drawer expanded → drawer stays (no auto-close on content click).
+4. **Switch without loss**: Type in editor tab → switch to article tab → switch back → content preserved
+5. **Dirty indicator**: Edit content without saving → verify dirty dot appears on editor tab in drawer → switch away → dot remains visible in collapsed state (as colored strip indicator)
+6. **Close clean tab**: × on article tab in drawer → tab closes, adjacent tab activates
+7. **Close dirty tab**: × on dirty editor tab → confirm dialog appears → "Save & Close" saves draft and closes → "Discard" closes without saving
+8. **Refresh recovery**: Open 3 tabs → refresh browser → all 3 tabs restored, last active tab focused
+9. **Existing tests**: All EditorPage and ArticlePage unit tests still pass (tab store is mocked)
+10. **Manual**: `cd frontend && npm run dev`, open multiple tabs, verify all behaviors above
