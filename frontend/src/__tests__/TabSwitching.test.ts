@@ -17,21 +17,21 @@ import { nextTick } from 'vue'
 
 // ── Mocks (I/O boundary only) ───────────────────────────────────
 
-vi.mock('../../api/articles', () => ({
+vi.mock('@/api/articles', () => ({
   getArticle: vi.fn(async () => ({ id: 'x', title: 'Test', status: 'published', authors: [], fork_count: 0, forked_from: null, commit_count: 1, commit_hash: 'abc', compiled_format: 'html', compiled_output: '<p>x</p>', compiled_pages: 1, score: {}, sink_eta: null, days_remaining: null, sink_duration_days: 30, review_count: 0, is_bookmarked: false, is_own_article: false, created_at: '', updated_at: '' })),
   getArticleSource: vi.fn(async () => ({ content: '#', format: 'markdown' })),
   getHistory: vi.fn(async () => ({ commits: [] })), forkArticle: vi.fn(), extendSink: vi.fn(),
   createMergeProposal: vi.fn(), getMergeProposals: vi.fn(async () => ({ proposals: [] })),
   deleteArticle: vi.fn(), compilePreview: vi.fn(async () => '<p>P</p>'),
 }))
-vi.mock('../../api/reviews', () => ({ getReviews: vi.fn(async () => []), createReview: vi.fn(), postReviewMessage: vi.fn() }))
-vi.mock('../../api/compile', () => ({ compilePreview: vi.fn(async () => '<p>P</p>') }))
-vi.mock('../../api/auth', () => ({ login: vi.fn(), register: vi.fn(), getMe: vi.fn(async () => ({ user: {} })) }))
-vi.mock('../../stores/useUserStore', () => ({
+vi.mock('@/api/reviews', () => ({ getReviews: vi.fn(async () => []), createReview: vi.fn(), postReviewMessage: vi.fn() }))
+vi.mock('@/api/compile', () => ({ compilePreview: vi.fn(async () => '<p>P</p>') }))
+vi.mock('@/api/auth', () => ({ login: vi.fn(), register: vi.fn(), getMe: vi.fn(async () => ({ user: {} })) }))
+vi.mock('@/stores/useUserStore', () => ({
   useUserStore: () => ({ viewer: { id: 'u1', name: 'A' }, token: 'x', showAuthModal: false, intendedRoute: null,
     isTauriMode: false, isBrowserLocal: false, restoreSession: vi.fn(async () => {}), login: vi.fn(), register: vi.fn(), logout: vi.fn() }),
 }))
-vi.mock('../../composables/useTauri', () => ({
+vi.mock('@/composables/useTauri', () => ({
   useTauri: () => ({ isTauri: { value: false }, isBrowserLocal: { value: false }, saveDraft: vi.fn(), getDraft: vi.fn().mockResolvedValue(null), listDrafts: vi.fn().mockResolvedValue([]), deleteDraft: vi.fn(), gitInit: vi.fn(), gitCommit: vi.fn(), gitHistory: vi.fn().mockResolvedValue([]), compileTypst: vi.fn(), getSessionToken: vi.fn(() => null), setSessionToken: vi.fn(), login: vi.fn(), listAccounts: vi.fn().mockResolvedValue([]), isFollowing: vi.fn(), getCachedArticle: vi.fn().mockResolvedValue(null), searchDrafts: vi.fn().mockResolvedValue([]), searchCachedArticles: vi.fn().mockResolvedValue([]), deleteArticle: vi.fn() }),
 }))
 

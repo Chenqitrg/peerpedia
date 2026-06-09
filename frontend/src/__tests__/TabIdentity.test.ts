@@ -13,33 +13,26 @@ import { nextTick } from 'vue'
 
 // ── Mocks (I/O boundary only) ───────────────────────────────────
 
-vi.mock('../../api/articles', () => ({
-  getArticle: vi.fn(async (id: string) => ({ id, title: 'Article-'+id, status: 'published', authors: [], fork_count: 0, forked_from: null, commit_count: 1, commit_hash: 'abc', compiled_format: 'html', compiled_output: '<p>'+id+'</p>', compiled_pages: 1, score: {}, sink_eta: null, days_remaining: null, sink_duration_days: 30, review_count: 0, is_bookmarked: false, is_own_article: false, created_at: '', updated_at: '' })),
+// Use @/ alias — ../../ from src/__tests__/ resolves differently than ../ from src/stores/.
+// @/ always resolves to src/, matching the store's import resolution.
+vi.mock('@/api/articles', () => ({
+  getArticle: vi.fn(async (id: string) => ({ id, title: 'Loaded-'+id, status: 'published', authors: [], fork_count: 0, forked_from: null, commit_count: 1, commit_hash: 'abc', compiled_format: 'html', compiled_output: '<p>'+id+'</p>', compiled_pages: 1, score: {}, sink_eta: null, days_remaining: null, sink_duration_days: 30, review_count: 0, is_bookmarked: false, is_own_article: false, created_at: '', updated_at: '' })),
+  getArticles: vi.fn(async () => ({ articles: [], total: 0 })),
   getArticleSource: vi.fn(async () => ({ content: '#', format: 'markdown' })),
-  getHistory: vi.fn(async () => ({ commits: [] })), forkArticle: vi.fn(), extendSink: vi.fn(),
-  createMergeProposal: vi.fn(), getMergeProposals: vi.fn(async () => ({ proposals: [] })),
-  deleteArticle: vi.fn(), compilePreview: vi.fn(async () => '<p>P</p>'),
+  getHistory: vi.fn(async () => ({ commits: [] })), createArticle: vi.fn(), updateArticle: vi.fn(),
+  forkArticle: vi.fn(), extendSink: vi.fn(), createMergeProposal: vi.fn(),
+  getMergeProposals: vi.fn(async () => ({ proposals: [] })), deleteArticle: vi.fn(),
+  compilePreview: vi.fn(async () => '<p>P</p>'), getDiff: vi.fn(), rollbackArticle: vi.fn(),
+  getCitations: vi.fn(), acceptMergeProposal: vi.fn(), rejectMergeProposal: vi.fn(),
 }))
-vi.mock('../../api/reviews', () => ({ getReviews: vi.fn(async () => []), createReview: vi.fn(), postReviewMessage: vi.fn() }))
-vi.mock('../../api/compile', () => ({ compilePreview: vi.fn(async () => '<p>P</p>') }))
-vi.mock('../../api/auth', () => ({ login: vi.fn(), register: vi.fn(), getMe: vi.fn(async () => ({ user: {} })) }))
-vi.mock('../../stores/useUserStore', () => ({
+vi.mock('@/api/reviews', () => ({ getReviews: vi.fn(async () => []), createReview: vi.fn(), postReviewMessage: vi.fn() }))
+vi.mock('@/api/compile', () => ({ compilePreview: vi.fn(async () => '<p>P</p>') }))
+vi.mock('@/api/auth', () => ({ login: vi.fn(), register: vi.fn(), getMe: vi.fn(async () => ({ user: {} })) }))
+vi.mock('@/stores/useUserStore', () => ({
   useUserStore: () => ({ viewer: { id: 'u1', name: 'A' }, token: 'x', showAuthModal: false, intendedRoute: null,
     isTauriMode: false, isBrowserLocal: false, restoreSession: vi.fn(async () => {}), login: vi.fn(), register: vi.fn(), logout: vi.fn() }),
 }))
-// Mock article store so EditorPage loads article data for /edit/:id routes.
-// EditorPage reads articleStore.currentArticle after calling fetchArticle().
-let _currentArticle: any = null
-vi.mock('../../stores/useArticleStore', () => ({
-  useArticleStore: () => ({
-    get currentArticle() { return _currentArticle },
-    fetchArticle: vi.fn(async (id: string) => {
-      _currentArticle = { id, title: 'Loaded-'+id, commit_hash: 'abc' }
-    }),
-    saveDraft: vi.fn(),
-  }),
-}))
-vi.mock('../../composables/useTauri', () => ({
+vi.mock('@/composables/useTauri', () => ({
   useTauri: () => ({ isTauri: { value: false }, isBrowserLocal: { value: false }, saveDraft: vi.fn(), getDraft: vi.fn().mockResolvedValue(null), listDrafts: vi.fn().mockResolvedValue([]), deleteDraft: vi.fn(), gitInit: vi.fn(), gitCommit: vi.fn(), gitHistory: vi.fn().mockResolvedValue([]), compileTypst: vi.fn(), getSessionToken: vi.fn(() => null), setSessionToken: vi.fn(), login: vi.fn(), listAccounts: vi.fn().mockResolvedValue([]), isFollowing: vi.fn(), getCachedArticle: vi.fn().mockResolvedValue(null), searchDrafts: vi.fn().mockResolvedValue([]), searchCachedArticles: vi.fn().mockResolvedValue([]), deleteArticle: vi.fn() }),
 }))
 
