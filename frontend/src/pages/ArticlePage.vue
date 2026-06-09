@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed, reactive } from 'vue'
+import { ref, onMounted, onActivated, onDeactivated, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
@@ -48,6 +48,12 @@ const articleSourceContent = ref('')
 const isForked = ref(false)
 
 const id = route.params.id as string
+
+// With KeepAlive, deactivated instances still see route changes via useRoute().
+// Guard to prevent cached instances from reloading data when another tab navigates.
+const isActive = ref(true)
+onActivated(() => { isActive.value = true })
+onDeactivated(() => { isActive.value = false })
 
 // Tab integration — syncs title to tab store
 const articleBodyRef = ref<HTMLElement | null>(null)
@@ -246,7 +252,7 @@ onMounted(async () => {
 })
 
 watch(() => route.params.id, async (newId) => {
-  if (!newId) return
+  if (!newId || !isActive.value) return
   loading.value = true
   reviewStore.reviews = []
   compiledHtml.value = ''
