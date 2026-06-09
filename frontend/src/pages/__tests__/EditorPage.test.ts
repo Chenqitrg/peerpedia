@@ -225,6 +225,7 @@ describe('EditorPage', () => {
     await new Promise(r => setTimeout(r, 50))
     const vm = wrapper.vm as any
 
+    vm.currentDraftId = 'draft-99'  // simulate second save (draft already exists)
     vm.title = 'Updated Article'
     vm.content = '# Updated Content'
     vm.commitMsg = 'Second draft'
@@ -482,10 +483,10 @@ describe('EditorPage', () => {
       format: 'typst',
     })
 
-    // Verify previewHtml contains the SVG output
-    expect(vm.previewHtml).toContain('<svg')
-    expect(vm.previewHtml).toContain('typst-preview')
-    expect(vm.previewHtml).toContain('Typst SVG output')
+    // Verify compileResult contains the SVG output (template-rendered, not HTML string)
+    expect(vm.compileResult).toBeDefined()
+    expect(vm.compileResult.type).toBe('svg')
+    expect(vm.compileResult.content).toContain('Typst SVG output')
   })
 
   // Regression: save button is disabled when no unsaved changes (isClean)
@@ -545,9 +546,10 @@ describe('EditorPage', () => {
     await vm.handleCompile()
     await new Promise(r => setTimeout(r, 50))
 
-    // Error should be shown in the preview area (typst-preview-error)
-    expect(vm.previewHtml).toContain('typst-preview-error')
-    expect(vm.previewHtml).toContain('typst: command not found')
+    // Error should be shown via compileResult (template-rendered, not HTML string)
+    expect(vm.compileResult).toBeDefined()
+    expect(vm.compileResult.type).toBe('error')
+    expect(vm.compileResult.content).toContain('typst')
     // Also set in error bar
     expect(vm.errorMsg).toContain('typst')
   })

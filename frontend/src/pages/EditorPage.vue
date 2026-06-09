@@ -3,7 +3,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
-import CodeEditor from '../components/CodeEditor.vue'
+import { defineAsyncComponent } from 'vue'
+const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 import { useArticleStore } from '../stores/useArticleStore'
 import { useUserStore } from '../stores/useUserStore'
 import { useDraftPersistence } from '../composables/useDraftPersistence'
@@ -47,6 +48,7 @@ const format = ref<'markdown' | 'typst'>('markdown')
 const previewHtml = ref('')
 const previewLoading = ref(false)
 const compiling = ref(false)
+const compileResult = ref<{ type: 'svg' | 'error'; content: string } | null>(null)
 
 // Side panel
 const showSelfReview = ref(false)
@@ -158,8 +160,31 @@ async function loadExistingArticle() {
     savedTitle.value = title.value
     return
   } catch (e: any) {
-    // 2. In Tauri/dev-mock mode, fall back to local draft storage.
+    // 2. In Tauri/dev-mock mode, read from git first (canonical source),
+    //    then fall back to local draft storage.
     if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      // Try gitShow for the latest commit content.
+      try {
+        const history = await tauri.gitHistory({ article_id: editId.value! })
+        if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+          const latestHash = history[0].hash
+          const gitContent = await tauri.gitShow({ article_id: editId.value!, commit_hash: latestHash })
+          if (gitContent && typeof gitContent === 'string') {
+            content.value = gitContent
+            format.value = 'markdown' // gitShow returns raw content; infer format from draft metadata
+            commitHash.value = latestHash
+            // Try draft metadata for title and format
+            const accountId = userStore.viewer?.id || 'local'
+            const draft = await draftPersistence.load(editId.value!, accountId)
+            if (draft && draft.title) title.value = draft.title
+            if (draft && draft.format) format.value = draft.format as 'markdown' | 'typst'
+            savedContent.value = content.value
+            savedTitle.value = title.value
+            return
+          }
+        }
+      } catch { /* gitShow failed — fall through to draft persistence */ }
+
       const accountId = userStore.viewer?.id || 'local'
       const draft = await draftPersistence.load(editId.value!, accountId)
       if (draft && draft.content !== undefined) {
@@ -211,7 +236,64 @@ async function saveDraft() {
   const accountId = userStore.viewer?.id || 'local'
   const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
 
-  // Persist via Tauri or REST (handled by useDraftPersistence).
+  // In Tauri/local mode: git is the source of truth (DESIGN.md §2.3).
+  // Every save is a git commit. Errors are surfaced, not swallowed.
+  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    const msg = commitMsg.value.trim() || 'Save draft'
+
+    // For new drafts: get an ID from persistence first (needed for git article_id),
+    // then gitInit. For existing drafts: gitCommit first, then update persistence.
+    const existingId = currentDraftId.value
+
+    if (!existingId) {
+      // New draft — create persistence entry first to get an ID.
+      const result = await draftPersistence.save(
+        accountId, title.value, content.value, format.value, undefined,
+      )
+      if (!result || !result.id) { errorMsg.value = 'Failed to create draft'; return }
+      currentDraftId.value = result.id
+      saveString(DRAFT_ID_KEY.value, result.id)
+
+      try {
+        const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
+        if (r && 'hash' in r) commitHash.value = r.hash
+      } catch (e: unknown) {
+        errorMsg.value = e instanceof Error ? e.message : 'Git init failed — draft saved without version history'
+      }
+    } else {
+      // Existing draft — git commit FIRST (source of truth).
+      try {
+        const history = await tauri.gitHistory({ article_id: existingId })
+        const hasRepo = history && !('error' in history) && Array.isArray(history) && history.length > 0
+        if (hasRepo) {
+          const r = await tauri.gitCommit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
+          if (r && 'hash' in r) commitHash.value = r.hash
+          else { errorMsg.value = 'Git commit failed — draft not saved'; return }
+        } else {
+          const r = await tauri.gitInit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
+          if (r && 'hash' in r) commitHash.value = r.hash
+          else { errorMsg.value = 'Git init failed — draft not saved'; return }
+        }
+      } catch (e: unknown) {
+        errorMsg.value = e instanceof Error ? e.message : 'Git operation failed — draft not saved'
+        return
+      }
+
+      // Git succeeded — update the DB index.
+      await draftPersistence.save(
+        accountId, title.value, content.value, format.value, existingId,
+      )
+    }
+
+    commitMsg.value = ''
+    savedContent.value = content.value
+    savedTitle.value = title.value
+    savedMsg.value = true
+    setTimeout(() => { savedMsg.value = false }, 2000)
+    return
+  }
+
+  // Web mode: persist via REST API + localStorage fallback.
   const result = await draftPersistence.save(
     accountId,
     title.value,
@@ -221,55 +303,26 @@ async function saveDraft() {
   )
   if (result && result.id) {
     currentDraftId.value = result.id
-    // Persist the Tauri draft ID so it survives page refresh.
     saveString(DRAFT_ID_KEY.value, result.id)
-
-    // In local mode, save = git commit.
-    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-      const msg = commitMsg.value.trim() || 'Save draft'
-      try {
-        if (!currentDraftId.value || currentDraftId.value === result.id) {
-          // Check if git repo exists; if not, init
-          const history = await tauri.gitHistory({ article_id: result.id })
-          if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
-            const r = await tauri.gitCommit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
-            if (r && r.hash) commitHash.value = r.hash
-          } else {
-            const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
-            if (r && r.hash) commitHash.value = r.hash
-          }
-        }
-      } catch { /* git ops optional — draft is still saved */ }
-    }
   }
 
-  // Also save to localStorage as offline backup (works in both modes).
-  const draft = {
-    title: title.value,
-    content: content.value,
-    format: format.value,
-    scores: scores.value,
-    keywords: keywords.value,
-    categories: categories.value,
-    abstract: abstract.value,
-  }
-  saveJSON(DRAFT_KEY.value, draft)
+  // localStorage as offline session backup (editor state only, not canonical).
+  saveJSON(DRAFT_KEY.value, {
+    title: title.value, content: content.value, format: format.value,
+    scores: scores.value, keywords: keywords.value,
+    categories: categories.value, abstract: abstract.value,
+  })
   savedContent.value = content.value
   savedTitle.value = title.value
   savedMsg.value = true
   setTimeout(() => { savedMsg.value = false }, 2000)
-
-  // Clear commit message after each save so the popup reopens next time.
-  // In Tauri/local mode every save is a git commit and needs a fresh message.
-  if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-    commitMsg.value = ''
-  }
 }
 
 async function handleCompile() {
   if (!content.value.trim()) return
   compiling.value = true
   previewHtml.value = ''
+  compileResult.value = null
   errorMsg.value = ''
   try {
     if (format.value === 'markdown') {
@@ -281,14 +334,12 @@ async function handleCompile() {
         format: format.value,
       })
       if (result && typeof result === 'string') {
-        // Success: SVG string returned — render in preview area
-        previewHtml.value = `<div class="typst-preview">${result}</div>`
+        compileResult.value = { type: 'svg', content: result }
       } else {
-        // Failure: show the actual error both in the preview area and error bar
         const errMsg = (result && typeof result === 'object' && 'error' in result)
           ? (result as { error: string }).error
           : 'Compilation failed'
-        previewHtml.value = `<div class="typst-preview-error text-[#d73a49] p-4 font-mono text-sm">${errMsg}</div>`
+        compileResult.value = { type: 'error', content: errMsg }
         errorMsg.value = errMsg
       }
     } else {
@@ -462,7 +513,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           <Transition name="slide-up">
             <div
               v-if="showCommitPopup"
-              class="absolute top-full right-0 mt-2 z-50 bg-card border border-divider rounded-xl shadow-2xl p-4 w-72 animate-fade-in"
+              class="absolute top-full right-0 mt-2 z-50 bg-card border border-divider rounded-lg shadow-2xl p-4 w-72 animate-fade-in"
             >
               <p class="text-xs text-ink-muted mb-2">{{ t('editor.commitMessage') }} <span class="text-[#d73a49]">*</span></p>
               <input
@@ -495,7 +546,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         <!-- Format toggle -->
         <div class="flex items-center bg-[#0d1117] border border-divider rounded-lg overflow-hidden ml-1">
           <button
-            class="px-2.5 py-1 text-xs font-mono transition-colors"
+            class="w-9 h-9 flex items-center justify-center text-xs font-mono transition-colors rounded-lg"
             :class="format === 'markdown'
               ? 'bg-accent text-[#0d1117] font-semibold'
               : 'text-ink-muted hover:text-ink'"
@@ -504,7 +555,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
             MD
           </button>
           <button
-            class="px-2.5 py-1 text-xs font-mono transition-colors"
+            class="w-9 h-9 flex items-center justify-center text-xs font-mono transition-colors rounded-lg"
             :class="format === 'typst'
               ? 'bg-accent text-[#0d1117] font-semibold'
               : 'text-ink-muted hover:text-ink'"
@@ -656,9 +707,16 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         :style="{ width: `${100 - splitRatio}%` }"
       >
         <div class="flex-1 overflow-y-auto bg-[#0d1117] p-4">
-          <div v-if="compiling" class="flex items-center justify-center h-full text-ink-muted text-sm">
+          <div v-if="compiling" class="flex items-center justify-center h-full text-ink-muted text-sm gap-2">
+            <span class="inline-block w-4 h-4 border-2 border-ink-muted/30 border-t-accent rounded-full animate-spin" />
             Compiling...
           </div>
+          <!-- Typst compile result (SVG or error) -->
+          <div v-else-if="compileResult?.type === 'svg'" class="typst-preview" v-html="compileResult.content" />
+          <div v-else-if="compileResult?.type === 'error'" class="typst-preview-error text-[#d73a49] p-4 font-mono text-sm">
+            {{ compileResult.content }}
+          </div>
+          <!-- Markdown HTML preview -->
           <div
             v-else-if="previewHtml"
             class="prose-custom max-w-none"
@@ -668,7 +726,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
             v-else
             class="flex items-center justify-center h-full text-ink-muted/40 text-xs"
           >
-            {{ t('editor.preview') }} <Play class="w-3 h-3 inline mx-1" stroke-width="2" /> 
+            {{ t('editor.preview') }} <Play class="w-3 h-3 inline mx-1" stroke-width="2" />
           </div>
         </div>
       </div>
