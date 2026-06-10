@@ -14,6 +14,7 @@ export const useUserStore = defineStore('user', () => {
   const token = ref<string | null>(storedToken)
   const showAuthModal = ref(false)
   const intendedRoute = ref<string | null>(null)
+  const syncError = ref<string | null>(null)
 
   // ── Local account layer (Tauri or dev mock) ──────────────────────────
 
@@ -24,6 +25,15 @@ export const useUserStore = defineStore('user', () => {
   const isBrowserLocal = ref(false)
 
   const tauri = useTauri()
+
+  // Credentials held for server sync retry. Stored when local login/register
+  // succeeds but the server is unreachable, cleared on successful sync.
+  let _pendingServerCreds: {
+    username: string
+    password: string
+    email: string
+    name: string
+  } | null = null
 
   // Detect Tauri / dev mock mode on store initialization.
   isTauriMode.value = tauri.isTauri.value
@@ -57,7 +67,7 @@ export const useUserStore = defineStore('user', () => {
     const result = await tauri.login({ username, password })
     if (!result) throw new Error('Tauri unavailable')
     if ('error' in result) throw new Error(result.error)
-    const acctWithToken = result as { id: string; username: string; token: string }
+    const acctWithToken = result as { id: string; username: string; token: string; email: string; name: string }
     localAccount.value = { id: acctWithToken.id, username: acctWithToken.username }
     localToken.value = acctWithToken.token
     tauri.setSessionToken(acctWithToken.token)
@@ -67,7 +77,7 @@ export const useUserStore = defineStore('user', () => {
     const profile = {
       id: (result as Account).id,
       username: (result as Account).username,
-      name: (result as Account).username,
+      name: acctWithToken.name || acctWithToken.username,
       anonymous_name: '',
       affiliation: '',
       expertise: [],
@@ -86,8 +96,16 @@ export const useUserStore = defineStore('user', () => {
       const { token: t } = await apiLogin({ username, password })
       token.value = t
       saveString('token', t)
+      _pendingServerCreds = null
+      syncError.value = null
     } catch {
-      // Server unreachable — keep using local-only profile (no token).
+      // Server unreachable — store credentials for later sync
+      _pendingServerCreds = {
+        username,
+        password,
+        email: acctWithToken.email || '',
+        name: acctWithToken.name || username,
+      }
     }
   }
 
@@ -135,8 +153,11 @@ export const useUserStore = defineStore('user', () => {
       const { token: t } = await apiRegister({ username, password, email, name })
       token.value = t
       saveString('token', t)
+      _pendingServerCreds = null
+      syncError.value = null
     } catch {
-      // Server unreachable — keep using local-only profile (no token).
+      // Server unreachable — store credentials for later sync
+      _pendingServerCreds = { username, password, email, name }
     }
   }
 
@@ -157,6 +178,8 @@ export const useUserStore = defineStore('user', () => {
     localAccount.value = null
     localToken.value = null
     tauri.setSessionToken(null)
+    _pendingServerCreds = null
+    syncError.value = null
     remove('viewer')
     remove('token')
     remove('peerpedia_local_token')
@@ -166,6 +189,73 @@ export const useUserStore = defineStore('user', () => {
       remove(`editor-draft-${uid}-new`)
       remove(`editor-draft-id-${uid}-new`)
       remove(`peerpedia_draft_${uid}`)
+    }
+  }
+
+  /**
+   * Try to obtain a server JWT using stored local credentials.
+   * Strategy: apiLogin first (user may already exist on server, e.g. seed data
+   * or multi-device), then apiRegister as fallback (create server account).
+   * On success: clears credentials, syncs profile. On failure: keeps credentials for retry.
+   * Returns true if a valid server token was obtained.
+   */
+  async function trySyncServerAuth(): Promise<boolean> {
+    if (!_pendingServerCreds) return false
+    const creds = _pendingServerCreds
+
+    // Step 1: Try apiLogin (user may already exist on server)
+    try {
+      const { token: t } = await apiLogin({
+        username: creds.username,
+        password: creds.password,
+      })
+      token.value = t
+      saveString('token', t)
+      _pendingServerCreds = null
+      syncError.value = null
+      await syncProfileToServer()
+      return true
+    } catch {
+      // apiLogin failed — continue to apiRegister
+    }
+
+    // Step 2: Try apiRegister (create server account for local user)
+    try {
+      const { token: t } = await apiRegister({
+        username: creds.username,
+        password: creds.password,
+        email: creds.email,
+        name: creds.name,
+      })
+      token.value = t
+      saveString('token', t)
+      _pendingServerCreds = null
+      syncError.value = null
+      await syncProfileToServer()
+      return true
+    } catch (regErr: any) {
+      const detail = regErr?.response?.data?.detail || regErr?.userMessage || ''
+      if (detail.includes('already exists') || detail.includes('taken') || detail.includes('unique')) {
+        syncError.value = `服务器上已有用户 ${creds.username}。请输入该账号的服务器密码进行关联。`
+      }
+      // Keep credentials for retry
+      return false
+    }
+  }
+
+  /**
+   * Sync local profile data to server (L3). Best-effort — silent on failure.
+   */
+  async function syncProfileToServer() {
+    if (!token.value || !viewer.value) return
+    try {
+      const { updateProfile } = await import('../api/users')
+      await updateProfile(viewer.value.id, {
+        affiliation: viewer.value.affiliation,
+        expertise: viewer.value.expertise,
+      })
+    } catch {
+      // Silent — profile sync is best-effort
     }
   }
 
@@ -219,6 +309,7 @@ export const useUserStore = defineStore('user', () => {
     token,
     showAuthModal,
     intendedRoute,
+    syncError,
     localAccount,
     localAccounts,
     localToken,
@@ -232,5 +323,7 @@ export const useUserStore = defineStore('user', () => {
     logout,
     restoreSession,
     clear,
+    trySyncServerAuth,
+    syncProfileToServer,
   }
 })
