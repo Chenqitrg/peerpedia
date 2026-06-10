@@ -32,7 +32,13 @@ jobs:
       - name: Seed
         run: python seed.py
       - name: Test
-        run: python -m pytest backend/tests/ -v --tb=short --durations=10 --ignore=backend/tests/test_seed_driven.py
+        run: python -m pytest backend/tests/ -v --tb=short --durations=10 --ignore=backend/tests/test_seed_driven.py --cov=peerpedia_api --cov=peerpedia_core --cov-report=xml --cov-report=term
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          flags: backend
+          fail_ci_if_error: false
       - name: E2E — live server health check
         run: bash backend/tests/integration/test_health_e2e.sh
 

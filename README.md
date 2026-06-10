@@ -1,5 +1,7 @@
 # PeerPedia · 知诸网
 
+[![codecov](https://codecov.io/gh/Chenqitrg/peerpedia/branch/main/graph/badge.svg)](https://codecov.io/gh/Chenqitrg/peerpedia)
+
 **Peer review as infrastructure. An open protocol for how knowledge is filtered, not a platform for how it's sold.**
 
 同行评审即基础设施。知识如何被筛选，应当是一个开放的协议，而非一个公司的产品。
