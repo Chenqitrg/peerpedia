@@ -80,14 +80,14 @@ const emit = defineEmits<{
         ></textarea>
         <div class="flex items-center justify-between">
           <button
-            class="px-4 py-1.5 text-xs font-semibold bg-accent text-[#0d1117] rounded-md
+            class="px-4 py-1.5 text-xs font-semibold bg-accent text-page rounded-md
                    hover:brightness-110 transition-all duration-200 disabled:opacity-50"
             :disabled="submittingReview"
             @click="emit('submit-review')"
           >
             {{ submittingReview ? 'Submitting...' : 'Submit Review' }}
           </button>
-          <p v-if="reviewFormError" class="text-xs text-[#d73a49]">{{ reviewFormError }}</p>
+          <p v-if="reviewFormError" class="text-xs text-danger">{{ reviewFormError }}</p>
           <p v-if="reviewFormSuccess" class="text-xs text-green-400">{{ reviewFormSuccess }}</p>
         </div>
       </div>
@@ -170,7 +170,7 @@ const emit = defineEmits<{
                   :disabled="sendingReplies[review.id]"
                   @send="emit('send-reply', review.id)"
                 />
-                <p v-if="replyErrors[review.id]" class="text-[10px] text-[#d73a49] mt-1">{{ replyErrors[review.id] }}</p>
+                <p v-if="replyErrors[review.id]" class="text-[10px] text-danger mt-1">{{ replyErrors[review.id] }}</p>
               </div>
 
               <p v-else-if="viewerId" class="text-[10px] text-ink-muted/40 italic">
@@ -187,7 +187,7 @@ const emit = defineEmits<{
               :disabled="sendingReplies[review.id]"
               @send="emit('send-reply', review.id)"
             />
-            <p v-if="replyErrors[review.id]" class="text-[10px] text-[#d73a49] mt-1">{{ replyErrors[review.id] }}</p>
+            <p v-if="replyErrors[review.id]" class="text-[10px] text-danger mt-1">{{ replyErrors[review.id] }}</p>
           </div>
         </div>
       </div>

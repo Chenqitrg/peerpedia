@@ -228,7 +228,7 @@ const processedHunksList = computed(() => {
       class="border-b border-divider last:border-b-0"
     >
       <!-- Hunk header -->
-      <div class="px-3 py-1 bg-[#161b22] text-ink-muted text-xs font-mono border-b border-divider">
+      <div class="px-3 py-1 bg-card text-ink-muted text-xs font-mono border-b border-divider">
         @@ -{{ hunk.old_start }},{{ hunk.old_lines }} +{{ hunk.new_start }},{{ hunk.new_lines }} @@
         <span v-if="hunk.header" class="ml-2 text-ink-muted/60">{{ hunk.header }}</span>
       </div>

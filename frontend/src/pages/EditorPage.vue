@@ -15,6 +15,7 @@ import { useEditorTab } from '../composables/useTabIntegration'
 import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
+import { sanitizeTypstSvg } from '../utils/typst'
 import DownloadButton from '../components/DownloadButton.vue'
 import SelfReviewPanel from '../components/SelfReviewPanel.vue'
 import {
@@ -361,7 +362,7 @@ async function handleCompile() {
         format: format.value,
       })
       if (result && typeof result === 'string') {
-        compileResult.value = { type: 'svg', content: result }
+        compileResult.value = { type: 'svg', content: sanitizeTypstSvg(result) }
       } else {
         const errMsg = (result && typeof result === 'object' && 'error' in result)
           ? (result as { error: string }).error

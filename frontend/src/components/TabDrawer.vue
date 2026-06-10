@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useTabStore } from '../stores/useTabStore'
 import { Edit, Eye, X } from 'lucide-vue-next'
+import { getStatusInfo } from '../composables/useStatusMap'
 
 const tabStore = useTabStore()
 const expanded = ref(false)
@@ -12,11 +13,11 @@ const emit = defineEmits<{ (e: 'close-tab', tabId: string): void }>()
 
 function statusColor(status: string, active: boolean): string {
   const base = active ? 'opacity-100' : 'opacity-70'
-  switch (status) {
-    case 'draft': return `bg-accent ${base}`
-    case 'published': return `bg-success ${base}`
-    case 'sedimentation': return `bg-yellow-500 ${base}`
-    default: return `bg-ink-muted/30 ${base}`
+  const info = getStatusInfo(status)
+  switch (info.class) {
+    case 'badge-published':    return `bg-success ${base}`
+    case 'badge-sedimentation': return `bg-neutral/60 ${base}`
+    default:                    return `bg-ink-muted/40 ${base}`  // badge-draft
   }
 }
 
@@ -95,6 +96,11 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
             @keydown.enter="tabStore.activateTab(tab.id)"
           >
             <component :is="iconComponent(tab.icon)" class="w-4 h-4 shrink-0 opacity-70" stroke-width="2" />
+            <span
+              class="w-2 h-2 rounded-full shrink-0"
+              :class="statusColor(tab.status, tab.id === tabStore.activeTabId)"
+              :title="tab.status"
+            />
             <span class="tab-drawer-item-title">{{ tab.title }}</span>
             <span v-if="tab.dirty" class="tab-drawer-dirty-dot" />
             <button
@@ -102,7 +108,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
               aria-label="Close tab"
               @click.stop="emit('close-tab', tab.id)"
             >
-              <X :size="14" stroke-width="2" />
+              <X :size="16" stroke-width="2" />
             </button>
           </div>
         </div>
@@ -129,7 +135,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 .tab-drawer-edge--dirty::after {
   content: ''; display: block;
   width: 3px; height: 3px; border-radius: 50%;
-  background: #58a6ff; margin: 2px auto 0;
+  background: #7b8c9e; margin: 2px auto 0;
 }
 
 /* Expanded panel */
@@ -157,20 +163,20 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   width: 100%; padding: 6px 8px;
   background: transparent; border: none;
   border-left: 2px solid transparent;
-  color: #8b949e; font-size: 0.75rem;
+  color: #6e7681; font-size: 0.75rem;
   cursor: pointer; text-align: left;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 .tab-drawer-item:hover {
   background-color: #21262d; color: #e6edf3;
 }
 .tab-drawer-item--active {
-  background-color: rgba(88, 166, 255, 0.12);
-  border-left-color: #58a6ff; color: #e6edf3;
+  background-color: rgba(123, 140, 158, 0.12);
+  border-left-color: #7b8c9e; color: #e6edf3;
 }
-.tab-drawer-item--active:hover { background-color: rgba(88, 166, 255, 0.18); }
+.tab-drawer-item--active:hover { background-color: rgba(123, 140, 158, 0.18); }
 .tab-drawer-item:focus-visible {
-  outline: 2px solid #58a6ff; outline-offset: -2px; border-radius: 6px;
+  outline: 2px solid #7b8c9e; outline-offset: -2px; border-radius: 6px;
 }
 
 .tab-drawer-item-title { flex: 1; min-width: 0; line-height: 1.4; word-break: break-word; }
@@ -178,7 +184,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 /* Dirty dot */
 .tab-drawer-dirty-dot {
   flex-shrink: 0; width: 8px; height: 8px;
-  border-radius: 50%; background-color: #58a6ff;
+  border-radius: 50%; background-color: #7b8c9e;
 }
 
 /* Close button — visible on row hover */
