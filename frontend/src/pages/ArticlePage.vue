@@ -8,6 +8,7 @@ import { compilePreview } from '../api/compile'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { useArticleTab } from '../composables/useTabIntegration'
 import { useTabStore } from '../stores/useTabStore'
 import { useReviewStore } from '../stores/useReviewStore'
@@ -319,12 +320,14 @@ async function loadReviews() {
   await reviewStore.fetchReviews(id)
 }
 
+const { isOnline } = useNetworkStatus()
+
 async function toggleBookmark() {
   if (!article.value || !userStore.viewer) return
   const wasBookmarked = article.value.is_bookmarked
   article.value.is_bookmarked = !wasBookmarked
   try {
-    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && !isOnline.value) {
       if (wasBookmarked) {
         await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: article.value.id })
       } else {

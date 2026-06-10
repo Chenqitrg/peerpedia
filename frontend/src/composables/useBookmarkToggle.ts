@@ -1,6 +1,7 @@
 import { type Ref } from 'vue'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from './useTauri'
+import { useNetworkStatus } from './useNetworkStatus'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
 import type { ArticleSummary } from '../api/types'
 
@@ -17,7 +18,8 @@ export function useBookmarkToggle(
 ) {
   const userStore = useUserStore()
   const tauri = useTauri()
-  const isLocal = userStore.isTauriMode || userStore.isBrowserLocal
+  const { isOnline } = useNetworkStatus()
+  const isLocal = (userStore.isTauriMode || userStore.isBrowserLocal) && !isOnline.value
 
   async function toggle(articleId: string, currentlyBookmarked: boolean) {
     if (!userStore.viewer) return
