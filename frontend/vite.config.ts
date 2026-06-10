@@ -1,12 +1,14 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), wasm(), topLevelAwait()],
   optimizeDeps: {
-    exclude: ['@tauri-apps/api'],
+    exclude: ['@tauri-apps/api', 'codemirror-lang-typst'],
   },
   resolve: {
     alias: {
