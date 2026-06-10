@@ -51,8 +51,8 @@ describe('sanitizeTypstSvg', () => {
 
   // ── Real Typst SVG output ──────────────────────────────────────────
 
-  it('strips Typst page-background path (typst-shape + #ffffff)', () => {
-    // This is the exact output from `typst compile --format svg` for "= test"
+  it('strips Typst page-background path (typst-shape + #ffffff) + inverts text', () => {
+    // Exact output from `typst compile --format svg` for "= test"
     const input =
       '<svg class="typst-doc" viewBox="0 0 595.28 841.89" width="595.28pt" height="841.89pt" xmlns="http://www.w3.org/2000/svg">' +
       '<path class="typst-shape" fill="#ffffff" fill-rule="nonzero" d="M 0 0v 841.89 h 595.28 v -841.89 Z "/>' +
@@ -62,16 +62,16 @@ describe('sanitizeTypstSvg', () => {
     // Page background must be gone
     expect(output).not.toContain('typst-shape')
     expect(output).not.toContain('#ffffff')
-    // Content must survive
+    // Content survives, black text inverted to ink
     expect(output).toContain('typst-text')
-    expect(output).toContain('#000000')
+    expect(output).not.toContain('#000000')
+    expect(output).toContain('#e6edf3')
     // viewBox preserved for proportional scaling
     expect(output).toContain('viewBox=')
   })
 
-  it('e2e: real Typst SVG has no white fill after sanitization', () => {
-    // Simulate the full pipeline: Typst compiles "= test" → sanitize → verify
-    // Uses the real SVG captured from `typst compile /tmp/test.typ`
+  it('e2e: real Typst SVG — no white fill, text readable on dark theme', () => {
+    // Full real output from `typst compile --format svg` for "= test"
     const input =
       '<svg class="typst-doc" viewBox="0 0 595.2755905511812 841.8897637795276" width="595.2755905511812pt" height="841.8897637795276pt" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h5="http://www.w3.org/1999/xhtml">\n' +
       '    <path class="typst-shape" fill="#ffffff" fill-rule="nonzero" d="M 0 0v 841.8898 h 595.2756 v -841.8898 Z "/>\n' +
@@ -80,17 +80,22 @@ describe('sanitizeTypstSvg', () => {
       '            <g>\n' +
       '                <g class="typst-text" transform="matrix(1 0 0 -1 0 9.933)">\n' +
       '                    <use xlink:href="#g1" x="0" y="0" fill="#000000" fill-rule="nonzero"/>\n' +
+      '                    <use xlink:href="#g2" x="5.51" y="0" fill="#000000" fill-rule="nonzero"/>\n' +
+      '                    <use xlink:href="#g3" x="13.04" y="0" fill="#000000" fill-rule="nonzero"/>\n' +
+      '                    <use xlink:href="#g1" x="19.62" y="0" fill="#000000" fill-rule="nonzero"/>\n' +
       '                </g>\n' +
       '            </g>\n' +
       '        </g>\n' +
       '    </g>\n' +
       '</svg>'
     const output = sanitizeTypstSvg(input)
-    // No white fill anywhere
+    // No white fills anywhere
     expect(output).not.toMatch(/#ffffff|#FFFFFF|#fff|#FFF/)
+    // No black text — all inverted to ink (#e6edf3 per MASTER.md, 13:1)
+    expect(output).not.toContain('#000000')
+    expect(output).toContain('#e6edf3')
     // Content intact
     expect(output).toContain('typst-text')
-    expect(output).toContain('#000000')
     // Width/height stripped for responsive
     expect(output).not.toMatch(/\bwidth\s*=/i)
     expect(output).not.toMatch(/\bheight\s*=/i)
