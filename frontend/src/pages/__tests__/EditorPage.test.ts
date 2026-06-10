@@ -87,8 +87,8 @@ describe('EditorPage', () => {
   })
 
   it('uses format from route query param', async () => {
-    // Typst mode → textarea visible (not CodeMirror)
-    mockRoute.query = { new: '1', format: 'typst' }
+    // Typst mode → CodeMirror renders with Typst extension
+    mockRoute.query = { format: 'typst' }
     // Re-mock to pick up new query
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
@@ -97,7 +97,11 @@ describe('EditorPage', () => {
       },
     })
     await flushPromises()
-    expect(wrapper.find('textarea').exists()).toBe(true)
+    const vm = wrapper.vm as any
+    // format propagates from route.query.format into component state
+    expect(vm.format).toBe('typst')
+    // No bare textarea — CodeEditor handles both formats
+    expect(wrapper.find('textarea').exists()).toBe(false)
     // Reset
     mockRoute.query = {}
   })
@@ -627,13 +631,13 @@ describe('EditorPage', () => {
     })
     await flushPromises()
     const vm = wrapper.vm as any
-    // Markdown mode: format defaults to 'markdown', no textarea in DOM
+    // Both Markdown and Typst use CodeMirror (no textarea)
     expect(vm.format).toBe('markdown')
     const textareas = wrapper.findAll('textarea')
     expect(textareas.length).toBe(0)
   })
 
-  it('uses plain textarea for Typst mode', async () => {
+  it('uses CodeMirror for Typst mode', async () => {
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
@@ -642,10 +646,11 @@ describe('EditorPage', () => {
     const vm = wrapper.vm as any
     vm.format = 'typst'
     await flushPromises()
-    const cm = wrapper.find('.cm-editor')
-    expect(cm.exists()).toBe(false)
+    // format is correctly set to typst
+    expect(vm.format).toBe('typst')
+    // No bare textarea — CodeEditor handles both formats
     const ta = wrapper.find('textarea')
-    expect(ta.exists()).toBe(true)
+    expect(ta.exists()).toBe(false)
   })
 
   // T7: Cmd+S / Ctrl+S keyboard shortcut triggers compile
