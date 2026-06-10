@@ -21,7 +21,6 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
-
 from peerpedia_core.storage.db.engine import get_engine, get_session
 
 # Connect to seed DB (CI runs seed.py before pytest)
