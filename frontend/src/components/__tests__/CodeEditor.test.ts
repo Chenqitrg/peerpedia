@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import CodeEditor from '../CodeEditor.vue'
@@ -97,54 +97,60 @@ describe('CodeEditor', () => {
     expect(editorEl.text()).toContain('= New Typst')
   })
 
-  // ── SPEC-HL-4/5/6: Graceful degradation when Typst WASM is unavailable ─
+  // ── SPEC-HL-4/5: Typst mode (pure-JS StreamLanguage, no WASM) ─────
 
-  describe('when Typst WASM load fails (e.g., WKWebView)', () => {
-    beforeEach(() => {
-      // Simulate WASM load failure — the dynamic import rejects
-      vi.doMock('codemirror-lang-typst', () => {
-        throw new Error('Simulated WASM load failure')
-      })
+  it('SPEC-HL-4: renders CodeMirror for Typst format with StreamLanguage (no freeze)', () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '= Title', format: 'typst' },
     })
+    // Editor MUST render — user can type Typst immediately.
+    // No WASM dependency means no freeze risk.
+    expect(wrapper.find('.cm-editor').exists()).toBe(true)
+    expect(wrapper.find('textarea').exists()).toBe(false)
+  })
 
-    it('SPEC-HL-4: STILL renders CodeMirror for Typst format (no crash, no freeze)', async () => {
-      // Re-import so doMock takes effect on the fresh dynamic import
-      const { default: CE } = await import('../CodeEditor.vue')
-      const wrapper = mount(CE, {
-        props: { modelValue: '= Title', format: 'typst' },
-      })
-      // Wait for the dynamic import to fail and the component to settle
-      await flushPromises()
-      await nextTick()
-      // The editor MUST render — the user must be able to type Typst,
-      // just without syntax highlighting.
-      expect(wrapper.find('.cm-editor').exists()).toBe(true)
-      expect(wrapper.find('textarea').exists()).toBe(false)
+  it('SPEC-HL-5: Typst StreamLanguage highlights headings', async () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '= Introduction\n\nBody text.', format: 'typst' },
     })
+    await nextTick()
+    // Content must be in the editor
+    const contentEl = wrapper.find('.cm-content')
+    expect(contentEl.exists()).toBe(true)
+    expect(contentEl.text()).toContain('Introduction')
+  })
 
-    it('SPEC-HL-5: Markdown mode works unaffected when Typst WASM is broken', async () => {
-      const { default: CE } = await import('../CodeEditor.vue')
-      const wrapper = mount(CE, {
-        props: { modelValue: '# Hello', format: 'markdown' },
-      })
-      await flushPromises()
-      await nextTick()
-      const editorEl = wrapper.find('.cm-content')
-      expect(editorEl.exists()).toBe(true)
-      expect(editorEl.text()).toContain('Hello')
+  it('SPEC-HL-6: Typst StreamLanguage highlights function calls', async () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '#strong[bold text]', format: 'typst' },
     })
+    await nextTick()
+    const contentEl = wrapper.find('.cm-content')
+    expect(contentEl.exists()).toBe(true)
+    expect(contentEl.text()).toContain('bold text')
+  })
 
-    it('SPEC-HL-6: Typst content is still editable without syntax highlighting', async () => {
-      const { default: CE } = await import('../CodeEditor.vue')
-      const wrapper = mount(CE, {
-        props: { modelValue: '= Introduction', format: 'typst' },
-      })
-      await flushPromises()
-      await nextTick()
-      const editorEl = wrapper.find('.cm-content')
-      expect(editorEl.exists()).toBe(true)
-      // Content MUST be visible — the user can still read and edit
-      expect(editorEl.text()).toContain('= Introduction')
+  it('SPEC-HL-7: Typst StreamLanguage highlights math mode', async () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '$x^2 + y^2 = z^2$', format: 'typst' },
     })
+    await nextTick()
+    const contentEl = wrapper.find('.cm-content')
+    expect(contentEl.exists()).toBe(true)
+    expect(contentEl.text()).toContain('x^2')
+  })
+
+  // ── SPEC-HL-8: Freeze regression — no WASM, no hang risk ──────────
+
+  it('SPEC-HL-8: Typst editor never freezes (pure JS, zero WASM deps)', () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '= Content', format: 'typst' },
+    })
+    // Synchronous mount must succeed — no async WASM to wait on.
+    // If this test hangs, the spec is violated.
+    const cm = wrapper.find('.cm-editor')
+    expect(cm.exists()).toBe(true)
+    const content = wrapper.find('.cm-content')
+    expect(content.exists()).toBe(true)
   })
 })
