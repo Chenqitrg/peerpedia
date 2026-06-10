@@ -100,4 +100,50 @@ describe('useNetworkStatus', () => {
     await vi.advanceTimersByTimeAsync(500)
     expect(isOnline.value).toBe(false) // still unchanged
   })
+
+  it('isOnline is a singleton — shared across multiple useNetworkStatus() calls', async () => {
+    // Bug: if each useNetworkStatus() call creates its own ref, App.vue's
+    // startPing() updates one instance while useOffline + NetworkStatusBadge
+    // read their own copies that stay false forever.
+    globalThis.fetch = vi.fn()
+      .mockRejectedValueOnce(new Error('fail'))
+      .mockRejectedValueOnce(new Error('fail'))
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) })
+
+    const a = useNetworkStatus() // caller A — e.g., useOffline
+    const b = useNetworkStatus() // caller B — e.g., NetworkStatusBadge
+    const c = useNetworkStatus() // caller C — e.g., App.vue (starts ping)
+
+    expect(a.isOnline.value).toBe(false)
+    expect(b.isOnline.value).toBe(false)
+    expect(c.isOnline.value).toBe(false)
+
+    c.startPing(100)
+
+    // After 200ms: immediate (fail, 0ms) + 100ms interval (fail) + 200ms interval (success)
+    await vi.advanceTimersByTimeAsync(100)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(c.isOnline.value).toBe(true)
+
+    // All callers share the same ref
+    expect(a.isOnline.value).toBe(true)
+    expect(b.isOnline.value).toBe(true)
+  })
+
+  it('ping sends request to http://localhost:8080/health (absolute URL)', async () => {
+    // Bug: relative /health resolves to tauri://localhost/health in Tauri webview.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true }),
+    })
+
+    const { startPing, stopPing } = useNetworkStatus()
+    startPing(100)
+
+    // Immediate ping fires at 0ms.
+    await vi.advanceTimersByTimeAsync(0)
+    stopPing()
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/health')
+  })
 })

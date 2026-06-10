@@ -9,13 +9,16 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ path: '/' }),
 }))
 
-// Mock useNetworkStatus so canRead('pool')/canRead('schools') pass in tests
-vi.mock('@/composables/useNetworkStatus', () => ({
-  useNetworkStatus: vi.fn(() => ({
+// Mock useNetworkStatus — vi.mock is hoisted, so the factory must use vi.hoisted.
+const { mockUseNetworkStatus } = vi.hoisted(() => ({
+  mockUseNetworkStatus: vi.fn(() => ({
     isOnline: { value: true },
     startPing: vi.fn(),
     stopPing: vi.fn(),
   })),
+}))
+vi.mock('@/composables/useNetworkStatus', () => ({
+  useNetworkStatus: mockUseNetworkStatus,
 }))
 
 const RouterLinkStub = {
@@ -138,5 +141,56 @@ describe('NavBar — search routing', () => {
     await wrapper.find('form').trigger('submit')
 
     expect(mockPush).toHaveBeenCalledWith('/search?q=general%20relativity')
+  })
+})
+
+describe('NavBar — WiFi connectivity icon', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
+
+  it('shows green Wifi icon when server is reachable (isOnline=true)', () => {
+    mockUseNetworkStatus.mockReturnValue({
+      isOnline: { value: true },
+      startPing: vi.fn(),
+      stopPing: vi.fn(),
+    })
+    const user = { id: 'u1', username: 'test', name: 'Test' }
+    localStorage.setItem('viewer', JSON.stringify(user))
+    localStorage.setItem('token', 'test-token')
+    setActivePinia(createPinia())
+
+    const wrapper = mount(NavBar, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    // Green WiFi icon uses text-green-500 class
+    const wifiIcon = wrapper.find('.text-green-500')
+    expect(wifiIcon.exists()).toBe(true)
+  })
+
+  it('shows gray WifiOff icon when server is unreachable in Tauri mode', () => {
+    mockUseNetworkStatus.mockReturnValue({
+      isOnline: { value: false },
+      startPing: vi.fn(),
+      stopPing: vi.fn(),
+    })
+    // Simulate Tauri environment
+    ;(window as any).__TAURI__ = {}
+    const user = { id: 'u1', username: 'test', name: 'Test' }
+    localStorage.setItem('viewer', JSON.stringify(user))
+    localStorage.setItem('token', 'test-token')
+    setActivePinia(createPinia())
+
+    const wrapper = mount(NavBar, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    // Gray icon — should NOT have text-green-500
+    expect(wrapper.find('.text-green-500').exists()).toBe(false)
+    // Should show a wifi icon (WifiOff when unreachable)
+    expect(wrapper.find('svg').exists()).toBe(true)
+
+    delete (window as any).__TAURI__
   })
 })
