@@ -552,4 +552,59 @@ describe('Tab System E2E', () => {
       expect(wrapper.find('.tab-drawer-edges').exists()).toBe(false)
     })
   })
+
+  // ── SPEC: Save & Close navigates to the editor, not an error page ─
+  // Bug: after UUID refactor, saveAndClose() called router.push(tabId)
+  // where tabId is a UUID string. The router had no matching route,
+  // causing a fallthrough to "Could not open article" error page.
+  // The tab was never closed because the save event targeted the wrong
+  // EditorPage instance (tabId mismatch in the guard).
+  //
+  // Locked spec: clicking "Save & Close" on a dirty editor tab from ANY
+  // other page must navigate to the editor and trigger the save — the
+  // user must never see an error page. After a successful save, the tab
+  // is closed (normal behavior — "save AND close").
+
+  describe('Save & Close from another page', () => {
+    it('SPEC: Save & Close navigates to editor and closes the tab without error', async () => {
+      const app = await mountApp()
+      wrapper = app.wrapper; router = app.router
+
+      // Create a new editor tab and make it dirty
+      await router.push('/edit?new=1&_t=' + Date.now())
+      await settle()
+
+      const textarea = wrapper.find('.cm-editor')
+      expect(textarea.exists()).toBe(true)
+      await textarea.setValue('Unsaved draft content')
+      await settle()
+
+      // Navigate to a different page — the article page
+      await router.push('/article/article-a')
+      await settle()
+
+      // Verify we're on the article page
+      expect(wrapper.html()).toContain('prose-custom')
+
+      // Now close the dirty editor tab from the drawer
+      await expandDrawer(wrapper)
+      const closeBtns = wrapper.findAll('.tab-drawer-close-btn')
+      await closeBtns[0].trigger('click')
+      await settle()
+
+      // Confirmation dialog must appear
+      expect(wrapper.text()).toContain('Save before closing')
+
+      // Click "Save & Close"
+      const buttons = wrapper.findAll('button')
+      const saveBtn = buttons.find((b: any) => b.text().trim() === 'Save & Close')
+      expect(saveBtn).toBeTruthy()
+      await saveBtn!.trigger('click')
+      await settle()
+
+      // The user must NEVER see an error page during this flow.
+      // This is the locked specification — the navigation must succeed.
+      expect(wrapper.text()).not.toContain('Could not open article')
+    })
+  })
 })

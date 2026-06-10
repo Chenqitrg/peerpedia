@@ -95,9 +95,12 @@ async function saveAndClose() {
   const tabId = closingTabId.value
   if (!tabId) return
 
-  // Navigate to the dirty tab so its EditorPage instance becomes active
+  // Navigate to the dirty tab so its EditorPage instance becomes active.
+  // Must use tab.routePath — tabId is a UUID, not a URL path.
+  const tab = tabStore.findById(tabId)
+  if (!tab) { closingTabId.value = null; return }
   tabStore.activeTabId = tabId
-  await router.push(tabId)
+  await router.push(tab.routePath)
   await nextTick()
 
   // Dispatch save event — EditorPage listens and calls handleSaveDraft(),
