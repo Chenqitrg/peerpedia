@@ -12,7 +12,9 @@ export function useNetworkStatus() {
 
   async function ping(): Promise<void> {
     try {
-      const resp = await fetch('/health')
+      // Must use absolute URL — relative /health resolves to tauri://localhost
+      // in Tauri webview, not the Python backend on localhost:8080.
+      const resp = await fetch('http://localhost:8080/health')
       if (resp.ok) {
         consecutiveFailures = 0
         isOnline.value = true
