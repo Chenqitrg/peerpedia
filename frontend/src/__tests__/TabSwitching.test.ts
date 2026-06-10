@@ -12,8 +12,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { createRouter, createMemoryHistory } from 'vue-router'
+import { createRouter, createMemoryHistory, useRoute } from 'vue-router'
 import { nextTick } from 'vue'
+import { useTabStore } from '../stores/useTabStore'
 
 // ── Mocks (I/O boundary only) ───────────────────────────────────
 
@@ -39,8 +40,14 @@ vi.mock('@/composables/useTauri', () => ({
 // Use /edit routes (which the tab system recognizes) but with simple
 // components that render distinct text, avoiding EditorPage complexity.
 
-const PageA = { template: '<div class="page-a"><h1>Page A Content</h1><textarea class="cm-editor"></textarea></div>' }
-const PageB = { template: '<div class="page-b"><h1>Page B Content</h1><textarea class="cm-editor"></textarea></div>' }
+const PageA = {
+  template: '<div class="page-a"><h1>Page A Content</h1><textarea class="cm-editor"></textarea></div>',
+  setup() { useTabStore().ensureTab('editor', useRoute().path) },
+}
+const PageB = {
+  template: '<div class="page-b"><h1>Page B Content</h1><textarea class="cm-editor"></textarea></div>',
+  setup() { useTabStore().ensureTab('editor', useRoute().path) },
+}
 
 // ── Helpers ─────────────────────────────────────────────────────
 

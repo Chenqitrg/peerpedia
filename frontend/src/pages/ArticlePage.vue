@@ -8,6 +8,7 @@ import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
 import { useArticleTab } from '../composables/useTabIntegration'
+import { useTabStore } from '../stores/useTabStore'
 import { useReviewStore } from '../stores/useReviewStore'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
 import type { ArticleDetail, ReviewOut } from '../api/types'
@@ -33,6 +34,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const tabStore = useTabStore()
 const tauriDelete = useTauri()
 const reviewStore = useReviewStore()
 const { t } = useI18n()
@@ -54,9 +56,10 @@ const id = route.params.id as string
 // changes for this instance.
 const myArticleId = id
 
-// Tab integration — syncs title to tab store
+// Tab integration — register this article as a tab and sync title
 const articleBodyRef = ref<HTMLElement | null>(null)
-useArticleTab(computed(() => article.value?.title), articleBodyRef)
+const articleTabId = tabStore.ensureTab('article', route.fullPath)
+useArticleTab(articleTabId, computed(() => article.value?.title), articleBodyRef)
 
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 
