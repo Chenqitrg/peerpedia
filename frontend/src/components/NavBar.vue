@@ -120,7 +120,7 @@ function handleLogout() {
            border border-divider
            rounded-xl shadow-lg shadow-black/20"
     role="navigation"
-    aria-label="Main navigation"
+    :aria-label="t('nav.mainNavigation')"
   >
     <div class="flex items-center justify-between h-12 px-4">
       <!-- Brand -->
@@ -163,7 +163,7 @@ function handleLogout() {
             'text-green-500': connectionStatus === 'online',
             'text-ink-muted': connectionStatus === 'offline' || connectionStatus === 'local',
           }"
-          :data-tooltip="connectionStatus === 'local' ? 'Local mode' : connectionStatus === 'online' ? 'Connected' : 'Offline'"
+          :data-tooltip="connectionStatus === 'local' ? t('nav.statusLocal') : connectionStatus === 'online' ? t('nav.statusConnected') : t('nav.statusOffline')"
         >
           <Wifi v-if="connectionStatus === 'online'" class="w-4 h-4" stroke-width="2" />
           <WifiOff v-else class="w-4 h-4" stroke-width="2" />
@@ -359,7 +359,7 @@ function handleLogout() {
         class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
         role="dialog"
         aria-modal="true"
-        aria-label="Choose article format"
+        :aria-label="t('nav.chooseFormat')"
         @click.self="closeFormatModal"
         @keydown="onFormatModalKeydown"
       >
@@ -367,14 +367,14 @@ function handleLogout() {
           <!-- Header -->
           <div class="flex items-start justify-between mb-5">
             <div>
-              <h2 class="text-lg font-heading font-semibold text-ink">Choose Format</h2>
-              <p class="text-sm text-ink-muted mt-0.5">Select the format for your new article</p>
+              <h2 class="text-lg font-heading font-semibold text-ink">{{ t('nav.chooseFormatTitle') }}</h2>
+              <p class="text-sm text-ink-muted mt-0.5">{{ t('nav.chooseFormatDesc') }}</p>
             </div>
             <button
               class="flex items-center justify-center w-7 h-7 rounded-lg
                      text-ink-muted hover:text-ink hover:bg-[#21262d]
                      transition-colors duration-200 shrink-0 -mt-1 -mr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent cursor-pointer"
-              aria-label="Close"
+              :aria-label="t('nav.close')"
               @click="closeFormatModal"
             >
               <X class="w-4 h-4" stroke-width="2" />
@@ -397,7 +397,7 @@ function handleLogout() {
               <FileText class="w-5 h-5 text-accent mb-2" stroke-width="2" />
               <div class="font-semibold text-ink text-sm">Markdown</div>
               <div class="text-xs text-ink-muted mt-1 leading-relaxed">
-                Standard format with math support (KaTeX)
+                {{ t('nav.formatMarkdown') }}
               </div>
             </button>
 
@@ -415,7 +415,7 @@ function handleLogout() {
               <FileCode class="w-5 h-5 text-accent mb-2" stroke-width="2" />
               <div class="font-semibold text-ink text-sm">Typst</div>
               <div class="text-xs text-ink-muted mt-1 leading-relaxed">
-                Academic typesetting with SVG output
+                {{ t('nav.formatTypst') }}
               </div>
             </button>
           </div>

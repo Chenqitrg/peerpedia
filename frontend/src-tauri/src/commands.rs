@@ -434,7 +434,8 @@ pub struct GitShowParams {
 
 #[tauri::command]
 pub fn git_show(params: GitShowParams) -> Result<String, AppError> {
-    local_git::git_show(&params.article_id, &params.commit_hash)
+    let (content, _format) = local_git::git_show(&params.article_id, &params.commit_hash)?;
+    Ok(content)
 }
 
 #[derive(Debug, Deserialize)]
@@ -453,18 +454,12 @@ pub fn git_diff(params: GitDiffParams) -> Result<local_git::DiffResult, AppError
 pub struct GitRollbackParams {
     pub article_id: String,
     pub commit_hash: String,
-    pub format: String,
     pub author: String,
 }
 
 #[tauri::command]
 pub fn git_rollback(params: GitRollbackParams) -> Result<local_git::GitCommitResult, AppError> {
-    local_git::git_rollback(
-        &params.article_id,
-        &params.commit_hash,
-        &params.format,
-        &params.author,
-    )
+    local_git::git_rollback(&params.article_id, &params.commit_hash, &params.author)
 }
 
 #[derive(Debug, Deserialize)]

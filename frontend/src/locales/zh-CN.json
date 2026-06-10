@@ -11,7 +11,17 @@
     "logout": "退出登录",
     "signIn": "登录",
     "createAccount": "注册",
-    "toggleMenu": "切换导航菜单"
+    "toggleMenu": "切换导航菜单",
+    "mainNavigation": "主导航",
+    "chooseFormat": "选择文章格式",
+    "close": "关闭",
+    "chooseFormatTitle": "选择格式",
+    "chooseFormatDesc": "选择新文章的格式",
+    "formatMarkdown": "标准格式，支持数学公式 (KaTeX)",
+    "formatTypst": "学术排版，SVG 输出",
+    "statusConnected": "已连接",
+    "statusLocal": "本地模式",
+    "statusOffline": "离线"
   },
   "schools": {
     "subtitle": "发现研究者，关注你感兴趣的学术工作。"
@@ -38,12 +48,12 @@
     "emptyHint": "收藏文章以便稍后阅读"
   },
   "search": {
-    "title": "搜索",
-    "subtitle": "跨文章、评审和作者搜索",
-    "searching": "搜索中...",
-    "results": "个结果",
-    "noResults": "未找到结果",
-    "placeholder": "输入搜索词查找文章"
+    "category": "分类",
+    "sort": "排序",
+    "all": "全部",
+    "relevance": "相关性",
+    "newest": "最新",
+    "score": "最高评分"
   },
   "common": {
     "retry": "重试",
@@ -81,10 +91,10 @@
     "compile": "编译",
     "compileFailed": "编译失败",
     "saveFailed": "保存失败",
-    "titlePlaceholder": "文章标题",
+    "titlePlaceholder": "文章标题...",
     "abstractPlaceholder": "摘要（可选）",
-    "keywordsPlaceholder": "关键词，逗号分隔",
-    "categoriesPlaceholder": "分类，逗号分隔",
+    "keywordsPlaceholder": "如：量子, 计算, 算法",
+    "categoriesPlaceholder": "如：cs.AI, math.NT",
     "preview": "预览",
     "markdown": "Markdown",
     "typst": "Typst",
@@ -95,24 +105,19 @@
     "commitMessagePlaceholder": "简述你的修改（必填）",
     "scores1to5": "评分 (1-5)",
     "keywords": "关键词",
-    "keywordsPlaceholder": "如：量子, 计算, 算法",
     "categories": "分类",
-    "categoriesPlaceholder": "如：cs.AI, math.NT",
     "abstract": "摘要",
     "abstractPlaceholder2": "文章简要概述...",
     "cancel": "取消",
     "submitting": "提交中...",
     "publishToPool": "发布至沉淀池",
     "contribution": "贡献度",
-    "contributionMustTotal100": "贡献度总和必须为 100%。当前："
-  },
-  "search": {
-    "category": "分类",
-    "sort": "排序",
-    "all": "全部",
-    "relevance": "相关性",
-    "newest": "最新",
-    "score": "最高评分"
+    "contributionMustTotal100": "贡献度总和必须为 100%。当前：",
+    "back": "返回",
+    "hidePreview": "隐藏预览",
+    "showPreview": "显示预览",
+    "mdPlaceholder": "# 标题\n\n用 Markdown 写文章...",
+    "typstPlaceholder": "= 标题\n\n用 Typst 写文章..."
   },
   "auth": {
     "signIn": "登录",
@@ -126,7 +131,10 @@
   },
   "user": {
     "anonymousName": "匿名名称",
-    "notFound": "用户未找到"
+    "notFound": "用户未找到",
+    "articlesCount": "{count} 篇文章",
+    "myDrafts": "我的草稿",
+    "articlesTitle": "文章"
   },
   "status": {
     "published": "已发布",
@@ -146,7 +154,11 @@
     "extend": "延长时间",
     "thread": "讨论",
     "reviews": "条评论",
-    "scores": "评分"
+    "scores": "评分",
+    "back": "返回",
+    "proposeMerge": "提议合并",
+    "delete": "删除文章",
+    "startConversation": "发起讨论..."
   },
   "history": {
     "parent": "父提交",
@@ -158,7 +170,14 @@
     "selectSecondCommit": "选择第二个提交以查看差异",
     "diff": "差异",
     "noDiff": "无差异内容",
-    "loadingDiff": "加载差异中..."
+    "loadingDiff": "加载差异中...",
+    "backToArticle": "返回文章",
+    "dismissError": "关闭错误",
+    "clearSelection": "清除选择",
+    "rollbackConfirm": "回滚到 {hash}？",
+    "rollbackConfirmDesc": "这将创建一个新提交，恢复到该版本。",
+    "cancel": "取消",
+    "confirm": "确认"
   },
   "citation": {
     "forward": "前向引用",
@@ -181,6 +200,24 @@
   },
   "download": {
     "source": "源码",
-    "compiled": "HTML"
+    "compiled": "HTML",
+    "repo": "下载仓库 (.git bundle)",
+    "repoShort": "仓库",
+    "sourceMd": "下载源文件 (.md)",
+    "sourceTypst": "下载源文件 (.typ)",
+    "compiledHtml": "下载编译文件 (.html)",
+    "compiledPdf": "下载编译文件 (.pdf)"
+  },
+  "citations": {
+    "backToArticle": "返回文章"
+  },
+  "tab": {
+    "close": "关闭标签页"
+  },
+  "ui": {
+    "rating": "评分",
+    "radarChart": "五维度雷达图",
+    "previousPage": "上一页",
+    "nextPage": "下一页"
   }
 }

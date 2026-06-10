@@ -19,7 +19,8 @@ export function useCommitFlow(onConfirm: (message: string) => Promise<void>) {
 
   /** Confirm: trim message, await onConfirm, close popup. */
   async function confirmCommit() {
-    const msg = tempCommitMsg.value.trim() || 'Save draft'
+    const msg = tempCommitMsg.value.trim()
+    if (!msg) return  // Require a non-empty commit message
     showCommitPopup.value = false
     await onConfirm(msg)
   }

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useTabStore } from '../stores/useTabStore'
 import { Edit, Eye, X } from 'lucide-vue-next'
 import { getStatusInfo } from '../composables/useStatusMap'
+
+const { t } = useI18n()
 
 const tabStore = useTabStore()
 const expanded = ref(false)
@@ -105,7 +108,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
             <span v-if="tab.dirty" class="tab-drawer-dirty-dot" />
             <button
               class="tab-drawer-close-btn"
-              aria-label="Close tab"
+              :aria-label="t('tab.close')"
               @click.stop="emit('close-tab', tab.id)"
             >
               <X :size="16" stroke-width="2" />

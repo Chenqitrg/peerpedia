@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Trash2 } from 'lucide-vue-next'
 import { useTauri } from '../composables/useTauri'
 import { deleteArticle } from '../api/articles'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   articleId: string
@@ -47,7 +50,7 @@ async function handleDelete() {
     class="flex items-center justify-center w-7 h-7 rounded cursor-pointer
            text-ink-muted hover:text-danger hover:bg-danger/10
            transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    aria-label="Delete article"
+    :aria-label="t('article.delete')"
     data-tooltip="Delete"
     @click="showConfirm = true"
   >
