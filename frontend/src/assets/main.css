@@ -181,3 +181,10 @@
 
 /* Dark scrollbar for Firefox */
 * { scrollbar-width: thin; scrollbar-color: #21262d #0d1117; }
+
+/* Typst SVG preview — dark theme compatibility */
+.typst-preview svg {
+  background: transparent !important;
+  width: 100% !important;
+  height: auto !important;
+}

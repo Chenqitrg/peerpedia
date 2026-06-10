@@ -29,7 +29,7 @@ const label = computed(() => online.value ? '在线' : '离线')
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   font-size: 12px;
-  color: #8b949e;
+  color: #6e7681;
   cursor: default;
 }
 
@@ -41,8 +41,8 @@ const label = computed(() => online.value ? '在线' : '离线')
 }
 
 .status-dot.online {
-  background: #3fb950;
-  box-shadow: 0 0 6px rgba(63, 185, 80, 0.4);
+  background: #5c7c6e;
+  box-shadow: 0 0 6px rgba(92, 124, 110, 0.4);
 }
 
 .status-dot.offline {

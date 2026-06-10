@@ -269,7 +269,7 @@ function goBack() {
       <!-- Rollback error -->
       <div
         v-if="rollbackError"
-        class="card p-3 mb-4 border-l-4 border-[#d73a49] bg-[#d73a49]/5 text-sm text-[#d73a49] flex items-center justify-between"
+        class="card p-3 mb-4 border-l-4 border-danger bg-danger/5 text-sm text-danger flex items-center justify-between"
       >
         <span>{{ rollbackError }}</span>
         <button
@@ -290,7 +290,7 @@ function goBack() {
           <p class="text-xs text-ink-muted mb-4">This creates a new commit reverting to that state.</p>
           <div class="flex items-center gap-2">
             <button class="flex-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-lg py-2 transition-colors" @click="cancelRollback">Cancel</button>
-            <button class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-2 hover:brightness-110 transition-all" @click="confirmRollback">Confirm</button>
+            <button class="flex-1 text-xs font-semibold bg-accent text-page rounded-lg py-2 hover:brightness-110 transition-all" @click="confirmRollback">Confirm</button>
           </div>
         </div>
       </div>

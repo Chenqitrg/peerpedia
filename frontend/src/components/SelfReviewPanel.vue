@@ -46,7 +46,7 @@ const show = computed({
         <!-- Commit message -->
         <div class="mb-5">
           <label class="text-xs font-semibold text-ink-muted block mb-1.5">
-            {{ t('editor.commitMessage') }} <span class="text-[#d73a49]">*</span>
+            {{ t('editor.commitMessage') }} <span class="text-danger">*</span>
           </label>
           <input
             v-model="commitMsg"
@@ -133,7 +133,7 @@ const show = computed({
             />
             <span class="text-xs text-ink font-mono w-8 text-right">{{ pct }}%</span>
           </div>
-          <p v-if="totalContribution !== 100" class="text-[10px] text-[#d73a49]">
+          <p v-if="totalContribution !== 100" class="text-[10px] text-danger">
             {{ t('editor.contributionMustTotal100') || 'Contributions must total 100%. Currently:' }} {{ totalContribution }}%
           </p>
         </div>

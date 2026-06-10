@@ -16,6 +16,7 @@ import DownloadButton from '../components/DownloadButton.vue'
 import ReviewPanel from '../components/ReviewPanel.vue'
 import ScoreBadges from '../components/ScoreBadges.vue'
 import { renderMathInHtml } from '../utils/math'
+import { sanitizeTypstSvg } from '../utils/typst'
 import {
   Bookmark,
   BookmarkCheck,
@@ -293,7 +294,7 @@ async function loadCompiledContent() {
       try {
         const result = await tauri.compileTypst({ content: srcContent, format: 'typst' })
         if (result && typeof result === 'string') {
-          compiledHtml.value = `<div class="typst-preview">${result}</div>`
+          compiledHtml.value = `<div class="typst-preview">${sanitizeTypstSvg(result)}</div>`
         } else if (result && typeof result === 'object' && 'error' in result) {
           compiledHtml.value = `<div class="typst-preview-error text-[#d73a49] p-4 font-mono text-sm">${(result as { error: string }).error}</div>`
         }
@@ -306,7 +307,7 @@ async function loadCompiledContent() {
     // Web mode: compile Typst → SVG via server API
     try {
       const result = await compilePreview({ content: srcContent, format: 'typst' })
-      compiledHtml.value = result.output  // SVG — skip renderMathInHtml
+      compiledHtml.value = sanitizeTypstSvg(result.output)
     } catch {
       compiledHtml.value = ''
     }

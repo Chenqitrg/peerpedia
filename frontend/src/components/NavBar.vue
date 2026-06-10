@@ -294,7 +294,7 @@ function handleLogout() {
         </button>
         <button
           class="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold
-                 bg-accent text-[#0d1117] rounded-lg
+                 bg-accent text-page rounded-lg
                  hover:brightness-110 transition-all duration-200"
           @click="openAuth"
         >
