@@ -234,6 +234,12 @@ pub fn cache_article(conn: &Connection, id: &str, article_json: &str) -> Result<
     cache_article_with_limit(conn, id, article_json, MAX_CACHE_SIZE_BYTES)
 }
 
+/// Delete a cached article by ID. Used after rollback to force fresh git-sourced load.
+pub fn delete_cached_article(conn: &Connection, id: &str) -> Result<(), AppError> {
+    conn.execute("DELETE FROM article_cache WHERE id = ?1", [id])?;
+    Ok(())
+}
+
 /// Retrieve a cached article by ID. Returns None if not cached.
 pub fn get_cached_article(conn: &Connection, id: &str) -> Result<Option<CachedArticle>, AppError> {
     let result = conn.query_row(

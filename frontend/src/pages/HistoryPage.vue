@@ -188,18 +188,47 @@ function parseUnifiedDiff(diffText: string, files: string[]): DiffResult {
   return { files, hunks }
 }
 
-async function handleRollback(hash: string) {
-  if (!confirm(`Rollback to ${hash.substring(0, 7)}? This will create a new commit reverting to this state.`)) return
+// Rollback confirmation dialog (Vue-based, works in Tauri unlike window.confirm)
+const rollbackConfirmHash = ref<string | null>(null)
+const rollbackConfirmShort = computed(() => rollbackConfirmHash.value?.substring(0, 7) || '')
+
+function handleRollback(hash: string) {
+  rollbackConfirmHash.value = hash
+}
+
+async function confirmRollback() {
+  const hash = rollbackConfirmHash.value
+  if (!hash) return
+  rollbackConfirmHash.value = null
   rollingBack.value = hash
+  rollbackError.value = ''
   try {
-    await rollbackArticle(id, hash)
-    // Reload history
+    if (isLocal.value) {
+      const result = await tauri.gitRollback({
+        article_id: id,
+        commit_hash: hash,
+        format: 'markdown',
+        author: 'User',
+      })
+      if (result && 'error' in result) {
+        rollbackError.value = typeof result.error === 'string' ? result.error : 'Rollback failed'
+        return
+      }
+      // Invalidate article cache so page shows fresh git content
+      await tauri.invalidateArticleCache({ article_id: id })
+    } else {
+      await rollbackArticle(id, hash)
+    }
     await loadHistory()
   } catch (e: any) {
-    rollbackError.value = e.response?.data?.detail || 'Rollback failed'
+    rollbackError.value = e.response?.data?.detail || e?.message || 'Rollback failed'
   } finally {
     rollingBack.value = null
   }
+}
+
+function cancelRollback() {
+  rollbackConfirmHash.value = null
 }
 
 function goBack() {
@@ -237,6 +266,34 @@ function goBack() {
     <ErrorState v-else-if="error" :message="error" @retry="loadHistory()" />
 
     <template v-else>
+      <!-- Rollback error -->
+      <div
+        v-if="rollbackError"
+        class="card p-3 mb-4 border-l-4 border-[#d73a49] bg-[#d73a49]/5 text-sm text-[#d73a49] flex items-center justify-between"
+      >
+        <span>{{ rollbackError }}</span>
+        <button
+          class="text-xs text-ink-muted hover:text-ink transition-colors ml-3 shrink-0"
+          @click="rollbackError = ''"
+          aria-label="Dismiss error"
+        >✕</button>
+      </div>
+
+      <!-- Rollback confirmation dialog -->
+      <div
+        v-if="rollbackConfirmHash"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        @click.self="cancelRollback"
+      >
+        <div class="bg-card border border-divider rounded-lg shadow-2xl p-5 w-80 animate-fade-in">
+          <p class="text-sm text-ink mb-1">Rollback to <code class="font-mono text-accent">{{ rollbackConfirmShort }}</code>?</p>
+          <p class="text-xs text-ink-muted mb-4">This creates a new commit reverting to that state.</p>
+          <div class="flex items-center gap-2">
+            <button class="flex-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-lg py-2 transition-colors" @click="cancelRollback">Cancel</button>
+            <button class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-2 hover:brightness-110 transition-all" @click="confirmRollback">Confirm</button>
+          </div>
+        </div>
+      </div>
       <!-- Commit graph -->
       <div class="card p-4 mb-6">
         <div class="space-y-0">

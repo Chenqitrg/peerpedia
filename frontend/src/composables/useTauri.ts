@@ -20,7 +20,7 @@ export type {
   CacheArticleParams, GetCachedArticleParams,
   FollowUserParams, IsFollowingParams, GetFollowListParams,
   BookmarkParams, GetBookmarksParams,
-  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams,
+  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
   GitCommitResult, CommitEntry,
   Account, AccountSummary, Draft, DraftSummary, CachedArticle,
 } from './useTauriTypes'
@@ -31,7 +31,7 @@ import type {
   CacheArticleParams, GetCachedArticleParams,
   FollowUserParams, IsFollowingParams, GetFollowListParams,
   BookmarkParams, GetBookmarksParams,
-  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams,
+  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
   GitCommitResult, CommitEntry,
   Account, AccountSummary, Draft, DraftSummary, CachedArticle,
 } from './useTauriTypes'
@@ -224,6 +224,12 @@ export function useTauri() {
     },
     async gitDiff(params: { article_id: string; hash1: string; hash2: string }) {
       return _invoke<{ files: string[]; hunks: { old_start: number; old_lines: number; new_start: number; new_lines: number; header: string; lines: { line_type: 'add' | 'del' | 'ctx'; content: string; old_lineno: number | null; new_lineno: number | null }[] }[] }>('git_diff', params as unknown as Record<string, unknown>)
+    },
+    async gitRollback(params: GitRollbackParams) {
+      return _invoke<GitCommitResult>('git_rollback', params as unknown as Record<string, unknown>)
+    },
+    async invalidateArticleCache(params: InvalidateCacheParams) {
+      return _invoke<{ ok: boolean }>('invalidate_article_cache', params as unknown as Record<string, unknown>)
     },
 
     // Search

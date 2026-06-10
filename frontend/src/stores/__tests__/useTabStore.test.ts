@@ -200,4 +200,29 @@ describe('useTabStore', () => {
       expect(s.tabs).toHaveLength(0)
     })
   })
+
+  // ── Bug regression: close all tabs → new page creates tab ──────────
+
+  it('creates tab after all tabs are closed', () => {
+    const s = useTabStore()
+
+    // Open 2 tabs
+    const a = s.ensureTab('article', '/article/a')
+    const b = s.ensureTab('article', '/article/b')
+    expect(s.tabs).toHaveLength(2)
+
+    // Close both tabs
+    s.removeTab(a)
+    s.removeTab(b)
+    expect(s.tabs).toHaveLength(0)
+    expect(s.activeTabId).toBeNull()
+
+    // Open a new article — should create a new tab
+    const c = s.ensureTab('article', '/article/c')
+    expect(c).toBeTruthy()
+    expect(c).not.toBe('')
+    expect(s.tabs).toHaveLength(1)
+    expect(s.activeTabId).toBe(c)
+    expect(s.tabs[0].routePath).toBe('/article/c')
+  })
 })

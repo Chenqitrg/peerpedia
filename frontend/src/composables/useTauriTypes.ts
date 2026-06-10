@@ -111,6 +111,17 @@ export interface GitShowParams {
   commit_hash: string
 }
 
+export interface GitRollbackParams {
+  article_id: string
+  commit_hash: string
+  format: string
+  author: string
+}
+
+export interface InvalidateCacheParams {
+  article_id: string
+}
+
 export interface GitCommitResult {
   hash: string
   message: string

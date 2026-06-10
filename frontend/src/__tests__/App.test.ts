@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ afterEach: vi.fn() }),
+  useRouter: () => ({ afterEach: vi.fn(), beforeEach: vi.fn() }),
   useRoute: () => ({ path: '/' }),
   RouterLink: { template: '<a><slot /></a>' },
 }))

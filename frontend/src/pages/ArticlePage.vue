@@ -192,42 +192,26 @@ async function loadArticle(articleId: string) {
     loadReviews()
     return
   } catch (e: any) {
-    // 2. In Tauri/dev-mock mode, fall back to local draft cache.
+    // 2. In Tauri/dev-mock mode: metadata from draft, content from git.
+    //    Git is the source of truth — no cache chain to get stale.
     const isOffline = tauri.isTauri.value || tauri.isBrowserLocal.value
     if (isOffline) {
-      const cached = await tauri.getCachedArticle({ id: articleId })
-      if (cached && !('error' in cached)) {
-        try {
-          article.value = JSON.parse(cached.json) as ArticleDetail
-          isFromCache.value = true
-          cachedAt.value = new Date(cached.cached_at).toLocaleString()
-          await loadCompiledContent()
-          // Populate commit hash from local git if cache didn't have it
-          commitHash.value = article.value.commit_hash || ''
-          if (!commitHash.value) {
-            try {
-              const history = await tauri.gitHistory({ article_id: articleId })
-              if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
-                commitHash.value = history[0].hash
-              }
-            } catch { /* optional */ }
-          }
-          return
-        } catch { /* corrupt cache, try draft fallback */ }
-      }
-
       const draft = await tauri.getDraft({ id: articleId })
       if (draft && !('error' in draft)) {
         const draftData = draft as { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
         article.value = buildArticleFromDraft(draftData)
-        await loadCompiledContent()
-        // Populate commit hash from local git
+        // Always get latest content + hash from git (source of truth)
         try {
           const history = await tauri.gitHistory({ article_id: articleId })
           if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
             commitHash.value = history[0].hash
+            const gitContent = await tauri.gitShow({ article_id: articleId, commit_hash: commitHash.value })
+            if (gitContent && typeof gitContent === 'string' && !gitContent.startsWith('{')) {
+              article.value.compiled_output = gitContent
+            }
           }
-        } catch { /* optional */ }
+        } catch { /* keep draft content as fallback */ }
+        await loadCompiledContent()
         return
       }
     }
@@ -281,8 +265,8 @@ async function loadCompiledContent() {
   let srcContent: string
   let srcFormat: string
 
-  // In local/Tauri mode, content and format come from the draft cache
-  // (set by buildArticleFromDraft). No REST server available offline.
+  // In local/Tauri mode, content was already sourced from git in loadArticle.
+  // compiled_output = git content (source of truth), not stale draft cache.
   if (isLocal) {
     srcContent = article.value.compiled_output || ''
     srcFormat = article.value.compiled_format || 'markdown'

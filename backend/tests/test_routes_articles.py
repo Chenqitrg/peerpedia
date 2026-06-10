@@ -753,3 +753,49 @@ class TestArticleErrorPaths:
     def test_rollback_nonexistent_article_returns_404(self, client):
         resp = client.post("/api/v1/articles/nonexistent/rollback/abc123")
         assert resp.status_code == 404
+
+    def test_rollback_creates_revert_commit(self, client, seed_user):
+        """Happy path: create article with 2 commits, rollback to first, verify content restored."""
+        body = {
+            "authors": [seed_user],
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
+                            "pedagogy": 3, "impact": 3},
+            "title": "Rollback Test",
+            "content": "Original content",
+            "format": "markdown",
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201
+        article_id = resp.json()["id"]
+        first_hash = resp.json()["commit_hash"]
+
+        # Update article — creates a 2nd commit
+        update_body = {
+            "content": "Updated content",
+            "commit_message": "Second commit",
+        }
+        resp2 = client.put(f"/api/v1/articles/{article_id}", json=update_body)
+        assert resp2.status_code == 200
+
+        # Get history — should have at least 2 commits
+        hist = client.get(f"/api/v1/articles/{article_id}/history")
+        assert hist.status_code == 200
+        commits = hist.json()["commits"]
+        assert len(commits) >= 2
+
+        # Rollback to the first commit
+        resp3 = client.post(f"/api/v1/articles/{article_id}/rollback/{first_hash}")
+        assert resp3.status_code == 200
+        data = resp3.json()
+        assert "commit_hash" in data
+        assert "Rollback" in data["message"]
+
+        # Source should be restored to original
+        src = client.get(f"/api/v1/articles/{article_id}/source")
+        assert src.status_code == 200
+        assert src.json()["content"] == "Original content"
+
+        # History should now have 3 commits
+        hist2 = client.get(f"/api/v1/articles/{article_id}/history")
+        assert hist2.status_code == 200
+        assert len(hist2.json()["commits"]) >= 3

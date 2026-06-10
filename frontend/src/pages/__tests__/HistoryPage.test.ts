@@ -33,14 +33,22 @@ vi.mock('@/api/articles', () => ({
 
 // Mock useTauri — default is web mode (isTauri=false). Tests that need
 // local mode can mock individual method return values via the refs below.
+// Shared mock fns (via hoisted) so component and test share the same fn reference.
+const { _mockGitHistory, _mockGitShow, _mockGitRollback } = vi.hoisted(() => ({
+  _mockGitHistory: vi.fn(),
+  _mockGitShow: vi.fn(),
+  _mockGitRollback: vi.fn(),
+}))
 let _isTauri = false
 let _gitHistoryReturn: any = []
+let _gitRollbackReturn: any = { hash: 'rollback-abc', message: 'Rollback to abc12345' }
 vi.mock('@/composables/useTauri', () => ({
   useTauri: () => ({
     isTauri: { value: _isTauri },
     isBrowserLocal: { value: false },
-    gitHistory: vi.fn().mockImplementation(() => Promise.resolve(_gitHistoryReturn)),
-    gitShow: vi.fn().mockResolvedValue(''),
+    gitHistory: _mockGitHistory.mockImplementation(() => Promise.resolve(_gitHistoryReturn)),
+    gitShow: _mockGitShow.mockResolvedValue(''),
+    gitRollback: _mockGitRollback.mockImplementation(() => Promise.resolve(_gitRollbackReturn)),
   }),
 }))
 
@@ -123,5 +131,148 @@ describe('HistoryPage', () => {
     // Should not be loading
     const hasCommits = wrapper.text().includes('First draft')
     expect(hasCommits).toBe(true)
+  })
+
+  // ── Rollback tests (Vue dialog, works in Tauri) ──────────────────
+
+  it('clicking rollback shows confirm dialog, confirm calls rollbackArticle', async () => {
+    const { rollbackArticle } = await import('@/api/articles')
+    ;(rollbackArticle as ReturnType<typeof vi.fn>).mockClear()
+    const HistoryPage = (await import('../HistoryPage.vue')).default
+    const wrapper = mount(HistoryPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    // Click rollback button
+    const rollbackBtn = wrapper.find('button[aria-label="Rollback to this version"]')
+    expect(rollbackBtn.exists()).toBe(true)
+    await rollbackBtn.trigger('click')
+    await flushPromises()
+
+    // Confirmation dialog should appear
+    expect(wrapper.text()).toContain('This creates a new commit')
+
+    // Click Confirm
+    const confirmBtn = wrapper.findAll('button').find(b => b.text().trim() === 'Confirm')!
+    expect(confirmBtn.exists()).toBe(true)
+    await confirmBtn.trigger('click')
+    await flushPromises()
+
+    expect(rollbackArticle).toHaveBeenCalled()
+  })
+
+  it('cancel rollback does not call rollbackArticle', async () => {
+    const { rollbackArticle } = await import('@/api/articles')
+    ;(rollbackArticle as ReturnType<typeof vi.fn>).mockClear()
+    const HistoryPage = (await import('../HistoryPage.vue')).default
+    const wrapper = mount(HistoryPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    const rollbackBtn = wrapper.find('button[aria-label="Rollback to this version"]')
+    await rollbackBtn.trigger('click')
+    await flushPromises()
+
+    // Click Cancel
+    const cancelBtn = wrapper.findAll('button').find(b => b.text().trim() === 'Cancel')!
+    await cancelBtn.trigger('click')
+    await flushPromises()
+
+    expect(rollbackArticle).not.toHaveBeenCalled()
+  })
+
+  it('shows rollback error message on failure', async () => {
+    const { rollbackArticle } = await import('@/api/articles')
+    ;(rollbackArticle as ReturnType<typeof vi.fn>).mockRejectedValueOnce({
+      response: { data: { detail: 'Repository not found' } },
+    })
+    const HistoryPage = (await import('../HistoryPage.vue')).default
+    const wrapper = mount(HistoryPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+
+    // Click rollback → Confirm
+    await wrapper.find('button[aria-label="Rollback to this version"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text().trim() === 'Confirm')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Repository not found')
+  })
+
+  // ── S2.x E2E: Tauri-mode rollback flow ────────────────────────────
+
+  describe('S2 E2E: rollback in Tauri/local mode', () => {
+    beforeEach(() => {
+      _isTauri = true
+      _gitHistoryReturn = [
+        { hash: 'abc1234', message: 'Add conclusion', author: 'Alice', timestamp: '2026-06-01T12:00:00Z' },
+        { hash: 'def5678', message: 'Fix methods', author: 'Alice', timestamp: '2026-05-28T10:00:00Z' },
+        { hash: 'ghi9012', message: 'Initial draft', author: 'Alice', timestamp: '2026-05-20T08:00:00Z' },
+      ]
+      _gitRollbackReturn = { hash: 'newhash99', message: 'Rollback to abc12345' }
+    })
+
+    afterEach(() => {
+      _isTauri = false
+    })
+
+    it('S2.1: rollback button → confirm → calls tauri.gitRollback', async () => {
+      const HistoryPage = (await import('../HistoryPage.vue')).default
+      const wrapper = mount(HistoryPage, {
+        global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+      })
+      await flushPromises()
+
+      _mockGitRollback.mockClear()
+      // Click rollback button
+      await wrapper.find('button[aria-label="Rollback to this version"]').trigger('click')
+      await flushPromises()
+      // Click Confirm in dialog
+      await wrapper.findAll('button').find(b => b.text().trim() === 'Confirm')!.trigger('click')
+      await flushPromises()
+
+      expect(_mockGitRollback).toHaveBeenCalledWith({
+        article_id: 'art-1',
+        commit_hash: 'ghi9012',
+        format: 'markdown',
+        author: 'User',
+      })
+    })
+
+    it('S2.4: rollback failure shows error in Tauri mode', async () => {
+      _gitRollbackReturn = { error: 'Git repository not found' }
+      const HistoryPage = (await import('../HistoryPage.vue')).default
+      const wrapper = mount(HistoryPage, {
+        global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+      })
+      await flushPromises()
+
+      await wrapper.find('button[aria-label="Rollback to this version"]').trigger('click')
+      await flushPromises()
+      await wrapper.findAll('button').find(b => b.text().trim() === 'Confirm')!.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Git repository not found')
+    })
+
+    it('S2.5: cancel rollback does nothing', async () => {
+      const HistoryPage = (await import('../HistoryPage.vue')).default
+      const wrapper = mount(HistoryPage, {
+        global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+      })
+      await flushPromises()
+
+      _mockGitRollback.mockClear()
+      await wrapper.find('button[aria-label="Rollback to this version"]').trigger('click')
+      await flushPromises()
+      await wrapper.findAll('button').find(b => b.text().trim() === 'Cancel')!.trigger('click')
+      await flushPromises()
+
+      expect(_mockGitRollback).not.toHaveBeenCalled()
+    })
   })
 })

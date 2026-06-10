@@ -37,6 +37,8 @@ fn main() {
             commands::git_history,
             commands::git_show,
             commands::git_diff,
+            commands::git_rollback,
+            commands::invalidate_article_cache,
             commands::search_drafts,
             commands::search_cached_articles,
             commands::compile_typst,

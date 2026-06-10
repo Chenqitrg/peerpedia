@@ -9,7 +9,7 @@
           : 'w-full max-w-content mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12'"
       >
         <router-view v-slot="{ Component, route }">
-          <keep-alive :include="['EditorPage', 'ArticlePage']">
+          <keep-alive :include="['EditorPage', 'ArticlePage']" :key="'ka-' + keepAliveVersion">
             <component :is="Component" :key="route.fullPath" />
           </keep-alive>
         </router-view>
@@ -54,6 +54,18 @@ const userStore = useUserStore()
 const tabStore = useTabStore()
 
 const isEditorPage = computed(() => route.path.startsWith('/edit'))
+
+// KeepAlive cache version — bumped when navigating to a tab-tracked page
+// with no open tabs. This clears stale cached instances (from previously
+// closed tabs) before the new page's ensureTab creates a fresh tab.
+const keepAliveVersion = ref(0)
+const isTabRoute = (p: string) =>
+  p.startsWith('/edit') || p.startsWith('/article') || p.startsWith('/articles')
+router.beforeEach((to, from) => {
+  if (isTabRoute(to.path) && tabStore.tabs.length === 0) {
+    keepAliveVersion.value++
+  }
+})
 
 // ── Tab activation on navigation ──────────────────────────────
 // Tab creation is handled by each page component (ensureTab in setup).

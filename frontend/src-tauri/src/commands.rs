@@ -449,6 +449,38 @@ pub fn git_diff(params: GitDiffParams) -> Result<local_git::DiffResult, AppError
     local_git::git_diff(&params.article_id, &params.hash1, &params.hash2)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GitRollbackParams {
+    pub article_id: String,
+    pub commit_hash: String,
+    pub format: String,
+    pub author: String,
+}
+
+#[tauri::command]
+pub fn git_rollback(params: GitRollbackParams) -> Result<local_git::GitCommitResult, AppError> {
+    local_git::git_rollback(
+        &params.article_id,
+        &params.commit_hash,
+        &params.format,
+        &params.author,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct InvalidateCacheParams {
+    pub article_id: String,
+}
+
+#[tauri::command]
+pub fn invalidate_article_cache(
+    state: State<'_, AppState>,
+    params: InvalidateCacheParams,
+) -> Result<(), AppError> {
+    let conn = lock_db(&state)?;
+    local_store::delete_cached_article(&conn, &params.article_id)
+}
+
 // ── Compile command ─────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
