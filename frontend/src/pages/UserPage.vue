@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { getUser, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
@@ -35,6 +36,7 @@ const id = computed(() => route.params.id as string)
 // In local mode (Tauri or browser-local), use local account data.
 const isSelf = computed(() => userStore.viewer?.id === id.value)
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
+const { isOnline } = useNetworkStatus()
 
 function _localUserToProfile(a: { id: string; username: string }): UserProfile {
   return {
@@ -89,6 +91,16 @@ async function loadFollowState() {
 
 async function handleFollow() {
   if (!userStore.viewer) return
+
+  // If server is reachable but we have no token, try to sync local creds first
+  const needsSync = (userStore.isTauriMode || userStore.isBrowserLocal) && isOnline.value && !userStore.token?.value
+  if (needsSync) {
+    followLoading.value = true
+    const synced = await userStore.trySyncServerAuth()
+    followLoading.value = false
+    if (!synced || !userStore.token?.value) return
+  }
+
   followLoading.value = true
   try {
     if (isLocal.value) {
