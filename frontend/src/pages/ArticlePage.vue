@@ -466,7 +466,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
     <!-- Back button -->
     <button
       class="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink mb-4 transition-colors duration-200"
-      aria-label="Back"
+      :aria-label="t('article.back')"
       @click="goBack"
     >
       <ArrowLeft class="w-4 h-4" stroke-width="2" />
@@ -626,7 +626,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             <button
               v-if="isOwnArticle && article.forked_from"
               class="flex items-center gap-1 px-2.5 py-1 text-xs text-accent hover:text-accent/80 hover:bg-accent/10 rounded-md transition-colors"
-              aria-label="Propose merge"
+              :aria-label="t('article.proposeMerge')"
               :disabled="mergeSubmitting"
               @click="handleMerge"
             >
