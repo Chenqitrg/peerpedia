@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-09 · All implemented features · Architecture debt resolved · Plan remediation merged (git-first architecture compliance)
+> 2026-06-10 · All implemented features · Architecture debt resolved · Plan remediation merged (git-first architecture compliance) · VSCode-style tab system
 
 ---
 
@@ -348,7 +348,7 @@ Compile output is **never** stored in the database. The compile endpoint generat
 | Suite | Tests | Framework |
 |-------|-------|-----------|
 | Backend | 353 | pytest |
-| Frontend | 341 | vitest |
+| Frontend | 425 | vitest |
 | Rust | 16 | cargo test |
 
 ### 7.2 CI Pipeline
@@ -409,7 +409,7 @@ The detailed engineering plan is maintained in [`docs/plan_reshape.md`](plan_res
 | P0 | Typst compilation (SVG preview) | ✅ |
 | P0 | Typst compilation (PDF download) | ✅ |
 | P0 | Draft search (FTS5) | ✅ |
-| P0 | Editor UX (keep-alive, split pane, save states, per-save commit msg) | ✅ |
+| P0 | Editor UX (keep-alive, split pane, save states, per-save commit msg, VSCode-style tab system) | ✅ |
 | P1 | CodeMirror 6 Markdown editor (syntax highlight, auto-indent, bracket matching) | ✅ |
 | P0 | Distribute & user testing | ⬜ |
 | P1 | arXiv mirror with scoring | ⬜ |
@@ -439,4 +439,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-09 · 353 backend tests · 341 frontend tests · 16 Rust tests · 9 DB entities*
+*Last updated: 2026-06-10 · 353 backend tests · 425 frontend tests · 16 Rust tests · 9 DB entities*
