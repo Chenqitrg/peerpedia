@@ -293,7 +293,7 @@ watch(() => route.params.id, () => {
             :class="isFollowing
               ? 'btn-outline rounded-xl'
               : canWrite('user.follow_graph')
-                ? 'bg-accent text-[#0d1117] hover:brightness-110 rounded-xl'
+                ? 'bg-accent text-page hover:brightness-110 rounded-xl'
                 : 'bg-[#21262d] text-ink-muted/50 cursor-not-allowed rounded-xl'"
             :disabled="followLoading || !canWrite('user.follow_graph')"
             :data-tooltip="!canWrite('user.follow_graph') ? t(getFallback('user.follow_graph')) : ''"

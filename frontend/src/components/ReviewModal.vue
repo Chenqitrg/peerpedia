@@ -52,7 +52,7 @@ function onOverlayClick(e: MouseEvent) {
         />
 
         <!-- Messages -->
-        <p v-if="error" class="text-xs text-[#d73a49] mt-4">{{ error }}</p>
+        <p v-if="error" class="text-xs text-danger mt-4">{{ error }}</p>
         <p v-if="success" class="text-xs text-green-400 mt-4">{{ success }}</p>
 
         <!-- Actions -->
@@ -64,7 +64,7 @@ function onOverlayClick(e: MouseEvent) {
             Cancel
           </button>
           <button
-            class="px-4 py-1.5 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg
+            class="px-4 py-1.5 text-xs font-semibold bg-accent text-page rounded-lg
                    hover:brightness-110 transition-all duration-200 disabled:opacity-50"
             :disabled="submitting"
             @click="emit('submit')"

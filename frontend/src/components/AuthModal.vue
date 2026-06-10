@@ -130,11 +130,11 @@ function close() {
             required
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <p v-if="error" class="text-xs text-[#d73a49]">{{ error }}</p>
+          <p v-if="error" class="text-xs text-danger">{{ error }}</p>
           <button
             type="submit"
             :disabled="loading"
-            class="w-full py-2 text-sm font-semibold bg-accent text-[#0d1117] rounded-lg hover:brightness-110 transition-all duration-200 disabled:opacity-50"
+            class="w-full py-2 text-sm font-semibold bg-accent text-page rounded-lg hover:brightness-110 transition-all duration-200 disabled:opacity-50"
           >
             {{ loading ? '...' : t('auth.signIn') }}
           </button>
@@ -170,11 +170,11 @@ function close() {
             required
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <p v-if="error" class="text-xs text-[#d73a49]">{{ error }}</p>
+          <p v-if="error" class="text-xs text-danger">{{ error }}</p>
           <button
             type="submit"
             :disabled="loading"
-            class="w-full py-2 text-sm font-semibold bg-accent text-[#0d1117] rounded-lg hover:brightness-110 transition-all duration-200 disabled:opacity-50"
+            class="w-full py-2 text-sm font-semibold bg-accent text-page rounded-lg hover:brightness-110 transition-all duration-200 disabled:opacity-50"
           >
             {{ loading ? '...' : 'Create Account' }}
           </button>
