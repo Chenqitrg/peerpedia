@@ -2,6 +2,7 @@
 import { shallowRef, computed } from 'vue'
 import { Codemirror } from 'vue-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
+import { typst } from 'codemirror-lang-typst'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView } from 'codemirror'
 import type { Extension } from '@codemirror/state'
@@ -20,7 +21,11 @@ const codemirrorView = shallowRef<EditorView>()
 
 const extensions = computed<Extension[]>(() => {
   const exts: Extension[] = [oneDark]
-  exts.push(markdown())
+  if (props.format === 'typst') {
+    exts.push(typst())
+  } else {
+    exts.push(markdown())
+  }
   return exts
 })
 
@@ -36,7 +41,7 @@ defineExpose({ codemirrorView })
 </script>
 
 <template>
-  <div v-if="format === 'markdown'" class="flex-1 w-full font-mono cm-wrapper">
+  <div class="flex-1 w-full font-mono cm-wrapper">
     <Codemirror
       :model-value="modelValue"
       :extensions="extensions"
@@ -47,7 +52,6 @@ defineExpose({ codemirrorView })
       @update:model-value="onUpdate"
     />
   </div>
-  <slot v-else name="typst-fallback" />
 </template>
 
 <style>
