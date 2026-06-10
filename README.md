@@ -30,7 +30,7 @@ arXiv solved **distribution**. But it didn't solve **filtering** — the problem
 A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. 5MB install, 30MB RAM. Useful alone — the key to cold-start users.
 
 **Phase 1.5 — Polish & Ship（打磨分发）✅**
-Delete, diff view (with word-level highlighting), Typst SVG preview + PDF download, draft search, editor UX (save-as-commit, per-save commit message, disabled-when-clean save button), CodeMirror 6 Markdown editor (syntax highlighting, bracket matching, ⌘S compile), architecture remediation (git-first write/read path per DESIGN.md §2.3, useCommitFlow composable, useTauri 3-file split, design consistency fixes). Desktop app is solid.
+Delete, diff view (with word-level highlighting), Typst SVG preview + PDF download, draft search, editor UX (save-as-commit, per-save commit message, disabled-when-clean save button, VSCode-style tab system with KeepAlive caching for simultaneous multi-article editing), CodeMirror 6 Markdown editor (syntax highlighting, bracket matching, ⌘S compile), architecture remediation (git-first write/read path per DESIGN.md §2.3, useCommitFlow composable, useTauri 3-file split, design consistency fixes). Desktop app is solid.
 
 **Phase 2 — Score arXiv（包围城市）**
 Community scoring layer on top of preprints. A quality filter that doesn't belong to any publisher.
@@ -218,7 +218,7 @@ peerpedia/
 # Backend (353 tests)
 python -m pytest backend/tests/ core/tests/ -q
 
-# Frontend (341 tests)
+# Frontend (425 tests)
 cd frontend && npx vitest run
 
 # Rust (53 tests)
