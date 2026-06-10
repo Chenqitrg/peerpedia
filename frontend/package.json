@@ -17,6 +17,7 @@
     "@vueuse/core": "^14.3.0",
     "axios": "^1.17.0",
     "codemirror": "^6.0.2",
+    "codemirror-lang-typst": "^0.4.0",
     "diff2html": "^3.4.56",
     "katex": "^0.17.0",
     "lucide-vue-next": "^1.0.0",
