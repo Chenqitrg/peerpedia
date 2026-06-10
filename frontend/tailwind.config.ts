@@ -13,7 +13,7 @@ export default {
         // Card/panel background
         card: '#161b22',
         // Divider/border
-        divider: '#21262d',
+        divider: '#30363d',
         // Text colors
         ink: {
           DEFAULT: '#b0b8c4',

@@ -31,7 +31,7 @@ const emit = defineEmits<{
       class="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-mono
              transition-colors duration-200"
       :class="p === page
-        ? 'bg-accent text-[#0d1117] font-bold'
+        ? 'bg-accent text-page font-bold'
         : 'text-ink-muted hover:text-ink hover:bg-[#21262d]'"
       @click="emit('change', p)"
     >
