@@ -60,6 +60,18 @@ User request → Git commit (content) → success → DB upsert (metadata index)
 - If the database is lost, it can be rebuilt from Git repositories. Git retains fork/diff/merge history.
 - Compile output is **never** stored in the database — it is generated on-demand with a filesystem cache.
 
+### 2.3-bis Git-First Content Loading (2026-06-10)
+
+Article content in Tauri mode is now read directly from git (`git_show`) on every page load, not from the draft cache. This ensures rollback and other git operations are immediately visible — no cache chain to go stale.
+
+```
+Before: git → article_cache → draft → compiled_output → UI  (stale after rollback)
+After:  git → content (git_show) → compile → UI            (always fresh)
+        draft → metadata only (title, author, format)
+```
+
+The `article_cache` SQLite table is an optional network-speed optimization, never a content authority. ArticlePage in Tauri mode skips it entirely and sources content from git.
+
 ### 2.4 Offline Architecture
 
 Phase 1 desktop is fully offline-capable:
@@ -347,9 +359,9 @@ Compile output is **never** stored in the database. The compile endpoint generat
 
 | Suite | Tests | Framework |
 |-------|-------|-----------|
-| Backend | 353 | pytest |
-| Frontend | 425 | vitest |
-| Rust | 16 | cargo test |
+| Backend | 354 | pytest |
+| Frontend | 432 | vitest |
+| Rust | 76 | cargo test |
 
 ### 7.2 CI Pipeline
 
@@ -439,4 +451,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-10 · 353 backend tests · 425 frontend tests · 16 Rust tests · 9 DB entities*
+*Last updated: 2026-06-10 · 354 backend tests · 432 frontend tests · 76 Rust tests · 9 DB entities · Git-first content loading · Rollback in Tauri*

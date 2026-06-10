@@ -215,13 +215,13 @@ peerpedia/
 ## Testing · 测试
 
 ```bash
-# Backend (353 tests)
+# Backend (354 tests)
 python -m pytest backend/tests/ core/tests/ -q
 
-# Frontend (425 tests)
+# Frontend (432 tests)
 cd frontend && npx vitest run
 
-# Rust (53 tests)
+# Rust (76 tests)
 cd frontend/src-tauri && cargo test
 ```
 

@@ -792,12 +792,22 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Rollback successful — new commit created",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "commit_hash": { "type": "string", "description": "Hash of the new rollback commit" },
+                    "message": { "type": "string", "description": "Commit message" }
+                  },
+                  "required": ["commit_hash", "message"]
+                }
               }
             }
+          },
+          "404": {
+            "description": "Article repo not found"
           },
           "422": {
             "description": "Validation Error",
