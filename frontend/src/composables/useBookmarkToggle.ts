@@ -24,6 +24,9 @@ export function useBookmarkToggle(
     const article = articles.value.find(a => a.id === articleId)
     if (!article) return
 
+    // SPEC-1.5: 静默忽略自收藏（防止 API 调用）
+    if (article.is_own_article) return
+
     const previous = article.is_bookmarked
     article.is_bookmarked = !currentlyBookmarked
 

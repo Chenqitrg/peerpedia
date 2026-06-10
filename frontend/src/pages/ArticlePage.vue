@@ -3,8 +3,9 @@ import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
-import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, createMergeProposal, deleteArticle } from '../api/articles'
+import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, createMergeProposal } from '../api/articles'
 import { compilePreview } from '../api/compile'
+import { addBookmark, removeBookmark } from '../api/bookmarks'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
 import { useArticleTab } from '../composables/useTabIntegration'
@@ -14,6 +15,7 @@ import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
 import type { ArticleDetail, ReviewOut } from '../api/types'
 import DownloadButton from '../components/DownloadButton.vue'
 import ReviewPanel from '../components/ReviewPanel.vue'
+import DeleteButton from '../components/DeleteButton.vue'
 import ScoreBadges from '../components/ScoreBadges.vue'
 import { renderMathInHtml } from '../utils/math'
 import { sanitizeTypstSvg } from '../utils/typst'
@@ -29,14 +31,12 @@ import {
   MessageSquare,
   Eye,
   ArrowLeft,
-  Trash2,
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const tabStore = useTabStore()
-const tauriDelete = useTauri()
 const reviewStore = useReviewStore()
 const { t } = useI18n()
 const { canRead, canWrite, getFallback } = useOffline()
@@ -64,29 +64,8 @@ useArticleTab(articleTabId, computed(() => article.value?.title), articleBodyRef
 
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 
-// Delete
-const showDeleteConfirm = ref(false)
-const deleting = ref(false)
-async function handleDeleteArticle() {
-  if (deleting.value || !article.value) return
-  deleting.value = true
-  try {
-    if (tauriDelete.isTauri.value || tauriDelete.isBrowserLocal.value) {
-      const result = await tauriDelete.deleteArticle({
-        id: article.value.id,
-        account_id: article.value.authors?.[0]?.id || '',
-      })
-      if (result && 'error' in result) return
-    } else {
-      await deleteArticle(article.value.id)
-    }
-    showDeleteConfirm.value = false
-    router.push(`/user/${userStore.viewer?.id}`)
-  } catch {
-    // article remains
-  } finally {
-    deleting.value = false
-  }
+function handleDeleted() {
+  router.push(`/user/${userStore.viewer?.id}`)
 }
 
 const isBookmarked = computed(() => article.value?.is_bookmarked ?? false)
@@ -340,9 +319,26 @@ async function loadReviews() {
   await reviewStore.fetchReviews(id)
 }
 
-function toggleBookmark() {
-  if (article.value) {
-    article.value.is_bookmarked = !article.value.is_bookmarked
+async function toggleBookmark() {
+  if (!article.value || !userStore.viewer) return
+  const wasBookmarked = article.value.is_bookmarked
+  article.value.is_bookmarked = !wasBookmarked
+  try {
+    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      if (wasBookmarked) {
+        await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: article.value.id })
+      } else {
+        await tauri.addBookmark({ user_id: userStore.viewer.id, article_id: article.value.id })
+      }
+    } else {
+      if (wasBookmarked) {
+        await removeBookmark(article.value.id)
+      } else {
+        await addBookmark(article.value.id)
+      }
+    }
+  } catch {
+    article.value.is_bookmarked = wasBookmarked
   }
 }
 
@@ -501,6 +497,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             </span>
           </div>
           <button
+            v-if="!isOwnArticle"
             class="flex items-center justify-center w-7 h-7 rounded
                    text-ink-muted hover:text-accent hover:bg-accent/10
                    transition-colors duration-200"
@@ -571,32 +568,12 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
               {{ t('card.edit') }}
             </button>
 
-            <template v-if="isOwnArticle && !showDeleteConfirm">
-              <button
-                class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-[#d73a49] hover:bg-[#d73a49]/10 rounded-md transition-colors"
-                aria-label="Delete article"
-                data-tooltip="Delete"
-                @click="showDeleteConfirm = true"
-              >
-                <Trash2 class="w-3 h-3" stroke-width="2" />
-              </button>
-            </template>
-            <template v-if="showDeleteConfirm">
-              <button
-                class="flex items-center gap-1 px-2.5 py-1 text-xs text-[#d73a49] hover:bg-[#d73a49]/10 rounded-md transition-colors font-semibold"
-                :disabled="deleting"
-                @click="handleDeleteArticle"
-              >
-                {{ deleting ? '...' : 'Delete' }}
-              </button>
-              <button
-                class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
-                :disabled="deleting"
-                @click="showDeleteConfirm = false"
-              >
-                Cancel
-              </button>
-            </template>
+            <DeleteButton
+              v-if="isOwnArticle"
+              :article-id="article?.id ?? ''"
+              :author-id="article?.authors?.[0]?.id"
+              @deleted="handleDeleted"
+            />
 
             <button
               class="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-colors"
