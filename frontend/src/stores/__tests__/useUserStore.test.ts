@@ -5,6 +5,7 @@ import { setActivePinia, createPinia } from 'pinia'
 const state = vi.hoisted(() => ({
   isTauri: false,
   isBrowserLocal: false,
+  loginResult: undefined as any,
 }))
 
 vi.mock('../../composables/useTauri', () => ({
@@ -13,7 +14,7 @@ vi.mock('../../composables/useTauri', () => ({
     isBrowserLocal: { value: state.isBrowserLocal },
     setSessionToken: vi.fn(),
     getSessionToken: vi.fn(() => null),
-    login: vi.fn(),
+    login: vi.fn(() => state.loginResult),
     createAccount: vi.fn(),
     listAccounts: vi.fn().mockResolvedValue([]),
   }),
@@ -209,5 +210,127 @@ describe('useUserStore — local session restore', () => {
     // The init block should have already restored the token synchronously.
     expect(store.localToken).toBe('init-restored-token')
     expect(store.isBrowserLocal).toBe(true)
+  })
+})
+
+// ── SPEC-AUTH: server token sync tests ─────────────────────────────────
+
+describe('SPEC-AUTH: server token sync', () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    setActivePinia(createPinia())
+    state.isTauri = true
+    state.isBrowserLocal = false
+    localStorage.clear()
+    vi.clearAllMocks()
+
+    // Set up Tauri login mock to return email/name (T1 change)
+    state.loginResult = {
+      id: 'local-1',
+      username: 'alice',
+      token: 'session-token',
+      email: 'alice@test.com',
+      name: 'Alice Test',
+    }
+  })
+
+  it('SPEC-AUTH-6: loginLocal captures email and name from Tauri login result', async () => {
+    const authMocks = await import('../../api/auth')
+    // apiLogin fails during loginLocal (server unreachable)
+    ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+
+    const { useUserStore } = await import('../useUserStore')
+    const store = useUserStore()
+    await store.loginLocal('alice', '666666')
+
+    expect(store.viewer).not.toBeNull()
+    expect(store.token).toBeNull() // Server was unreachable
+
+    // trySyncServerAuth: apiLogin fails (still unreachable), apiRegister succeeds
+    ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockResolvedValueOnce({
+      user: { id: 's1', username: 'alice', name: 'Alice', anonymous_name: '', reputation: {} },
+      token: 'synced-jwt',
+    })
+    const result = await store.trySyncServerAuth()
+    expect(result).toBe(true)
+    expect(store.token).toBe('synced-jwt')
+    expect(authMocks.register).toHaveBeenCalledWith({
+      username: 'alice',
+      password: '666666',
+      email: 'alice@test.com',
+      name: 'Alice Test',
+    })
+  })
+
+  it('SPEC-AUTH-7: falls back to apiRegister when apiLogin fails', async () => {
+    const authMocks = await import('../../api/auth')
+    // apiLogin fails during loginLocal (server unreachable)
+    ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+
+    const { useUserStore } = await import('../useUserStore')
+    const store = useUserStore()
+    await store.loginLocal('alice', '666666')
+
+    // trySyncServerAuth: apiLogin fails (user not on server), apiRegister succeeds
+    ;(authMocks.login as any).mockRejectedValueOnce({ response: { status: 401, data: { detail: 'Invalid credentials' } } })
+    ;(authMocks.register as any).mockResolvedValueOnce({
+      user: { id: 's1', username: 'alice', name: 'Alice', anonymous_name: '', reputation: {} },
+      token: 'registered-jwt',
+    })
+
+    const result = await store.trySyncServerAuth()
+    expect(result).toBe(true)
+    expect(store.token).toBe('registered-jwt')
+    expect(authMocks.login).toHaveBeenCalled()
+    expect(authMocks.register).toHaveBeenCalled()
+  })
+
+  it('SPEC-AUTH-8: sets syncError on username conflict', async () => {
+    const authMocks = await import('../../api/auth')
+    // apiLogin fails during loginLocal (server unreachable)
+    ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+
+    const { useUserStore } = await import('../useUserStore')
+    const store = useUserStore()
+    await store.loginLocal('alice', '666666')
+
+    // trySyncServerAuth: apiLogin fails, apiRegister fails with "already exists"
+    ;(authMocks.login as any).mockRejectedValueOnce({ response: { status: 401 } })
+    ;(authMocks.register as any).mockRejectedValueOnce({
+      response: { status: 409, data: { detail: 'Username already exists' } },
+    })
+
+    const result = await store.trySyncServerAuth()
+    expect(result).toBe(false)
+    expect(store.syncError).toBeTruthy()
+    expect(store.syncError).toContain('alice')
+    expect(store.token).toBeNull()
+  })
+
+  it('SPEC-AUTH-9: keeps credentials after failed sync for retry', async () => {
+    const authMocks = await import('../../api/auth')
+    // apiLogin fails during loginLocal (server unreachable)
+    ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+
+    const { useUserStore } = await import('../useUserStore')
+    const store = useUserStore()
+    await store.loginLocal('alice', '666666')
+
+    // First trySyncServerAuth: both apiLogin and apiRegister fail
+    ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Server error'))
+
+    await store.trySyncServerAuth()
+    expect(store.token).toBeNull()
+
+    // Second trySyncServerAuth: apiLogin succeeds (server now up)
+    ;(authMocks.login as any).mockResolvedValueOnce({
+      user: { id: 's1', username: 'alice', name: 'Alice', anonymous_name: '', reputation: {} },
+      token: 'delayed-jwt',
+    })
+    const result = await store.trySyncServerAuth()
+    expect(result).toBe(true)
+    expect(store.token).toBe('delayed-jwt')
   })
 })
