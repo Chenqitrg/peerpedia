@@ -27,11 +27,16 @@ vi.mock('../useTauri', () => ({
 // Mock useUserStore
 const mockViewer = ref<{ id: string } | null>({ id: 'u1' })
 const mockIsTauriMode = ref(false)
+const mockToken = ref<string | null>(null)
+const mockSyncError = ref<string | null>(null)
 vi.mock('../../stores/useUserStore', () => ({
   useUserStore: vi.fn(() => ({
     viewer: mockViewer,
     isTauriMode: mockIsTauriMode,
     isBrowserLocal: false,
+    token: mockToken,
+    syncError: mockSyncError,
+    trySyncServerAuth: vi.fn().mockResolvedValue(false),
   })),
 }))
 
@@ -64,6 +69,7 @@ describe('useBookmarkToggle', () => {
       mockIsTauri.value = true
       mockIsTauriMode.value = true
       mockIsOnline.value = true // Server reachable
+      mockToken.value = 'existing-jwt' // Already have server token, skip sync
     })
 
     it('routes add bookmark through REST API', async () => {
