@@ -138,6 +138,8 @@ export interface CommitEntry {
 export interface Account {
   id: string
   username: string
+  email?: string  // from Rust login (AccountWithToken)
+  name?: string   // from Rust login (AccountWithToken)
 }
 
 export interface AccountSummary {

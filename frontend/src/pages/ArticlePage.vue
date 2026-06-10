@@ -324,8 +324,26 @@ const { isOnline } = useNetworkStatus()
 
 async function toggleBookmark() {
   if (!article.value || !userStore.viewer) return
+
+  // Silently ignore self-bookmark
+  if (article.value.is_own_article) return
+
   const wasBookmarked = article.value.is_bookmarked
   article.value.is_bookmarked = !wasBookmarked
+
+  // If server is reachable but we have no token, try to sync local creds first
+  const needsSync = (userStore.isTauriMode || userStore.isBrowserLocal)
+    && isOnline.value
+    && !userStore.token?.value
+
+  if (needsSync) {
+    const synced = await userStore.trySyncServerAuth()
+    if (!synced || !userStore.token?.value) {
+      article.value.is_bookmarked = wasBookmarked
+      return
+    }
+  }
+
   try {
     if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && !isOnline.value) {
       if (wasBookmarked) {

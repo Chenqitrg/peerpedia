@@ -32,6 +32,24 @@ export function useBookmarkToggle(
     const previous = article.is_bookmarked
     article.is_bookmarked = !currentlyBookmarked
 
+    // If server is reachable but we have no token, try to sync local creds first.
+    // Without this, Tauri users who registered locally while the server was down
+    // would see "Authentication required" on every bookmark click.
+    const needsSync = (userStore.isTauriMode || userStore.isBrowserLocal)
+      && isOnline.value
+      && !userStore.token?.value
+
+    if (needsSync) {
+      const synced = await userStore.trySyncServerAuth()
+      if (!synced || !userStore.token?.value) {
+        article.is_bookmarked = previous
+        if (onError) {
+          onError(userStore.syncError?.value || '书签功能需要服务器账号')
+        }
+        return
+      }
+    }
+
     try {
       if (isLocal) {
         if (currentlyBookmarked) {

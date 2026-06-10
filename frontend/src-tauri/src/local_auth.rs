@@ -22,6 +22,8 @@ pub struct AccountWithToken {
     pub id: String,
     pub username: String,
     pub token: String,
+    pub email: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,19 +126,21 @@ pub fn login(
     }
 
     let result = conn.query_row(
-        "SELECT id, username, password_hash FROM local_accounts WHERE username = ?1",
+        "SELECT id, username, password_hash, email, name FROM local_accounts WHERE username = ?1",
         [username],
         |row| {
             Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
+                row.get::<_, String>(0)?, // id
+                row.get::<_, String>(1)?, // username
+                row.get::<_, String>(2)?, // password_hash
+                row.get::<_, String>(3)?, // email
+                row.get::<_, String>(4)?, // name
             ))
         },
     );
 
     match result {
-        Ok((id, uname, password_hash)) => {
+        Ok((id, uname, password_hash, email, name)) => {
             let valid = verify(password, &password_hash)
                 .map_err(|e| AppError::AuthFailed(e.to_string()))?;
             if valid {
@@ -145,6 +149,8 @@ pub fn login(
                     id,
                     username: uname,
                     token,
+                    email,
+                    name,
                 })
             } else {
                 Err(AppError::AuthFailed("Incorrect password".into()))
@@ -220,9 +226,11 @@ mod tests {
     #[test]
     fn test_login_correct_password() {
         let conn = setup();
-        create_account(&conn, "bob", "correcthorse", "", "Bob").unwrap();
+        create_account(&conn, "bob", "correcthorse", "bob@test.com", "Bob").unwrap();
         let result = login(&conn, "bob", "correcthorse").unwrap();
         assert_eq!(result.username, "bob");
+        assert_eq!(result.email, "bob@test.com");
+        assert_eq!(result.name, "Bob");
         assert!(!result.token.is_empty());
         // Token should be verifiable.
         let account_id = verify_session(&conn, &result.token).unwrap();

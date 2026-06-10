@@ -27,11 +27,17 @@ vi.mock('../useTauri', () => ({
 // Mock useUserStore
 const mockViewer = ref<{ id: string } | null>({ id: 'u1' })
 const mockIsTauriMode = ref(false)
+const mockToken = ref<string | null>(null)
+const mockSyncError = ref<string | null>(null)
+const mockTrySyncServerAuth = vi.fn().mockResolvedValue(false)
 vi.mock('../../stores/useUserStore', () => ({
   useUserStore: vi.fn(() => ({
     viewer: mockViewer,
     isTauriMode: mockIsTauriMode,
     isBrowserLocal: false,
+    token: mockToken,
+    syncError: mockSyncError,
+    trySyncServerAuth: mockTrySyncServerAuth,
   })),
 }))
 
@@ -64,6 +70,7 @@ describe('useBookmarkToggle', () => {
       mockIsTauri.value = true
       mockIsTauriMode.value = true
       mockIsOnline.value = true // Server reachable
+      mockToken.value = 'existing-jwt' // Already have server token, skip sync
     })
 
     it('routes add bookmark through REST API', async () => {
@@ -132,6 +139,43 @@ describe('useBookmarkToggle', () => {
       const { toggle } = useBookmarkToggle(articles)
       await toggle('a1', false)
       expect(addBookmark).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('SPEC-AUTH-BM-2: Bookmark awaits sync when no token', () => {
+    beforeEach(() => {
+      mockIsTauri.value = true
+      mockIsTauriMode.value = true
+      mockIsOnline.value = true // Server reachable
+      mockToken.value = null    // No token — need sync
+      mockTrySyncServerAuth.mockReset()
+    })
+
+    it('calls trySyncServerAuth and rolls back on sync failure', async () => {
+      mockTrySyncServerAuth.mockResolvedValue(false)
+      mockSyncError.value = '服务器上已有用户 alice'
+
+      const { toggle } = useBookmarkToggle(articles)
+      await toggle('a1', false)
+
+      expect(mockTrySyncServerAuth).toHaveBeenCalled()
+      // Optimistic update set is_bookmarked=true, then rolled back to false
+      expect(articles.value[0].is_bookmarked).toBe(false)
+    })
+
+    it('proceeds with REST API when sync succeeds', async () => {
+      // Simulate sync populating the token
+      mockTrySyncServerAuth.mockImplementation(async () => {
+        mockToken.value = 'newly-synced-jwt'
+        return true
+      })
+
+      const { toggle } = useBookmarkToggle(articles)
+      await toggle('a1', false)
+
+      expect(mockTrySyncServerAuth).toHaveBeenCalled()
+      expect(addBookmark).toHaveBeenCalledWith('a1')
+      expect(articles.value[0].is_bookmarked).toBe(true)
     })
   })
 })

@@ -35,3 +35,17 @@ export async function unfollowUser(id: string): Promise<{ ok: boolean }> {
   const res = await apiClient.delete(`/users/${id}/follow`)
   return res.data
 }
+
+export async function updateProfile(
+  userId: string,
+  data: {
+    affiliation?: string
+    expertise?: string[]
+    anonymous_name?: string
+    avatar_url?: string | null
+    contact?: string | null
+  }
+): Promise<any> {
+  const res = await apiClient.put(`/users/${userId}`, data)
+  return res.data
+}
