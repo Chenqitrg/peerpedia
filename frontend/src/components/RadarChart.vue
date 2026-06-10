@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   scores: { originality: number; rigor: number; completeness: number; pedagogy: number; impact: number }
@@ -48,7 +51,7 @@ const axisLines = computed(() => {
 </script>
 
 <template>
-  <svg :width="size" :height="size" viewBox="0 0 200 200" class="radar-chart" role="img" aria-label="Five dimension radar chart">
+  <svg :width="size" :height="size" viewBox="0 0 200 200" class="radar-chart" role="img" :aria-label="t('ui.radarChart')">
     <!-- Grid -->
     <polygon
       v-for="(grid, gi) in gridPolygons"

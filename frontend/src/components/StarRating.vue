@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
   modelValue: number
   readonly?: boolean
@@ -22,7 +25,7 @@ function setRating(value: number) {
     :class="gapClass"
     :style="{ '--star-filled': color, '--star-empty': color + '30' }"
     role="radiogroup"
-    aria-label="Rating"
+    :aria-label="t('ui.rating')"
   >
     <component
       v-for="i in 5"

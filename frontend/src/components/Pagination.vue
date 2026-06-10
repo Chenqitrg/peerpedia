@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 defineProps<{
   page: number
   totalPages: number
@@ -20,7 +24,7 @@ const emit = defineEmits<{
              disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       :disabled="page <= 1"
       @click="emit('change', page - 1)"
-      aria-label="Previous page"
+      :aria-label="t('ui.previousPage')"
     >
       &lsaquo;
     </button>
@@ -44,7 +48,7 @@ const emit = defineEmits<{
              disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       :disabled="page >= totalPages"
       @click="emit('change', page + 1)"
-      aria-label="Next page"
+      :aria-label="t('ui.nextPage')"
     >
       &rsaquo;
     </button>

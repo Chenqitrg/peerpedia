@@ -11,7 +11,17 @@
     "logout": "Log Out",
     "signIn": "Sign In",
     "createAccount": "Create Account",
-    "toggleMenu": "Toggle navigation menu"
+    "toggleMenu": "Toggle navigation menu",
+    "mainNavigation": "Main navigation",
+    "chooseFormat": "Choose article format",
+    "close": "Close",
+    "chooseFormatTitle": "Choose Format",
+    "chooseFormatDesc": "Select the format for your new article",
+    "formatMarkdown": "Standard format with math support (KaTeX)",
+    "formatTypst": "Academic typesetting with SVG output",
+    "statusConnected": "Connected",
+    "statusLocal": "Local mode",
+    "statusOffline": "Offline"
   },
   "schools": {
     "subtitle": "Discover researchers. Follow people whose work you find interesting."
@@ -87,10 +97,10 @@
     "compile": "Compile",
     "compileFailed": "Compile failed",
     "saveFailed": "Save failed",
-    "titlePlaceholder": "Article title",
+    "titlePlaceholder": "Article title...",
     "abstractPlaceholder": "Abstract (optional)",
-    "keywordsPlaceholder": "Keywords, comma-separated",
-    "categoriesPlaceholder": "Categories, comma-separated",
+    "keywordsPlaceholder": "e.g. quantum, computing, algorithms",
+    "categoriesPlaceholder": "e.g. cs.AI, math.NT",
     "preview": "Preview",
     "markdown": "Markdown",
     "typst": "Typst",
@@ -101,16 +111,19 @@
     "commitMessagePlaceholder": "Summarize your changes (required)",
     "scores1to5": "Scores (1-5)",
     "keywords": "Keywords",
-    "keywordsPlaceholder": "e.g. quantum, computing, algorithms",
     "categories": "Categories",
-    "categoriesPlaceholder": "e.g. cs.AI, math.NT",
     "abstract": "Abstract",
     "abstractPlaceholder2": "Brief summary of your article...",
     "cancel": "Cancel",
     "submitting": "Submitting...",
     "publishToPool": "Publish to Pool",
     "contribution": "Contribution",
-    "contributionMustTotal100": "Contributions must total 100%."
+    "contributionMustTotal100": "Contributions must total 100%.",
+    "back": "Back",
+    "hidePreview": "Hide preview",
+    "showPreview": "Show preview",
+    "mdPlaceholder": "# Title\n\nWrite your article in Markdown...",
+    "typstPlaceholder": "= Title\n\nWrite your article in Typst..."
   },
   "auth": {
     "signIn": "Sign In",
@@ -124,7 +137,10 @@
   },
   "user": {
     "anonymousName": "Anonymous name",
-    "notFound": "User not found."
+    "notFound": "User not found.",
+    "articlesCount": "{count} articles",
+    "myDrafts": "My Drafts",
+    "articlesTitle": "Articles"
   },
   "status": {
     "published": "Published",
@@ -144,7 +160,11 @@
     "extend": "Extend",
     "thread": "Discussion",
     "reviews": "reviews",
-    "scores": "Scores"
+    "scores": "Scores",
+    "back": "Back",
+    "proposeMerge": "Propose merge",
+    "delete": "Delete article",
+    "startConversation": "Start a conversation..."
   },
   "history": {
     "parent": "parent",
@@ -156,7 +176,14 @@
     "selectSecondCommit": "Select a second commit to view the diff",
     "diff": "Diff",
     "noDiff": "No diff available.",
-    "loadingDiff": "Loading diff..."
+    "loadingDiff": "Loading diff...",
+    "backToArticle": "Back to article",
+    "dismissError": "Dismiss error",
+    "clearSelection": "Clear selection",
+    "rollbackConfirm": "Rollback to {hash}?",
+    "rollbackConfirmDesc": "This creates a new commit reverting to that state.",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   },
   "citation": {
     "forward": "Forward",
@@ -179,6 +206,24 @@
   },
   "download": {
     "source": "Source",
-    "compiled": "HTML"
+    "compiled": "HTML",
+    "repo": "Download repo (.git bundle)",
+    "repoShort": "Repo",
+    "sourceMd": "Download source (.md)",
+    "sourceTypst": "Download source (.typ)",
+    "compiledHtml": "Download compiled (.html)",
+    "compiledPdf": "Download compiled (.pdf)"
+  },
+  "citations": {
+    "backToArticle": "Back to article"
+  },
+  "tab": {
+    "close": "Close tab"
+  },
+  "ui": {
+    "rating": "Rating",
+    "radarChart": "Five dimension radar chart",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
   }
 }

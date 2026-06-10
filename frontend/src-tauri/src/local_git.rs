@@ -249,7 +249,8 @@ pub fn git_history(article_id: &str) -> Result<Vec<CommitEntry>, AppError> {
 // ── Show ─────────────────────────────────────────────────────────────────
 
 /// Return the content of an article file at a given commit.
-pub fn git_show(article_id: &str, commit_hash: &str) -> Result<String, AppError> {
+/// Returns (content, format) where format is "md" or "typ"
+pub fn git_show(article_id: &str, commit_hash: &str) -> Result<(String, String), AppError> {
     let rp = repo_path(article_id)?;
 
     // Try .md first, then .typ
@@ -262,7 +263,9 @@ pub fn git_show(article_id: &str, commit_hash: &str) -> Result<String, AppError>
 
         match output {
             Ok(o) if o.status.success() => {
-                return Ok(String::from_utf8_lossy(&o.stdout).to_string());
+                let content = String::from_utf8_lossy(&o.stdout).to_string();
+                let fmt = if *ext == ".typ" { "typst" } else { "markdown" };
+                return Ok((content, fmt.to_string()));
             }
             _ => continue,
         }
@@ -479,17 +482,26 @@ fn get_head_hash(repo_path: &PathBuf) -> Result<String, AppError> {
 pub fn git_rollback(
     article_id: &str,
     commit_hash: &str,
-    format: &str,
     author: &str,
 ) -> Result<GitCommitResult, AppError> {
-    let old_content = git_show(article_id, commit_hash)?;
+    let rp = repo_path(article_id)?;
+    let (old_content, format) = git_show(article_id, commit_hash)?;
     let short_hash = if commit_hash.len() >= 8 {
         &commit_hash[..8]
     } else {
         commit_hash
     };
     let message = format!("Rollback to {}", short_hash);
-    git_commit(article_id, &old_content, format, &message, author)
+
+    // Clean up stale file from wrong-format extension (caused by previous buggy rollbacks).
+    // If the primary file is article.typ, remove article.md if it exists, and vice versa.
+    let stale_ext = if format == "typst" { ".md" } else { ".typ" };
+    let stale_path = rp.join(format!("article{}", stale_ext));
+    if stale_path.exists() {
+        std::fs::remove_file(&stale_path).ok();
+    }
+
+    git_commit(article_id, &old_content, &format, &message, author)
 }
 
 #[cfg(test)]
@@ -534,7 +546,7 @@ mod tests {
         assert_eq!(history[0].message, "Initial draft");
         assert_eq!(history[0].author, "alice");
 
-        let content = git_show("test-art", &commit.hash).unwrap();
+        let (content, _fmt) = git_show("test-art", &commit.hash).unwrap();
         assert_eq!(content, "# Hello");
 
         cleanup(&dir);
@@ -558,7 +570,7 @@ mod tests {
         assert_eq!(history[2].message, "First"); // oldest last
 
         // Show v1 content
-        let v1_content = git_show("multi", &history[2].hash).unwrap();
+        let (v1_content, _fmt) = git_show("multi", &history[2].hash).unwrap();
         assert_eq!(v1_content, "v1");
 
         cleanup(&dir);
@@ -595,7 +607,7 @@ mod tests {
         let first_hash = &history[2].hash; // oldest commit
 
         // Rollback to first commit
-        let result = git_rollback("rb-test", first_hash, "markdown", "alice");
+        let result = git_rollback("rb-test", first_hash, "alice");
         assert!(result.is_ok(), "git_rollback failed: {:?}", result.err());
         let rb = result.unwrap();
         assert!(
@@ -604,7 +616,11 @@ mod tests {
         );
 
         // Content should be restored to v1
-        let content = git_show("rb-test", &rb.hash).unwrap();
+        let (content, fmt) = git_show("rb-test", &rb.hash).unwrap();
+        assert_eq!(
+            fmt, "markdown",
+            "rollback to markdown repo should detect markdown format"
+        );
         assert_eq!(content, "v1");
 
         // History should now have 4 commits
@@ -623,8 +639,48 @@ mod tests {
         std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
         git_init("rb-bad", "v1", "markdown", "First", "alice").unwrap();
-        let result = git_rollback("rb-bad", "deadbeef12345678", "markdown", "alice");
+        let result = git_rollback("rb-bad", "deadbeef12345678", "alice");
         assert!(result.is_err());
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_rollback_creates_revert_commit_typst() {
+        let _lock = git_test_lock().lock().unwrap();
+        let dir = setup_dir();
+        let home = dir.join("home");
+        fs::create_dir_all(&home).unwrap();
+        std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+        // Create a Typst article with 3 commits
+        git_init("rb-typst", "= v1", "typst", "First", "alice").unwrap();
+        git_commit("rb-typst", "= v2", "typst", "Second", "alice").unwrap();
+        let third = git_commit("rb-typst", "= v3", "typst", "Third", "alice").unwrap();
+
+        let history = git_history("rb-typst").unwrap();
+        assert_eq!(history.len(), 3);
+        let first_hash = &history[2].hash;
+
+        // Rollback to first commit — auto-detects typst format, no format param
+        let result = git_rollback("rb-typst", first_hash, "alice");
+        assert!(result.is_ok(), "git_rollback failed: {:?}", result.err());
+        let rb = result.unwrap();
+
+        // Content restored to = v1, format auto-detected as "typst"
+        let (content, fmt) = git_show("rb-typst", &rb.hash).unwrap();
+        assert_eq!(
+            fmt, "typst",
+            "rollback to typst repo should detect typst format"
+        );
+        assert_eq!(content, "= v1");
+
+        // Verify no stale .md file was created
+        let rp = repo_path("rb-typst").unwrap();
+        assert!(
+            !rp.join("article.md").exists(),
+            "rollback should not create article.md in a typst repo"
+        );
 
         cleanup(&dir);
     }
@@ -637,7 +693,7 @@ mod tests {
         assert!(git_commit("../../etc/passwd", "x", "md", "msg", "alice").is_err());
         assert!(git_history("../../etc/passwd").is_err());
         assert!(git_show("../../etc/passwd", "abc123").is_err());
-        assert!(git_rollback("../../etc/passwd", "abc123", "md", "alice").is_err());
+        assert!(git_rollback("../../etc/passwd", "abc123", "alice").is_err());
 
         // article_id with backslashes (Windows)
         assert!(git_init("..\\..\\windows\\system32", "x", "md", "msg", "alice").is_err());

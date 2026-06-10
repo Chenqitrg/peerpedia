@@ -31,11 +31,11 @@ const downloading = ref(false)
 const tooltipText = computed(() => {
   if (props.disabled && props.disabledReason) return props.disabledReason
   if (props.showLabel) return undefined
-  if (props.format === 'repo') return 'Download repo (.git bundle)'
+  if (props.format === 'repo') return t('download.repo')
   if (props.format === 'source') {
-    return props.contentFormat === 'typst' ? 'Download source (.typ)' : 'Download source (.md)'
+    return props.contentFormat === 'typst' ? t('download.sourceTypst') : t('download.sourceMd')
   }
-  return props.contentFormat === 'typst' ? 'Download compiled (.pdf)' : 'Download compiled (.html)'
+  return props.contentFormat === 'typst' ? t('download.compiledPdf') : t('download.compiledHtml')
 })
 
 async function handleDownload() {
@@ -134,10 +134,10 @@ async function handleDownload() {
 <template>
   <button
     :aria-label="format === 'repo'
-      ? 'Download repo (.git bundle)'
+      ? t('download.repo')
       : format === 'source'
-        ? (contentFormat === 'typst' ? 'Download source (.typ)' : 'Download source (.md)')
-        : (contentFormat === 'typst' ? 'Download compiled (.pdf)' : 'Download compiled (.html)')"
+        ? (contentFormat === 'typst' ? t('download.sourceTypst') : t('download.sourceMd'))
+        : (contentFormat === 'typst' ? t('download.compiledPdf') : t('download.compiledHtml'))"
     :data-tooltip="tooltipText"
     :disabled="downloading || disabled"
     class="flex items-center gap-1 rounded-md transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-ink-muted"
@@ -151,7 +151,7 @@ async function handleDownload() {
       <FileCode v-if="format === 'source'" class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
       <FileDown v-else-if="format === 'compiled'" class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
       <Package v-else class="w-4 h-4" :class="{ 'w-3 h-3': showLabel }" stroke-width="2" />
-      <span v-if="showLabel">{{ format === 'repo' ? 'Repo' : format === 'source' ? t('download.source') : (contentFormat === 'typst' ? 'PDF' : t('download.compiled')) }}</span>
+      <span v-if="showLabel">{{ format === 'repo' ? t('download.repoShort') : format === 'source' ? t('download.source') : (contentFormat === 'typst' ? 'PDF' : t('download.compiled')) }}</span>
     </template>
   </button>
 </template>

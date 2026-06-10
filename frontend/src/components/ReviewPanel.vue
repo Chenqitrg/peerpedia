@@ -183,7 +183,7 @@ const emit = defineEmits<{
           <div v-if="review.reviewer_id === viewerId && (!review.thread || !review.thread.length)" class="mt-2">
             <ThreadReplyInput
               :model-value="replyTexts[review.id] || ''"
-              placeholder="Start a conversation..."
+              :placeholder="t('article.startConversation')"
               :disabled="sendingReplies[review.id]"
               @send="emit('send-reply', review.id)"
             />

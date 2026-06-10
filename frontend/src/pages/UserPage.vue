@@ -241,7 +241,7 @@ watch(() => route.params.id, () => {
               </span>
               <span class="flex items-center gap-1">
                 <BookOpen class="w-3 h-3" stroke-width="2" />
-                {{ user.article_count }} articles
+                {{ t('user.articlesCount', { count: user.article_count }) }}
               </span>
             </div>
 
@@ -335,7 +335,7 @@ watch(() => route.params.id, () => {
       <!-- Articles section -->
       <div>
         <h2 class="text-lg font-heading font-semibold text-ink mb-4">
-          {{ isSelf && isLocal ? 'My Drafts' : 'Articles' }}
+          {{ isSelf && isLocal ? t('user.myDrafts') : t('user.articlesTitle') }}
         </h2>
 
         <div v-if="articles.length === 0" class="card p-8 text-center">

@@ -336,7 +336,7 @@ async function saveDraft() {
   const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
 
   if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-    const msg = commitMsg.value.trim() || 'Save draft'
+    const msg = commitMsg.value.trim()
     const ok = await persistToGit(accountId, author, msg)
     if (!ok) return
     commitMsg.value = ''
@@ -490,7 +490,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         class="flex items-center justify-center w-9 h-9 rounded-lg
                text-ink-muted hover:text-ink hover:bg-[#21262d]
                transition-colors duration-200 shrink-0"
-        aria-label="Back"
+        :aria-label="t('editor.back')"
         @click="router.back()"
       >
         <ArrowLeft class="w-4 h-4" stroke-width="2" />
@@ -501,7 +501,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           v-if="!isEdit"
           v-model="title"
           type="text"
-          placeholder="Article title..."
+          :placeholder="t('editor.titlePlaceholder')"
           class="flex-1 min-w-0 bg-transparent border-none text-base font-heading font-semibold text-ink
                  placeholder:text-ink-muted/50 focus:outline-none"
         />
@@ -540,7 +540,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                 type="text"
                 :placeholder="t('editor.commitMessagePlaceholder')"
                 class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent mb-3"
-                @keyup.enter="confirmSaveWithCommit"
+                @keyup.enter="tempCommitMsg.trim() && confirmCommit()"
               />
               <div class="flex items-center gap-2">
                 <button
@@ -548,7 +548,8 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                   @click="cancelCommit()"
                 >{{ t('editor.cancel') }}</button>
                 <button
-                  class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-1.5 hover:brightness-110 transition-all"
+                  class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-1.5 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="!tempCommitMsg.trim()"
                   @click="confirmCommit"
                 >{{ t('editor.saveDraft') }}</button>
               </div>
@@ -569,8 +570,8 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           class="flex items-center justify-center w-9 h-9 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
-          :aria-label="showPreview ? 'Hide preview' : 'Show preview'"
-          :data-tooltip="showPreview ? 'Hide preview' : 'Show preview'"
+          :aria-label="showPreview ? t('editor.hidePreview') : t('editor.showPreview')"
+          :data-tooltip="showPreview ? t('editor.hidePreview') : t('editor.showPreview')"
           @click="showPreview = !showPreview"
         >
           <Eye v-if="showPreview" class="w-4 h-4" stroke-width="2" />
@@ -680,8 +681,8 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           v-model="content"
           :format="format"
           :placeholder="format === 'markdown'
-            ? '# Title\n\nWrite your article in Markdown...'
-            : '= Title\n\nWrite your article in Typst...'"
+            ? t('editor.mdPlaceholder')
+            : t('editor.typstPlaceholder')"
           class="flex-1 w-full"
         />
       </div>
