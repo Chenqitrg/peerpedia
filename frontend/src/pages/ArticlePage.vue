@@ -7,6 +7,8 @@ import { getArticle, getArticleSource, getHistory, forkArticle, extendSink, crea
 import { compilePreview } from '../api/compile'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useArticleTab } from '../composables/useTabIntegration'
+import { useTabStore } from '../stores/useTabStore'
 import { useReviewStore } from '../stores/useReviewStore'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
 import type { ArticleDetail, ReviewOut } from '../api/types'
@@ -32,6 +34,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const tabStore = useTabStore()
 const tauriDelete = useTauri()
 const reviewStore = useReviewStore()
 const { t } = useI18n()
@@ -47,6 +50,16 @@ const articleSourceContent = ref('')
 const isForked = ref(false)
 
 const id = route.params.id as string
+
+// This component instance is ALWAYS for this specific article (enforced by
+// :key="route.path" in the router-view). Capture the id at setup — it never
+// changes for this instance.
+const myArticleId = id
+
+// Tab integration — register this article as a tab and sync title
+const articleBodyRef = ref<HTMLElement | null>(null)
+const articleTabId = tabStore.ensureTab('article', route.fullPath)
+useArticleTab(articleTabId, computed(() => article.value?.title), articleBodyRef)
 
 const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
 
@@ -236,20 +249,29 @@ async function loadArticle(articleId: string) {
 // ── Lifecycle ───────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  await loadArticle(id)
-  loading.value = false
+  try {
+    await loadArticle(id)
+  } finally {
+    loading.value = false
+  }
 })
 
 watch(() => route.params.id, async (newId) => {
-  if (!newId) return
+  // With :key="route.path", this component instance owns exactly one article.
+  // When navigating to a different article, Vue fires this watch BEFORE
+  // onDeactivated — isActive guards don't work. Compare against the captured id.
+  if (!newId || newId !== myArticleId) return
   loading.value = true
   reviewStore.reviews = []
   compiledHtml.value = ''
   activeTab.value = 'body'
   isFromCache.value = false
   cachedAt.value = null
-  await loadArticle(newId as string)
-  loading.value = false
+  try {
+    await loadArticle(newId as string)
+  } finally {
+    loading.value = false
+  }
 })
 
 async function loadCompiledContent() {
@@ -686,6 +708,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
       <!-- Tab content -->
       <div v-if="activeTab === 'body'" class="card p-6">
         <div
+          ref="articleBodyRef"
           v-if="compiledHtml"
           class="prose-custom max-w-none"
           v-html="compiledHtml"
