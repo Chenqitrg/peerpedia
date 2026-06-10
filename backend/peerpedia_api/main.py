@@ -63,11 +63,20 @@ app = FastAPI(title="PeerPedia API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
+    allow_origins=[
+        "http://localhost:5173",      # Vite dev server
+        "tauri://localhost",          # Tauri production webview
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+async def health_check():
+    """Liveness probe for the frontend network-status pinger."""
+    return {"status": "ok"}
 
 
 @app.exception_handler(Exception)

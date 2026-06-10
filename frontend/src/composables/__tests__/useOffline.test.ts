@@ -42,10 +42,9 @@ describe('useOffline', () => {
     })
   })
 
-  describe('when in local mode (Tauri/browser-local)', () => {
+  describe('when in Tauri mode AND server reachable (online)', () => {
     beforeEach(() => {
-      setOnline(true) // pings say "online", but local mode overrides
-      // Simulate Tauri environment.
+      setOnline(true) // pings say "online" — server is reachable
       ;(window as any).__TAURI__ = {}
     })
 
@@ -53,30 +52,30 @@ describe('useOffline', () => {
       delete (window as any).__TAURI__
     })
 
-    it('pool is blocked even when pings say online', () => {
+    it('pool is unblocked when server is reachable', () => {
       const { canRead, canWrite } = useOffline()
-      expect(canRead('pool')).toBe(false)
-      expect(canWrite('pool')).toBe(false)
+      expect(canRead('pool')).toBe(true)
+      expect(canWrite('pool')).toBe(true)
     })
 
-    it('schools is blocked even when pings say online', () => {
+    it('schools is unblocked when server is reachable', () => {
       const { canRead, canWrite } = useOffline()
-      expect(canRead('schools')).toBe(false)
-      expect(canWrite('schools')).toBe(false)
+      expect(canRead('schools')).toBe(true)
+      expect(canWrite('schools')).toBe(true)
     })
 
-    it('search.network is blocked even when pings say online', () => {
+    it('search.network is unblocked when server is reachable', () => {
       const { canRead } = useOffline()
-      expect(canRead('search.network')).toBe(false)
+      expect(canRead('search.network')).toBe(true)
     })
 
-    it('article.fork is blocked even when pings say online', () => {
+    it('article.fork is unblocked when server is reachable', () => {
       const { canRead, canWrite } = useOffline()
-      expect(canRead('article.fork')).toBe(false)
-      expect(canWrite('article.fork')).toBe(false)
+      expect(canRead('article.fork')).toBe(true)
+      expect(canWrite('article.fork')).toBe(true)
     })
 
-    it('local features are not blocked (feed, editor, search.local, bookmarks)', () => {
+    it('local features remain accessible (feed, editor, search.local, bookmarks)', () => {
       const { canRead, canWrite } = useOffline()
       expect(canRead('feed')).toBe(true)
       expect(canRead('editor')).toBe(true)
@@ -85,15 +84,43 @@ describe('useOffline', () => {
       expect(canRead('article.content')).toBe(true)
     })
 
-    it('getFallback returns local_mode_hint for network features', () => {
+    it('isLocalOnly returns false when Tauri AND server reachable', () => {
+      const { isLocalOnly } = useOffline()
+      expect(isLocalOnly()).toBe(false)
+    })
+  })
+
+  describe('when in Tauri mode AND server unreachable (offline)', () => {
+    beforeEach(() => {
+      setOnline(false) // pings say "offline" — server is down
+      ;(window as any).__TAURI__ = {}
+    })
+
+    afterEach(() => {
+      delete (window as any).__TAURI__
+    })
+
+    it('pool is blocked when server is down', () => {
+      const { canRead, canWrite } = useOffline()
+      expect(canRead('pool')).toBe(false)
+      expect(canWrite('pool')).toBe(false)
+    })
+
+    it('schools is blocked when server is down', () => {
+      const { canRead, canWrite } = useOffline()
+      expect(canRead('schools')).toBe(false)
+      expect(canWrite('schools')).toBe(false)
+    })
+
+    it('isLocalOnly returns true when Tauri AND offline', () => {
+      const { isLocalOnly } = useOffline()
+      expect(isLocalOnly()).toBe(true)
+    })
+
+    it('getFallback returns local_mode_hint for network features when offline', () => {
       const { getFallback } = useOffline()
       expect(getFallback('pool')).toBe('offline.local_mode_hint')
       expect(getFallback('schools')).toBe('offline.local_mode_hint')
-    })
-
-    it('isLocalOnly returns true', () => {
-      const { isLocalOnly } = useOffline()
-      expect(isLocalOnly()).toBe(true)
     })
   })
 
