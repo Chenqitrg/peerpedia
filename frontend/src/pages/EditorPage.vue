@@ -12,6 +12,7 @@ import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
 import { useEditorTab } from '../composables/useTabIntegration'
+import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
 import DownloadButton from '../components/DownloadButton.vue'
@@ -34,6 +35,7 @@ const route = useRoute()
 const router = useRouter()
 const articleStore = useArticleStore()
 const userStore = useUserStore()
+const tabStore = useTabStore()
 const { t } = useI18n()
 
 const { canWrite, getFallback } = useOffline()
@@ -80,9 +82,10 @@ const isClean = computed(() => content.value === savedContent.value && title.val
  *  because git commit may not always succeed (e.g., running before login). */
 const hasSaved = computed(() => !!currentDraftId.value || !!commitHash.value)
 
-// Tab integration — syncs dirty state + title to tab store (via composable)
+// Tab integration — register this editor as a tab and sync state
 const editorAreaRef = ref<HTMLElement | null>(null)
-useEditorTab(title, isClean, editorAreaRef)
+const tabId = tabStore.ensureTab('editor', route.fullPath)
+useEditorTab(tabId, title, isClean, editorAreaRef)
 
 // Split panel resize
 const { splitRatio, splitterEl, isDragging, onSplitterMouseDown } = useSplitPane()
@@ -101,14 +104,9 @@ const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
 
-// Path normalized to match tab store ids (must use fullPath to match store tab ids)
-const myEditorPath = route.fullPath.startsWith('/articles/')
-  ? route.fullPath.replace('/articles/', '/article/')
-  : route.fullPath
-
 function onSaveAndClose(e: Event) {
   const detail = (e as CustomEvent).detail
-  if (detail?.tabId !== myEditorPath) return  // not for this instance
+  if (detail?.tabId !== tabId) return  // not for this instance
   handleSaveDraft()
 }
 

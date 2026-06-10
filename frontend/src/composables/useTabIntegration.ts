@@ -1,22 +1,17 @@
 import { watch, onDeactivated, onActivated, type Ref } from 'vue'
-import { useRoute } from 'vue-router'
 import { useTabStore } from '../stores/useTabStore'
-
-/** Normalize route path to match the canonical form used by openTab. */
-function normalizePath(path: string): string {
-  if (path.startsWith('/articles/')) {
-    return path.replace('/articles/', '/article/')
-  }
-  return path
-}
 
 /**
  * EditorPage tab integration: syncs title + dirty state to tab store.
+ * Receives an explicit tabId (UUID) — no route parsing needed.
  */
-export function useEditorTab(title: Ref<string>, isClean: Ref<boolean>, contentEl: Ref<HTMLElement | null>) {
-  const route = useRoute()
+export function useEditorTab(
+  tabId: string,
+  title: Ref<string>,
+  isClean: Ref<boolean>,
+  contentEl: Ref<HTMLElement | null>,
+) {
   const tabStore = useTabStore()
-  const tabId = normalizePath(route.fullPath)
 
   watch([isClean, title], ([clean, t]) => {
     tabStore.updateTab(tabId, { dirty: !clean, title: t || 'Untitled' })
@@ -29,7 +24,7 @@ export function useEditorTab(title: Ref<string>, isClean: Ref<boolean>, contentE
     }
   })
   onActivated(() => {
-    const tab = tabStore.tabs.find(t => t.id === tabId)
+    const tab = tabStore.findById(tabId)
     if (tab?.scrollTop && contentEl.value) {
       contentEl.value.scrollTop = tab.scrollTop
     }
@@ -38,11 +33,14 @@ export function useEditorTab(title: Ref<string>, isClean: Ref<boolean>, contentE
 
 /**
  * ArticlePage tab integration: syncs title to tab store.
+ * Receives an explicit tabId (UUID) — no route parsing needed.
  */
-export function useArticleTab(articleTitle: Ref<string | undefined>, contentEl: Ref<HTMLElement | null>) {
-  const route = useRoute()
+export function useArticleTab(
+  tabId: string,
+  articleTitle: Ref<string | undefined>,
+  contentEl: Ref<HTMLElement | null>,
+) {
   const tabStore = useTabStore()
-  const tabId = normalizePath(route.fullPath)
 
   watch(articleTitle, (title) => {
     if (title) tabStore.updateTab(tabId, { title })
@@ -55,7 +53,7 @@ export function useArticleTab(articleTitle: Ref<string | undefined>, contentEl: 
     }
   })
   onActivated(() => {
-    const tab = tabStore.tabs.find(t => t.id === tabId)
+    const tab = tabStore.findById(tabId)
     if (tab?.scrollTop && contentEl.value) {
       contentEl.value.scrollTop = tab.scrollTop
     }

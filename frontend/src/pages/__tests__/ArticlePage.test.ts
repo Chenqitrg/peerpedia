@@ -123,10 +123,17 @@ vi.mock('../../api/reviews', () => ({
   postReviewMessage: vi.fn().mockResolvedValue({}),
 }))
 
-// Mock useTabIntegration
+// Mock useTabIntegration + useTabStore
 const mockUseArticleTab = vi.fn()
 vi.mock('@/composables/useTabIntegration', () => ({
   useArticleTab: mockUseArticleTab,
+}))
+vi.mock('@/stores/useTabStore', () => ({
+  useTabStore: () => ({
+    ensureTab: vi.fn().mockReturnValue('test-tab-uuid'),
+    updateTab: vi.fn(),
+    findById: vi.fn(),
+  }),
 }))
 
 describe('ArticlePage', () => {

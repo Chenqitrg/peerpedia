@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { loadJSON, saveJSON } from '../composables/useLocalStorage'
 
 export interface Tab {
-  id: string
+  id: string            // UUID — stable identity, never changes
+  routePath: string     // associated route (for lookup + navigation)
   type: 'editor' | 'article'
   title: string
   dirty: boolean
@@ -16,22 +17,41 @@ export interface Tab {
 
 const STORAGE_KEY = 'peerpedia_tabs'
 
+/** Generate a unique tab id. Falls back to timestamp+random in HTTP contexts. */
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2)
+}
+
+/** Normalize /articles/xxx → /article/xxx for consistent routePath lookup. */
+function normalizePath(path: string): string {
+  if (path.startsWith('/articles/')) {
+    return path.replace('/articles/', '/article/')
+  }
+  return path
+}
+
+const TAB_DEFAULTS: Record<Tab['type'], Pick<Tab, 'title' | 'icon' | 'status'>> = {
+  editor: { title: 'Untitled', icon: 'edit', status: 'draft' },
+  article: { title: 'Loading...', icon: 'eye', status: 'published' },
+}
+
 export const useTabStore = defineStore('tab', () => {
   const tabs = ref<Tab[]>([])
   const activeTabId = ref<string | null>(null)
 
   // Capture router once during store setup — useRouter() must be called
   // while the Pinia store is being initialized within a Vue app that has
-  // the router plugin installed. Storing the reference avoids calling
-  // useRouter() inside action callbacks where getCurrentInstance() may
-  // be unavailable.
+  // the router plugin installed.
   let router: ReturnType<typeof useRouter> | null = null
   try { router = useRouter() } catch { /* no router available */ }
 
   function persist(): void {
     saveJSON(STORAGE_KEY, {
       tabs: tabs.value.map(t => ({
-        id: t.id, type: t.type, title: t.title,
+        id: t.id, routePath: t.routePath, type: t.type, title: t.title,
         icon: t.icon, status: t.status,
         scrollTop: t.scrollTop, cursorPosition: t.cursorPosition,
       })),
@@ -39,8 +59,13 @@ export const useTabStore = defineStore('tab', () => {
     })
   }
 
-  function findTab(routePath: string): Tab | undefined {
-    return tabs.value.find(t => t.id === routePath)
+  function findById(id: string): Tab | undefined {
+    return tabs.value.find(t => t.id === id)
+  }
+
+  function findByRoutePath(routePath: string): Tab | undefined {
+    const normalized = normalizePath(routePath)
+    return tabs.value.find(t => t.routePath === normalized)
   }
 
   function getAdjacentTabId(closedId: string): string | null {
@@ -51,37 +76,70 @@ export const useTabStore = defineStore('tab', () => {
     return null
   }
 
-  function openTab(rawPath: string): void {
-    // Normalize /articles/xxx → /article/xxx (preserve query params for uniqueness)
-    const normalized = rawPath.replace(/^\/articles\//, '/article/')
+  /**
+   * Create or retrieve a tab for the given route. Called by page components
+   * during setup to register themselves. Returns the stable UUID.
+   */
+  function ensureTab(type: Tab['type'], rawPath: string): string {
+    const normalized = normalizePath(rawPath)
     const basePath = normalized.split('?')[0]
-    if (!basePath.startsWith('/edit') && !basePath.startsWith('/article')) return
+    if (!basePath.startsWith('/edit') && !basePath.startsWith('/article')) {
+      // Not a tab-tracked route — still return an id so callers don't crash
+      return ''
+    }
 
-    const existing = findTab(normalized)
-    if (existing) { activeTabId.value = normalized; persist(); return }
+    const existing = findByRoutePath(normalized)
+    if (existing) {
+      activeTabId.value = existing.id
+      persist()
+      return existing.id
+    }
 
-    const type = basePath.startsWith('/edit') ? 'editor' : 'article'
-    const status = type === 'editor' ? 'draft' : 'published'
+    const id = generateId()
+    const defaults = TAB_DEFAULTS[type]
     tabs.value.push({
-      id: normalized, type,
-      title: type === 'editor' ? 'Untitled' : 'Loading...',
+      id,
+      routePath: normalized,
+      type,
+      title: defaults.title,
       dirty: false,
-      icon: type === 'editor' ? 'edit' : 'eye',
-      status,
+      icon: defaults.icon,
+      status: defaults.status,
     })
-    activeTabId.value = normalized
+    activeTabId.value = id
     persist()
+    return id
+  }
+
+  /**
+   * Activate the tab matching the given route path. Used by router.afterEach
+   * to sync active tab with URL navigation. No-op if no tab matches.
+   */
+  function activateTabByRoute(rawPath: string): void {
+    const tab = findByRoutePath(rawPath)
+    if (tab && activeTabId.value !== tab.id) {
+      activeTabId.value = tab.id
+      persist()
+    }
   }
 
   function activateTab(tabId: string): void {
+    const tab = findById(tabId)
+    if (!tab) {
+      if (import.meta.env.DEV) console.error(`activateTab: tab ${tabId} not found`)
+      return
+    }
     activeTabId.value = tabId
     persist()
-    if (router) router.push(tabId)
+    if (router) router.push(tab.routePath)
   }
 
   function updateTab(tabId: string, patch: Partial<Pick<Tab, 'title' | 'dirty' | 'status' | 'scrollTop' | 'cursorPosition'>>): void {
-    const tab = findTab(tabId)
-    if (!tab) return
+    const tab = findById(tabId)
+    if (!tab) {
+      if (import.meta.env.DEV) console.error(`updateTab: tab ${tabId} not found`)
+      return
+    }
     if (patch.title !== undefined) tab.title = patch.title
     if (patch.dirty !== undefined) tab.dirty = patch.dirty
     if (patch.status !== undefined) tab.status = patch.status
@@ -91,7 +149,7 @@ export const useTabStore = defineStore('tab', () => {
   }
 
   function closeTab(tabId: string): { shouldPrompt: boolean } {
-    const tab = findTab(tabId)
+    const tab = findById(tabId)
     if (!tab) return { shouldPrompt: false }
     if (tab.dirty) return { shouldPrompt: true }
     removeTab(tabId)
@@ -105,8 +163,9 @@ export const useTabStore = defineStore('tab', () => {
 
     if (wasActive) {
       if (nextTabId) {
+        const nextTab = findById(nextTabId)
         activeTabId.value = nextTabId
-        if (router) router.push(nextTabId)
+        if (router && nextTab) router.push(nextTab.routePath)
       } else {
         activeTabId.value = null
         if (router) router.push('/')
@@ -118,10 +177,26 @@ export const useTabStore = defineStore('tab', () => {
   function restoreTabs(): void {
     const saved = loadJSON<{ tabs: Tab[]; activeTabId: string | null }>(STORAGE_KEY)
     if (!saved?.tabs?.length) return
+
+    // If saved tabs have old path-based IDs (no routePath field and id starts
+    // with '/'), clear and start fresh — the user loses their tab session once.
+    const isOldFormat = saved.tabs.some(t => !t.routePath && t.id.startsWith('/'))
+    if (isOldFormat) {
+      localStorage.removeItem(STORAGE_KEY)
+      return
+    }
+
     tabs.value = saved.tabs.map(t => ({ ...t, dirty: false }))
     activeTabId.value = saved.activeTabId
-    if (saved.activeTabId && router) router.push(saved.activeTabId)
+    if (saved.activeTabId && router) {
+      const tab = findById(saved.activeTabId)
+      if (tab) router.push(tab.routePath)
+    }
   }
 
-  return { tabs, activeTabId, openTab, activateTab, updateTab, closeTab, removeTab, restoreTabs }
+  return {
+    tabs, activeTabId,
+    ensureTab, activateTabByRoute, activateTab, updateTab, closeTab, removeTab, restoreTabs,
+    findById, findByRoutePath,
+  }
 })

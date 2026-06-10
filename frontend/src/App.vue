@@ -55,14 +55,14 @@ const tabStore = useTabStore()
 
 const isEditorPage = computed(() => route.path.startsWith('/edit'))
 
-// ── Tab auto-registration ──────────────────────────────────────
+// ── Tab activation on navigation ──────────────────────────────
+// Tab creation is handled by each page component (ensureTab in setup).
 
 router.afterEach((to) => {
   if (to.path.startsWith('/edit') || to.path.startsWith('/article') || to.path.startsWith('/articles')) {
     // Pass fullPath so editor tabs with different ?new=1&_t=X get unique ids.
     // Article paths get normalized: /articles/foo → /article/foo.
-    const rawPath = to.fullPath
-    tabStore.openTab(rawPath)
+    tabStore.activateTabByRoute(to.fullPath)
   }
 })
 
