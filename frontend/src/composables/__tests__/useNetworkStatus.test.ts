@@ -4,6 +4,8 @@ import { useNetworkStatus } from '../useNetworkStatus'
 describe('useNetworkStatus', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    // Singleton refs persist across tests — reset them.
+    useNetworkStatus()._resetForTest()
     // Default: fetch succeeds
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,

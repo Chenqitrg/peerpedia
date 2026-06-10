@@ -2,13 +2,15 @@ import { ref, type Ref } from 'vue'
 
 const FAILURE_THRESHOLD = 2
 
+// Module-level singleton — all callers share the same isOnline state.
+// If each useNetworkStatus() call created its own ref, App.vue's
+// startPing() would update one instance while useOffline reads another
+// that stays false forever.
+const isOnline: Ref<boolean> = ref(false)
+let intervalId: ReturnType<typeof setInterval> | null = null
+let consecutiveFailures = 0
+
 export function useNetworkStatus() {
-  // Start as offline — only flip to online after a successful ping.
-  // This prevents the ~60s window where offline features like pool/schools
-  // would incorrectly render as accessible when the device is actually offline.
-  const isOnline: Ref<boolean> = ref(false)
-  let intervalId: ReturnType<typeof setInterval> | null = null
-  let consecutiveFailures = 0
 
   async function ping(): Promise<void> {
     try {
@@ -32,6 +34,13 @@ export function useNetworkStatus() {
     }
   }
 
+  // Exposed for tests — reset singleton state between test cases.
+  function _resetForTest() {
+    isOnline.value = false
+    stopPing()
+    consecutiveFailures = 0
+  }
+
   function startPing(intervalMs = 30000): void {
     // No fetch in test environment (jsdom) — skip silently.
     if (typeof fetch === 'undefined') return
@@ -50,5 +59,5 @@ export function useNetworkStatus() {
     }
   }
 
-  return { isOnline, startPing, stopPing }
+  return { isOnline, startPing, stopPing, _resetForTest }
 }
