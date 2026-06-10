@@ -34,6 +34,9 @@ def bookmark(article_id: str, current_user: User = Depends(deps.require_user),
              db: Session = Depends(deps.get_db)):
     if get_article(db, article_id) is None:
         raise HTTPException(status_code=404, detail="Article not found")
+    author_ids = get_author_ids(db, article_id)
+    if current_user.id in author_ids:
+        raise HTTPException(status_code=400, detail="Cannot bookmark your own article")
     if not is_bookmarked(db, current_user.id, article_id):
         add_bookmark(db, current_user.id, article_id)
     return {"bookmarked": True}
@@ -42,5 +45,8 @@ def bookmark(article_id: str, current_user: User = Depends(deps.require_user),
 @router.delete("/{article_id}")
 def unbookmark(article_id: str, current_user: User = Depends(deps.require_user),
                db: Session = Depends(deps.get_db)):
+    author_ids = get_author_ids(db, article_id)
+    if current_user.id in author_ids:
+        raise HTTPException(status_code=400, detail="Cannot bookmark your own article")
     remove_bookmark(db, current_user.id, article_id)
     return {"bookmarked": False}

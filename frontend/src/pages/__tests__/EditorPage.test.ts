@@ -86,13 +86,33 @@ describe('EditorPage', () => {
     expect(titleInput.exists()).toBe(true)
   })
 
-  it('has format toggle between Markdown and Typst', async () => {
+  it('uses format from route query param', async () => {
+    // Typst mode → textarea visible (not CodeMirror)
+    mockRoute.query = { new: '1', format: 'typst' }
+    // Re-mock to pick up new query
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: {
+        stubs: { 'router-link': RouterLinkStub, 'router-view': true },
+      },
+    })
+    await flushPromises()
+    expect(wrapper.find('textarea').exists()).toBe(true)
+    // Reset
+    mockRoute.query = {}
+  })
+
+  it('has no format toggle buttons in toolbar', async () => {
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await flushPromises()
-    expect(wrapper.text()).toMatch(/markdown|typst/i)
+    const buttons = wrapper.findAll('button')
+    const mdBtn = buttons.filter(b => b.text() === 'MD')
+    const typstBtn = buttons.filter(b => b.text() === 'Typst')
+    expect(mdBtn.length).toBe(0)
+    expect(typstBtn.length).toBe(0)
   })
 
   it('has a Publish button', async () => {

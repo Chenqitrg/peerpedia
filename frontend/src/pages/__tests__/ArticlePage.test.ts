@@ -169,14 +169,14 @@ describe('ArticlePage', () => {
     expect(wrapper.text()).toMatch(/In Pool|sedimentation/)
   })
 
-  it('has bookmark toggle', async () => {
+  it('hides bookmark button on own article', async () => {
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await new Promise(r => setTimeout(r, 100))
     const bookmarkBtn = wrapper.find('button[aria-label*="bookmark" i]')
-    expect(bookmarkBtn.exists()).toBe(true)
+    expect(bookmarkBtn.exists()).toBe(false)
   })
 
   it('has tab switcher for Body and Comments', async () => {

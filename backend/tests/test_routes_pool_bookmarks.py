@@ -99,3 +99,41 @@ class TestBookmarks:
         # list empty
         resp = client.get("/api/v1/bookmarks", headers=headers)
         assert len(resp.json()["bookmarks"]) == 0
+
+    def test_self_bookmark_rejected(self, client, db_engine, auth_header):
+        """SPEC-1.1: 用户不能收藏自己的文章"""
+        s = get_session(db_engine)
+        u = User(username="author1", password_hash="", name="作者", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        a = Article(status="published")
+        s.add(a)
+        s.commit()
+        # 将 u 设为文章作者
+        from peerpedia_core.storage.db.models import ArticleAuthor
+        s.add(ArticleAuthor(article_id=a.id, author_id=u.id, position=0))
+        s.commit()
+        s.close()
+
+        headers = auth_header(u.id)
+        resp = client.post(f"/api/v1/bookmarks?article_id={a.id}", headers=headers)
+        assert resp.status_code == 400
+        assert "own article" in resp.json()["detail"].lower()
+
+    def test_self_unbookmark_rejected(self, client, db_engine, auth_header):
+        """SPEC-1.2: 用户不能取消收藏自己的文章"""
+        s = get_session(db_engine)
+        u = User(username="author2", password_hash="", name="作者2", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        a = Article(status="published")
+        s.add(a)
+        s.commit()
+        from peerpedia_core.storage.db.models import ArticleAuthor
+        s.add(ArticleAuthor(article_id=a.id, author_id=u.id, position=0))
+        s.commit()
+        s.close()
+
+        headers = auth_header(u.id)
+        resp = client.delete(f"/api/v1/bookmarks/{a.id}", headers=headers)
+        assert resp.status_code == 400
