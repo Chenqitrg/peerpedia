@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useTabStore } from '../stores/useTabStore'
 import { Edit, Eye, X } from 'lucide-vue-next'
 
 const tabStore = useTabStore()
 const expanded = ref(false)
+const container = ref<HTMLElement | null>(null)
 let collapseTimer: ReturnType<typeof setTimeout> | null = null
 
 const emit = defineEmits<{ (e: 'close-tab', tabId: string): void }>()
@@ -25,20 +26,35 @@ function onTriggerEnter() {
 }
 
 function onDrawerLeave() {
-  collapseTimer = setTimeout(() => { expanded.value = false }, 200)
+  collapseTimer = setTimeout(collapse, 200)
 }
 
 function onDrawerEnter() {
   if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null }
 }
 
+function collapse() {
+  if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null }
+  expanded.value = false
+}
+
+function onClickOutside(e: MouseEvent) {
+  if (!expanded.value) return
+  if (container.value && !container.value.contains(e.target as Node)) {
+    collapse()
+  }
+}
+
 function iconComponent(icon: 'edit' | 'eye') {
   return icon === 'edit' ? Edit : Eye
 }
+
+onMounted(() => document.addEventListener('click', onClickOutside))
+onUnmounted(() => document.removeEventListener('click', onClickOutside))
 </script>
 
 <template>
-  <div v-if="tabStore.tabs.length > 0" class="tab-drawer-container">
+  <div v-if="tabStore.tabs.length > 0" ref="container" class="tab-drawer-container">
     <!-- Collapsed: stacked tab edges -->
     <div class="tab-drawer-edges" @mouseenter="onTriggerEnter">
       <div
