@@ -29,8 +29,8 @@ arXiv solved **distribution**. But it didn't solve **filtering** — the problem
 **Phase 1 — Tauri Desktop（冷启动）✅**
 A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. 5MB install, 30MB RAM. Useful alone — the key to cold-start users.
 
-**Phase 1.5 — Polish & Ship（打磨分发）✅**
-Delete, diff view (with word-level highlighting), Typst SVG preview + PDF download, draft search, editor UX (save-as-commit, per-save commit message, disabled-when-clean save button, VSCode-style tab system with KeepAlive caching for simultaneous multi-article editing), CodeMirror 6 Markdown editor (syntax highlighting, bracket matching, ⌘S compile), architecture remediation (git-first write/read path per DESIGN.md §2.3, useCommitFlow composable, useTauri 3-file split, design consistency fixes). Desktop app is solid.
+**Phase 1.5 — Polish & Ship（打磨分发）✅ v0.2.0**
+Delete, diff view (with word-level highlighting), Typst SVG preview (dark-theme compatible, responsive sizing) + PDF download, draft search, editor UX (save-as-commit, per-save commit message, disabled-when-clean save button, VSCode-style tab system with KeepAlive caching for simultaneous multi-article editing), CodeMirror 6 Markdown editor (syntax highlighting, bracket matching, ⌘S compile), architecture remediation (git-first write/read path per DESIGN.md §2.3, useCommitFlow composable, useTauri 3-file split), self-bookmark rejection (backend 400 + frontend guard), format choice modal (Markdown/Typst on creation), DeleteButton unified component, design system alignment (Tailwind tokens, color consistency). Desktop app is solid.
 
 **Phase 2 — Score arXiv（包围城市）**
 Community scoring layer on top of preprints. A quality filter that doesn't belong to any publisher.
@@ -215,10 +215,10 @@ peerpedia/
 ## Testing · 测试
 
 ```bash
-# Backend (354 tests)
+# Backend (356 tests)
 python -m pytest backend/tests/ core/tests/ -q
 
-# Frontend (432 tests)
+# Frontend (448 tests)
 cd frontend && npx vitest run
 
 # Rust (76 tests)
