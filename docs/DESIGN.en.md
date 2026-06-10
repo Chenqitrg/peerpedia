@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-10 · All implemented features · Architecture debt resolved · Plan remediation merged (git-first architecture compliance) · VSCode-style tab system
+> 2026-06-10 · v0.2.0 · All implemented features · Architecture debt resolved · Plan remediation merged (git-first architecture compliance) · VSCode-style tab system · UI/UX polish (7 issues + 1 bug cleared, 40 executable specs)
 
 ---
 
