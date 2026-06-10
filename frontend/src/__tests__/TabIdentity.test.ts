@@ -605,4 +605,55 @@ describe('Tab Identity Specification', () => {
     // The second tab must be a fresh editor, not showing first tab's title
     expect(titles[1]).not.toBe('Quantum Mechanics')
   })
+
+  // ── SPEC: Editor tab title survives switch-away-and-back ─────────
+  // Bug: watch(() => route.query.new, { immediate: true }) fires on
+  // every KeepAlive reactivation. When the user switches away from a
+  // "New Article" editor tab and comes back, route.query.new changes
+  // from undefined back to '1', triggering a full reset that clears
+  // the title and content. The tab shows "Untitled" instead of the
+  // user's typed title.
+  //
+  // Locked spec: switching away from a new-article editor tab and back
+  // must preserve the user's title and content.
+
+  it('SPEC: editor tab title persists after switching to article and back', async () => {
+    const app = await mountApp(); wrp = app.wrapper; rou = app.router
+
+    // Create new article tab and type a title
+    const t1 = Date.now()
+    await rou.push(`/edit?new=1&_t=${t1}`)
+    await settle()
+
+    const titleInput = wrp.find('input[placeholder="Article title..."]')
+    expect(titleInput.exists()).toBe(true)
+    await titleInput.setValue('Quantum Mechanics')
+    await settle()
+
+    // Verify tab shows the typed title
+    await expand(wrp)
+    expect(tabTitles(wrp)).toContain('Quantum Mechanics')
+
+    // Navigate to an existing article (simulates reading while writing)
+    await rou.push('/article/art-a')
+    await settle()
+
+    // Click back to the editor tab via the drawer
+    await expand(wrp)
+    const items = wrp.findAll('.tab-drawer-item')
+    const editorItem = items.find((i: any) => i.text().includes('Quantum Mechanics'))
+    expect(editorItem).toBeTruthy()
+    await editorItem!.trigger('click')
+    await settle()
+
+    // User sees: the editor tab still shows "Quantum Mechanics" — NOT "Untitled"
+    await expand(wrp)
+    const titles = tabTitles(wrp)
+    expect(titles).toContain('Quantum Mechanics')
+    expect(titles).not.toContain('Untitled')
+
+    // The title input itself must retain the typed value
+    const titleInputAfter = wrp.find('input[placeholder="Article title..."]')
+    expect((titleInputAfter.element as HTMLInputElement).value).toBe('Quantum Mechanics')
+  })
 })
