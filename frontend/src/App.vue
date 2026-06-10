@@ -47,11 +47,13 @@ import TabDrawer from './components/TabDrawer.vue'
 import { useUserStore } from './stores/useUserStore'
 import { useTabStore } from './stores/useTabStore'
 import { loadString, remove } from './composables/useLocalStorage'
+import { useNetworkStatus } from './composables/useNetworkStatus'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const tabStore = useTabStore()
+const { startPing, stopPing } = useNetworkStatus()
 
 const isEditorPage = computed(() => route.path.startsWith('/edit'))
 
@@ -133,6 +135,7 @@ async function saveAndClose() {
 // ── Restore session and tabs on mount ──────────────────────────
 
 onMounted(async () => {
+  startPing()
   await userStore.restoreSession()
   tabStore.restoreTabs()
   if (loadString('showAuthModal') === 'true') {

@@ -33,6 +33,8 @@ export function useNetworkStatus() {
   }
 
   function startPing(intervalMs = 30000): void {
+    // No fetch in test environment (jsdom) — skip silently.
+    if (typeof fetch === 'undefined') return
     stopPing()
     consecutiveFailures = 0
     // Fire an immediate first ping so we don't wait intervalMs before
