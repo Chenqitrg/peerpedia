@@ -207,7 +207,6 @@ async function confirmRollback() {
       const result = await tauri.gitRollback({
         article_id: id,
         commit_hash: hash,
-        format: 'markdown',
         author: 'User',
       })
       if (result && 'error' in result) {
@@ -361,8 +360,9 @@ function goBack() {
               </div>
             </div>
 
-            <!-- Rollback button -->
+            <!-- Rollback button — hidden for HEAD (rolling back to latest is a no-op) -->
             <button
+              v-if="!(history?.commits?.[0] && commit.hash === history.commits[0].hash)"
               class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted
                      hover:text-ink hover:bg-[#21262d] rounded-md
                      transition-colors shrink-0"

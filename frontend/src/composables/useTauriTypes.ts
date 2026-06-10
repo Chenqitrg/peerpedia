@@ -114,7 +114,6 @@ export interface GitShowParams {
 export interface GitRollbackParams {
   article_id: string
   commit_hash: string
-  format: string
   author: string
 }
 
