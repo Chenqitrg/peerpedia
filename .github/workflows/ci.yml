@@ -39,6 +39,7 @@ jobs:
           files: coverage.xml
           flags: backend
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
       - name: E2E — live server health check
         run: bash backend/tests/integration/test_health_e2e.sh
 
