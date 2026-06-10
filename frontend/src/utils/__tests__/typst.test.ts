@@ -32,4 +32,20 @@ describe('sanitizeTypstSvg', () => {
   it('handles empty string', () => {
     expect(sanitizeTypstSvg('')).toBe('')
   })
+
+  it('strips width and height from root svg tag for responsive sizing', () => {
+    const input = '<svg width="595.27pt" height="841.89pt" viewBox="0 0 595.27 841.89"><text>Hello</text></svg>'
+    const output = sanitizeTypstSvg(input)
+    expect(output).not.toContain('width=')
+    expect(output).not.toContain('height=')
+    expect(output).toContain('viewBox=')
+    expect(output).toContain('<text>Hello</text>')
+  })
+
+  it('strips rect with closing tag (non-self-closing)', () => {
+    const input = '<svg><rect width="100%" height="100%" fill="white"></rect><text>Hello</text></svg>'
+    const output = sanitizeTypstSvg(input)
+    expect(output).not.toContain('<rect')
+    expect(output).toContain('<text>Hello</text>')
+  })
 })
