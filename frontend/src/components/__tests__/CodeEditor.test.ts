@@ -44,13 +44,56 @@ describe('CodeEditor', () => {
     expect(vm.codemirrorView.state).toBeDefined()
   })
 
-  // T7: Typst slot fallback
-  it('renders Typst fallback slot when format is typst', () => {
+  // ── Typst format (post codemirror-lang-typst) ─────────────────────
+
+  it('renders CodeMirror for Typst format, NOT textarea', () => {
     const wrapper = mount(CodeEditor, {
       props: { modelValue: '= Title', format: 'typst' },
-      slots: { 'typst-fallback': '<textarea class="typst-fallback">= Title</textarea>' },
     })
-    expect(wrapper.find('.cm-editor').exists()).toBe(false)
-    expect(wrapper.find('.typst-fallback').exists()).toBe(true)
+    expect(wrapper.find('.cm-editor').exists()).toBe(true)
+    expect(wrapper.find('textarea').exists()).toBe(false)
+  })
+
+  it('renders CodeMirror for Markdown format (regression check)', () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '# Title', format: 'markdown' },
+    })
+    expect(wrapper.find('.cm-editor').exists()).toBe(true)
+    expect(wrapper.find('textarea').exists()).toBe(false)
+  })
+
+  it('displays Typst content in CodeMirror editor', async () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '= Introduction', format: 'typst' },
+    })
+    await nextTick()
+    const editorEl = wrapper.find('.cm-content')
+    expect(editorEl.exists()).toBe(true)
+    expect(editorEl.text()).toContain('= Introduction')
+  })
+
+  it('exposes codemirrorView for Typst format', async () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: '', format: 'typst' },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    expect(vm.codemirrorView).toBeDefined()
+    expect(vm.codemirrorView.state).toBeDefined()
+    // Confirm the doc content is accessible
+    expect(vm.codemirrorView.state.doc.toString()).toBe('')
+  })
+
+  it('updates CodeMirror when switching format from Markdown to Typst', async () => {
+    const wrapper = mount(CodeEditor, {
+      props: { modelValue: 'some content', format: 'markdown' },
+    })
+    await flushPromises()
+    await wrapper.setProps({ format: 'typst' as const, modelValue: '= New Typst' })
+    await flushPromises()
+    await nextTick()
+    const editorEl = wrapper.find('.cm-content')
+    expect(editorEl.exists()).toBe(true)
+    expect(editorEl.text()).toContain('= New Typst')
   })
 })
