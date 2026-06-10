@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import CodeEditor from '../CodeEditor.vue'
@@ -95,5 +95,56 @@ describe('CodeEditor', () => {
     const editorEl = wrapper.find('.cm-content')
     expect(editorEl.exists()).toBe(true)
     expect(editorEl.text()).toContain('= New Typst')
+  })
+
+  // ── SPEC-HL-4/5/6: Graceful degradation when Typst WASM is unavailable ─
+
+  describe('when Typst WASM load fails (e.g., WKWebView)', () => {
+    beforeEach(() => {
+      // Simulate WASM load failure — the dynamic import rejects
+      vi.doMock('codemirror-lang-typst', () => {
+        throw new Error('Simulated WASM load failure')
+      })
+    })
+
+    it('SPEC-HL-4: STILL renders CodeMirror for Typst format (no crash, no freeze)', async () => {
+      // Re-import so doMock takes effect on the fresh dynamic import
+      const { default: CE } = await import('../CodeEditor.vue')
+      const wrapper = mount(CE, {
+        props: { modelValue: '= Title', format: 'typst' },
+      })
+      // Wait for the dynamic import to fail and the component to settle
+      await flushPromises()
+      await nextTick()
+      // The editor MUST render — the user must be able to type Typst,
+      // just without syntax highlighting.
+      expect(wrapper.find('.cm-editor').exists()).toBe(true)
+      expect(wrapper.find('textarea').exists()).toBe(false)
+    })
+
+    it('SPEC-HL-5: Markdown mode works unaffected when Typst WASM is broken', async () => {
+      const { default: CE } = await import('../CodeEditor.vue')
+      const wrapper = mount(CE, {
+        props: { modelValue: '# Hello', format: 'markdown' },
+      })
+      await flushPromises()
+      await nextTick()
+      const editorEl = wrapper.find('.cm-content')
+      expect(editorEl.exists()).toBe(true)
+      expect(editorEl.text()).toContain('Hello')
+    })
+
+    it('SPEC-HL-6: Typst content is still editable without syntax highlighting', async () => {
+      const { default: CE } = await import('../CodeEditor.vue')
+      const wrapper = mount(CE, {
+        props: { modelValue: '= Introduction', format: 'typst' },
+      })
+      await flushPromises()
+      await nextTick()
+      const editorEl = wrapper.find('.cm-content')
+      expect(editorEl.exists()).toBe(true)
+      // Content MUST be visible — the user can still read and edit
+      expect(editorEl.text()).toContain('= Introduction')
+    })
   })
 })

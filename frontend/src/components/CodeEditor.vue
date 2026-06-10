@@ -2,10 +2,28 @@
 import { shallowRef, computed } from 'vue'
 import { Codemirror } from 'vue-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
-import { typst } from 'codemirror-lang-typst'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView } from 'codemirror'
 import type { Extension } from '@codemirror/state'
+
+// Dynamic import — isolates WASM failure so it doesn't crash the entire app.
+// Static `import { typst }` would fail at module evaluation time in WKWebView.
+let typstFn: (() => Extension) | null = null
+let typstLoadAttempted = false
+
+async function ensureTypst() {
+  if (typstLoadAttempted) return
+  typstLoadAttempted = true
+  try {
+    const mod = await import('codemirror-lang-typst')
+    typstFn = mod.typst
+  } catch (e) {
+    console.warn('Typst syntax highlighting unavailable (WASM load failed):', e)
+  }
+}
+
+// Start loading WASM immediately — don't wait for format switch
+ensureTypst()
 
 const props = defineProps<{
   modelValue: string
@@ -21,15 +39,13 @@ const codemirrorView = shallowRef<EditorView>()
 
 const extensions = computed<Extension[]>(() => {
   const exts: Extension[] = [oneDark]
-  if (props.format === 'typst') {
+  if (props.format === 'typst' && typstFn) {
     try {
-      exts.push(typst())
+      exts.push(typstFn())
     } catch (e) {
-      // WASM may fail to load in some environments (e.g., WKWebView).
-      // Fall back to no syntax highlighting rather than crashing.
-      console.warn('Typst syntax highlighting unavailable:', e)
+      console.warn('Typst extension init failed:', e)
     }
-  } else {
+  } else if (props.format === 'markdown') {
     exts.push(markdown())
   }
   return exts
