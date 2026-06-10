@@ -20,16 +20,16 @@ describe('TabDrawer', () => {
 
   it('renders stacked edges when tabs open', () => {
     const s = useTabStore()
-    s.openTab('/edit/a')
-    s.openTab('/article/b')
+    s.ensureTab('editor', '/edit/a')
+    s.ensureTab('article', '/article/b')
     const wrapper = mount(TabDrawer)
     expect(wrapper.findAll('.tab-drawer-edge')).toHaveLength(2)
   })
 
   it('expands drawer on mouseenter and shows tab titles', async () => {
     const s = useTabStore()
-    s.openTab('/edit/a')
-    s.updateTab('/edit/a', { title: 'My Draft' })
+    const id = s.ensureTab('editor', '/edit/a')
+    s.updateTab(id, { title: 'My Draft' })
     const wrapper = mount(TabDrawer)
     await wrapper.find('.tab-drawer-edges').trigger('mouseenter')
     await wrapper.vm.$nextTick()
@@ -39,9 +39,9 @@ describe('TabDrawer', () => {
 
   it('highlights active tab', async () => {
     const s = useTabStore()
-    s.openTab('/edit/a')
-    s.openTab('/edit/b')
-    s.activateTab('/edit/a')
+    const idA = s.ensureTab('editor', '/edit/a')
+    s.ensureTab('editor', '/edit/b')
+    s.activateTab(idA)
     const wrapper = mount(TabDrawer)
     await wrapper.find('.tab-drawer-edges').trigger('mouseenter')
     await wrapper.vm.$nextTick()
@@ -52,21 +52,21 @@ describe('TabDrawer', () => {
 
   it('shows dirty dot on dirty editor tab', async () => {
     const s = useTabStore()
-    s.openTab('/edit/a')
-    s.updateTab('/edit/a', { dirty: true })
+    const id = s.ensureTab('editor', '/edit/a')
+    s.updateTab(id, { dirty: true })
     const wrapper = mount(TabDrawer)
     await wrapper.find('.tab-drawer-edges').trigger('mouseenter')
     await wrapper.vm.$nextTick()
     expect(wrapper.find('.tab-drawer-dirty-dot').exists()).toBe(true)
   })
 
-  it('emits close-tab when close button clicked', async () => {
+  it('emits close-tab with UUID when close button clicked', async () => {
     const s = useTabStore()
-    s.openTab('/edit/a')
+    const id = s.ensureTab('editor', '/edit/a')
     const wrapper = mount(TabDrawer)
     await wrapper.find('.tab-drawer-edges').trigger('mouseenter')
     await wrapper.vm.$nextTick()
     await wrapper.find('.tab-drawer-close-btn').trigger('click')
-    expect(wrapper.emitted('close-tab')![0]).toEqual(['/edit/a'])
+    expect(wrapper.emitted('close-tab')![0]).toEqual([id])
   })
 })

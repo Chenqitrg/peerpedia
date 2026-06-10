@@ -7,16 +7,12 @@ let deactivatedCallbacks: Array<() => void> = []
 let activatedCallbacks: Array<() => void> = []
 
 const mockUpdateTab = vi.fn()
-const mockTabs = vi.fn()
-
-vi.mock('vue-router', () => ({
-  useRoute: () => ({ path: '/edit/test-article', fullPath: '/edit/test-article' }),
-}))
+const mockFindById = vi.fn()
 
 vi.mock('@/stores/useTabStore', () => ({
   useTabStore: () => ({
     updateTab: mockUpdateTab,
-    tabs: mockTabs(),
+    findById: mockFindById,
   }),
 }))
 
@@ -32,139 +28,27 @@ vi.mock('vue', async () => {
 
 import { useEditorTab, useArticleTab } from '../useTabIntegration'
 
-// ── Regression: path normalization ──────────────────────────────
-// The router defines both /article/:id and /articles/:id. openTab normalizes
-// /articles/ → /article/ before storing. The composables must do the same,
-// otherwise updateTab targets a tab id that doesn't exist (titles stay
-// "Loading…" forever, tab switching has no visible effect).
-//
-// These tests use vi.resetModules() so we can override the hoisted useRoute
-// mock with a /articles/ path.
-
-describe('Path normalization regression', () => {
-  beforeEach(async () => {
-    vi.resetModules()
-    setActivePinia(createPinia())
-  })
-
-  it('useArticleTab normalizes /articles/ to /article/ when updating title', async () => {
-    const localUpdateTab = vi.fn()
-    const localTabs = vi.fn().mockReturnValue([])
-
-    vi.doMock('vue-router', () => ({
-      useRoute: () => ({ path: '/articles/quantum-physics', fullPath: '/articles/quantum-physics' }),
-    }))
-    vi.doMock('@/stores/useTabStore', () => ({
-      useTabStore: () => ({
-        updateTab: localUpdateTab,
-        tabs: localTabs(),
-      }),
-    }))
-    vi.doMock('vue', async () => {
-      const actual = await vi.importActual('vue')
-      return {
-        ...actual,
-        onDeactivated: vi.fn(),
-        onActivated: vi.fn(),
-      }
-    })
-
-    const { useArticleTab: uat } = await import('../useTabIntegration')
-    const articleTitle = ref('Quantum Physics')
-    uat(articleTitle, ref(null))
-
-    await vi.waitFor(() => {
-      expect(localUpdateTab).toHaveBeenCalledWith('/article/quantum-physics', {
-        title: 'Quantum Physics',
-      })
-    })
-  })
-
-  it('useEditorTab normalizes /articles/ to /article/ for title+dirty sync', async () => {
-    const localUpdateTab = vi.fn()
-    const localTabs = vi.fn().mockReturnValue([])
-
-    vi.doMock('vue-router', () => ({
-      useRoute: () => ({ path: '/articles/my-draft', fullPath: '/articles/my-draft' }),
-    }))
-    vi.doMock('@/stores/useTabStore', () => ({
-      useTabStore: () => ({
-        updateTab: localUpdateTab,
-        tabs: localTabs(),
-      }),
-    }))
-    vi.doMock('vue', async () => {
-      const actual = await vi.importActual('vue')
-      return {
-        ...actual,
-        onDeactivated: vi.fn(),
-        onActivated: vi.fn(),
-      }
-    })
-
-    const { useEditorTab: uet } = await import('../useTabIntegration')
-    uet(ref('My Draft'), ref(false), ref(null))
-
-    await vi.waitFor(() => {
-      expect(localUpdateTab).toHaveBeenCalledWith('/article/my-draft', {
-        dirty: true,
-        title: 'My Draft',
-      })
-    })
-  })
-
-  it('does not normalize /edit paths (no /edits/ route exists)', async () => {
-    const localUpdateTab = vi.fn()
-    const localTabs = vi.fn().mockReturnValue([])
-
-    vi.doMock('vue-router', () => ({
-      useRoute: () => ({ path: '/edit/some-draft', fullPath: '/edit/some-draft' }),
-    }))
-    vi.doMock('@/stores/useTabStore', () => ({
-      useTabStore: () => ({
-        updateTab: localUpdateTab,
-        tabs: localTabs(),
-      }),
-    }))
-    vi.doMock('vue', async () => {
-      const actual = await vi.importActual('vue')
-      return {
-        ...actual,
-        onDeactivated: vi.fn(),
-        onActivated: vi.fn(),
-      }
-    })
-
-    const { useArticleTab: uat } = await import('../useTabIntegration')
-    uat(ref('Draft Title'), ref(null))
-
-    await vi.waitFor(() => {
-      expect(localUpdateTab).toHaveBeenCalledWith('/edit/some-draft', {
-        title: 'Draft Title',
-      })
-    })
-  })
-})
+const TAB_ID = 'test-tab-uuid-123'
 
 describe('useTabIntegration', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockUpdateTab.mockClear()
+    mockFindById.mockClear()
     deactivatedCallbacks = []
     activatedCallbacks = []
   })
 
   describe('useEditorTab', () => {
-    it('calls updateTab with dirty and title when watch fires', async () => {
+    it('calls updateTab with explicit tabId, dirty and title when watch fires', async () => {
       const title = ref('My Draft')
       const isClean = ref(false)
       const contentEl = ref<HTMLElement | null>(null)
 
-      useEditorTab(title, isClean, contentEl)
+      useEditorTab(TAB_ID, title, isClean, contentEl)
 
-      // Wait for watch with immediate:true to fire
       await vi.waitFor(() => {
-        expect(mockUpdateTab).toHaveBeenCalledWith('/edit/test-article', {
+        expect(mockUpdateTab).toHaveBeenCalledWith(TAB_ID, {
           dirty: true,
           title: 'My Draft',
         })
@@ -176,10 +60,10 @@ describe('useTabIntegration', () => {
       const isClean = ref(true)
       const contentEl = ref<HTMLElement | null>(null)
 
-      useEditorTab(title, isClean, contentEl)
+      useEditorTab(TAB_ID, title, isClean, contentEl)
 
       await vi.waitFor(() => {
-        expect(mockUpdateTab).toHaveBeenCalledWith('/edit/test-article', {
+        expect(mockUpdateTab).toHaveBeenCalledWith(TAB_ID, {
           dirty: false,
           title: 'Untitled',
         })
@@ -193,38 +77,36 @@ describe('useTabIntegration', () => {
       el.scrollTop = 150
       const contentEl = ref<HTMLElement | null>(el)
 
-      useEditorTab(title, isClean, contentEl)
+      useEditorTab(TAB_ID, title, isClean, contentEl)
 
-      // Trigger deactivated callback
       deactivatedCallbacks.forEach(cb => cb())
-      expect(mockUpdateTab).toHaveBeenCalledWith('/edit/test-article', { scrollTop: 150 })
+      expect(mockUpdateTab).toHaveBeenCalledWith(TAB_ID, { scrollTop: 150 })
     })
 
     it('restores scrollTop on activation when tab has saved position', () => {
-      mockTabs.mockReturnValue([{ id: '/edit/test-article', scrollTop: 300 }])
+      mockFindById.mockReturnValue({ id: TAB_ID, scrollTop: 300 })
 
       const title = ref('Draft')
       const isClean = ref(true)
       const el = document.createElement('div')
       const contentEl = ref<HTMLElement | null>(el)
 
-      useEditorTab(title, isClean, contentEl)
+      useEditorTab(TAB_ID, title, isClean, contentEl)
 
-      // Trigger activated callback
       activatedCallbacks.forEach(cb => cb())
       expect(el.scrollTop).toBe(300)
     })
   })
 
   describe('useArticleTab', () => {
-    it('calls updateTab with title when watch fires', async () => {
+    it('calls updateTab with explicit tabId and title when watch fires', async () => {
       const articleTitle = ref('Quantum Physics')
       const contentEl = ref<HTMLElement | null>(null)
 
-      useArticleTab(articleTitle, contentEl)
+      useArticleTab(TAB_ID, articleTitle, contentEl)
 
       await vi.waitFor(() => {
-        expect(mockUpdateTab).toHaveBeenCalledWith('/edit/test-article', {
+        expect(mockUpdateTab).toHaveBeenCalledWith(TAB_ID, {
           title: 'Quantum Physics',
         })
       })
@@ -234,13 +116,10 @@ describe('useTabIntegration', () => {
       const articleTitle = ref<string | undefined>(undefined)
       const contentEl = ref<HTMLElement | null>(null)
 
-      useArticleTab(articleTitle, contentEl)
+      useArticleTab(TAB_ID, articleTitle, contentEl)
 
-      // Should not have been called because title is undefined
-      // (watch fires but the if (title) guard prevents the call)
       await new Promise(r => setTimeout(r, 50))
-      // Only calls from the initial undefined watch should be skipped
-      // No call expected since title is undefined
+      // The watch fires with immediate:true but the if (title) guard prevents the call
     })
 
     it('saves scrollTop on deactivation', () => {
@@ -249,20 +128,20 @@ describe('useTabIntegration', () => {
       el.scrollTop = 200
       const contentEl = ref<HTMLElement | null>(el)
 
-      useArticleTab(articleTitle, contentEl)
+      useArticleTab(TAB_ID, articleTitle, contentEl)
 
       deactivatedCallbacks.forEach(cb => cb())
-      expect(mockUpdateTab).toHaveBeenCalledWith('/edit/test-article', { scrollTop: 200 })
+      expect(mockUpdateTab).toHaveBeenCalledWith(TAB_ID, { scrollTop: 200 })
     })
 
     it('restores scrollTop on activation when tab has saved position', () => {
-      mockTabs.mockReturnValue([{ id: '/edit/test-article', scrollTop: 500 }])
+      mockFindById.mockReturnValue({ id: TAB_ID, scrollTop: 500 })
 
       const articleTitle = ref('Article')
       const el = document.createElement('div')
       const contentEl = ref<HTMLElement | null>(el)
 
-      useArticleTab(articleTitle, contentEl)
+      useArticleTab(TAB_ID, articleTitle, contentEl)
 
       activatedCallbacks.forEach(cb => cb())
       expect(el.scrollTop).toBe(500)
