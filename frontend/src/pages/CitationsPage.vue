@@ -30,7 +30,7 @@ function goBack() {
       <button
         class="flex items-center justify-center w-8 h-8 rounded-lg
                text-ink-muted hover:text-ink hover:bg-[#21262d] transition-colors"
-        aria-label="Back to article"
+        :aria-label="t('citations.backToArticle')"
         @click="goBack"
       >
         <ArrowLeft class="w-4 h-4" stroke-width="2" />

@@ -242,7 +242,7 @@ function goBack() {
       <button
         class="flex items-center justify-center w-8 h-8 rounded-lg
                text-ink-muted hover:text-ink hover:bg-[#21262d] transition-colors"
-        aria-label="Back to article"
+        :aria-label="t('history.backToArticle')"
         @click="goBack"
       >
         <ArrowLeft class="w-4 h-4" stroke-width="2" />
@@ -274,7 +274,7 @@ function goBack() {
         <button
           class="text-xs text-ink-muted hover:text-ink transition-colors ml-3 shrink-0"
           @click="rollbackError = ''"
-          aria-label="Dismiss error"
+          :aria-label="t('history.dismissError')"
         >✕</button>
       </div>
 
@@ -285,11 +285,11 @@ function goBack() {
         @click.self="cancelRollback"
       >
         <div class="bg-card border border-divider rounded-lg shadow-2xl p-5 w-80 animate-fade-in">
-          <p class="text-sm text-ink mb-1">Rollback to <code class="font-mono text-accent">{{ rollbackConfirmShort }}</code>?</p>
-          <p class="text-xs text-ink-muted mb-4">This creates a new commit reverting to that state.</p>
+          <p class="text-sm text-ink mb-1">{{ t('history.rollbackConfirm', { hash: rollbackConfirmShort }) }}</p>
+          <p class="text-xs text-ink-muted mb-4">{{ t('history.rollbackConfirmDesc') }}</p>
           <div class="flex items-center gap-2">
-            <button class="flex-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-lg py-2 transition-colors" @click="cancelRollback">Cancel</button>
-            <button class="flex-1 text-xs font-semibold bg-accent text-page rounded-lg py-2 hover:brightness-110 transition-all" @click="confirmRollback">Confirm</button>
+            <button class="flex-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-lg py-2 transition-colors" @click="cancelRollback">{{ t('history.cancel') }}</button>
+            <button class="flex-1 text-xs font-semibold bg-accent text-page rounded-lg py-2 hover:brightness-110 transition-all" @click="confirmRollback">{{ t('history.confirm') }}</button>
           </div>
         </div>
       </div>
@@ -403,7 +403,7 @@ function goBack() {
         <button
           class="ml-3 text-ink-muted hover:text-ink transition-colors"
           @click="selectedHash1 = null; selectedHash2 = null; diffResult = null"
-          aria-label="Clear selection"
+          :aria-label="t('history.clearSelection')"
         >✕</button>
       </div>
 

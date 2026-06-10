@@ -490,7 +490,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         class="flex items-center justify-center w-9 h-9 rounded-lg
                text-ink-muted hover:text-ink hover:bg-[#21262d]
                transition-colors duration-200 shrink-0"
-        aria-label="Back"
+        :aria-label="t('editor.back')"
         @click="router.back()"
       >
         <ArrowLeft class="w-4 h-4" stroke-width="2" />
@@ -501,7 +501,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           v-if="!isEdit"
           v-model="title"
           type="text"
-          placeholder="Article title..."
+          :placeholder="t('editor.titlePlaceholder')"
           class="flex-1 min-w-0 bg-transparent border-none text-base font-heading font-semibold text-ink
                  placeholder:text-ink-muted/50 focus:outline-none"
         />
