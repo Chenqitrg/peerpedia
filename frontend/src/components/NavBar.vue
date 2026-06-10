@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
 import { useOffline } from '../composables/useOffline'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { saveString } from '../composables/useLocalStorage'
 import {
   Bookmark,
@@ -26,6 +27,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const tauri = useTauri()
 const { canRead } = useOffline()
+const { isOnline } = useNetworkStatus()
 const { t, locale } = useI18n()
 const searchQuery = ref('')
 const mobileOpen = ref(false)
@@ -43,10 +45,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 const isLoggedIn = computed(() => !!userStore.viewer)
 
-// Connection status: Tauri/dev-mock=local, Web=online/offline
+// Connection status: Tauri/dev-mock without server=local, server reachable=online
 const connectionStatus = computed(() => {
+  if (isOnline.value) return 'online'
   if (tauri.isTauri.value || tauri.isBrowserLocal.value) return 'local'
-  if (userStore.viewer) return 'online'
   return 'offline'
 })
 
