@@ -4,7 +4,108 @@ import { Codemirror } from 'vue-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView } from 'codemirror'
+import { StreamLanguage } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import type { Extension } from '@codemirror/state'
+
+// Pure-JavaScript Typst syntax highlighting via StreamLanguage.
+// Avoids WASM dependency which fails in WKWebView (Tauri on macOS).
+const typstLanguage = StreamLanguage.define({
+  token(stream) {
+    // Line comment
+    if (stream.match('//')) {
+      stream.skipToEnd()
+      return 'lineComment'
+    }
+    // Block comment
+    if (stream.match('/*')) {
+      while (!stream.eol()) {
+        if (stream.match('*/')) return 'blockComment'
+        stream.next()
+      }
+      return 'blockComment'
+    }
+    // Heading — leading = signs
+    if (stream.sol()) {
+      if (stream.match(/^=+/)) {
+        return 'heading'
+      }
+    }
+    // Math mode $...$
+    if (stream.match('$')) {
+      while (!stream.eol() && !stream.match('$')) {
+        if (stream.peek() === '\\') stream.next()
+        stream.next()
+      }
+      return 'string'
+    }
+    // Function/macro call #identifier
+    if (stream.match('#')) {
+      if (stream.match(/[a-zA-Z_][a-zA-Z0-9_-]*/)) {
+        return 'keyword'
+      }
+      stream.next()
+      return null
+    }
+    // Content block [...]
+    if (stream.match('[')) {
+      return 'bracket'
+    }
+    if (stream.match(']')) {
+      return 'bracket'
+    }
+    // Label <...>
+    if (stream.match('<')) {
+      if (stream.match(/[a-zA-Z_][a-zA-Z0-9_-]*/)) {
+        if (stream.match('>')) return 'labelName'
+      }
+      stream.next()
+      return null
+    }
+    // Reference @name
+    if (stream.match('@')) {
+      stream.match(/[a-zA-Z_][a-zA-Z0-9_-]*/)
+      return 'labelName'
+    }
+    // *bold* and _italic_
+    if (stream.match('*')) {
+      if (stream.peek() !== '*') {
+        while (!stream.eol() && stream.peek() !== '*') {
+          stream.next()
+        }
+        stream.match('*')
+        return 'strong'
+      }
+      stream.next()
+      return null
+    }
+    if (stream.match('_')) {
+      while (!stream.eol() && stream.peek() !== '_') {
+        stream.next()
+      }
+      stream.match('_')
+      return 'emphasis'
+    }
+    // String literal
+    if (stream.match('"')) {
+      while (!stream.eol() && !stream.match('"')) {
+        if (stream.peek() === '\\') stream.next()
+        stream.next()
+      }
+      return 'string'
+    }
+    // Set/show rule
+    if (stream.match(/#(set|show)\b/)) {
+      return 'keyword'
+    }
+    stream.next()
+    return null
+  },
+  languageData: {
+    closeBrackets: { brackets: ['[', '{', '(', '"', '$'] },
+    commentTokens: { line: '//', block: { open: '/*', close: '*/' } },
+  },
+})
 
 const props = defineProps<{
   modelValue: string
@@ -20,7 +121,11 @@ const codemirrorView = shallowRef<EditorView>()
 
 const extensions = computed<Extension[]>(() => {
   const exts: Extension[] = [oneDark]
-  exts.push(markdown())
+  if (props.format === 'typst') {
+    exts.push(typstLanguage)
+  } else {
+    exts.push(markdown())
+  }
   return exts
 })
 
@@ -36,7 +141,7 @@ defineExpose({ codemirrorView })
 </script>
 
 <template>
-  <div v-if="format === 'markdown'" class="flex-1 w-full font-mono cm-wrapper">
+  <div class="flex-1 w-full font-mono cm-wrapper">
     <Codemirror
       :model-value="modelValue"
       :extensions="extensions"
@@ -47,7 +152,6 @@ defineExpose({ codemirrorView })
       @update:model-value="onUpdate"
     />
   </div>
-  <slot v-else name="typst-fallback" />
 </template>
 
 <style>

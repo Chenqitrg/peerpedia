@@ -676,23 +676,13 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           <div class="h-4 bg-[#21262d] rounded w-5/6 mb-3" />
           <div class="h-4 bg-[#21262d] rounded w-2/3" />
         </div>
-        <!-- CodeMirror for Markdown -->
         <CodeEditor
-          v-if="format === 'markdown'"
           v-model="content"
           :format="format"
-          :placeholder="'# Title\n\nWrite your article in Markdown...'"
+          :placeholder="format === 'markdown'
+            ? '# Title\n\nWrite your article in Markdown...'
+            : '= Title\n\nWrite your article in Typst...'"
           class="flex-1 w-full"
-        />
-        <!-- Plain textarea for Typst -->
-        <textarea
-          v-else
-          v-model="content"
-          class="flex-1 w-full bg-[#0d1117] text-ink font-mono text-sm leading-relaxed
-                 p-4 resize-none border-none focus:outline-none
-                 placeholder:text-ink-muted/30"
-          placeholder="= Title\n\nWrite your article in Typst..."
-          spellcheck="false"
         />
       </div>
 
