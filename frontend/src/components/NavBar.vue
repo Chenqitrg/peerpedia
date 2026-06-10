@@ -10,6 +10,8 @@ import {
   Bookmark,
   Waypoints,
   FilePlus,
+  FileText,
+  FileCode,
   Search,
   User,
   ChevronDown,
@@ -17,6 +19,7 @@ import {
   WifiOff,
   Landmark,
   Waves,
+  X,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -62,9 +65,24 @@ function close() {
 
 function newArticle() {
   close()
-  // Generate unique path per click so each "New Article" creates an
-  // independent editor tab (VSCode behavior: Cmd+N always = new file).
-  router.push(`/edit?new=1&_t=${Date.now()}`)
+  showFormatModal.value = true
+}
+
+const showFormatModal = ref(false)
+
+function chooseFormat(format: 'markdown' | 'typst') {
+  showFormatModal.value = false
+  router.push(`/edit?new=1&_t=${Date.now()}&format=${format}`)
+}
+
+function closeFormatModal() {
+  showFormatModal.value = false
+}
+
+function onFormatModalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    closeFormatModal()
+  }
 }
 
 function handleSearch(e: Event) {
@@ -333,6 +351,77 @@ function handleLogout() {
       <button v-else class="nav-link-mobile text-left" @click="openAuth">{{ t('nav.signIn') }}</button>
     </div>
   </nav>
+
+    <!-- Format picker modal -->
+    <Teleport to="body">
+      <div
+        v-if="showFormatModal"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose article format"
+        @click.self="closeFormatModal"
+        @keydown="onFormatModalKeydown"
+      >
+        <div class="bg-card border border-divider rounded-xl max-w-sm w-full mx-4 p-6 animate-fade-in">
+          <!-- Header -->
+          <div class="flex items-start justify-between mb-5">
+            <div>
+              <h2 class="text-lg font-heading font-semibold text-ink">Choose Format</h2>
+              <p class="text-sm text-ink-muted mt-0.5">Select the format for your new article</p>
+            </div>
+            <button
+              class="flex items-center justify-center w-7 h-7 rounded-lg
+                     text-ink-muted hover:text-ink hover:bg-[#21262d]
+                     transition-colors duration-200 shrink-0 -mt-1 -mr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent cursor-pointer"
+              aria-label="Close"
+              @click="closeFormatModal"
+            >
+              <X class="w-4 h-4" stroke-width="2" />
+            </button>
+          </div>
+
+          <!-- Format cards -->
+          <div class="grid grid-cols-2 gap-3">
+            <!-- Markdown -->
+            <button
+              class="bg-[#0d1117] border border-divider rounded-lg p-4 cursor-pointer
+                     hover:border-accent/50 hover:bg-[#21262d]
+                     transition-colors duration-200 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent focus-visible:rounded-lg"
+              role="button"
+              tabindex="0"
+              @click="chooseFormat('markdown')"
+              @keydown.enter="chooseFormat('markdown')"
+              @keydown.space.prevent="chooseFormat('markdown')"
+            >
+              <FileText class="w-5 h-5 text-accent mb-2" stroke-width="2" />
+              <div class="font-semibold text-ink text-sm">Markdown</div>
+              <div class="text-xs text-ink-muted mt-1 leading-relaxed">
+                Standard format with math support (KaTeX)
+              </div>
+            </button>
+
+            <!-- Typst -->
+            <button
+              class="bg-[#0d1117] border border-divider rounded-lg p-4 cursor-pointer
+                     hover:border-accent/50 hover:bg-[#21262d]
+                     transition-colors duration-200 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent focus-visible:rounded-lg"
+              role="button"
+              tabindex="0"
+              @click="chooseFormat('typst')"
+              @keydown.enter="chooseFormat('typst')"
+              @keydown.space.prevent="chooseFormat('typst')"
+            >
+              <FileCode class="w-5 h-5 text-accent mb-2" stroke-width="2" />
+              <div class="font-semibold text-ink text-sm">Typst</div>
+              <div class="text-xs text-ink-muted mt-1 leading-relaxed">
+                Academic typesetting with SVG output
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 </template>
 
 <style scoped>

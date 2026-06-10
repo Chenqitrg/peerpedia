@@ -112,9 +112,18 @@ describe('ArticleCard (Article Bar)', () => {
     expect(wrapper.text()).not.toContain('remaining')
   })
 
-  it('renders bookmark toggle button', () => {
+  it('hides bookmark button on own article', () => {
     const wrapper = mount(ArticleCard, {
-      props: { article: makeArticle() },
+      props: { article: makeArticle({ is_own_article: true }) },
+      global: { stubs: { 'router-link': RouterLinkStub } },
+    })
+    const bookmarkBtn = wrapper.find('button[aria-label*="bookmark" i]')
+    expect(bookmarkBtn.exists()).toBe(false)
+  })
+
+  it('renders bookmark toggle button on other articles', () => {
+    const wrapper = mount(ArticleCard, {
+      props: { article: makeArticle({ is_own_article: false }) },
       global: { stubs: { 'router-link': RouterLinkStub } },
     })
     const bookmarkBtn = wrapper.find('button[aria-label*="bookmark" i]')

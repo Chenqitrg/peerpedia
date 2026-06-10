@@ -56,7 +56,7 @@ describe('NavBar', () => {
     expect(wrapper.find('input').exists()).toBe(false)
   })
 
-  it('New Article link navigates to /edit?new=1 for fresh editor', () => {
+  it('New Article link navigates to /edit?new=1 for fresh editor', async () => {
     const user = { id: 'u1', username: 'test', name: 'Test' }
     localStorage.setItem('viewer', JSON.stringify(user))
     localStorage.setItem('token', 'test-token')
@@ -68,9 +68,20 @@ describe('NavBar', () => {
     // Find the "New Article" button by aria-label (i18n key: nav.newArticle)
     const newArticleBtn = wrapper.find('button[aria-label="写文章"], button[aria-label="New Article"]')
     expect(newArticleBtn.exists()).toBe(true)
-    // Clicking this should navigate to /edit?new=1&_t=<timestamp>
+    // Clicking this should open the format picker modal (Teleported to body)
     newArticleBtn.trigger('click')
-    expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/edit\?new=1&_t=\d+$/))
+    await wrapper.vm.$nextTick()
+    // Modal is Teleported to body — query document.body
+    expect(document.body.textContent).toContain('Choose Format')
+    expect(document.body.textContent).toContain('Standard format with math support')
+    expect(document.body.textContent).toContain('Academic typesetting')
+    // Click the Markdown format card
+    const markdownCard = Array.from(document.body.querySelectorAll('button')).find(
+      b => b.textContent?.includes('Markdown') && b.textContent?.includes('Standard format')
+    )
+    expect(markdownCard).toBeTruthy()
+    markdownCard!.click()
+    expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/edit\?new=1&_t=\d+&format=markdown$/))
   })
 
   it('shows nav links when logged in', () => {

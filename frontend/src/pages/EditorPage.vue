@@ -49,7 +49,9 @@ const isEdit = computed(() => !!editId.value)
 // Editor state
 const title = ref('')
 const content = ref('')
-const format = ref<'markdown' | 'typst'>('markdown')
+const format = ref<'markdown' | 'typst'>(
+  (route.query.format as 'markdown' | 'typst') || 'markdown'
+)
 const previewHtml = ref('')
 const previewLoading = ref(false)
 const compiling = ref(false)
@@ -557,28 +559,6 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           >
             Saved
           </span>
-        </div>
-
-        <!-- Format toggle -->
-        <div class="flex items-center bg-[#0d1117] border border-divider rounded-lg overflow-hidden ml-1">
-          <button
-            class="w-9 h-9 flex items-center justify-center text-xs font-mono transition-colors rounded-lg"
-            :class="format === 'markdown'
-              ? 'bg-accent text-[#0d1117] font-semibold'
-              : 'text-ink-muted hover:text-ink'"
-            @click="format = 'markdown'"
-          >
-            MD
-          </button>
-          <button
-            class="w-9 h-9 flex items-center justify-center text-xs font-mono transition-colors rounded-lg"
-            :class="format === 'typst'
-              ? 'bg-accent text-[#0d1117] font-semibold'
-              : 'text-ink-muted hover:text-ink'"
-            @click="format = 'typst'"
-          >
-            Typst
-          </button>
         </div>
 
         <div class="w-px h-5 bg-divider mx-1" />
