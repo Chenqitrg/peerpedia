@@ -336,7 +336,7 @@ async function saveDraft() {
   const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
 
   if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
-    const msg = commitMsg.value.trim() || 'Save draft'
+    const msg = commitMsg.value.trim()
     const ok = await persistToGit(accountId, author, msg)
     if (!ok) return
     commitMsg.value = ''
@@ -540,7 +540,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                 type="text"
                 :placeholder="t('editor.commitMessagePlaceholder')"
                 class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent mb-3"
-                @keyup.enter="confirmSaveWithCommit"
+                @keyup.enter="tempCommitMsg.trim() && confirmCommit()"
               />
               <div class="flex items-center gap-2">
                 <button
@@ -548,7 +548,8 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
                   @click="cancelCommit()"
                 >{{ t('editor.cancel') }}</button>
                 <button
-                  class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-1.5 hover:brightness-110 transition-all"
+                  class="flex-1 text-xs font-semibold bg-accent text-[#0d1117] rounded-lg py-1.5 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="!tempCommitMsg.trim()"
                   @click="confirmCommit"
                 >{{ t('editor.saveDraft') }}</button>
               </div>
