@@ -11,6 +11,8 @@ import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
+import { useEditorTab } from '../composables/useTabIntegration'
+import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
 import DownloadButton from '../components/DownloadButton.vue'
@@ -33,7 +35,9 @@ const route = useRoute()
 const router = useRouter()
 const articleStore = useArticleStore()
 const userStore = useUserStore()
+const tabStore = useTabStore()
 const { t } = useI18n()
+
 const { canWrite, getFallback } = useOffline()
 
 import { getArticleSource } from '../api/articles'
@@ -78,6 +82,11 @@ const isClean = computed(() => content.value === savedContent.value && title.val
  *  because git commit may not always succeed (e.g., running before login). */
 const hasSaved = computed(() => !!currentDraftId.value || !!commitHash.value)
 
+// Tab integration — register this editor as a tab and sync state
+const editorAreaRef = ref<HTMLElement | null>(null)
+const tabId = tabStore.ensureTab('editor', route.fullPath)
+useEditorTab(tabId, title, isClean, editorAreaRef)
+
 // Split panel resize
 const { splitRatio, splitterEl, isDragging, onSplitterMouseDown } = useSplitPane()
 
@@ -95,6 +104,12 @@ const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
 
+function onSaveAndClose(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (detail?.tabId !== tabId) return  // not for this instance
+  handleSaveDraft()
+}
+
 onMounted(() => {
   if (isEdit.value) {
     loadExistingArticle()
@@ -108,10 +123,12 @@ onMounted(() => {
     currentDraftId.value = undefined
   }
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('tab-save-and-close', onSaveAndClose)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('tab-save-and-close', onSaveAndClose)
 })
 
 // Cmd+S / Ctrl+S → compile preview (only when editor area is focused)
@@ -126,10 +143,14 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 // When NavBar navigates to /edit?new=1, reset editor state for a fresh start.
-// The keep-alive cache preserves the component across navigations, so this watch
-// is the signal that distinguishes "New Article" from "resume editing".
+// With unique KeepAlive keys (route.fullPath), each "New Article" click creates
+// a brand new component instance. The { immediate: true } watch fires on the
+// initial mount to clear any stale state. We guard with didReset to prevent
+// re-triggering on KeepAlive reactivation (which would clear the user's work).
+let didReset = false
 watch(() => route.query.new, (val) => {
-  if (val === '1') {
+  if (val === '1' && !didReset) {
+    didReset = true
     title.value = ''
     content.value = ''
     previewHtml.value = ''
@@ -145,7 +166,6 @@ watch(() => route.query.new, (val) => {
     currentDraftId.value = undefined
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
-    router.replace({ path: '/edit' })
   }
 }, { immediate: true })
 
@@ -664,6 +684,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
     <div class="flex flex-1 border-x border-divider overflow-hidden border-t">
       <!-- Editor area (left) -->
       <div
+        ref="editorAreaRef"
         class="flex flex-col"
         :style="{ width: showPreview ? `${splitRatio}%` : '100%' }"
       >

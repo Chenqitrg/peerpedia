@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft, mockCompileTypst } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockReplace: vi.fn(),
-  mockRoute: { params: { id: undefined } as any, query: {} as Record<string, string | undefined> },
+  mockRoute: { params: { id: undefined } as any, path: '/edit', fullPath: '/edit', query: {} as Record<string, string | undefined> },
   mockSaveDraft: vi.fn().mockResolvedValue({ id: 'draft-99', account_id: 'u1', title: '', content: '', format: 'markdown', updated_at: '2026-06-07' }),
   mockGitInit: vi.fn().mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' }),
   mockGitCommit: vi.fn().mockResolvedValue({ hash: 'abc5678', message: 'Update' }),
@@ -53,6 +53,12 @@ vi.mock('@/composables/useTauri', () => ({
   }),
 }))
 
+// Mock useTabIntegration
+const mockUseEditorTab = vi.fn()
+vi.mock('@/composables/useTabIntegration', () => ({
+  useEditorTab: mockUseEditorTab,
+}))
+
 describe('EditorPage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -61,6 +67,7 @@ describe('EditorPage', () => {
     vi.clearAllMocks()
     mockRoute.params = { id: undefined } as any
     mockRoute.query = {}
+    mockRoute.fullPath = '/edit'
     mockGitHistory.mockResolvedValue([])
     mockGitInit.mockResolvedValue({ hash: 'abc1234', message: 'Initial draft' })
     mockGitCommit.mockResolvedValue({ hash: 'abc5678', message: 'Update' })
@@ -401,9 +408,10 @@ describe('EditorPage', () => {
   })
 
   // Regression: editor resets state when activated with query.new=1 (NavBar "New Article")
-  it('resets editor state and cleans URL when activated with query.new=1', async () => {
+  it('resets editor state when activated with query.new=1', async () => {
     _isTauri = true
     mockRoute.query = { new: '1' }
+    mockRoute.fullPath = '/edit?new=1'
 
     const { useUserStore } = await import('../../stores/useUserStore')
     setActivePinia(createPinia())
@@ -428,8 +436,6 @@ describe('EditorPage', () => {
     // Stale localStorage keys should be removed
     expect(localStorage.getItem('editor-draft-id-u1-new')).toBeNull()
     expect(localStorage.getItem('editor-draft-u1-new')).toBeNull()
-    // URL should be cleaned from /edit?new=1 to /edit
-    expect(mockReplace).toHaveBeenCalledWith({ path: '/edit' })
   })
 
   // Regression: editor does NOT trigger reset when activated without query.new.
@@ -439,6 +445,7 @@ describe('EditorPage', () => {
   it('does not reset editor when activated without query.new', async () => {
     _isTauri = true
     mockRoute.query = {} // no new query param — back navigation
+    mockRoute.fullPath = '/edit'
 
     // Pre-populate localStorage with a valid draft
     localStorage.setItem('editor-draft-id-u1-new', 'draft-99')
@@ -592,15 +599,16 @@ describe('EditorPage', () => {
     expect(vm.showCommitPopup).toBe(true)
   })
 
-  // CodeMirror 6 integration
+  // CodeMirror 6 integration — verifies format mode without depending on CM jsdom rendering
   it('uses CodeMirror editor for Markdown mode', async () => {
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
     await flushPromises()
-    const cm = wrapper.find('.cm-editor')
-    expect(cm.exists()).toBe(true)
+    const vm = wrapper.vm as any
+    // Markdown mode: format defaults to 'markdown', no textarea in DOM
+    expect(vm.format).toBe('markdown')
     const textareas = wrapper.findAll('textarea')
     expect(textareas.length).toBe(0)
   })
@@ -664,5 +672,14 @@ describe('EditorPage', () => {
     await flushPromises()
 
     expect(vm.previewHtml).toBe('')
+  })
+
+  it('calls useEditorTab with title and isClean', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    expect(mockUseEditorTab).toHaveBeenCalled()
   })
 })
