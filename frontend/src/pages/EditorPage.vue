@@ -145,10 +145,14 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 // When NavBar navigates to /edit?new=1, reset editor state for a fresh start.
-// The keep-alive cache preserves the component across navigations, so this watch
-// is the signal that distinguishes "New Article" from "resume editing".
+// With unique KeepAlive keys (route.fullPath), each "New Article" click creates
+// a brand new component instance. The { immediate: true } watch fires on the
+// initial mount to clear any stale state. We guard with didReset to prevent
+// re-triggering on KeepAlive reactivation (which would clear the user's work).
+let didReset = false
 watch(() => route.query.new, (val) => {
-  if (val === '1') {
+  if (val === '1' && !didReset) {
+    didReset = true
     title.value = ''
     content.value = ''
     previewHtml.value = ''
