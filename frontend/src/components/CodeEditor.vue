@@ -22,7 +22,13 @@ const codemirrorView = shallowRef<EditorView>()
 const extensions = computed<Extension[]>(() => {
   const exts: Extension[] = [oneDark]
   if (props.format === 'typst') {
-    exts.push(typst())
+    try {
+      exts.push(typst())
+    } catch (e) {
+      // WASM may fail to load in some environments (e.g., WKWebView).
+      // Fall back to no syntax highlighting rather than crashing.
+      console.warn('Typst syntax highlighting unavailable:', e)
+    }
   } else {
     exts.push(markdown())
   }
