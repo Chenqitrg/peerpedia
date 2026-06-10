@@ -42,12 +42,14 @@ const offlineMatrix: Record<string, FeatureCapability> = {
 export function useOffline() {
   const { isOnline } = useNetworkStatus()
 
-  // In local-only mode (Tauri desktop / browser-local mock), network features
-  // are never available — there is no server to reach. This check is independent
-  // of ping-based isOnline which can lag for ~60s.
+  // Tauri / browser-local mock mode. When a server IS reachable (isOnline),
+  // network-only features are unblocked — the app is in "connected" mode even
+  // though it's running on Tauri. This lets a locally-running Python backend
+  // serve pool, feed, schools, search, and publish features.
   function isLocalOnly(): boolean {
     if (typeof window === 'undefined') return false
-    return '__TAURI__' in window || new URLSearchParams(window.location.search).has('tauri')
+    return ('__TAURI__' in window || new URLSearchParams(window.location.search).has('tauri'))
+      && !isOnline.value
   }
 
   function canRead(feature: string): boolean {
