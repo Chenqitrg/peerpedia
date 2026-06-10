@@ -33,6 +33,8 @@ jobs:
         run: python seed.py
       - name: Test
         run: python -m pytest backend/tests/ -v --tb=short --durations=10 --ignore=backend/tests/test_seed_driven.py
+      - name: E2E — live server health check
+        run: bash backend/tests/integration/test_health_e2e.sh
 
   backend-lint:
     name: Backend — ruff
