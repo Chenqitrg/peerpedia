@@ -519,6 +519,56 @@ pub fn cache_article_full(
     Ok(OkResponse { ok: true })
 }
 
+// ── Article sync command ────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct SetServerArticleIdParams {
+    pub draft_id: String,
+    pub server_article_id: String,
+    pub server_commit_hash: String,
+    pub token: Option<String>,
+    #[serde(default)]
+    pub account_id: String,
+}
+
+#[tauri::command]
+pub fn set_server_article_id(
+    state: State<'_, AppState>,
+    params: SetServerArticleIdParams,
+) -> Result<OkResponse, AppError> {
+    let account_id = if let Some(ref token) = params.token {
+        resolve_account(&state, token)?
+    } else if !params.account_id.is_empty() {
+        params.account_id.clone()
+    } else {
+        return Err(AppError::AuthFailed("Authentication required".into()));
+    };
+
+    let conn = lock_db(&state)?;
+    let mut draft = local_store::get_draft(&conn, &params.draft_id)?;
+    if draft.account_id != account_id {
+        return Err(AppError::AuthFailed(
+            "Draft belongs to another account".into(),
+        ));
+    }
+
+    draft.server_article_id = Some(params.server_article_id);
+    draft.server_commit_hash = Some(params.server_commit_hash);
+
+    local_store::save_draft(
+        &conn,
+        Some(&draft.id),
+        &draft.account_id,
+        &draft.title,
+        &draft.content,
+        &draft.format,
+        draft.server_article_id.as_deref(),
+        draft.server_commit_hash.as_deref(),
+    )?;
+
+    Ok(OkResponse { ok: true })
+}
+
 // ── Export command ──────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
