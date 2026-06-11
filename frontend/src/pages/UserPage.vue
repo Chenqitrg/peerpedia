@@ -35,7 +35,9 @@ const id = computed(() => route.params.id as string)
 
 // In local mode (Tauri or browser-local), use local account data.
 const isSelf = computed(() => userStore.viewer?.id === id.value)
-const isLocal = computed(() => (userStore.isTauriMode || userStore.isBrowserLocal) && !isOnline.value)
+const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
+// Follow/bookmark actions need server when online; profile loading uses local identity.
+const useServerApi = computed(() => isLocal.value && isOnline.value)
 const { isOnline } = useNetworkStatus()
 
 function _localUserToProfile(a: { id: string; username: string }): UserProfile {
@@ -103,12 +105,9 @@ async function handleFollow() {
 
   followLoading.value = true
   try {
-    if (isLocal.value) {
-      if (isFollowing.value) {
-        await tauri.unfollowUser({ follower_id: userStore.viewer.id, followed_id: id.value })
-      } else {
-        await tauri.followUser({ follower_id: userStore.viewer.id, followed_id: id.value })
-      }
+    if (isLocal.value && !useServerApi.value) {
+      // Local mode + offline: follow not supported (no Rust IPC)
+      return
     } else {
       if (isFollowing.value) {
         await unfollowUser(id.value)
