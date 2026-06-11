@@ -11,8 +11,8 @@ import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
-import { useArticleSync } from '../composables/useArticleSync'
-import { useNetworkStatus } from '../composables/useNetworkStatus'
+import { useArticleSync } from '@/composables/useArticleSync'
+import { useNetworkStatus } from '@/composables/useNetworkStatus'
 import { useEditorTab } from '../composables/useTabIntegration'
 import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
@@ -31,8 +31,6 @@ import {
   Play,
   Save,
   Send,
-  Upload,
-  Loader,
 } from 'lucide-vue-next'
 
 
@@ -109,37 +107,34 @@ const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
 const { isOnline } = useNetworkStatus()
 
-// ── L4 Article sync ─────────────────────────────────────────────────────
-const syncDraftMeta = ref<{ server_article_id?: string | null; server_commit_hash?: string | null } | null>(null)
-const syncHeadHash = ref<string | null>(null)
+// ── L4 Auto-upload: silently backup to server on save ──────────────────
+const _draftId = () => currentDraftId.value || editId.value || ''
+const _sid = ref<string | null>(null)
+const _sch = ref<string | null>(null)
+const _lh = ref<string | null>(null)
+const { upload: autoUpload } = useArticleSync(_draftId, () => _sid.value, () => _sch.value, () => _lh.value)
 
-const syncDraftId = () => currentDraftId.value || editId.value || ''
-const syncSid = () => syncDraftMeta.value?.server_article_id
-const syncSch = () => syncDraftMeta.value?.server_commit_hash
-const syncLh = () => syncHeadHash.value
+async function _tryAutoUpload() {
+  if (!isOnline.value || !(tauri.isTauri.value || tauri.isBrowserLocal.value)) return
+  const id = _draftId()
+  if (!id) return
 
-const { syncState, pushing, upload, clearError } = useArticleSync(
-  syncDraftId, syncSid, syncSch, syncLh,
-)
+  // Only upload if we don't already have a server article ID.
+  const draft = await tauri.getDraft({ id })
+  if (!draft || typeof draft !== 'object' || 'error' in draft) return
+  const d = draft as { server_article_id?: string | null }
+  if (d.server_article_id) return  // already synced
 
-async function loadSyncMeta() {
-  const id = syncDraftId()
-  if (!id || !tauri.isTauri.value) return
-  const result = await tauri.getDraft({ id })
-  if (result && typeof result === 'object' && !('error' in result)) {
-    syncDraftMeta.value = result as typeof syncDraftMeta.value
-  }
+  // Load git HEAD for the upload.
   const history = await tauri.gitHistory({ article_id: id })
-  if (history && typeof history === 'object' && !('error' in history) && Array.isArray(history) && history.length > 0) {
-    syncHeadHash.value = history[0].hash
-  }
-}
+  if (!history || typeof history !== 'object' || 'error' in history || !Array.isArray(history) || history.length === 0) return
+  _lh.value = history[0].hash
 
-async function handleUpload() {
-  const ok = await upload()
-  if (ok) {
-    await loadSyncMeta()
-  }
+  // Also load existing sync meta (may be stale from DB).
+  if (d.server_article_id) _sid.value = d.server_article_id
+  if ((d as any).server_commit_hash) _sch.value = (d as any).server_commit_hash
+
+  await autoUpload()
 }
 
 const currentDraftId = ref<string | undefined>(
@@ -153,7 +148,6 @@ function onSaveAndClose(e: Event) {
 }
 
 onMounted(() => {
-  loadSyncMeta()
   if (isEdit.value) {
     loadExistingArticle()
   } else {
@@ -381,6 +375,7 @@ async function saveDraft() {
     if (!ok) return
     commitMsg.value = ''
     markSaved()
+    _tryAutoUpload()  // L4: silent backup to server (fire-and-forget)
     return
   }
 
@@ -692,19 +687,6 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           <Send class="w-4 h-4" stroke-width="2" />
         </button>
 
-        <!-- L4 Upload to server -->
-        <button
-          v-if="syncState === 'upload'"
-          class="flex items-center justify-center w-9 h-9 rounded-lg
-                 text-accent hover:text-accent hover:bg-accent/10
-                 transition-colors duration-200"
-          :disabled="pushing"
-          title="上传到服务器"
-          @click="handleUpload"
-        >
-          <Loader v-if="pushing" :size="18" stroke-width="2" class="animate-spin" />
-          <Upload v-else :size="18" stroke-width="2" />
-        </button>
       </div>
     </div>
 

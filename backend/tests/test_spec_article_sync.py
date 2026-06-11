@@ -105,8 +105,7 @@ class TestSpecSyncUpload:
         article = _create_article(client, token, user["id"], "My First Upload")
         assert "id" in article
         assert article["title"] == "My First Upload"
-        # Server auto-enters sedimentation pool on creation.
-        assert article["status"] in ("draft", "sedimentation")
+        assert article["status"] == "draft"
 
     def test_uploaded_article_appears_in_list(self, client):
         """SPEC-SYNC-UPLOAD-2: After upload, article appears in GET /articles."""
