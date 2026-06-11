@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-11 · v0.2.1 · L4 article sync: auto-backup to server on save, conflict resolution (Keep Local / Use Remote), bookmark offline guard · Draft-first: articles created as draft, publish is explicit
+> 2026-06-11 · v0.2.2 · L4 follow: Tauri Rust follow commands (follow_user, unfollow_user, is_following, get_following, get_followers) with local SQLite storage · Schools page follow state persistence · User profile fallback for server users in Tauri mode · Article visibility in Tauri+online mode
 
 ---
 
@@ -92,7 +92,7 @@ Publish → POST /articles/{id}/publish → enters sedimentation pool
 - No manual Upload button — backup is automatic and silent
 - Draft ≠ published — articles on the server stay private until explicitly published
 - Conflict resolution IS sync — no separate Push/Pull, just compare hashes
-- Bookmark/Follow require server connection — offline shows disabled state, not silent failure
+- Follow works fully offline via local SQLite in Tauri mode, with server sync deferred to Phase 2. Bookmark requires server connection — offline shows disabled state, not silent failure.
 
 ### 2.5 Offline Architecture
 
@@ -101,7 +101,7 @@ Phase 1 desktop is fully offline-capable (with L4 auto-backup when online):
 - **Browse = cache**: every article read is automatically cached in local SQLite.
 - **Bookmark = full cache**: bookmarked articles cache reviews + citation graph.
 - **Network status**: `useNetworkStatus` with Wifi/WifiOff icon. Starts offline, flips online on first successful ping — no 60s window where offline features incorrectly appear accessible.
-- **Network-blocked features**: `useOffline` permanently blocks pool, schools, and search.network in local/Tauri mode. These features show a disabled state (grayed icons with tooltip), not an error after navigation.
+- **Network-blocked features**: `useOffline` permanently blocks pool and search.network in local/Tauri mode. Schools is available in Tauri mode (user list fetched from server API). Follow/unfollow works locally via Tauri IPC. These offline features show a disabled state (grayed icons with tooltip), not an error after navigation.
 - **Save = Git commit**: every draft save creates or updates a local Git repository (`local_git.rs`). Commit history is available offline via `git log`.
 - **Download = committed artifact**: download filenames embed the 7-char commit hash (e.g., `Title-a1b2c3d.pdf`). Downloads are disabled until the first save — every downloaded file is tied to a committed version. Source downloads use `.typ`/`.md` extension, compiled Markdown → `.html`, compiled Typst → `.pdf` (via server-side `/compile-download` API). In the article page, labels are shown; in the editor toolbar, icons only with instant tooltips.
 - **Save-as-commit**: each save in Tauri/local mode triggers a git commit. The commit message popup opens for every save — `commitMsg` is cleared after each successful commit, forcing a fresh message per save.
