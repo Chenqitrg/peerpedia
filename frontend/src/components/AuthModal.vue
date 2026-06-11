@@ -42,8 +42,17 @@ async function handleLogin() {
 
 async function handleRegister() {
   error.value = ''
-  if (!username.value.trim() || !password.value.trim()) {
+  const uname = username.value.trim()
+  if (!uname || !password.value.trim()) {
     error.value = 'Username and password are required'
+    return
+  }
+  if (uname.length < 3) {
+    error.value = 'Username must be at least 3 characters'
+    return
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(uname)) {
+    error.value = 'Username must contain only letters, numbers, and underscores'
     return
   }
   if (password.value.length < 6) {
