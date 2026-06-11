@@ -116,7 +116,7 @@ async function handleFollow() {
       }
     }
     isFollowing.value = !isFollowing.value
-  } catch { /* ignore */ }
+  } catch (e: any) { console.log('[follow] error:', e?.response?.status, e?.response?.data || e?.message) }
   finally { followLoading.value = false }
 }
 
