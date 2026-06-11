@@ -71,6 +71,32 @@
     "forks": "次复刻",
     "follow": "关注"
   },
+  "sync": {
+    "loginRequired": "请先登录服务器",
+    "noArticle": "没有可上传的文章",
+    "cannotReadDraft": "无法读取本地草稿",
+    "cannotReadHistory": "无法读取 git 历史",
+    "noCommits": "文章没有任何提交",
+    "cannotReadContent": "无法读取文章内容",
+    "serverError": "服务器返回异常",
+    "uploadFailed": "上传失败",
+    "updateNoId": "无法更新：缺少服务器文章 ID",
+    "updateFailed": "更新失败",
+    "rollbackFailed": "回滚失败",
+    "cannotLoadDiff": "无法加载对比",
+    "cannotReadVersions": "无法读取版本内容",
+    "diffTitle": "版本对比",
+    "diffSubtitle": "远程版本 vs 本地版本",
+    "remoteVersion": "远程版本",
+    "localVersion": "本地版本",
+    "keepLocal": "Keep Local",
+    "useRemote": "Use Remote",
+    "conflictTooltip": "与服务器版本冲突，点击解决",
+    "close": "关闭"
+  },
+  "bookmark": {
+    "serverRequired": "书签功能需要服务器连接"
+  },
   "card": {
     "addBookmark": "添加收藏",
     "removeBookmark": "取消收藏",

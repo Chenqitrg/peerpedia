@@ -50,6 +50,8 @@ vi.mock('../../api/users', () => ({
   }),
   getFollowers: vi.fn().mockResolvedValue([]),
   getFollowing: vi.fn().mockResolvedValue([]),
+  followUser: vi.fn(),
+  unfollowUser: vi.fn(),
 }))
 
 vi.mock('../../api/articles', () => ({

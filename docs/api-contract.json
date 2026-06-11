@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PeerPedia API",
-    "version": "0.2.0",
-    "description": "PeerPedia API — Phase 1.5 (2026-06-10). v0.2.0: self-bookmark rejection (400 on own article), format-aware editor routing."
+    "version": "0.2.1",
+    "description": "PeerPedia API — Phase 1.5 (2026-06-11). v0.2.1: L4 article sync (draft-first creation, publish is explicit), auto-backup on save, conflict resolution."
   },
   "paths": {
     "/api/v1/auth/register": {
@@ -247,6 +247,7 @@
           "articles"
         ],
         "summary": "Api Create Article",
+        "description": "Create a new article. Articles start as draft — use POST /articles/{id}/publish to enter the sedimentation pool.",
         "operationId": "api_create_article_api_v1_articles_post",
         "requestBody": {
           "required": true,
@@ -344,7 +345,7 @@
           "articles"
         ],
         "summary": "Api Update Article",
-        "description": "Edit an article: update content, commit to git, re-enter pool.",
+        "description": "Edit an article: update content, commit to git. Set publish=true to re-enter the sedimentation pool.",
         "operationId": "api_update_article_api_v1_articles__article_id__put",
         "parameters": [
           {

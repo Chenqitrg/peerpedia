@@ -77,6 +77,32 @@
     "forks": "forks",
     "follow": "Follow"
   },
+  "sync": {
+    "loginRequired": "Please log in to the server",
+    "noArticle": "No article to upload",
+    "cannotReadDraft": "Cannot read local draft",
+    "cannotReadHistory": "Cannot read git history",
+    "noCommits": "Article has no commits",
+    "cannotReadContent": "Cannot read article content",
+    "serverError": "Server returned an error",
+    "uploadFailed": "Upload failed",
+    "updateNoId": "Cannot update: missing server article ID",
+    "updateFailed": "Update failed",
+    "rollbackFailed": "Rollback failed",
+    "cannotLoadDiff": "Cannot load diff",
+    "cannotReadVersions": "Cannot read version content",
+    "diffTitle": "Version Comparison",
+    "diffSubtitle": "Remote vs Local",
+    "remoteVersion": "Remote Version",
+    "localVersion": "Local Version",
+    "keepLocal": "Keep Local",
+    "useRemote": "Use Remote",
+    "conflictTooltip": "Conflict with server version, click to resolve",
+    "close": "Close"
+  },
+  "bookmark": {
+    "serverRequired": "Bookmarks require a server connection"
+  },
   "card": {
     "addBookmark": "Add bookmark",
     "removeBookmark": "Remove bookmark",

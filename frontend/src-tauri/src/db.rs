@@ -14,7 +14,7 @@ use crate::error::AppError;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
-const CURRENT_SCHEMA_VERSION: i32 = 5;
+const CURRENT_SCHEMA_VERSION: i32 = 6;
 
 /// Resolve the database path: ~/.peerpedia/peerpedia.db
 fn get_db_path() -> Result<PathBuf, AppError> {
@@ -160,16 +160,14 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
             )?;
         }
         5 => {
-            // Backfill: re-index all existing drafts into FTS5.
-            // v4 originally shipped without this backfill INSERT (later fixed
-            // in commit d752f60), so databases that ran v4 before the fix have
-            // old drafts missing from the FTS index. This migration runs the
-            // backfill unconditionally — INSERT OR REPLACE avoids duplicates
-            // for drafts already indexed by triggers.
             tx.execute_batch(
                 "INSERT OR REPLACE INTO drafts_fts(rowid, title, content)
                  SELECT rowid, title, content FROM drafts;",
             )?;
+        }
+        6 => {
+            let _ = tx.execute("ALTER TABLE drafts ADD COLUMN server_article_id TEXT", []);
+            let _ = tx.execute("ALTER TABLE drafts ADD COLUMN server_commit_hash TEXT", []);
         }
         _ => {
             // Unknown migration — rollback and report.
@@ -209,7 +207,7 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        assert_eq!(v, 5);
+        assert_eq!(v, 6);
 
         // Create account first (FK target for sessions).
         conn.execute(
@@ -432,8 +430,8 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
-        // Five version rows (v1, v2, v3, v4, v5), not duplicated on re-run.
-        assert_eq!(count, 5);
+        // Six version rows (v1-v6), not duplicated on re-run.
+        assert_eq!(count, 6);
     }
 
     #[test]
@@ -483,6 +481,30 @@ mod tests {
             )
             .unwrap();
         assert_eq!(name, "alice");
+    }
+
+    #[test]
+    fn test_migration_v6_adds_sync_columns() {
+        let conn = test_conn();
+        run_migrations(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO local_accounts (id, username, password_hash) VALUES ('a1', 'alice', 'hash')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO drafts (id, account_id, title, content, server_article_id, server_commit_hash)
+             VALUES ('d1', 'a1', 'Test', 'content', 'server-123', 'abc123')",
+            [],
+        ).unwrap();
+        let (sid, sch): (String, String) = conn
+            .query_row(
+                "SELECT server_article_id, server_commit_hash FROM drafts WHERE id = 'd1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(sid, "server-123");
+        assert_eq!(sch, "abc123");
     }
 
     #[test]

@@ -11,6 +11,8 @@ import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
+import { useArticleSync } from '@/composables/useArticleSync'
+import { useNetworkStatus } from '@/composables/useNetworkStatus'
 import { useEditorTab } from '../composables/useTabIntegration'
 import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
@@ -103,6 +105,38 @@ const totalContribution = computed(() =>
 // Draft persistence — Tauri IPC when available, REST + localStorage fallback.
 const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
+const { isOnline } = useNetworkStatus()
+
+// ── L4 Auto-upload: silently backup to server on save ──────────────────
+const _draftId = () => currentDraftId.value || editId.value || ''
+const _sid = ref<string | null>(null)
+const _sch = ref<string | null>(null)
+const _lh = ref<string | null>(null)
+const { upload: autoUpload } = useArticleSync(_draftId, () => _sid.value, () => _sch.value, () => _lh.value)
+
+async function _tryAutoUpload() {
+  if (!isOnline.value || !(tauri.isTauri.value || tauri.isBrowserLocal.value)) return
+  const id = _draftId()
+  if (!id) return
+
+  // Only upload if we don't already have a server article ID.
+  const draft = await tauri.getDraft({ id })
+  if (!draft || typeof draft !== 'object' || 'error' in draft) return
+  const d = draft as { server_article_id?: string | null }
+  if (d.server_article_id) return  // already synced
+
+  // Load git HEAD for the upload.
+  const history = await tauri.gitHistory({ article_id: id })
+  if (!history || typeof history !== 'object' || 'error' in history || !Array.isArray(history) || history.length === 0) return
+  _lh.value = history[0].hash
+
+  // Also load existing sync meta (may be stale from DB).
+  if (d.server_article_id) _sid.value = d.server_article_id
+  if ((d as any).server_commit_hash) _sch.value = (d as any).server_commit_hash
+
+  await autoUpload()
+}
+
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
@@ -341,6 +375,7 @@ async function saveDraft() {
     if (!ok) return
     commitMsg.value = ''
     markSaved()
+    _tryAutoUpload()  // L4: silent backup to server (fire-and-forget)
     return
   }
 
@@ -651,6 +686,7 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
         >
           <Send class="w-4 h-4" stroke-width="2" />
         </button>
+
       </div>
     </div>
 

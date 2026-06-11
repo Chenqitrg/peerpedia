@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
+
 // Mock useNetworkStatus — Layer 1 test controls isOnline directly.
 const mockIsOnline = ref(false)
 vi.mock('../useNetworkStatus', () => ({

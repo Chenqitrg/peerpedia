@@ -30,7 +30,7 @@ vi.mock('@/api/compile', () => ({ compilePreview: vi.fn(async () => '<p>P</p>') 
 vi.mock('@/api/auth', () => ({ login: vi.fn(), register: vi.fn(), getMe: vi.fn(async () => ({ user: {} })) }))
 vi.mock('@/stores/useUserStore', () => ({
   useUserStore: () => ({ viewer: { id: 'u1', name: 'A' }, token: 'x', showAuthModal: false, intendedRoute: null,
-    isTauriMode: false, isBrowserLocal: false, restoreSession: vi.fn(async () => {}), login: vi.fn(), register: vi.fn(), logout: vi.fn() }),
+    isTauriMode: false, isBrowserLocal: false, restoreSession: vi.fn(async () => {}), login: vi.fn(), register: vi.fn(), logout: vi.fn(), trySyncServerAuth: vi.fn() }),
 }))
 vi.mock('@/composables/useTauri', () => ({
   useTauri: () => ({ isTauri: { value: false }, isBrowserLocal: { value: false }, saveDraft: vi.fn(), getDraft: vi.fn().mockResolvedValue(null), listDrafts: vi.fn().mockResolvedValue([]), deleteDraft: vi.fn(), gitInit: vi.fn(), gitCommit: vi.fn(), gitHistory: vi.fn().mockResolvedValue([]), compileTypst: vi.fn(), getSessionToken: vi.fn(() => null), setSessionToken: vi.fn(), login: vi.fn(), listAccounts: vi.fn().mockResolvedValue([]), isFollowing: vi.fn(), getCachedArticle: vi.fn().mockResolvedValue(null), searchDrafts: vi.fn().mockResolvedValue([]), searchCachedArticles: vi.fn().mockResolvedValue([]), deleteArticle: vi.fn() }),

@@ -192,7 +192,7 @@ def api_create_article(
     commit_msg = body.commit_message or "Initial submission"
     commit_hash = commit_article(rp, commit_msg, body.authors[0],
                                   f"{body.authors[0]}@peerpedia", allow_empty=True)
-    a = set_sink_start(db, a.id, params.sink.new_article_default_days)
+    # L4: articles start as draft — publish is explicit via POST /articles/{id}/publish
 
     contributions = None
     if body.contributions:
