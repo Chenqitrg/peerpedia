@@ -102,8 +102,16 @@ pub fn create_account(
         ));
     }
     let email = email.trim();
-    if !email.is_empty() && !email.contains('@') {
-        return Err(AppError::AuthFailed("Invalid email format".into()));
+    // Must match the server's email regex: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$
+    if !email.is_empty() {
+        let has_at = email.contains('@');
+        let after_at = email.rfind('@').map(|i| &email[i + 1..]).unwrap_or("");
+        let has_dot_with_tld = after_at
+            .rfind('.')
+            .map_or(false, |i| after_at[i + 1..].len() >= 2);
+        if !has_at || !has_dot_with_tld {
+            return Err(AppError::AuthFailed("Invalid email format".into()));
+        }
     }
     let name = name.trim();
     if name.is_empty() {
