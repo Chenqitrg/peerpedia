@@ -85,7 +85,7 @@ watch(isOnline, (online) => {
   if (online) {
     userStore.trySyncServerAuth()
   }
-})
+}, { immediate: true })
 
 // ── Close confirmation dialog (dirty tabs) ─────────────────────
 
