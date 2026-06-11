@@ -82,7 +82,9 @@ router.afterEach((to) => {
 
 // ── L4: Auto-sync local account to server when network becomes available ──
 watch(isOnline, (online) => {
+  console.log('[App] isOnline changed:', online)
   if (online) {
+    console.log('[App] calling trySyncServerAuth from watcher')
     userStore.trySyncServerAuth()
   }
 }, { immediate: true })

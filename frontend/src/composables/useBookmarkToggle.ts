@@ -42,7 +42,9 @@ export function useBookmarkToggle(
       && !userStore.token?.value
 
     if (needsSync) {
+      console.log('[bookmark] needsSync, calling trySyncServerAuth')
       const synced = await userStore.trySyncServerAuth()
+      console.log('[bookmark] trySyncServerAuth result:', synced, 'token:', !!userStore.token?.value)
       if (!synced || !userStore.token?.value) {
         article.is_bookmarked = previous
         if (onError) {
