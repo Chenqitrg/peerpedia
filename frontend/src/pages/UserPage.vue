@@ -129,6 +129,7 @@ async function handleFollow() {
         await followUser(id.value)
       }
       console.log('[follow] API success')
+    }
     isFollowing.value = !isFollowing.value
   } catch (e: any) { console.log('[follow] error:', e?.response?.status, e?.response?.data || e?.message) }
   finally { followLoading.value = false }
