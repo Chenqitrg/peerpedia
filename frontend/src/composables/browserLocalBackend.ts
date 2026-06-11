@@ -9,7 +9,6 @@ import { loadString, loadJSON, saveString, saveJSON, remove } from './useLocalSt
 interface MockAccount { id: string; username: string; password: string }
 interface MockDraft { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
 interface MockCacheEntry { id: string; json: string; cached_at: string }
-interface MockFollow { follower_id: string; followed_id: string; created_at: string }
 interface MockBookmark { user_id: string; article_id: string; created_at: string }
 
 // ── Browser-local activation (module-level, runs once on import) ─────────
@@ -41,7 +40,7 @@ function _save<T>(key: string, val: T) {
 }
 
 const _draftsKey = '_t_drafts', _cacheKey = '_t_cache', _acctsKey = '_t_accts'
-const _followsKey = '_t_follows', _bookmarksKey = '_t_bookmarks'
+const _bookmarksKey = '_t_bookmarks'
 const _sessionsKey = '_t_sessions'
 
 /// Resolve a token to account_id in mock mode, or return a raw user identifier.
@@ -62,7 +61,6 @@ export async function browserLocalInvoke(cmd: string, args?: Record<string, unkn
   const sessions = _load<{ token: string; account_id: string }[]>(_sessionsKey, [])
   const drafts = _load<MockDraft[]>(_draftsKey, [])
   const cache = _load<Record<string, MockCacheEntry>>(_cacheKey, {})
-  const follows = _load<MockFollow[]>(_followsKey, [])
   const bookmarks = _load<MockBookmark[]>(_bookmarksKey, [])
 
   switch (cmd) {
@@ -128,43 +126,6 @@ export async function browserLocalInvoke(cmd: string, args?: Record<string, unkn
     }
     case 'get_cached_article':
       return cache[a.id as string] || null
-    case 'follow_user': {
-      const accountId = _resolveToken(a, sessions) || ''
-      const exists = follows.find(x => x.follower_id === accountId && x.followed_id === a.followed_id)
-      if (!exists) {
-        follows.push({ follower_id: accountId, followed_id: a.followed_id as string, created_at: new Date().toISOString() })
-        _save(_followsKey, follows)
-      }
-      return { ok: true }
-    }
-    case 'unfollow_user': {
-      const accountId = _resolveToken(a, sessions) || ''
-      _save(_followsKey, follows.filter(x => !(x.follower_id === accountId && x.followed_id === a.followed_id)))
-      return { ok: true }
-    }
-    case 'is_following': {
-      const accountId = _resolveToken(a, sessions) || ''
-      const f = follows.find(x => x.follower_id === accountId && x.followed_id === a.followed_id)
-      return { following: !!f }
-    }
-    case 'get_followers': {
-      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
-      const ids = follows.filter(x => x.followed_id === targetId).map(x => x.follower_id)
-      return ids.map(id => ({ id }))
-    }
-    case 'get_following': {
-      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
-      const ids = follows.filter(x => x.follower_id === targetId).map(x => x.followed_id)
-      return ids.map(id => ({ id }))
-    }
-    case 'get_follower_count': {
-      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
-      return { count: follows.filter(x => x.followed_id === targetId).length }
-    }
-    case 'get_following_count': {
-      const targetId = (a.followed_id as string) || (a.user_id as string) || ''
-      return { count: follows.filter(x => x.follower_id === targetId).length }
-    }
     case 'add_bookmark': {
       const accountId = _resolveToken(a, sessions) || ''
       const bm = bookmarks.find(x => x.user_id === accountId && x.article_id === a.article_id)

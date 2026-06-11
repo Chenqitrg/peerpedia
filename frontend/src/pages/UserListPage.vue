@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { getFollowers, getFollowing, getUsers } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useFollowCache } from '../composables/useFollowCache'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
 import UserCard from '../components/UserCard.vue'
 import ErrorState from '../components/ErrorState.vue'
@@ -30,28 +31,19 @@ const title = computed(() => isFollowers.value ? t('common.followers') : t('comm
 async function load() {
   loading.value = true
   error.value = ''
-  const isLocal = userStore.isTauriMode || userStore.isBrowserLocal
   try {
-    if (isLocal) {
-      const result = isFollowers.value
-        ? await tauri.getFollowers({ user_id: userId.value })
-        : await tauri.getFollowing({ user_id: userId.value })
-      if (result && !('error' in result) && Array.isArray(result) && result.length > 0) {
-        // Resolve names: fetch server user list to map IDs to names
-        let nameMap: Map<string, string> = new Map()
-        if (isOnline.value) {
-          try {
-            const serverUsers = await getUsers()
-            for (const u of serverUsers) nameMap.set(u.id, u.name)
-          } catch { /* server unreachable, use IDs as names */ }
+    if (!isOnline.value) {
+      // Offline — only the viewer's own following list is cached.
+      const isSelf = userId.value === userStore.viewer?.id
+      if (isSelf && !isFollowers.value) {
+        const cache = useFollowCache()
+        const ids = await cache.getCachedFollowingIds(userId.value)
+        if (ids) {
+          users.value = ids.map(id => ({
+            id, name: id.slice(0, 8) + '…', anonymous_name: '',
+            article_count: 0, reputation: {},
+          })) as UserSummary[]
         }
-        users.value = result.map(a => ({
-          id: a.id,
-          name: nameMap.get(a.id) || a.id.slice(0, 8) + '…',
-          anonymous_name: '',
-          article_count: 0,
-          reputation: {},
-        })) as UserSummary[]
       }
     } else {
       users.value = isFollowers.value

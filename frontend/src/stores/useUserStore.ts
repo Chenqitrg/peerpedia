@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { login as apiLogin, register as apiRegister, getMe } from '../api/auth'
 import { useTauri } from '../composables/useTauri'
+import { useFollowCache } from '../composables/useFollowCache'
 import { loadString, loadJSON, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import type { UserProfile } from '../api/types'
 import type { Account, AccountSummary } from '../composables/useTauri'
@@ -110,6 +111,8 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
+      // Refresh offline follow cache.
+      useFollowCache().refreshCache(serverUser.id).catch(() => {})
     } catch (e: any) {
       console.log('[loginLocal] apiLogin failed, storing pending creds:', username)
       // Server unreachable — store credentials for later sync
@@ -232,6 +235,7 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
+      useFollowCache().refreshCache(serverUser.id).catch(() => {})
       return true
     } catch (e: any) {
       console.log('[sync] apiLogin failed:', e?.response?.status, e?.response?.data?.detail || e?.message || e)
@@ -253,6 +257,7 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
+      useFollowCache().refreshCache(serverUser.id).catch(() => {})
       return true
     } catch (regErr: any) {
       console.log('[sync] apiRegister failed:', regErr?.response?.status, regErr?.response?.data?.detail || regErr?.message || regErr)

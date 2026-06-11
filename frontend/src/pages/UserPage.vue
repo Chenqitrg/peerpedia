@@ -8,6 +8,7 @@ import { getUser, getFollowing, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useFollowCache } from '../composables/useFollowCache'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import ArticleCard from '../components/ArticleCard.vue'
@@ -88,34 +89,27 @@ const followLoading = ref(false)
   // Load initial follow state.
   async function loadFollowState() {
     if (!userStore.viewer) return
-    if (isLocal.value) {
-      if (isSelf.value) {
-        // Self in local mode — patch follow counts from local storage.
-        try {
-          const following = await tauri.getFollowing({ user_id: userStore.viewer?.id || '' })
-          const followers = await tauri.getFollowers({ user_id: userStore.viewer?.id || '' })
-          if (user.value && following && !('error' in following) && Array.isArray(following)) {
-            user.value = { ...user.value, following_count: following.length }
-          }
-          if (user.value && followers && !('error' in followers) && Array.isArray(followers)) {
-            user.value = { ...user.value, followers_count: followers.length }
-          }
-        } catch { /* fall through */ }
-        return
+    if (!isOnline.value) {
+      // Offline — read from local cache.
+      const cache = useFollowCache()
+      const ids = await cache.getCachedFollowingIds(userStore.viewer.id)
+      if (ids && isSelf.value && user.value) {
+        user.value = { ...user.value, following_count: ids.length }
+      } else if (ids) {
+        isFollowing.value = ids.includes(id.value)
       }
-      // Other user in local mode — check local storage.
-      const r = await tauri.isFollowing({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
-      if (r && !('error' in r)) {
-        isFollowing.value = r.following
-      }
-    } else {
-      // Web mode — check via server REST API.
-      try {
-        const following = await getFollowing(userStore.viewer.id)
-        const followed = Array.isArray(following) ? following : (following as any)?.users || []
-        isFollowing.value = followed.some((u: any) => u.id === id.value)
-      } catch { /* fall through */ }
+      return
     }
+    // Online — use server REST API.
+    try {
+      const following = await getFollowing(userStore.viewer.id)
+      const followed = Array.isArray(following) ? following : (following as any)?.users || []
+      if (isSelf.value && user.value) {
+        user.value = { ...user.value, following_count: followed.length }
+      } else {
+        isFollowing.value = followed.some((u: any) => u.id === id.value)
+      }
+    } catch { /* fall through */ }
   }
 
 
@@ -123,20 +117,14 @@ async function handleFollow() {
   if (!userStore.viewer) return
   followLoading.value = true
   try {
-    if (isLocal.value) {
-      if (isFollowing.value) {
-        await tauri.unfollowUser({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
-      } else {
-        await tauri.followUser({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
-      }
+    if (isFollowing.value) {
+      await unfollowUser(id.value)
     } else {
-      if (isFollowing.value) {
-        await unfollowUser(id.value)
-      } else {
-        await followUser(id.value)
-      }
+      await followUser(id.value)
     }
     isFollowing.value = !isFollowing.value
+    // Refresh offline cache after mutation.
+    useFollowCache().refreshCache(userStore.viewer.id).catch(() => {})
   } catch { /* revert on failure — no state change */ }
   finally { followLoading.value = false }
 }
