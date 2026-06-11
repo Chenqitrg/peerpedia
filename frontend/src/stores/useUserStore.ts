@@ -114,7 +114,7 @@ export const useUserStore = defineStore('user', () => {
       _savePendingCreds({
         username,
         password,
-        email: acctWithToken.email || '',
+        email: acctWithToken.email || `${username}@peerpedia.local`,
         name: acctWithToken.name || username,
       })
     }
