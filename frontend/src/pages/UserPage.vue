@@ -82,12 +82,25 @@ const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 const isFollowing = ref(false)
 const followLoading = ref(false)
 
-// Load initial follow state from browser-local backend in local mode.
+// Load initial follow state.
 async function loadFollowState() {
-  if (!isLocal.value || !userStore.viewer) return
-  const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: id.value })
-  if (r && !('error' in r)) {
-    isFollowing.value = r.following
+  if (!userStore.viewer || isSelf.value) return
+  // Online: check via server API
+  if (isOnline.value && userStore.token?.value) {
+    try {
+      const { getFollowing } = await import('../api/users')
+      const following = await getFollowing(userStore.viewer.id)
+      const followed = Array.isArray(following) ? following : (following as any)?.users || []
+      isFollowing.value = followed.some((u: any) => u.id === id.value)
+      return
+    } catch { /* fall through */ }
+  }
+  // Offline local: check via Tauri IPC
+  if (isLocal.value && !isOnline.value) {
+    const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: id.value })
+    if (r && !('error' in r)) {
+      isFollowing.value = r.following
+    }
   }
 }
 
