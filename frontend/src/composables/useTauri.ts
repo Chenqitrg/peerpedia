@@ -21,6 +21,7 @@ export type {
   FollowUserParams, IsFollowingParams, GetFollowListParams,
   BookmarkParams, GetBookmarksParams,
   GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
+  SetServerArticleIdParams,
   GitCommitResult, CommitEntry,
   Account, AccountSummary, Draft, DraftSummary, CachedArticle,
 } from './useTauriTypes'
@@ -32,6 +33,7 @@ import type {
   FollowUserParams, IsFollowingParams, GetFollowListParams,
   BookmarkParams, GetBookmarksParams,
   GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
+  SetServerArticleIdParams,
   GitCommitResult, CommitEntry,
   Account, AccountSummary, Draft, DraftSummary, CachedArticle,
 } from './useTauriTypes'
@@ -250,6 +252,14 @@ export function useTauri() {
     // Export
     async exportArticle(params: { article_id: string }) {
       return _invoke<string>('export_article', params as unknown as Record<string, unknown>)
+    },
+
+    // Article sync
+    async setServerArticleId(params: SetServerArticleIdParams) {
+      return _invoke<{ ok: boolean }>(
+        'set_server_article_id',
+        params as unknown as Record<string, unknown>,
+      )
     },
   }
 }
