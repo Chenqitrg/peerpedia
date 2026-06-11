@@ -108,7 +108,7 @@ pub fn create_account(
         let after_at = email.rfind('@').map(|i| &email[i + 1..]).unwrap_or("");
         let has_dot_with_tld = after_at
             .rfind('.')
-            .map_or(false, |i| after_at[i + 1..].len() >= 2);
+            .is_some_and(|i| after_at[i + 1..].len() >= 2);
         if !has_at || !has_dot_with_tld {
             return Err(AppError::AuthFailed("Invalid email format".into()));
         }
