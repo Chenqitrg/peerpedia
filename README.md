@@ -168,7 +168,9 @@ Phase 1 Tauri desktop is fully offline-capable:
 - **Auto-backup: every save silently syncs to server (draft, never auto-published)**
 - **Conflict resolution: when server version differs from local, forced Keep Local / Use Remote choice**
 - Network status indicator shows real-time online/offline state
-- Network-dependent features (pool, schools) show clear offline states, not errors
+- **Local follow graph**: follow/unfollow stored in local SQLite, works fully offline
+- Network-dependent features (pool, online search) show clear offline states, not errors
+- Schools page available in Tauri mode via server API, local follows reflected in UI
 - Local account system: bcrypt + SQLite, no server needed
 
 ---
