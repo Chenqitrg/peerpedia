@@ -16,15 +16,20 @@ import {
   History,
   Edit,
   GitFork,
+  Upload,
+  GitCompare,
 } from 'lucide-vue-next'
 
 const props = defineProps<{
   article: ArticleSummary
+  syncState?: 'upload' | 'synced' | 'conflict' | 'offline'
 }>()
 
 const emit = defineEmits<{
   (e: 'toggleBookmark', articleId: string, currentlyBookmarked: boolean): void
   (e: 'deleted', articleId: string): void
+  (e: 'sync-upload', articleId: string): void
+  (e: 'sync-resolve', articleId: string): void
 }>()
 
 const router = useRouter()
@@ -81,6 +86,23 @@ async function goToFork() {
           {{ article.title || t('card.untitled') }}
         </h3>
       </router-link>
+      <!-- L4 sync icons -->
+      <button
+        v-if="syncState === 'upload'"
+        class="sync-icon-btn"
+        :title="'上传到服务器'"
+        @click.stop="emit('sync-upload', article.id)"
+      >
+        <Upload :size="16" stroke-width="2" class="text-accent" />
+      </button>
+      <button
+        v-if="syncState === 'conflict'"
+        class="sync-icon-btn"
+        :title="'与服务器版本冲突，点击解决'"
+        @click.stop="emit('sync-resolve', article.id)"
+      >
+        <GitCompare :size="16" stroke-width="2" class="text-warning" />
+      </button>
     </div>
 
     <!-- Authors row with badges -->
@@ -222,3 +244,24 @@ async function goToFork() {
     </div>
   </article>
 </template>
+
+<style scoped>
+.sync-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.sync-icon-btn:hover {
+  background-color: rgba(123, 140, 158, 0.15);
+}
+.text-warning {
+  color: #9e6a03;
+}
+</style>

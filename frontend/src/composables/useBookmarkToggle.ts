@@ -52,11 +52,12 @@ export function useBookmarkToggle(
 
     try {
       if (isLocal) {
-        if (currentlyBookmarked) {
-          await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: articleId })
-        } else {
-          await tauri.addBookmark({ user_id: userStore.viewer.id, article_id: articleId })
+        // L4: bookmarks require server connection — rollback optimistic update.
+        article.is_bookmarked = previous
+        if (onError) {
+          onError('书签功能需要服务器连接')
         }
+        return
       } else {
         if (currentlyBookmarked) {
           await removeBookmark(articleId)
@@ -77,7 +78,10 @@ export function useBookmarkToggle(
     if (!userStore.viewer) return
     try {
       if (isLocal) {
-        await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: articleId })
+        if (onError) {
+          onError('书签功能需要服务器连接')
+        }
+        return
       } else {
         await removeBookmark(articleId)
       }
