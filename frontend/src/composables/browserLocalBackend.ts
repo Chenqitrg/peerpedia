@@ -149,15 +149,13 @@ export async function browserLocalInvoke(cmd: string, args?: Record<string, unkn
     }
     case 'get_followers': {
       const targetId = (a.followed_id as string) || (a.user_id as string) || ''
-      // Return raw IDs — followed users may be server users
-      // whose UUIDs don't exist in local accounts.
-      return follows.filter(x => x.followed_id === targetId).map(x => ({ id: x.follower_id }))
+      const ids = follows.filter(x => x.followed_id === targetId).map(x => x.follower_id)
+      return ids.map(id => ({ id }))
     }
     case 'get_following': {
       const targetId = (a.followed_id as string) || (a.user_id as string) || ''
-      // Return raw IDs — followed users may be server users
-      // whose UUIDs don't exist in local accounts.
-      return follows.filter(x => x.follower_id === targetId).map(x => ({ id: x.followed_id }))
+      const ids = follows.filter(x => x.follower_id === targetId).map(x => x.followed_id)
+      return ids.map(id => ({ id }))
     }
     case 'get_follower_count': {
       const targetId = (a.followed_id as string) || (a.user_id as string) || ''
