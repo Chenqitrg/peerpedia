@@ -59,6 +59,7 @@ pub struct HistoryEntry {
 
 /// Save a draft. If `id` is empty or new, a new draft is created. Otherwise the
 /// existing draft is updated — but only if it belongs to the same account.
+#[allow(clippy::too_many_arguments)]
 pub fn save_draft(
     conn: &Connection,
     id: Option<&str>,
