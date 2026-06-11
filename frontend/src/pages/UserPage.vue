@@ -85,23 +85,39 @@ const isFollowing = ref(false)
 const followLoading = ref(false)
 
 // Load initial follow state.
-async function loadFollowState() {
-  if (!userStore.viewer || isSelf.value) return
-  if (isLocal.value) {
-    // Tauri / browser-local mode — check local storage.
-    const r = await tauri.isFollowing({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
-    if (r && !('error' in r)) {
-      isFollowing.value = r.following
+  // Load initial follow state.
+  async function loadFollowState() {
+    if (!userStore.viewer) return
+    if (isLocal.value) {
+      if (isSelf.value) {
+        // Self in local mode — patch follow counts from local storage.
+        try {
+          const following = await tauri.getFollowing({ user_id: userStore.viewer?.id || '' })
+          const followers = await tauri.getFollowers({ user_id: userStore.viewer?.id || '' })
+          if (user.value && following && !('error' in following) && Array.isArray(following)) {
+            user.value = { ...user.value, following_count: following.length }
+          }
+          if (user.value && followers && !('error' in followers) && Array.isArray(followers)) {
+            user.value = { ...user.value, followers_count: followers.length }
+          }
+        } catch { /* fall through */ }
+        return
+      }
+      // Other user in local mode — check local storage.
+      const r = await tauri.isFollowing({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
+      if (r && !('error' in r)) {
+        isFollowing.value = r.following
+      }
+    } else {
+      // Web mode — check via server REST API.
+      try {
+        const following = await getFollowing(userStore.viewer.id)
+        const followed = Array.isArray(following) ? following : (following as any)?.users || []
+        isFollowing.value = followed.some((u: any) => u.id === id.value)
+      } catch { /* fall through */ }
     }
-  } else {
-    // Web mode — check via server REST API.
-    try {
-      const following = await getFollowing(userStore.viewer.id)
-      const followed = Array.isArray(following) ? following : (following as any)?.users || []
-      isFollowing.value = followed.some((u: any) => u.id === id.value)
-    } catch { /* fall through */ }
   }
-}
+
 
 async function handleFollow() {
   if (!userStore.viewer) return
