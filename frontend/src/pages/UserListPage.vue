@@ -2,9 +2,10 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getFollowers, getFollowing } from '../api/users'
+import { getFollowers, getFollowing, getUsers } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import UserCard from '../components/UserCard.vue'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
@@ -15,6 +16,7 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const tauri = useTauri()
+const { isOnline } = useNetworkStatus()
 
 const userId = computed(() => route.params.id as string)
 const isFollowers = computed(() => route.path.endsWith('/followers'))
@@ -34,10 +36,18 @@ async function load() {
       const result = isFollowers.value
         ? await tauri.getFollowers({ user_id: userId.value })
         : await tauri.getFollowing({ user_id: userId.value })
-      if (result && !('error' in result) && Array.isArray(result)) {
+      if (result && !('error' in result) && Array.isArray(result) && result.length > 0) {
+        // Resolve names: fetch server user list to map IDs to names
+        let nameMap: Map<string, string> = new Map()
+        if (isOnline.value) {
+          try {
+            const serverUsers = await getUsers()
+            for (const u of serverUsers) nameMap.set(u.id, u.name)
+          } catch { /* server unreachable, use IDs as names */ }
+        }
         users.value = result.map(a => ({
           id: a.id,
-          name: (a as any).username || a.id,
+          name: nameMap.get(a.id) || a.id.slice(0, 8) + '…',
           anonymous_name: '',
           article_count: 0,
           reputation: {},
@@ -74,7 +84,7 @@ watch([userId, isFollowers], load, { immediate: true })
       {{ title }}
     </h1>
     <p class="text-sm text-ink-muted mb-6">
-      {{ t('common.articles') }}
+      {{ users.length }} {{ isFollowers ? t('common.followers') : t('common.following') }}
     </p>
 
     <div v-if="loading" class="space-y-2 animate-pulse">
