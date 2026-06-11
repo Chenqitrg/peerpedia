@@ -32,7 +32,13 @@ import {
   MessageSquare,
   Eye,
   ArrowLeft,
+  GitCompare,
+  Check,
+  X,
+  Loader,
 } from 'lucide-vue-next'
+import { useArticleSync } from '../composables/useArticleSync'
+import DiffView from '../components/DiffView.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -214,6 +220,7 @@ async function loadArticle(articleId: string) {
 // ── Lifecycle ───────────────────────────────────────────────────────────
 
 onMounted(async () => {
+  loadSyncMeta()
   try {
     await loadArticle(id)
   } finally {
@@ -321,6 +328,86 @@ async function loadReviews() {
 }
 
 const { isOnline } = useNetworkStatus()
+
+// ── L4 Article sync ─────────────────────────────────────────────────────
+const draftSyncMeta = ref<{ server_article_id?: string | null; server_commit_hash?: string | null } | null>(null)
+const localHeadHash = ref<string | null>(null)
+const showDiff = ref(false)
+const remoteContent = ref('')
+const localContent = ref('')
+const diffError = ref<string | null>(null)
+
+const draftId = () => myArticleId
+const sid = () => draftSyncMeta.value?.server_article_id
+const sch = () => draftSyncMeta.value?.server_commit_hash
+const lh = () => localHeadHash.value
+
+const {
+  syncState,
+  pushing,
+  upload,
+  pushUpdate,
+  useRemote,
+  getContentAtCommit,
+  clearError: clearSyncError,
+} = useArticleSync(draftId, sid, sch, lh)
+
+async function loadSyncMeta() {
+  if (!tauri.isTauri.value) return
+  const result = await tauri.getDraft({ id: myArticleId })
+  if (result && !('error' in result)) {
+    draftSyncMeta.value = result as { server_article_id?: string | null; server_commit_hash?: string | null }
+  }
+  const history = await tauri.gitHistory({ article_id: myArticleId })
+  if (history && !('error' in history) && Array.isArray(history) && history.length > 0) {
+    localHeadHash.value = history[0].hash
+  }
+}
+
+async function openDiffView() {
+  const remoteHash = sch()
+  const localHash = lh()
+  if (!remoteHash || !localHash) {
+    diffError.value = '无法加载对比'
+    return
+  }
+  const [remote, local] = await Promise.all([
+    getContentAtCommit(remoteHash),
+    getContentAtCommit(localHash),
+  ])
+  if (remote === null || local === null) {
+    diffError.value = '无法读取版本内容'
+    return
+  }
+  remoteContent.value = remote
+  localContent.value = local
+  showDiff.value = true
+}
+
+async function handleKeepLocal() {
+  const ok = await pushUpdate()
+  if (ok) {
+    showDiff.value = false
+    await loadSyncMeta()
+    refreshArticle()
+  }
+}
+
+async function handleUseRemote() {
+  const remoteHash = sch()
+  if (!remoteHash) return
+  const ok = await useRemote(remoteHash)
+  if (ok) {
+    showDiff.value = false
+    await loadSyncMeta()
+    refreshArticle()
+  }
+}
+
+function refreshArticle() {
+  loadArticle(myArticleId)
+  loadReviews()
+}
 
 async function toggleBookmark() {
   if (!article.value || !userStore.viewer) return
@@ -534,6 +621,14 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
         <!-- Title -->
         <h1 class="text-display-md font-heading font-bold text-ink mb-3 leading-tight">
           {{ article.title || t('card.untitled') }}
+          <button
+            v-if="syncState === 'conflict'"
+            class="sync-icon-btn inline-flex align-middle ml-2"
+            title="与服务器版本冲突，点击解决"
+            @click="openDiffView"
+          >
+            <GitCompare :size="18" stroke-width="2" class="text-warning" />
+          </button>
         </h1>
 
         <!-- Authors -->
@@ -733,5 +828,107 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
       <p class="text-ink-muted">{{ errorMessage || 'Article not found.' }}</p>
     </div>
 
+    <!-- L4 Diff View overlay -->
+    <Teleport to="body">
+      <div v-if="showDiff" class="diff-overlay" @click.self="showDiff = false">
+        <div class="diff-panel">
+          <div class="diff-header">
+            <h3>版本对比</h3>
+            <span class="text-xs text-ink-muted">远程版本 vs 本地版本</span>
+            <button class="sync-close-btn" @click="showDiff = false">
+              <X :size="18" stroke-width="2" />
+            </button>
+          </div>
+          <div v-if="diffError" class="diff-error">
+            {{ diffError }}
+            <button @click="diffError = null">关闭</button>
+          </div>
+          <div v-else-if="remoteContent && localContent" class="diff-content">
+            <div class="diff-pane">
+              <div class="diff-pane-label">远程版本</div>
+              <pre class="diff-pane-text">{{ remoteContent }}</pre>
+            </div>
+            <div class="diff-pane">
+              <div class="diff-pane-label">本地版本</div>
+              <pre class="diff-pane-text">{{ localContent }}</pre>
+            </div>
+          </div>
+          <div class="diff-actions">
+            <button
+              class="btn-primary"
+              :disabled="pushing"
+              @click="handleKeepLocal"
+            >
+              <Loader v-if="pushing" :size="16" stroke-width="2" class="animate-spin" />
+              <Check v-else :size="16" stroke-width="2" />
+              Keep Local
+            </button>
+            <button
+              class="btn-secondary"
+              :disabled="pushing"
+              @click="handleUseRemote"
+            >
+              <X :size="16" stroke-width="2" />
+              Use Remote
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+.sync-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; border-radius: 6px;
+  background: transparent; cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.sync-icon-btn:hover { background-color: rgba(123, 140, 158, 0.15); }
+.text-warning { color: #9e6a03; }
+
+.diff-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex; align-items: center; justify-content: center;
+}
+.diff-panel {
+  width: 90vw; max-width: 1200px; max-height: 90vh;
+  background: #0d1117; border: 1px solid #30363d; border-radius: 12px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.diff-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid #30363d;
+}
+.diff-header h3 { flex: 1; margin: 0; font-size: 16px; color: #e6edf3; }
+.sync-close-btn { background: none; border: none; color: #8b949e; cursor: pointer; }
+.diff-error { padding: 16px; color: #f85149; }
+.diff-content { display: flex; flex: 1; overflow: hidden; }
+.diff-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.diff-pane + .diff-pane { border-left: 1px solid #30363d; }
+.diff-pane-label { padding: 8px 16px; font-size: 12px; color: #8b949e; border-bottom: 1px solid #30363d; }
+.diff-pane-text {
+  flex: 1; overflow: auto; padding: 16px;
+  font-family: monospace; font-size: 13px; color: #e6edf3; white-space: pre-wrap;
+}
+.diff-actions {
+  display: flex; gap: 12px; padding: 16px 20px;
+  border-top: 1px solid #30363d; justify-content: flex-end;
+}
+.btn-primary {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border: none; border-radius: 6px;
+  background: #7b8c9e; color: #0d1117; font-weight: 600;
+  cursor: pointer; font-size: 13px;
+}
+.btn-primary:hover { filter: brightness(1.15); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border: 1px solid #30363d; border-radius: 6px;
+  background: #21262d; color: #e6edf3; font-size: 13px; cursor: pointer;
+}
+.btn-secondary:hover { background: #30363d; }
+</style>

@@ -11,6 +11,8 @@ import { useDraftPersistence } from '../composables/useDraftPersistence'
 import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
+import { useArticleSync } from '../composables/useArticleSync'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { useEditorTab } from '../composables/useTabIntegration'
 import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
@@ -29,6 +31,8 @@ import {
   Play,
   Save,
   Send,
+  Upload,
+  Loader,
 } from 'lucide-vue-next'
 
 
@@ -103,6 +107,41 @@ const totalContribution = computed(() =>
 // Draft persistence — Tauri IPC when available, REST + localStorage fallback.
 const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
+const { isOnline } = useNetworkStatus()
+
+// ── L4 Article sync ─────────────────────────────────────────────────────
+const syncDraftMeta = ref<{ server_article_id?: string | null; server_commit_hash?: string | null } | null>(null)
+const syncHeadHash = ref<string | null>(null)
+
+const syncDraftId = () => currentDraftId.value || editId.value || ''
+const syncSid = () => syncDraftMeta.value?.server_article_id
+const syncSch = () => syncDraftMeta.value?.server_commit_hash
+const syncLh = () => syncHeadHash.value
+
+const { syncState, pushing, upload, clearError } = useArticleSync(
+  syncDraftId, syncSid, syncSch, syncLh,
+)
+
+async function loadSyncMeta() {
+  const id = syncDraftId()
+  if (!id || !tauri.isTauri.value) return
+  const result = await tauri.getDraft({ id })
+  if (result && typeof result === 'object' && !('error' in result)) {
+    syncDraftMeta.value = result as typeof syncDraftMeta.value
+  }
+  const history = await tauri.gitHistory({ article_id: id })
+  if (history && typeof history === 'object' && !('error' in history) && Array.isArray(history) && history.length > 0) {
+    syncHeadHash.value = history[0].hash
+  }
+}
+
+async function handleUpload() {
+  const ok = await upload()
+  if (ok) {
+    await loadSyncMeta()
+  }
+}
+
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
@@ -114,6 +153,7 @@ function onSaveAndClose(e: Event) {
 }
 
 onMounted(() => {
+  loadSyncMeta()
   if (isEdit.value) {
     loadExistingArticle()
   } else {
@@ -650,6 +690,20 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
           @click="handlePublish"
         >
           <Send class="w-4 h-4" stroke-width="2" />
+        </button>
+
+        <!-- L4 Upload to server -->
+        <button
+          v-if="syncState === 'upload'"
+          class="flex items-center justify-center w-9 h-9 rounded-lg
+                 text-accent hover:text-accent hover:bg-accent/10
+                 transition-colors duration-200"
+          :disabled="pushing"
+          title="上传到服务器"
+          @click="handleUpload"
+        >
+          <Loader v-if="pushing" :size="18" stroke-width="2" class="animate-spin" />
+          <Upload v-else :size="18" stroke-width="2" />
         </button>
       </div>
     </div>
