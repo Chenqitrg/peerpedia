@@ -28,12 +28,20 @@ export const useUserStore = defineStore('user', () => {
 
   // Credentials held for server sync retry. Stored when local login/register
   // succeeds but the server is unreachable, cleared on successful sync.
+  // Persisted to localStorage to survive HMR and page refreshes.
+  const PENDING_CREDS_KEY = 'peerpedia_pending_server_creds'
   let _pendingServerCreds: {
     username: string
     password: string
     email: string
     name: string
-  } | null = null
+  } | null = loadJSON(PENDING_CREDS_KEY) || null
+
+  function _savePendingCreds(creds: typeof _pendingServerCreds) {
+    _pendingServerCreds = creds
+    if (creds) saveJSON(PENDING_CREDS_KEY, creds)
+    else remove(PENDING_CREDS_KEY)
+  }
 
   // Detect Tauri / dev mock mode on store initialization.
   isTauriMode.value = tauri.isTauri.value
@@ -90,22 +98,27 @@ export const useUserStore = defineStore('user', () => {
     viewer.value = profile
     saveJSON('viewer', profile)
 
-    // Try to get a backend JWT so authenticated API calls work when server is up.
-    // Only save the token — keep the local profile as viewer to avoid ID mismatches.
+    // Try to get a backend JWT and sync identity with server.
     try {
-      const { token: t } = await apiLogin({ username, password })
+      console.log('[loginLocal] Trying apiLogin with:', username)
+      const { user: serverUser, token: t } = await apiLogin({ username, password })
+      console.log('[loginLocal] apiLogin SUCCESS, token:', !!t, 'serverId:', serverUser.id)
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      // Switch to server identity when online — follow/bookmark/article APIs use server UUIDs.
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
+      _savePendingCreds(null)
       syncError.value = null
-    } catch {
+    } catch (e: any) {
+      console.log('[loginLocal] apiLogin failed, storing pending creds:', username)
       // Server unreachable — store credentials for later sync
-      _pendingServerCreds = {
+      _savePendingCreds({
         username,
         password,
-        email: acctWithToken.email || '',
+        email: acctWithToken.email || `${username}@peerpedia.local`,
         name: acctWithToken.name || username,
-      }
+      })
     }
   }
 
@@ -147,17 +160,18 @@ export const useUserStore = defineStore('user', () => {
       // OK to continue without local token
     }
 
-    // Try to register on backend so authenticated API calls work when server is up.
-    // Only save the token — keep the local profile as viewer to avoid ID mismatches.
+    // Try to register on backend — sync identity with server.
     try {
-      const { token: t } = await apiRegister({ username, password, email, name })
+      const { user: serverUser, token: t } = await apiRegister({ username, password, email, name })
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
+      _savePendingCreds(null)
       syncError.value = null
     } catch {
       // Server unreachable — store credentials for later sync
-      _pendingServerCreds = { username, password, email, name }
+      _savePendingCreds({ username, password, email, name })
     }
   }
 
@@ -178,7 +192,7 @@ export const useUserStore = defineStore('user', () => {
     localAccount.value = null
     localToken.value = null
     tauri.setSessionToken(null)
-    _pendingServerCreds = null
+    _savePendingCreds(null)
     syncError.value = null
     remove('viewer')
     remove('token')
@@ -200,40 +214,48 @@ export const useUserStore = defineStore('user', () => {
    * Returns true if a valid server token was obtained.
    */
   async function trySyncServerAuth(): Promise<boolean> {
+    console.log('[sync] trySyncServerAuth called, pendingCreds:', !!_pendingServerCreds)
     if (!_pendingServerCreds) return false
     const creds = _pendingServerCreds
+    console.log('[sync] creds:', creds.username)
 
     // Step 1: Try apiLogin (user may already exist on server)
     try {
-      const { token: t } = await apiLogin({
+      const { user: serverUser, token: t } = await apiLogin({
         username: creds.username,
         password: creds.password,
       })
+      console.log('[sync] apiLogin SUCCESS')
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
+      _savePendingCreds(null)
       syncError.value = null
-      await syncProfileToServer()
       return true
-    } catch {
-      // apiLogin failed — continue to apiRegister
+    } catch (e: any) {
+      console.log('[sync] apiLogin failed:', e?.response?.status, e?.response?.data?.detail || e?.message || e)
     }
 
     // Step 2: Try apiRegister (create server account for local user)
     try {
-      const { token: t } = await apiRegister({
+      console.log('[sync] Trying apiRegister:', creds.username)
+      const { user: serverUser, token: t } = await apiRegister({
         username: creds.username,
         password: creds.password,
-        email: creds.email,
-        name: creds.name,
+        email: creds.email || `${creds.username}@peerpedia.local`,
+        name: creds.name || creds.username,
       })
+      console.log('[sync] apiRegister SUCCESS')
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
+      _savePendingCreds(null)
       syncError.value = null
-      await syncProfileToServer()
       return true
     } catch (regErr: any) {
+      console.log('[sync] apiRegister failed:', regErr?.response?.status, regErr?.response?.data?.detail || regErr?.message || regErr)
       const detail = regErr?.response?.data?.detail || regErr?.userMessage || ''
       if (detail.includes('already exists') || detail.includes('taken') || detail.includes('unique')) {
         syncError.value = `服务器上已有用户 ${creds.username}。请输入该账号的服务器密码进行关联。`

@@ -36,6 +36,19 @@ vi.mock('@/composables/useNetworkStatus', () => ({
   })),
 }))
 
+vi.mock('@/composables/useArticleSync', () => ({
+  useArticleSync: vi.fn(() => ({
+    syncState: { value: 'synced' },
+    error: { value: null },
+    pushing: { value: false },
+    upload: vi.fn().mockResolvedValue(true),
+    pushUpdate: vi.fn().mockResolvedValue(true),
+    useRemote: vi.fn().mockResolvedValue(true),
+    getContentAtCommit: vi.fn().mockResolvedValue('# content'),
+    clearError: vi.fn(),
+  })),
+}))
+
 // Mock useTauri — default web mode. Tests that need local mode set _isTauri=true.
 let _isTauri = false
 vi.mock('@/composables/useTauri', () => ({

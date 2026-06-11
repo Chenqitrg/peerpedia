@@ -73,7 +73,7 @@ class TestJourneyWriteReviewPublish:
         author_headers = {"Authorization": f"Bearer {author['token']}"}
         reviewer_headers = {"Authorization": f"Bearer {reviewer['token']}"}
 
-        # 2. Author creates an article → enters sedimentation pool
+        # 2. Author creates an article → starts as draft
         create_body = {
             "authors": [author["user"]["id"]],
             "content": "# 西游记新解\n\n大闹天宫是一场革命。",
@@ -88,11 +88,15 @@ class TestJourneyWriteReviewPublish:
         assert resp.status_code == 201, f"Create article failed: {resp.json()}"
         article = resp.json()
         article_id = article["id"]
-        assert article["status"] == "sedimentation"
-        assert article["sink_eta"] is not None
+        assert article["status"] == "draft"
         assert article["authors"][0]["name"] == "孙悟空"
 
-        # 3. Article appears in the pool (author can see their own article)
+        # 3. Author publishes the article → enters sedimentation pool
+        pub_resp = client.post(f"/api/v1/articles/{article_id}/publish", headers=author_headers)
+        assert pub_resp.status_code == 200
+        assert pub_resp.json()["status"] == "sedimentation"
+
+        # 4. Article appears in the pool (author can see their own article)
         pool_resp = client.get("/api/v1/pool", headers=author_headers)
         assert pool_resp.status_code == 200
         pool_articles = pool_resp.json()["articles"]
@@ -350,7 +354,11 @@ class TestJourneyMultiAuthor:
             assert get_resp.status_code == 200
             assert get_resp.json()["is_own_article"] is True
 
-        # 5. Article appears in pool
+        # 5. Publish the article → enters pool
+        pub_resp = client.post(f"/api/v1/articles/{article_id}/publish", headers=co1_headers)
+        assert pub_resp.status_code == 200
+
+        # 6. Article appears in pool
         pool_resp = client.get("/api/v1/pool", headers=co1_headers)
         assert pool_resp.status_code == 200
         assert any(a["id"] == article_id for a in pool_resp.json()["articles"])

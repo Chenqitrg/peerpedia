@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
-import { getUser, followUser, unfollowUser } from '../api/users'
+import { getUser, getFollowing, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
@@ -36,6 +36,8 @@ const id = computed(() => route.params.id as string)
 // In local mode (Tauri or browser-local), use local account data.
 const isSelf = computed(() => userStore.viewer?.id === id.value)
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
+// Follow/bookmark actions need server when online; profile loading uses local identity.
+const useServerApi = computed(() => isLocal.value && isOnline.value)
 const { isOnline } = useNetworkStatus()
 
 function _localUserToProfile(a: { id: string; username: string }): UserProfile {
@@ -80,16 +82,29 @@ const { toggle: handleToggleBookmark } = useBookmarkToggle(articles)
 const isFollowing = ref(false)
 const followLoading = ref(false)
 
-// Load initial follow state from browser-local backend in local mode.
+// Load initial follow state.
 async function loadFollowState() {
-  if (!isLocal.value || !userStore.viewer) return
-  const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: id.value })
-  if (r && !('error' in r)) {
-    isFollowing.value = r.following
+  if (!userStore.viewer || isSelf.value) return
+  // Online: check via server API
+  if (isOnline.value && userStore.token?.value) {
+    try {
+      const following = await getFollowing(userStore.viewer.id)
+      const followed = Array.isArray(following) ? following : (following as any)?.users || []
+      isFollowing.value = followed.some((u: any) => u.id === id.value)
+      return
+    } catch { /* fall through */ }
+  }
+  // Offline local: check via Tauri IPC
+  if (isLocal.value && !isOnline.value) {
+    const r = await tauri.isFollowing({ follower_id: userStore.viewer.id, followed_id: id.value })
+    if (r && !('error' in r)) {
+      isFollowing.value = r.following
+    }
   }
 }
 
 async function handleFollow() {
+  console.log('[follow] handleFollow called, viewer:', !!userStore.viewer, 'isOnline:', isOnline.value, 'token:', !!userStore.token?.value)
   if (!userStore.viewer) return
 
   // If server is reachable but we have no token, try to sync local creds first
@@ -103,21 +118,20 @@ async function handleFollow() {
 
   followLoading.value = true
   try {
-    if (isLocal.value) {
-      if (isFollowing.value) {
-        await tauri.unfollowUser({ follower_id: userStore.viewer.id, followed_id: id.value })
-      } else {
-        await tauri.followUser({ follower_id: userStore.viewer.id, followed_id: id.value })
-      }
+    if (isLocal.value && !useServerApi.value) {
+      console.log('[follow] offline — blocked')
+      return
     } else {
+      console.log('[follow] calling REST API:', isFollowing.value ? 'unfollow' : 'follow', id.value)
       if (isFollowing.value) {
         await unfollowUser(id.value)
       } else {
         await followUser(id.value)
       }
+      console.log('[follow] API success')
     }
     isFollowing.value = !isFollowing.value
-  } catch { /* ignore */ }
+  } catch (e: any) { console.log('[follow] error:', e?.response?.status, e?.response?.data || e?.message) }
   finally { followLoading.value = false }
 }
 

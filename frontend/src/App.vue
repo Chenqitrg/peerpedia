@@ -53,7 +53,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const tabStore = useTabStore()
-const { startPing, stopPing } = useNetworkStatus()
+const { startPing, stopPing, isOnline } = useNetworkStatus()
 
 const isEditorPage = computed(() => route.path.startsWith('/edit'))
 
@@ -79,6 +79,19 @@ router.afterEach((to) => {
     tabStore.activateTabByRoute(to.fullPath)
   }
 })
+
+// ── L4: Auto-sync local account to server when network or login state changes ──
+watch(
+  [isOnline, () => userStore.localToken?.value],
+  ([online, localToken]) => {
+    console.log('[App] isOnline:', online, 'localToken:', !!localToken)
+    if (online && localToken) {
+      console.log('[App] calling trySyncServerAuth')
+      userStore.trySyncServerAuth()
+    }
+  },
+  { immediate: true },
+)
 
 // ── Close confirmation dialog (dirty tabs) ─────────────────────
 

@@ -1,4 +1,5 @@
 import { type Ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from './useTauri'
 import { useNetworkStatus } from './useNetworkStatus'
@@ -18,6 +19,7 @@ export function useBookmarkToggle(
 ) {
   const userStore = useUserStore()
   const tauri = useTauri()
+  const { t } = useI18n()
   const { isOnline } = useNetworkStatus()
   const isLocal = (userStore.isTauriMode || userStore.isBrowserLocal) && !isOnline.value
 
@@ -40,11 +42,13 @@ export function useBookmarkToggle(
       && !userStore.token?.value
 
     if (needsSync) {
+      console.log('[bookmark] needsSync, calling trySyncServerAuth')
       const synced = await userStore.trySyncServerAuth()
+      console.log('[bookmark] trySyncServerAuth result:', synced, 'token:', !!userStore.token?.value)
       if (!synced || !userStore.token?.value) {
         article.is_bookmarked = previous
         if (onError) {
-          onError(userStore.syncError?.value || '书签功能需要服务器账号')
+          onError(userStore.syncError?.value || t('bookmark.serverRequired'))
         }
         return
       }
@@ -52,11 +56,12 @@ export function useBookmarkToggle(
 
     try {
       if (isLocal) {
-        if (currentlyBookmarked) {
-          await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: articleId })
-        } else {
-          await tauri.addBookmark({ user_id: userStore.viewer.id, article_id: articleId })
+        // L4: bookmarks require server connection — rollback optimistic update.
+        article.is_bookmarked = previous
+        if (onError) {
+          onError(t('bookmark.serverRequired'))
         }
+        return
       } else {
         if (currentlyBookmarked) {
           await removeBookmark(articleId)
@@ -77,7 +82,10 @@ export function useBookmarkToggle(
     if (!userStore.viewer) return
     try {
       if (isLocal) {
-        await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: articleId })
+        if (onError) {
+          onError(t('bookmark.serverRequired'))
+        }
+        return
       } else {
         await removeBookmark(articleId)
       }

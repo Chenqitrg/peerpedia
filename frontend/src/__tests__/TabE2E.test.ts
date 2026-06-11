@@ -128,6 +128,27 @@ vi.mock('@/composables/useTauri', () => ({
   }),
 }))
 
+vi.mock('@/composables/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({
+    isOnline: { value: true },
+    startPing: vi.fn(),
+    stopPing: vi.fn(),
+  })),
+}))
+
+vi.mock('@/composables/useArticleSync', () => ({
+  useArticleSync: vi.fn(() => ({
+    syncState: { value: 'synced' },
+    error: { value: null },
+    pushing: { value: false },
+    upload: vi.fn().mockResolvedValue(true),
+    pushUpdate: vi.fn().mockResolvedValue(true),
+    useRemote: vi.fn().mockResolvedValue(true),
+    getContentAtCommit: vi.fn().mockResolvedValue('# content'),
+    clearError: vi.fn(),
+  })),
+}))
+
 // ── Helpers ─────────────────────────────────────────────────────
 
 function makeRouter() {
