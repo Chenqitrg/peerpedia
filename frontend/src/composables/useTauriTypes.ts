@@ -117,6 +117,14 @@ export interface GitRollbackParams {
   author: string
 }
 
+export interface SetServerArticleIdParams {
+  draft_id: string
+  server_article_id: string
+  server_commit_hash: string
+  token?: string
+  account_id?: string
+}
+
 export interface InvalidateCacheParams {
   article_id: string
 }
@@ -154,6 +162,8 @@ export interface Draft {
   content: string
   format: string
   updated_at: string
+  server_article_id?: string | null
+  server_commit_hash?: string | null
 }
 
 export interface DraftSummary {
