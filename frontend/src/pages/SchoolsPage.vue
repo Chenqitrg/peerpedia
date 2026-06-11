@@ -22,9 +22,6 @@ const { isOnline } = useNetworkStatus()
 const following = ref<Set<string>>(new Set())
 
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
-// In local mode, follow operations use the local account ID (not viewer.id,
-// which may be overwritten with a server UUID after apiLogin sync).
-const localId = computed(() => userStore.localAccount?.id || userStore.viewer?.id || '')
 
 async function loadFollowState() {
   if (!userStore.viewer) return
@@ -33,9 +30,9 @@ async function loadFollowState() {
   if (isLocal.value) {
     // Tauri / browser-local mode — load from local storage.
     try {
-      const r = await tauri.getFollowing({ user_id: localId.value })
+      const r = await tauri.getFollowing({ user_id: userStore.viewer?.id || '' })
       console.log('[SchoolsPage] loadFollowState result:', JSON.stringify(r),
-        'localId:', localId.value, 'viewerId:', userStore.viewer?.id)
+        'localId:', userStore.viewer?.id || '', 'viewerId:', userStore.viewer?.id)
       if (r && !('error' in r) && Array.isArray(r)) {
         for (const f of r) ids.add(f.id)
       }
@@ -80,12 +77,12 @@ async function toggleFollow(u: UserSummary) {
     if (isLocal.value) {
       let result
       if (isCurrentlyFollowing) {
-        result = await tauri.unfollowUser({ follower_id: localId.value, followed_id: u.id })
+        result = await tauri.unfollowUser({ follower_id: userStore.viewer?.id || '', followed_id: u.id })
       } else {
-        result = await tauri.followUser({ follower_id: localId.value, followed_id: u.id })
+        result = await tauri.followUser({ follower_id: userStore.viewer?.id || '', followed_id: u.id })
       }
       console.log('[SchoolsPage] follow result:', JSON.stringify(result),
-        'localId:', localId.value,
+        'localId:', userStore.viewer?.id || '',
         'viewerId:', userStore.viewer?.id,
         'localAcctId:', userStore.localAccount?.id,
         'targetId:', u.id)

@@ -36,7 +36,6 @@ const id = computed(() => route.params.id as string)
 // In local mode (Tauri or browser-local), use local account data.
 const isSelf = computed(() => userStore.viewer?.id === id.value)
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
-const localId = computed(() => userStore.localAccount?.id || userStore.viewer?.id || '')
 const { isOnline } = useNetworkStatus()
 
 function _localUserToProfile(a: { id: string; username: string }): UserProfile {
@@ -90,7 +89,7 @@ async function loadFollowState() {
   if (!userStore.viewer || isSelf.value) return
   if (isLocal.value) {
     // Tauri / browser-local mode — check local storage.
-    const r = await tauri.isFollowing({ follower_id: localId.value, followed_id: id.value })
+    const r = await tauri.isFollowing({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
     if (r && !('error' in r)) {
       isFollowing.value = r.following
     }
@@ -110,9 +109,9 @@ async function handleFollow() {
   try {
     if (isLocal.value) {
       if (isFollowing.value) {
-        await tauri.unfollowUser({ follower_id: localId.value, followed_id: id.value })
+        await tauri.unfollowUser({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
       } else {
-        await tauri.followUser({ follower_id: localId.value, followed_id: id.value })
+        await tauri.followUser({ follower_id: userStore.viewer?.id || '', followed_id: id.value })
       }
     } else {
       if (isFollowing.value) {

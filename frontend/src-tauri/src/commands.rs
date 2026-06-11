@@ -596,15 +596,17 @@ pub fn follow_user(
     state: State<'_, AppState>,
     params: FollowUserParams,
 ) -> Result<OkResponse, AppError> {
-    let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token)?
-    } else if !params.follower_id.is_empty() {
-        params.follower_id.clone()
-    } else {
+    // Verify token if present (for security), but always use follower_id
+    // as the stored identity. After apiLogin sync, viewer.id is the server
+    // UUID; follower_id must match what get_following queries with.
+    if let Some(ref token) = params.token {
+        let _ = resolve_account(&state, token)?;
+    }
+    if params.follower_id.is_empty() {
         return Err(AppError::AuthFailed("Authentication required".into()));
-    };
+    }
     let conn = lock_db(&state)?;
-    local_store::follow_user(&conn, &account_id, &params.followed_id)?;
+    local_store::follow_user(&conn, &params.follower_id, &params.followed_id)?;
     Ok(OkResponse { ok: true })
 }
 
@@ -621,15 +623,14 @@ pub fn unfollow_user(
     state: State<'_, AppState>,
     params: UnfollowUserParams,
 ) -> Result<OkResponse, AppError> {
-    let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token)?
-    } else if !params.follower_id.is_empty() {
-        params.follower_id.clone()
-    } else {
+    if let Some(ref token) = params.token {
+        let _ = resolve_account(&state, token)?;
+    }
+    if params.follower_id.is_empty() {
         return Err(AppError::AuthFailed("Authentication required".into()));
-    };
+    }
     let conn = lock_db(&state)?;
-    local_store::unfollow_user(&conn, &account_id, &params.followed_id)?;
+    local_store::unfollow_user(&conn, &params.follower_id, &params.followed_id)?;
     Ok(OkResponse { ok: true })
 }
 
