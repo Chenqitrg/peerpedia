@@ -93,12 +93,15 @@ export const useUserStore = defineStore('user', () => {
     // Try to get a backend JWT so authenticated API calls work when server is up.
     // Only save the token — keep the local profile as viewer to avoid ID mismatches.
     try {
+      console.log('[loginLocal] Trying apiLogin with:', username)
       const { token: t } = await apiLogin({ username, password })
+      console.log('[loginLocal] apiLogin SUCCESS, token:', !!t)
       token.value = t
       saveString('token', t)
       _pendingServerCreds = null
       syncError.value = null
-    } catch {
+    } catch (e: any) {
+      console.log('[loginLocal] apiLogin failed, storing pending creds:', username)
       // Server unreachable — store credentials for later sync
       _pendingServerCreds = {
         username,
@@ -200,8 +203,10 @@ export const useUserStore = defineStore('user', () => {
    * Returns true if a valid server token was obtained.
    */
   async function trySyncServerAuth(): Promise<boolean> {
+    console.log('[sync] trySyncServerAuth called, pendingCreds:', !!_pendingServerCreds)
     if (!_pendingServerCreds) return false
     const creds = _pendingServerCreds
+    console.log('[sync] creds:', creds.username)
 
     // Step 1: Try apiLogin (user may already exist on server)
     try {
@@ -209,24 +214,27 @@ export const useUserStore = defineStore('user', () => {
         username: creds.username,
         password: creds.password,
       })
+      console.log('[sync] apiLogin SUCCESS')
       token.value = t
       saveString('token', t)
       _pendingServerCreds = null
       syncError.value = null
       await syncProfileToServer()
       return true
-    } catch {
-      // apiLogin failed — continue to apiRegister
+    } catch (e: any) {
+      console.log('[sync] apiLogin failed:', e?.response?.status, e?.response?.data?.detail || e?.message || e)
     }
 
     // Step 2: Try apiRegister (create server account for local user)
     try {
+      console.log('[sync] Trying apiRegister:', creds.username)
       const { token: t } = await apiRegister({
         username: creds.username,
         password: creds.password,
         email: creds.email,
         name: creds.name,
       })
+      console.log('[sync] apiRegister SUCCESS')
       token.value = t
       saveString('token', t)
       _pendingServerCreds = null
@@ -234,6 +242,7 @@ export const useUserStore = defineStore('user', () => {
       await syncProfileToServer()
       return true
     } catch (regErr: any) {
+      console.log('[sync] apiRegister failed:', regErr?.response?.status, regErr?.response?.data?.detail || regErr?.message || regErr)
       const detail = regErr?.response?.data?.detail || regErr?.userMessage || ''
       if (detail.includes('already exists') || detail.includes('taken') || detail.includes('unique')) {
         syncError.value = `服务器上已有用户 ${creds.username}。请输入该账号的服务器密码进行关联。`
