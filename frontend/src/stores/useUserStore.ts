@@ -239,8 +239,8 @@ export const useUserStore = defineStore('user', () => {
       const { token: t } = await apiRegister({
         username: creds.username,
         password: creds.password,
-        email: creds.email,
-        name: creds.name,
+        email: creds.email || `${creds.username}@peerpedia.local`,
+        name: creds.name || creds.username,
       })
       console.log('[sync] apiRegister SUCCESS')
       token.value = t
