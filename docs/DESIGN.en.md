@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-10 · v0.2.0 · All implemented features · Architecture debt resolved · Plan remediation merged (git-first architecture compliance) · VSCode-style tab system · UI/UX polish (7 issues + 1 bug cleared, 40 executable specs)
+> 2026-06-11 · v0.2.1 · L4 article sync: auto-backup to server on save, conflict resolution (Keep Local / Use Remote), bookmark offline guard · Draft-first: articles created as draft, publish is explicit
 
 ---
 
@@ -72,9 +72,31 @@ After:  git → content (git_show) → compile → UI            (always fresh)
 
 The `article_cache` SQLite table is an optional network-speed optimization, never a content authority. ArticlePage in Tauri mode skips it entirely and sources content from git.
 
-### 2.4 Offline Architecture
+### 2.4 Article Sync (L4)
 
-Phase 1 desktop is fully offline-capable:
+Every save in Tauri mode auto-uploads the article to the server as a private draft (like a GitHub private repo). Publish is a separate, explicit action.
+
+```
+Save → auto POST/PUT /articles (status=draft)
+     → server_article_id + server_commit_hash stored locally
+
+Next save → local HEAD ≠ server_commit_hash → GitCompare icon
+     → "Keep Local" = PUT local changes to server
+     → "Use Remote" = git rollback to server version
+     → Both resolve the conflict and update server_commit_hash
+
+Publish → POST /articles/{id}/publish → enters sedimentation pool
+```
+
+**Design principles:**
+- No manual Upload button — backup is automatic and silent
+- Draft ≠ published — articles on the server stay private until explicitly published
+- Conflict resolution IS sync — no separate Push/Pull, just compare hashes
+- Bookmark/Follow require server connection — offline shows disabled state, not silent failure
+
+### 2.5 Offline Architecture
+
+Phase 1 desktop is fully offline-capable (with L4 auto-backup when online):
 
 - **Browse = cache**: every article read is automatically cached in local SQLite.
 - **Bookmark = full cache**: bookmarked articles cache reviews + citation graph.
@@ -318,7 +340,7 @@ Compile output is **never** stored in the database. The compile endpoint generat
 | POST | `/api/v1/auth/register` | Register |
 | POST | `/api/v1/auth/login` | Login (returns JWT) |
 | GET | `/api/v1/articles` | List articles (status, author, page filters) |
-| POST | `/api/v1/articles` | Create article (Git commit + DB metadata) |
+| POST | `/api/v1/articles` | Create article as draft (Git commit + DB metadata; publish via `/publish`) |
 | GET | `/api/v1/articles/{id}` | Article detail |
 | PUT | `/api/v1/articles/{id}` | Update article |
 | GET | `/api/v1/articles/{id}/source` | Raw Markdown/Typst source |
@@ -359,9 +381,9 @@ Compile output is **never** stored in the database. The compile endpoint generat
 
 | Suite | Tests | Framework |
 |-------|-------|-----------|
-| Backend | 354 | pytest |
-| Frontend | 432 | vitest |
-| Rust | 76 | cargo test |
+| Backend | 384 | pytest |
+| Frontend | 492 | vitest |
+| Rust | 79 | cargo test |
 
 ### 7.2 CI Pipeline
 
@@ -451,4 +473,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-10 · 354 backend tests · 432 frontend tests · 76 Rust tests · 9 DB entities · Git-first content loading · Rollback in Tauri*
+*Last updated: 2026-06-11 · 384 backend tests · 492 frontend tests · 79 Rust tests · 9 DB entities · L4 article sync (auto-backup + conflict resolution) · Draft-first creation*

@@ -165,6 +165,8 @@ Reputation grows across four dimensions: Professionalism, Objectivity, Collabora
 Phase 1 Tauri desktop is fully offline-capable:
 - Browse = cache: every article you read is cached locally
 - Bookmark = full cache: bookmarked articles include reviews + history
+- **Auto-backup: every save silently syncs to server (draft, never auto-published)**
+- **Conflict resolution: when server version differs from local, forced Keep Local / Use Remote choice**
 - Network status indicator shows real-time online/offline state
 - Network-dependent features (pool, schools) show clear offline states, not errors
 - Local account system: bcrypt + SQLite, no server needed
@@ -217,13 +219,13 @@ peerpedia/
 ## Testing · 测试
 
 ```bash
-# Backend (356 tests)
+# Backend (384 tests)
 python -m pytest backend/tests/ core/tests/ -q
 
-# Frontend (448 tests)
+# Frontend (492 tests)
 cd frontend && npx vitest run
 
-# Rust (76 tests)
+# Rust (79 tests)
 cd frontend/src-tauri && cargo test
 ```
 
@@ -238,7 +240,7 @@ See [`docs/plan_reshape.md`](docs/plan_reshape.md) for the detailed engineering 
 | Phase | Focus | Status |
 |-------|-------|--------|
 | **1 — Desktop MVP** | Offline writing, local git, session auth, profile with drafts | ✅ Done |
-| **1.5 — Polish & Ship** | Delete, word-level diff, Typst SVG+PDF, FTS5 search, editor UX, per-save commit | ✅ Done |
+| **1.5 — Polish & Ship** | Delete, word-level diff, Typst SVG+PDF, FTS5 search, editor UX, per-save commit, article sync (auto-backup + conflict resolution) | ✅ Done |
 | **2 — Score arXiv** | Community scoring, sedimentation pool, reputation | 🔜 Next |
 | **3 — P2P Network** | Content-addressed storage, peer-to-peer distribution | 🔮 Future |
 
