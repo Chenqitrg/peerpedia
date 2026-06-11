@@ -19,6 +19,8 @@ pub struct Draft {
     pub content: String,
     pub format: String,
     pub updated_at: String,
+    pub server_article_id: Option<String>,
+    pub server_commit_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +66,8 @@ pub fn save_draft(
     title: &str,
     content: &str,
     format: &str,
+    server_article_id: Option<&str>,
+    server_commit_hash: Option<&str>,
 ) -> Result<Draft, AppError> {
     let draft_id = id
         .filter(|s| !s.is_empty())
@@ -87,15 +91,20 @@ pub fn save_draft(
     }
 
     conn.execute(
-        "INSERT INTO drafts (id, account_id, title, content, format, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
+        "INSERT INTO drafts (id, account_id, title, content, format, updated_at, server_article_id, server_commit_hash)
+         VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'), ?6, ?7)
          ON CONFLICT(id) DO UPDATE SET
            title = excluded.title,
            content = excluded.content,
            format = excluded.format,
-           updated_at = datetime('now')
+           updated_at = datetime('now'),
+           server_article_id = excluded.server_article_id,
+           server_commit_hash = excluded.server_commit_hash
          WHERE account_id = excluded.account_id",
-        rusqlite::params![draft_id, account_id, title, content, format],
+        rusqlite::params![
+            draft_id, account_id, title, content, format,
+            server_article_id, server_commit_hash,
+        ],
     )?;
 
     // Read back the saved row to get the real updated_at timestamp.
@@ -125,7 +134,7 @@ pub fn list_drafts(conn: &Connection, account_id: &str) -> Result<Vec<DraftSumma
 /// Get a single draft by ID.
 pub fn get_draft(conn: &Connection, id: &str) -> Result<Draft, AppError> {
     conn.query_row(
-        "SELECT id, account_id, title, content, format, updated_at FROM drafts WHERE id = ?1",
+        "SELECT id, account_id, title, content, format, updated_at, server_article_id, server_commit_hash FROM drafts WHERE id = ?1",
         [id],
         |row| {
             Ok(Draft {
@@ -135,6 +144,8 @@ pub fn get_draft(conn: &Connection, id: &str) -> Result<Draft, AppError> {
                 content: row.get(3)?,
                 format: row.get(4)?,
                 updated_at: row.get(5)?,
+                server_article_id: row.get(6)?,
+                server_commit_hash: row.get(7)?,
             })
         },
     )
@@ -700,7 +711,10 @@ mod tests {
     #[test]
     fn test_save_new_draft() {
         let conn = setup();
-        let draft = save_draft(&conn, None, "acc1", "My Draft", "# Hello", "markdown").unwrap();
+        let draft = save_draft(
+            &conn, None, "acc1", "My Draft", "# Hello", "markdown", None, None,
+        )
+        .unwrap();
         assert!(!draft.id.is_empty());
         assert_eq!(draft.title, "My Draft");
         assert_eq!(draft.content, "# Hello");
@@ -717,7 +731,17 @@ mod tests {
         )
         .unwrap();
 
-        let draft = save_draft(&conn, None, "acc1", "Acc1 Draft", "secret", "markdown").unwrap();
+        let draft = save_draft(
+            &conn,
+            None,
+            "acc1",
+            "Acc1 Draft",
+            "secret",
+            "markdown",
+            None,
+            None,
+        )
+        .unwrap();
         // Account 2 tries to overwrite Account 1's draft.
         let result = save_draft(
             &conn,
@@ -726,6 +750,8 @@ mod tests {
             "Overwritten",
             "hacked",
             "markdown",
+            None,
+            None,
         );
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AppError::AuthFailed(_)));
@@ -739,10 +765,21 @@ mod tests {
     #[test]
     fn test_save_update_existing_draft() {
         let conn = setup();
-        let draft = save_draft(&conn, None, "acc1", "V1", "content", "markdown").unwrap();
+        let draft =
+            save_draft(&conn, None, "acc1", "V1", "content", "markdown", None, None).unwrap();
         let id = draft.id.clone();
 
-        let updated = save_draft(&conn, Some(&id), "acc1", "V2", "new content", "typst").unwrap();
+        let updated = save_draft(
+            &conn,
+            Some(&id),
+            "acc1",
+            "V2",
+            "new content",
+            "typst",
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(updated.id, id);
         assert_eq!(updated.title, "V2");
         assert_eq!(updated.content, "new content");
@@ -758,8 +795,8 @@ mod tests {
         )
         .unwrap();
 
-        save_draft(&conn, None, "acc1", "A1 Draft", "a", "markdown").unwrap();
-        save_draft(&conn, None, "acc2", "A2 Draft", "b", "markdown").unwrap();
+        save_draft(&conn, None, "acc1", "A1 Draft", "a", "markdown", None, None).unwrap();
+        save_draft(&conn, None, "acc2", "A2 Draft", "b", "markdown", None, None).unwrap();
 
         let acc1_drafts = list_drafts(&conn, "acc1").unwrap();
         assert_eq!(acc1_drafts.len(), 1);
@@ -779,7 +816,10 @@ mod tests {
         )
         .unwrap();
 
-        let d1 = save_draft(&conn, None, "acc1", "Secret", "secret", "markdown").unwrap();
+        let d1 = save_draft(
+            &conn, None, "acc1", "Secret", "secret", "markdown", None, None,
+        )
+        .unwrap();
         // Account 2 should not be able to see account 1's draft.
         let result = get_draft(&conn, &d1.id);
         assert!(result.is_ok()); // get_draft doesn't check account — but list_drafts does.
@@ -799,10 +839,45 @@ mod tests {
     #[test]
     fn test_delete_draft() {
         let conn = setup();
-        let draft = save_draft(&conn, None, "acc1", "To Delete", "x", "markdown").unwrap();
+        let draft = save_draft(
+            &conn,
+            None,
+            "acc1",
+            "To Delete",
+            "x",
+            "markdown",
+            None,
+            None,
+        )
+        .unwrap();
         delete_draft(&conn, &draft.id).unwrap();
         let result = get_draft(&conn, &draft.id);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_draft_server_sync_fields() {
+        let conn = setup();
+        let draft = save_draft(
+            &conn,
+            None,
+            "acc1",
+            "Test",
+            "content",
+            "markdown",
+            Some("server-article-123"),
+            Some("abc123def"),
+        )
+        .unwrap();
+        assert_eq!(
+            draft.server_article_id.as_deref(),
+            Some("server-article-123")
+        );
+        assert_eq!(draft.server_commit_hash.as_deref(), Some("abc123def"));
+
+        let reloaded = get_draft(&conn, &draft.id).unwrap();
+        assert_eq!(reloaded.server_article_id, draft.server_article_id);
+        assert_eq!(reloaded.server_commit_hash, draft.server_commit_hash);
     }
 
     #[test]
@@ -823,14 +898,14 @@ mod tests {
     #[test]
     fn test_list_drafts_newest_first() {
         let conn = setup();
-        let d1 = save_draft(&conn, None, "acc1", "Old", "", "markdown").unwrap();
+        let d1 = save_draft(&conn, None, "acc1", "Old", "", "markdown", None, None).unwrap();
         // Force d1's timestamp to be older.
         conn.execute(
             "UPDATE drafts SET updated_at = '2020-01-01' WHERE id = ?1",
             [&d1.id],
         )
         .unwrap();
-        let d2 = save_draft(&conn, None, "acc1", "New", "", "markdown").unwrap();
+        let d2 = save_draft(&conn, None, "acc1", "New", "", "markdown", None, None).unwrap();
 
         let drafts = list_drafts(&conn, "acc1").unwrap();
         assert_eq!(drafts.len(), 2);

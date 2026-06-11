@@ -124,6 +124,8 @@ pub fn save_draft(state: State<'_, AppState>, params: SaveDraftParams) -> Result
         &params.title,
         &params.content,
         &params.format,
+        None,
+        None,
     )
 }
 
