@@ -98,14 +98,16 @@ export const useUserStore = defineStore('user', () => {
     viewer.value = profile
     saveJSON('viewer', profile)
 
-    // Try to get a backend JWT so authenticated API calls work when server is up.
-    // Only save the token — keep the local profile as viewer to avoid ID mismatches.
+    // Try to get a backend JWT and sync identity with server.
     try {
       console.log('[loginLocal] Trying apiLogin with:', username)
-      const { token: t } = await apiLogin({ username, password })
-      console.log('[loginLocal] apiLogin SUCCESS, token:', !!t)
+      const { user: serverUser, token: t } = await apiLogin({ username, password })
+      console.log('[loginLocal] apiLogin SUCCESS, token:', !!t, 'serverId:', serverUser.id)
       token.value = t
       saveString('token', t)
+      // Switch to server identity when online — follow/bookmark/article APIs use server UUIDs.
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
     } catch (e: any) {
@@ -158,12 +160,13 @@ export const useUserStore = defineStore('user', () => {
       // OK to continue without local token
     }
 
-    // Try to register on backend so authenticated API calls work when server is up.
-    // Only save the token — keep the local profile as viewer to avoid ID mismatches.
+    // Try to register on backend — sync identity with server.
     try {
-      const { token: t } = await apiRegister({ username, password, email, name })
+      const { user: serverUser, token: t } = await apiRegister({ username, password, email, name })
       token.value = t
       saveString('token', t)
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
     } catch {
@@ -218,16 +221,17 @@ export const useUserStore = defineStore('user', () => {
 
     // Step 1: Try apiLogin (user may already exist on server)
     try {
-      const { token: t } = await apiLogin({
+      const { user: serverUser, token: t } = await apiLogin({
         username: creds.username,
         password: creds.password,
       })
       console.log('[sync] apiLogin SUCCESS')
       token.value = t
       saveString('token', t)
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
-      await syncProfileToServer()
       return true
     } catch (e: any) {
       console.log('[sync] apiLogin failed:', e?.response?.status, e?.response?.data?.detail || e?.message || e)
@@ -236,7 +240,7 @@ export const useUserStore = defineStore('user', () => {
     // Step 2: Try apiRegister (create server account for local user)
     try {
       console.log('[sync] Trying apiRegister:', creds.username)
-      const { token: t } = await apiRegister({
+      const { user: serverUser, token: t } = await apiRegister({
         username: creds.username,
         password: creds.password,
         email: creds.email || `${creds.username}@peerpedia.local`,
@@ -245,9 +249,10 @@ export const useUserStore = defineStore('user', () => {
       console.log('[sync] apiRegister SUCCESS')
       token.value = t
       saveString('token', t)
+      viewer.value = serverUser
+      saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
-      await syncProfileToServer()
       return true
     } catch (regErr: any) {
       console.log('[sync] apiRegister failed:', regErr?.response?.status, regErr?.response?.data?.detail || regErr?.message || regErr)
