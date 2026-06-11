@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
-import { getUser, followUser, unfollowUser } from '../api/users'
+import { getUser, getFollowing, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
@@ -88,7 +88,6 @@ async function loadFollowState() {
   // Online: check via server API
   if (isOnline.value && userStore.token?.value) {
     try {
-      const { getFollowing } = await import('../api/users')
       const following = await getFollowing(userStore.viewer.id)
       const followed = Array.isArray(following) ? following : (following as any)?.users || []
       isFollowing.value = followed.some((u: any) => u.id === id.value)
