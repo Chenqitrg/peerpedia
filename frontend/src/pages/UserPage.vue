@@ -92,6 +92,7 @@ async function loadFollowState() {
 }
 
 async function handleFollow() {
+  console.log('[follow] handleFollow called, viewer:', !!userStore.viewer, 'isOnline:', isOnline.value, 'token:', !!userStore.token?.value)
   if (!userStore.viewer) return
 
   // If server is reachable but we have no token, try to sync local creds first
@@ -106,15 +107,16 @@ async function handleFollow() {
   followLoading.value = true
   try {
     if (isLocal.value && !useServerApi.value) {
-      // Local mode + offline: follow not supported (no Rust IPC)
+      console.log('[follow] offline — blocked')
       return
     } else {
+      console.log('[follow] calling REST API:', isFollowing.value ? 'unfollow' : 'follow', id.value)
       if (isFollowing.value) {
         await unfollowUser(id.value)
       } else {
         await followUser(id.value)
       }
-    }
+      console.log('[follow] API success')
     isFollowing.value = !isFollowing.value
   } catch (e: any) { console.log('[follow] error:', e?.response?.status, e?.response?.data || e?.message) }
   finally { followLoading.value = false }
