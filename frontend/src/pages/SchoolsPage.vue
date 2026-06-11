@@ -6,6 +6,7 @@ import { getUsers, followUser, unfollowUser, getFollowing } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import ReputationBadges from '../components/ReputationBadges.vue'
 import { useTauri } from '../composables/useTauri'
+import { useFollowCache } from '../composables/useFollowCache'
 import { useOffline } from '../composables/useOffline'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { useAsyncResource } from '../composables/useAsyncResource'
@@ -17,7 +18,7 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const tauri = useTauri()
-const { canRead, getFallback } = useOffline()
+const { canRead, canWrite, getFallback } = useOffline()
 const { isOnline } = useNetworkStatus()
 const following = ref<Set<string>>(new Set())
 
@@ -27,18 +28,13 @@ async function loadFollowState() {
   if (!userStore.viewer) return
   const ids = new Set<string>()
 
-  if (isLocal.value) {
-    // Tauri / browser-local mode — load from local storage.
-    try {
-      const r = await tauri.getFollowing({ user_id: userStore.viewer?.id || '' })
-      console.log('[SchoolsPage] loadFollowState result:', JSON.stringify(r),
-        'localId:', userStore.viewer?.id || '', 'viewerId:', userStore.viewer?.id)
-      if (r && !('error' in r) && Array.isArray(r)) {
-        for (const f of r) ids.add(f.id)
-      }
-    } catch { /* fall through */ }
+  if (!isOnline.value) {
+    // Offline — read from local cache.
+    const cache = useFollowCache()
+    const cachedIds = await cache.getCachedFollowingIds(userStore.viewer.id)
+    if (cachedIds) for (const id of cachedIds) ids.add(id)
   } else {
-    // Web mode — load from server REST API.
+    // Online — use server REST API.
     try {
       const following_users = await getFollowing(userStore.viewer.id)
       const list = Array.isArray(following_users) ? following_users : (following_users as any)?.users || []
@@ -72,31 +68,15 @@ async function toggleFollow(u: UserSummary) {
   } else {
     following.value.add(u.id)
   }
-  // Persist: Tauri IPC for local mode, REST API for web mode.
+  // Persist to server (follow requires network).
   try {
-    if (isLocal.value) {
-      let result
-      if (isCurrentlyFollowing) {
-        result = await tauri.unfollowUser({ follower_id: userStore.viewer?.id || '', followed_id: u.id })
-      } else {
-        result = await tauri.followUser({ follower_id: userStore.viewer?.id || '', followed_id: u.id })
-      }
-      console.log('[SchoolsPage] follow result:', JSON.stringify(result),
-        'localId:', userStore.viewer?.id || '',
-        'viewerId:', userStore.viewer?.id,
-        'localAcctId:', userStore.localAccount?.id,
-        'targetId:', u.id)
-      if (result && typeof result === 'object' && 'error' in result) {
-        console.error('[SchoolsPage] follow error:', result.error)
-        throw new Error((result as any).error)
-      }
+    if (isCurrentlyFollowing) {
+      await unfollowUser(u.id)
     } else {
-      if (isCurrentlyFollowing) {
-        await unfollowUser(u.id)
-      } else {
-        await followUser(u.id)
-      }
+      await followUser(u.id)
     }
+    // Refresh offline cache.
+    useFollowCache().refreshCache(userStore.viewer.id).catch(() => {})
   } catch {
     // Revert on failure.
     if (isCurrentlyFollowing) {
@@ -188,6 +168,8 @@ function goToUser(id: string) {
             :class="following.has(u.id)
               ? 'bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20'
               : 'bg-accent text-[#0d1117] hover:brightness-110'"
+            :disabled="!canWrite('user.follow_graph')"
+            :title="!canWrite('user.follow_graph') ? getFallback('user.follow_graph') : ''"
             @click.stop="toggleFollow(u)"
         >
           <UserCheck v-if="following.has(u.id)" class="w-3 h-3" stroke-width="2" />

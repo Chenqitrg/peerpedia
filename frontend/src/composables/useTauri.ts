@@ -18,7 +18,6 @@ export type {
   CreateAccountParams, LoginParams, SaveDraftParams, ListDraftsParams,
   GetDraftParams, DeleteDraftParams, DeleteArticleParams,
   CacheArticleParams, GetCachedArticleParams,
-  FollowUserParams, IsFollowingParams, GetFollowListParams,
   BookmarkParams, GetBookmarksParams,
   GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
   SetServerArticleIdParams,
@@ -30,7 +29,6 @@ import type {
   CreateAccountParams, LoginParams, SaveDraftParams, ListDraftsParams,
   GetDraftParams, DeleteDraftParams, DeleteArticleParams,
   CacheArticleParams, GetCachedArticleParams,
-  FollowUserParams, IsFollowingParams, GetFollowListParams,
   BookmarkParams, GetBookmarksParams,
   GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
   SetServerArticleIdParams,
@@ -174,27 +172,28 @@ export function useTauri() {
       return _invoke<CachedArticle>('get_cached_article', params as unknown as Record<string, unknown>)
     },
 
-    // Follows
-    async followUser(params: FollowUserParams) {
-      return _invoke<{ ok: boolean }>('follow_user', params as unknown as Record<string, unknown>)
+    // Follows — server is source of truth; these always return null so
+    // callers fall back to REST API (online) or useFollowCache (offline).
+    async followUser(_params?: Record<string, unknown>) {
+      return null as unknown as { ok: boolean }
     },
-    async unfollowUser(params: FollowUserParams) {
-      return _invoke<{ ok: boolean }>('unfollow_user', params as unknown as Record<string, unknown>)
+    async unfollowUser(_params?: Record<string, unknown>) {
+      return null as unknown as { ok: boolean }
     },
-    async isFollowing(params: IsFollowingParams) {
-      return _invoke<{ following: boolean }>('is_following', params as unknown as Record<string, unknown>)
+    async isFollowing(_params?: Record<string, unknown>) {
+      return null as unknown as { following: boolean }
     },
-    async getFollowers(params: GetFollowListParams) {
-      return _invoke<AccountSummary[]>('get_followers', params as unknown as Record<string, unknown>)
+    async getFollowers(_params?: Record<string, unknown>) {
+      return null as unknown as AccountSummary[]
     },
-    async getFollowing(params: GetFollowListParams) {
-      return _invoke<AccountSummary[]>('get_following', params as unknown as Record<string, unknown>)
+    async getFollowing(_params?: Record<string, unknown>) {
+      return null as unknown as AccountSummary[]
     },
-    async getFollowerCount(params: GetFollowListParams) {
-      return _invoke<{ count: number }>('get_follower_count', params as unknown as Record<string, unknown>)
+    async getFollowerCount(_params?: Record<string, unknown>) {
+      return null as unknown as { count: number }
     },
-    async getFollowingCount(params: GetFollowListParams) {
-      return _invoke<{ count: number }>('get_following_count', params as unknown as Record<string, unknown>)
+    async getFollowingCount(_params?: Record<string, unknown>) {
+      return null as unknown as { count: number }
     },
 
     // Bookmarks

@@ -45,11 +45,6 @@ fn main() {
             commands::compile_typst_pdf,
             commands::export_article,
             commands::set_server_article_id,
-            commands::follow_user,
-            commands::unfollow_user,
-            commands::is_following,
-            commands::get_following,
-            commands::get_followers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PeerPedia");

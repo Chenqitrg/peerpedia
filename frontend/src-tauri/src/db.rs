@@ -14,7 +14,7 @@ use crate::error::AppError;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
-const CURRENT_SCHEMA_VERSION: i32 = 7;
+const CURRENT_SCHEMA_VERSION: i32 = 8;
 
 /// Resolve the database path: ~/.peerpedia/peerpedia.db
 fn get_db_path() -> Result<PathBuf, AppError> {
@@ -179,6 +179,9 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
                 );",
             )?;
         }
+        8 => {
+            tx.execute_batch("DROP TABLE IF EXISTS follows;")?;
+        }
         _ => {
             // Unknown migration — rollback and report.
             return Err(AppError::DatabaseError(format!(
@@ -217,7 +220,7 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        assert_eq!(v, 7);
+        assert_eq!(v, 8);
 
         // Create account first (FK target for sessions).
         conn.execute(
@@ -440,8 +443,8 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
-        // Seven version rows (v1-v7), not duplicated on re-run.
-        assert_eq!(count, 7);
+        // Eight version rows (v1-v8), not duplicated on re-run.
+        assert_eq!(count, 8);
     }
 
     #[test]

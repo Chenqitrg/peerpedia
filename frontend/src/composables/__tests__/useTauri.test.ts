@@ -238,102 +238,22 @@ describe('useTauri — browserLocal drafts', () => {
   })
 })
 
-describe('useTauri — browserLocal follows', () => {
+describe('useTauri — follow methods return null (server is source of truth)', () => {
   beforeEach(() => {
     delete (window as any).__TAURI__
     localStorage.clear()
     localStorage.setItem('peerpedia_browser_local', '1')
   })
 
-  it('followUser creates follow relationship', async () => {
+  it('follow methods return null to signal REST API fallback', async () => {
     const tauri = useTauri()
-    const result = await tauri.followUser({ follower_id: 'u1', followed_id: 'u2' })
-    expect(result).toEqual({ ok: true })
-    expect(result).not.toHaveProperty('error')
-  })
-
-  it('followUser is idempotent (double follow is safe)', async () => {
-    const tauri = useTauri()
-    await tauri.followUser({ follower_id: 'u1', followed_id: 'u2' })
-    await tauri.followUser({ follower_id: 'u1', followed_id: 'u2' })
-    // Should not throw or error
-    const following = await tauri.isFollowing({ follower_id: 'u1', followed_id: 'u2' })
-    expect(following).toEqual({ following: true })
-  })
-
-  it('unfollowUser removes follow relationship', async () => {
-    const tauri = useTauri()
-    await tauri.followUser({ follower_id: 'u1', followed_id: 'u2' })
-    await tauri.unfollowUser({ follower_id: 'u1', followed_id: 'u2' })
-    const result = await tauri.isFollowing({ follower_id: 'u1', followed_id: 'u2' })
-    expect(result).toEqual({ following: false })
-  })
-
-  it('unfollowUser is safe on non-existent follow', async () => {
-    const tauri = useTauri()
-    const result = await tauri.unfollowUser({ follower_id: 'u1', followed_id: 'u2' })
-    expect(result).toEqual({ ok: true })
-  })
-
-  it('isFollowing returns false when not following', async () => {
-    const tauri = useTauri()
-    const result = await tauri.isFollowing({ follower_id: 'u1', followed_id: 'u2' })
-    expect(result).toEqual({ following: false })
-  })
-
-  it('getFollowers returns list of followers (by username)', async () => {
-    const tauri = useTauri()
-    await tauri.createAccount({ username: 'alice', password: 'x' })
-    await tauri.createAccount({ username: 'bob', password: 'x' })
-    await tauri.createAccount({ username: 'carol', password: 'x' })
-    const accts = await tauri.listAccounts() as any[]
-    const alice = accts.find(a => a.username === 'alice')!
-    const bob = accts.find(a => a.username === 'bob')!
-    const carol = accts.find(a => a.username === 'carol')!
-
-    await tauri.followUser({ follower_id: bob.id, followed_id: alice.id })
-    await tauri.followUser({ follower_id: carol.id, followed_id: alice.id })
-
-    const followers = await tauri.getFollowers({ user_id: alice.id })
-    expect(Array.isArray(followers)).toBe(true)
-    expect(followers).toHaveLength(2)
-    expect((followers as any[]).map(f => f.id).sort()).toEqual([bob.id, carol.id].sort())
-  })
-
-  it('getFollowing returns list of followed users', async () => {
-    const tauri = useTauri()
-    await tauri.createAccount({ username: 'alice', password: 'x' })
-    await tauri.createAccount({ username: 'bob', password: 'x' })
-    const accts = await tauri.listAccounts() as any[]
-    const alice = accts.find(a => a.username === 'alice')!
-    const bob = accts.find(a => a.username === 'bob')!
-
-    await tauri.followUser({ follower_id: alice.id, followed_id: bob.id })
-
-    const following = await tauri.getFollowing({ user_id: alice.id })
-    expect(following).toHaveLength(1)
-    expect((following as any[])[0].id).toBe(bob.id)
-  })
-
-  it('getFollowerCount and getFollowingCount return correct counts', async () => {
-    const tauri = useTauri()
-    await tauri.createAccount({ username: 'a', password: 'x' })
-    await tauri.createAccount({ username: 'b', password: 'x' })
-    await tauri.createAccount({ username: 'c', password: 'x' })
-    const accts = await tauri.listAccounts() as any[]
-    const a = accts.find(u => u.username === 'a')!
-    const b = accts.find(u => u.username === 'b')!
-    const c = accts.find(u => u.username === 'c')!
-
-    await tauri.followUser({ follower_id: b.id, followed_id: a.id })
-    await tauri.followUser({ follower_id: c.id, followed_id: a.id })
-    await tauri.followUser({ follower_id: a.id, followed_id: b.id })
-
-    const followerCount = await tauri.getFollowerCount({ user_id: a.id })
-    expect(followerCount).toEqual({ count: 2 })
-
-    const followingCount = await tauri.getFollowingCount({ user_id: a.id })
-    expect(followingCount).toEqual({ count: 1 })
+    expect(await tauri.followUser({ follower_id: 'u1', followed_id: 'u2' })).toBeNull()
+    expect(await tauri.unfollowUser({ follower_id: 'u1', followed_id: 'u2' })).toBeNull()
+    expect(await tauri.isFollowing({ follower_id: 'u1', followed_id: 'u2' })).toBeNull()
+    expect(await tauri.getFollowing({ user_id: 'u1' })).toBeNull()
+    expect(await tauri.getFollowers({ user_id: 'u1' })).toBeNull()
+    expect(await tauri.getFollowerCount({ user_id: 'u1' })).toBeNull()
+    expect(await tauri.getFollowingCount({ user_id: 'u1' })).toBeNull()
   })
 })
 
@@ -419,12 +339,10 @@ describe('useTauri — browserLocal error handling', () => {
     localStorage.setItem('peerpedia_browser_local', '1')
   })
 
-  it('browserLocalInvoke returns { ok: true } for unknown commands', async () => {
-    // Use a known command that dispatches to 'default' — all methods go through
-    // _invoke with the command name, so test a valid method call.
+  it('browserLocalInvoke returns { ok: true } for known commands', async () => {
+    // Use cacheArticle — a valid non-follow command through browserLocalBackend.
     const tauri = useTauri()
-    const result = await tauri.followUser({ follower_id: 'u1', followed_id: 'u2' })
-    // Known command works fine.
+    const result = await tauri.cacheArticle({ id: 'test', article_json: '{}' })
     expect(result).toEqual({ ok: true })
   })
 })

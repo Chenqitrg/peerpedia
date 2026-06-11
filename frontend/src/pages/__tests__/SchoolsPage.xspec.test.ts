@@ -1,10 +1,9 @@
 /**
  * xspec Specification Tests — SchoolsPage Follow State
  *
- * SPECIFICATION STATUS = LOCKED
- *
- * These tests encode the contract for follow behavior on the Schools page.
- * Do not modify tests merely to make implementation pass.
+ * SPECIFICATION: Follow data lives on the server (sole source of truth).
+ * Online: REST API. Offline: grayed button (useOffline blocks write),
+ * follow state reads from useFollowCache.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -36,9 +35,8 @@ const { mockUsers, mockFollowing, mockViewer, viewerRef } = vi.hoisted(() => {
 
 import { ref as vRef } from 'vue'
 const mockIsOnline = vRef(true)
-let mockIsTauriMode = false
-let mockIsBrowserLocal = false
 let mockCanReadSchools = true
+let mockCanWriteFollow = true
 
 // ── Module mocks ─────────────────────────────────────────────────────────
 
@@ -54,16 +52,20 @@ vi.mock('../../api/users', () => ({
   unfollowUser: (...args: any[]) => mockUnfollowUser(...args),
 }))
 
-const mockTauriGetFollowing = vi.fn()
-const mockTauriFollowUser = vi.fn()
-const mockTauriUnfollowUser = vi.fn()
+const mockCacheGetFollowingIds = vi.fn().mockResolvedValue(null)
+const mockCacheRefresh = vi.fn().mockResolvedValue(undefined)
+const mockCacheGetFeed = vi.fn().mockResolvedValue(null)
+
+vi.mock('../../composables/useFollowCache', () => ({
+  useFollowCache: () => ({
+    getCachedFollowingIds: (...args: any[]) => mockCacheGetFollowingIds(...args),
+    getCachedFeed: (...args: any[]) => mockCacheGetFeed(...args),
+    refreshCache: (...args: any[]) => mockCacheRefresh(...args),
+  }),
+}))
 
 vi.mock('../../composables/useTauri', () => ({
   useTauri: () => ({
-    getFollowing: (...args: any[]) => mockTauriGetFollowing(...args),
-    followUser: (...args: any[]) => mockTauriFollowUser(...args),
-    unfollowUser: (...args: any[]) => mockTauriUnfollowUser(...args),
-    isFollowing: vi.fn(),
     listAccounts: vi.fn(),
     isTauri: { value: false },
     isBrowserLocal: { value: false },
@@ -73,8 +75,8 @@ vi.mock('../../composables/useTauri', () => ({
 vi.mock('../../stores/useUserStore', () => ({
   useUserStore: () => ({
     get viewer() { return viewerRef.current },
-    isTauriMode: mockIsTauriMode,
-    isBrowserLocal: mockIsBrowserLocal,
+    isTauriMode: false,
+    isBrowserLocal: false,
     token: { value: 'test-token' },
   }),
 }))
@@ -82,7 +84,7 @@ vi.mock('../../stores/useUserStore', () => ({
 vi.mock('../../composables/useOffline', () => ({
   useOffline: () => ({
     canRead: (feature: string) => feature === 'schools' ? mockCanReadSchools : true,
-    canWrite: () => true,
+    canWrite: (feature: string) => feature === 'user.follow_graph' ? mockCanWriteFollow : true,
     getFallback: () => '',
     isLocalOnly: () => false,
   }),
@@ -106,23 +108,18 @@ vi.mock('vue-router', () => ({
 
 import SchoolsPage from '../SchoolsPage.vue'
 
-// Import for vi.mocked usage
-const api = await import('../../api/users')
-
 describe('xspec: SchoolsPage Follow State', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockIsOnline.value = true
-    mockIsTauriMode = false
-    mockIsBrowserLocal = false
     mockCanReadSchools = true
+    mockCanWriteFollow = true
     mockGetUsers.mockResolvedValue(mockUsers)
     mockGetFollowing.mockResolvedValue(mockFollowing)
     mockFollowUser.mockResolvedValue({})
     mockUnfollowUser.mockResolvedValue({})
-    mockTauriGetFollowing.mockResolvedValue([])
-    mockTauriFollowUser.mockResolvedValue({ ok: true })
-    mockTauriUnfollowUser.mockResolvedValue({ ok: true })
+    mockCacheGetFollowingIds.mockResolvedValue(null)
+    mockCacheRefresh.mockResolvedValue(undefined)
   })
 
   async function mountAndSettle() {
@@ -133,67 +130,45 @@ describe('xspec: SchoolsPage Follow State', () => {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Regression: loadFollowState uses Tauri IPC in Tauri mode
-  // (Rust backend now implements follow commands — local path is correct.)
+  // loadFollowState: online uses REST API
   // ═══════════════════════════════════════════════════════════════════════
-  describe('loadFollowState: Tauri mode uses Tauri IPC', () => {
-    it('GIVEN Tauri mode '
+  describe('loadFollowState: online uses REST API', () => {
+    it('GIVEN online '
      + 'WHEN the Schools page loads '
-     + 'THEN follow state is fetched via Tauri IPC', async () => {
-      mockIsTauriMode = true
-      mockTauriGetFollowing.mockResolvedValue([{ id: 'uuid-bohr' }])
+     + 'THEN follow state is fetched via REST API', async () => {
+      mockIsOnline.value = true
 
       await mountAndSettle()
 
-      // Must use Tauri IPC with user_id parameter
-      expect(mockTauriGetFollowing).toHaveBeenCalledWith({ user_id: 'uuid-einstein' })
+      expect(mockGetFollowing).toHaveBeenCalledWith('uuid-einstein')
     })
   })
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Regression: loadFollowState uses Tauri IPC in offline local mode
+  // loadFollowState: offline reads from cache
   // ═══════════════════════════════════════════════════════════════════════
-  describe('loadFollowState: offline local uses Tauri IPC', () => {
-    it('GIVEN Tauri mode without server '
+  describe('loadFollowState: offline reads from cache', () => {
+    it('GIVEN offline '
      + 'WHEN the Schools page loads '
-     + 'THEN follow state is fetched via Tauri IPC with user_id param', async () => {
-      mockIsTauriMode = true
+     + 'THEN follow state is read from useFollowCache', async () => {
       mockIsOnline.value = false
-      mockTauriGetFollowing.mockResolvedValue([{ id: 'uuid-bohr' }])
+      mockCacheGetFollowingIds.mockResolvedValue(['uuid-bohr'])
 
       await mountAndSettle()
 
-      // Must use Tauri IPC with user_id (not follower_id)
-      expect(mockTauriGetFollowing).toHaveBeenCalledWith({ user_id: 'uuid-einstein' })
+      expect(mockCacheGetFollowingIds).toHaveBeenCalledWith('uuid-einstein')
       expect(mockGetFollowing).not.toHaveBeenCalled()
     })
   })
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Regression: loadFollowState uses REST API in pure web mode
+  // toggleFollow: uses REST API when online
   // ═══════════════════════════════════════════════════════════════════════
-  describe('loadFollowState: web mode uses REST API', () => {
-    it('GIVEN pure web mode (no Tauri) '
-     + 'WHEN the Schools page loads '
-     + 'THEN follow state is fetched via REST API', async () => {
-      mockIsTauriMode = false
-      mockIsBrowserLocal = false
-
-      await mountAndSettle()
-
-      expect(mockGetFollowing).toHaveBeenCalledWith('uuid-einstein')
-      expect(mockTauriGetFollowing).not.toHaveBeenCalled()
-    })
-  })
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // Regression: toggleFollow uses Tauri IPC in Tauri mode
-  // ═══════════════════════════════════════════════════════════════════════
-  describe('toggleFollow: Tauri mode uses Tauri IPC', () => {
-    it('GIVEN Tauri mode '
+  describe('toggleFollow: uses REST API', () => {
+    it('GIVEN online '
      + 'WHEN the user clicks Follow '
-     + 'THEN the follow is persisted via Tauri IPC', async () => {
-      mockIsTauriMode = true
+     + 'THEN follow is persisted via REST API', async () => {
+      mockIsOnline.value = true
 
       const wrapper = await mountAndSettle()
       const btn = wrapper.findAll('button').find(b => b.text().trim() === 'Follow')
@@ -201,12 +176,14 @@ describe('xspec: SchoolsPage Follow State', () => {
       await btn!.trigger('click')
       await nextTick()
 
-      expect(mockTauriFollowUser).toHaveBeenCalled()
+      expect(mockFollowUser).toHaveBeenCalled()
+      // Cache refreshed after mutation.
+      expect(mockCacheRefresh).toHaveBeenCalledWith('uuid-einstein')
     })
   })
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Regression: toggleFollow reverts on REST API failure
+  // toggleFollow: revert on failure
   // ═══════════════════════════════════════════════════════════════════════
   describe('toggleFollow: revert on failure', () => {
     it('GIVEN follow API call fails '
@@ -228,9 +205,9 @@ describe('xspec: SchoolsPage Follow State', () => {
   })
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Regression: toggleFollow calls unfollowUser (REST API) for already-followed
+  // toggleFollow: unfollow calls REST API
   // ═══════════════════════════════════════════════════════════════════════
-  describe('toggleFollow: unfollow calls REST API in web mode', () => {
+  describe('toggleFollow: unfollow calls REST API', () => {
     it('GIVEN a user is already followed '
      + 'WHEN the user clicks the "Following" button '
      + 'THEN unfollowUser REST API is called', async () => {
@@ -238,7 +215,6 @@ describe('xspec: SchoolsPage Follow State', () => {
       mockGetFollowing.mockResolvedValue(mockFollowing)
 
       const wrapper = await mountAndSettle()
-      // Find the "Following" button (Bohr)
       const btns = wrapper.findAll('button')
       const followingBtn = btns.find(b => b.text().trim() === 'Following')
       expect(followingBtn).toBeTruthy()
@@ -247,33 +223,30 @@ describe('xspec: SchoolsPage Follow State', () => {
       await nextTick()
 
       expect(mockUnfollowUser).toHaveBeenCalled()
+      expect(mockCacheRefresh).toHaveBeenCalledWith('uuid-einstein')
     })
   })
 
   // ═══════════════════════════════════════════════════════════════════════
+  // Regression: offline write is blocked by useOffline
   // ═══════════════════════════════════════════════════════════════════════
-  // Regression: Tauri IPC error triggers revert
-  // ═══════════════════════════════════════════════════════════════════════
-  describe('Regression: Tauri IPC error reverts optimistic update', () => {
-    it('GIVEN Tauri offline mode '
-     + 'WHEN follow IPC returns { error } '
-     + 'THEN button reverts to "Follow"', async () => {
-      mockIsTauriMode = true
+  describe('Regression: offline follow write is blocked', () => {
+    it('GIVEN offline '
+     + 'WHEN useOffline blocks follow write '
+     + 'THEN follow button is disabled', async () => {
       mockIsOnline.value = false
-      mockTauriGetFollowing.mockResolvedValue([])
-      // Tauri _invoke returns { error } on failure — doesn't throw
-      mockTauriFollowUser.mockResolvedValue({ error: 'command not found' })
+      mockCanWriteFollow = false
 
       const wrapper = await mountAndSettle()
-      // Simulate clicking Follow button
-      await wrapper.find('button').trigger('click')
-      await nextTick()
-      await new Promise(r => setTimeout(r, 10))
-
-      // Must have attempted Tauri IPC
-      expect(mockTauriFollowUser).toHaveBeenCalled()
-      // REST API must NOT be called
-      expect(mockFollowUser).not.toHaveBeenCalled()
+      const btns = wrapper.findAll('button')
+      // Follow buttons should be disabled when canWrite is false for user.follow_graph
+      const followBtns = btns.filter(b => {
+        const text = b.text().trim()
+        return text === 'Follow' || text === 'Following'
+      })
+      for (const btn of followBtns) {
+        expect((btn.element as HTMLButtonElement).disabled).toBe(true)
+      }
     })
   })
 
@@ -289,7 +262,7 @@ describe('xspec: SchoolsPage Follow State', () => {
       await mountAndSettle()
 
       expect(mockGetFollowing).not.toHaveBeenCalled()
-      expect(mockTauriGetFollowing).not.toHaveBeenCalled()
+      expect(mockCacheGetFollowingIds).not.toHaveBeenCalled()
 
       viewerRef.current = mockViewer
     })
