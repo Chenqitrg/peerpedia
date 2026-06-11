@@ -36,6 +36,23 @@ vi.mock('@/composables/useTauri', () => ({
   useTauri: () => ({ isTauri: { value: false }, isBrowserLocal: { value: false }, saveDraft: vi.fn(), getDraft: vi.fn().mockResolvedValue(null), listDrafts: vi.fn().mockResolvedValue([]), deleteDraft: vi.fn(), gitInit: vi.fn(), gitCommit: vi.fn(), gitHistory: vi.fn().mockResolvedValue([]), compileTypst: vi.fn(), getSessionToken: vi.fn(() => null), setSessionToken: vi.fn(), login: vi.fn(), listAccounts: vi.fn().mockResolvedValue([]), isFollowing: vi.fn(), getCachedArticle: vi.fn().mockResolvedValue(null), searchDrafts: vi.fn().mockResolvedValue([]), searchCachedArticles: vi.fn().mockResolvedValue([]), deleteArticle: vi.fn() }),
 }))
 
+vi.mock('@/composables/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({ isOnline: { value: true }, startPing: vi.fn(), stopPing: vi.fn() })),
+}))
+
+vi.mock('@/composables/useArticleSync', () => ({
+  useArticleSync: vi.fn(() => ({
+    syncState: { value: 'synced' },
+    error: { value: null },
+    pushing: { value: false },
+    upload: vi.fn().mockResolvedValue(true),
+    pushUpdate: vi.fn().mockResolvedValue(true),
+    useRemote: vi.fn().mockResolvedValue(true),
+    getContentAtCommit: vi.fn().mockResolvedValue('# content'),
+    clearError: vi.fn(),
+  })),
+}))
+
 // ── Helpers ─────────────────────────────────────────────────────
 
 async function makeRouter() {

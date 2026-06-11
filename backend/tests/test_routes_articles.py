@@ -106,9 +106,8 @@ class TestCreateArticle:
         resp = client.post("/api/v1/articles", json=body)
         assert resp.status_code == 201
         data = resp.json()
-        assert data["status"] == "sedimentation"
+        assert data["status"] == "draft"
         assert data["authors"][0]["id"] == seed_user
-        assert data["sink_eta"] is not None
 
     def test_create_missing_self_review(self, client, seed_user):
         resp = client.post("/api/v1/articles", json={"authors": [seed_user]})
@@ -172,10 +171,10 @@ class TestUpdateArticle:
         assert resp2.status_code == 200
         data = resp2.json()
         assert data["id"] == article_id
-        assert data["status"] == "sedimentation"
+        assert data["status"] == "draft"
 
     def test_update_no_content_change(self, client, seed_user):
-        """Edit without content change: still commits and re-enters pool."""
+        """Edit without content change: commits, stays draft unless publish=true."""
         create_body = {
             "authors": [seed_user],
             "content": "# Test",
@@ -194,7 +193,7 @@ class TestUpdateArticle:
         }
         resp2 = client.put(f"/api/v1/articles/{article_id}", json=edit_body)
         assert resp2.status_code == 200
-        assert resp2.json()["status"] == "sedimentation"
+        assert resp2.json()["status"] == "draft"
 
     def test_update_nonexistent(self, client):
         resp = client.put("/api/v1/articles/nonexistent", json={"content": "x"})
@@ -610,8 +609,8 @@ class TestDeleteArticle:
 class TestArticleLifecycle:
     """Verify article status transitions through the sedimentation pool."""
 
-    def test_create_article_enters_sedimentation(self, client, seed_user):
-        """New articles enter sedimentation, not draft."""
+    def test_create_article_starts_as_draft(self, client, seed_user):
+        """New articles start as draft; publish is explicit via POST /{id}/publish."""
         body = {
             "authors": [seed_user],
             "content": "# Test\n\nContent.",
@@ -621,9 +620,7 @@ class TestArticleLifecycle:
         }
         resp = client.post("/api/v1/articles", json=body)
         assert resp.status_code == 201
-        assert resp.json()["status"] == "sedimentation"
-        assert resp.json()["sink_eta"] is not None
-        assert resp.json()["days_remaining"] is not None
+        assert resp.json()["status"] == "draft"
 
     def test_edit_re_enters_pool(self, client, seed_user):
         """Editing an article should update sink_start and re-enter sedimentation."""
