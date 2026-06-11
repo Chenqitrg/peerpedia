@@ -297,7 +297,7 @@ describe('useTauri — browserLocal follows', () => {
     const followers = await tauri.getFollowers({ user_id: alice.id })
     expect(Array.isArray(followers)).toBe(true)
     expect(followers).toHaveLength(2)
-    expect((followers as any[]).map(f => f.username).sort()).toEqual(['bob', 'carol'])
+    expect((followers as any[]).map(f => f.id).sort()).toEqual([bob.id, carol.id].sort())
   })
 
   it('getFollowing returns list of followed users', async () => {
@@ -312,7 +312,7 @@ describe('useTauri — browserLocal follows', () => {
 
     const following = await tauri.getFollowing({ user_id: alice.id })
     expect(following).toHaveLength(1)
-    expect((following as any[])[0].username).toBe('bob')
+    expect((following as any[])[0].id).toBe(bob.id)
   })
 
   it('getFollowerCount and getFollowingCount return correct counts', async () => {

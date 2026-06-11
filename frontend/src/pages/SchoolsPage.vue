@@ -34,6 +34,8 @@ async function loadFollowState() {
     // Tauri / browser-local mode — load from local storage.
     try {
       const r = await tauri.getFollowing({ user_id: localId.value })
+      console.log('[SchoolsPage] loadFollowState result:', JSON.stringify(r),
+        'localId:', localId.value, 'viewerId:', userStore.viewer?.id)
       if (r && !('error' in r) && Array.isArray(r)) {
         for (const f of r) ids.add(f.id)
       }
@@ -76,10 +78,20 @@ async function toggleFollow(u: UserSummary) {
   // Persist: Tauri IPC for local mode, REST API for web mode.
   try {
     if (isLocal.value) {
+      let result
       if (isCurrentlyFollowing) {
-        await tauri.unfollowUser({ follower_id: localId.value, followed_id: u.id })
+        result = await tauri.unfollowUser({ follower_id: localId.value, followed_id: u.id })
       } else {
-        await tauri.followUser({ follower_id: localId.value, followed_id: u.id })
+        result = await tauri.followUser({ follower_id: localId.value, followed_id: u.id })
+      }
+      console.log('[SchoolsPage] follow result:', JSON.stringify(result),
+        'localId:', localId.value,
+        'viewerId:', userStore.viewer?.id,
+        'localAcctId:', userStore.localAccount?.id,
+        'targetId:', u.id)
+      if (result && typeof result === 'object' && 'error' in result) {
+        console.error('[SchoolsPage] follow error:', result.error)
+        throw new Error((result as any).error)
       }
     } else {
       if (isCurrentlyFollowing) {
