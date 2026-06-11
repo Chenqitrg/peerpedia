@@ -117,6 +117,12 @@ export const useUserStore = defineStore('user', () => {
         email: acctWithToken.email || `${username}@peerpedia.local`,
         name: acctWithToken.name || username,
       })
+      // Immediately try to sync if network is available (don't wait for watcher)
+      const { isOnline } = useNetworkStatus()
+      if (isOnline.value) {
+        console.log('[loginLocal] network is online, trying immediate sync')
+        await trySyncServerAuth()
+      }
     }
   }
 
