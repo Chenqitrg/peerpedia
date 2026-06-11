@@ -28,12 +28,20 @@ export const useUserStore = defineStore('user', () => {
 
   // Credentials held for server sync retry. Stored when local login/register
   // succeeds but the server is unreachable, cleared on successful sync.
+  // Persisted to localStorage to survive HMR and page refreshes.
+  const PENDING_CREDS_KEY = 'peerpedia_pending_server_creds'
   let _pendingServerCreds: {
     username: string
     password: string
     email: string
     name: string
-  } | null = null
+  } | null = loadJSON(PENDING_CREDS_KEY) || null
+
+  function _savePendingCreds(creds: typeof _pendingServerCreds) {
+    _pendingServerCreds = creds
+    if (creds) saveJSON(PENDING_CREDS_KEY, creds)
+    else remove(PENDING_CREDS_KEY)
+  }
 
   // Detect Tauri / dev mock mode on store initialization.
   isTauriMode.value = tauri.isTauri.value
@@ -98,17 +106,17 @@ export const useUserStore = defineStore('user', () => {
       console.log('[loginLocal] apiLogin SUCCESS, token:', !!t)
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      _savePendingCreds(null)
       syncError.value = null
     } catch (e: any) {
       console.log('[loginLocal] apiLogin failed, storing pending creds:', username)
       // Server unreachable — store credentials for later sync
-      _pendingServerCreds = {
+      _savePendingCreds({
         username,
         password,
         email: acctWithToken.email || '',
         name: acctWithToken.name || username,
-      }
+      })
     }
   }
 
@@ -156,11 +164,11 @@ export const useUserStore = defineStore('user', () => {
       const { token: t } = await apiRegister({ username, password, email, name })
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      _savePendingCreds(null)
       syncError.value = null
     } catch {
       // Server unreachable — store credentials for later sync
-      _pendingServerCreds = { username, password, email, name }
+      _savePendingCreds({ username, password, email, name })
     }
   }
 
@@ -181,7 +189,7 @@ export const useUserStore = defineStore('user', () => {
     localAccount.value = null
     localToken.value = null
     tauri.setSessionToken(null)
-    _pendingServerCreds = null
+    _savePendingCreds(null)
     syncError.value = null
     remove('viewer')
     remove('token')
@@ -217,7 +225,7 @@ export const useUserStore = defineStore('user', () => {
       console.log('[sync] apiLogin SUCCESS')
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      _savePendingCreds(null)
       syncError.value = null
       await syncProfileToServer()
       return true
@@ -237,7 +245,7 @@ export const useUserStore = defineStore('user', () => {
       console.log('[sync] apiRegister SUCCESS')
       token.value = t
       saveString('token', t)
-      _pendingServerCreds = null
+      _savePendingCreds(null)
       syncError.value = null
       await syncProfileToServer()
       return true
