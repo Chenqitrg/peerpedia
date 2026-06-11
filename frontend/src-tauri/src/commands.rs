@@ -656,8 +656,8 @@ pub struct GetFollowListParams {
     pub user_id: String,
 }
 
-#[tauri::command(name = "get_following")]
-pub fn get_following_cmd(
+#[tauri::command]
+pub fn get_following(
     state: State<'_, AppState>,
     params: GetFollowListParams,
 ) -> Result<Vec<FollowEntry>, AppError> {
@@ -665,8 +665,8 @@ pub fn get_following_cmd(
     local_store::get_following(&conn, &params.user_id)
 }
 
-#[tauri::command(name = "get_followers")]
-pub fn get_followers_cmd(
+#[tauri::command]
+pub fn get_followers(
     state: State<'_, AppState>,
     params: GetFollowListParams,
 ) -> Result<Vec<FollowEntry>, AppError> {

@@ -48,8 +48,8 @@ fn main() {
             commands::follow_user,
             commands::unfollow_user,
             commands::is_following,
-            commands::get_following_cmd,
-            commands::get_followers_cmd,
+            commands::get_following,
+            commands::get_followers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PeerPedia");
