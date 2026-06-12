@@ -213,3 +213,16 @@ def extend_sink(session: Session, article_id: str, extra_days: int, max_days: in
         a.sink_extended_count += 1
     session.commit()
     return a
+
+
+def get_article_by_fork_and_author(
+    session: Session, forked_from: str, author_id: str,
+) -> Article | None:
+    """Find an article forked from *forked_from* by *author_id*."""
+    return (
+        session.query(Article)
+        .join(ArticleAuthor, Article.id == ArticleAuthor.article_id)
+        .filter(Article.forked_from == forked_from)
+        .filter(ArticleAuthor.author_id == author_id)
+        .first()
+    )
