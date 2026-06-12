@@ -13,6 +13,12 @@ let consecutiveFailures = 0
 export function useNetworkStatus() {
 
   async function ping(): Promise<void> {
+    // Use navigator.onLine as primary signal — instant, no network request.
+    // Prevents console noise from failed fetch() calls when server is down.
+    if (!navigator.onLine) {
+      isOnline.value = false
+      return
+    }
     try {
       // Must use absolute URL — relative /health resolves to tauri://localhost
       // in Tauri webview, not the Python backend on localhost:8080.

@@ -132,21 +132,22 @@ export const useUserStore = defineStore('user', () => {
         useFollowCache().refreshCache(serverUser.id).catch(() => {})
       } catch (regErr: any) {
         const detail = regErr?.response?.data?.detail
-        console.error('[loginLocal] apiRegister 422:', JSON.stringify(detail))
-        // Only show validation errors (422) — network errors will retry silently.
-        if (regErr?.response?.status === 422) {
-          syncError.value = Array.isArray(detail)
-            ? detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
-            : detail || '注册数据不合规'
-          throw new Error(syncError.value)
-        }
-        // Server unreachable — store credentials for later retry.
+        console.error('[loginLocal] apiRegister error:', regErr?.response?.status, JSON.stringify(detail))
+        // Save credentials for retry regardless of error type.
+        // 422 (validation error): user can fix the issue and trySyncServerAuth will retry.
+        // Network error: server will be reachable later.
         _savePendingCreds({
           username,
           password,
           email: acctWithToken.email || `${username}@peerpedia.local`,
           name: acctWithToken.name || username,
         })
+        if (regErr?.response?.status === 422) {
+          syncError.value = Array.isArray(detail)
+            ? detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
+            : detail || '注册数据不合规'
+          throw new Error(syncError.value)
+        }
       }
     }
   }
@@ -204,14 +205,14 @@ export const useUserStore = defineStore('user', () => {
       _savePendingCreds(null)
       syncError.value = null
     } catch (e: any) {
+      // Save credentials for retry regardless of error type.
+      _savePendingCreds({ username, password, email, name })
       // Show validation errors to user, re-throw for AuthModal.
       const detail = e?.response?.data?.detail
       if (Array.isArray(detail) && detail.length > 0) {
         syncError.value = detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
         throw new Error(syncError.value)
       }
-      // Server unreachable — store credentials for later sync
-      _savePendingCreds({ username, password, email, name })
     }
   }
 
