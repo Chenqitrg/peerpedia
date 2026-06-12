@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getFollowers, getFollowing, getUser, getUsers } from '../api/users'
+import { getFollowers, getFollowing } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
 import { useFollowCache } from '../composables/useFollowCache'
@@ -46,14 +46,9 @@ async function load() {
       users.value = isFollowers.value
         ? await getFollowers(userId.value)
         : await getFollowing(userId.value)
-      // Cache the following list + profiles for offline use.
+      // Cache the following list for offline use.
       if (!isFollowers.value && userStore.viewer) {
-        const cache = useFollowCache()
-        cache.setCachedFollowingUsers(userId.value, users.value).catch(() => {})
-        // Cache each followed user's profile individually.
-        for (const u of users.value) {
-          getUser(u.id).then(p => cache.setCachedUserProfile(u.id, p).catch(() => {})).catch(() => {})
-        }
+        useFollowCache().setCachedFollowingUsers(userId.value, users.value).catch(() => {})
       }
       // Fetch viewer's following list to show correct button state on each card.
       if (userStore.viewer) {
