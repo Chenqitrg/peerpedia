@@ -30,13 +30,13 @@ def get_review(session: Session, review_id: str) -> Review | None:
     return session.get(Review, review_id)
 
 
-def get_reviews_for_article(session: Session, article_id: str) -> list[Review]:
-    return (
-        session.query(Review)
-        .filter(Review.article_id == article_id)
-        .order_by(Review.created_at.desc())
-        .all()
-    )
+def get_reviews_for_article(
+    session: Session, article_id: str, commit_hash: str | None = None,
+) -> list[Review]:
+    q = session.query(Review).filter(Review.article_id == article_id)
+    if commit_hash is not None:
+        q = q.filter(Review.commit_hash == commit_hash)
+    return q.order_by(Review.created_at.desc()).all()
 
 
 def get_review_by_user_scope(
