@@ -206,6 +206,7 @@ npm run tauri dev    # → 启动 Tauri 窗口
 ### 桌面版（Phase 1 — 冷启动）
 
 - 离线 Markdown/Typst 编辑，实时预览
+- 三态同步按钮（电话模型）：点击连接、绿色已同步、红色超时，用户手动控制，无后台轮询
 - 本地 Git 版本控制（fork, history, diff）
 - 基于 SQLite 的草稿和文章缓存
 - 本地账号系统（bcrypt，无需服务器）
