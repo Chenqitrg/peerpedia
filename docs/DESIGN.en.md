@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-12 · v0.2.3 · L4 follow: server as source of truth (REST API), offline cache via article_cache table · Schools page follow state persistence · User profile fallback for server users in Tauri mode · Article visibility in Tauri+online mode
+> 2026-06-12 · v0.3.0 · Auth hardening (PUT+merge ownership), score accumulation across commits, async Tauri commands, N+1 query elimination, engine singleton cache, feed/pool pagination
 
 ---
 
@@ -290,6 +290,7 @@ Reputation determines voting weight in the pool.
 3. Reviews during pool phase use anonymous names.
 4. When timer expires → auto-publish via `publish_ready_articles()` background task.
 5. Articles with zero community reviews receive a penalty to their score.
+6. **Score accumulation:** reviews across all commits are aggregated — editing a sedimentation article no longer erases existing scores. The article score is the weighted average of all reviews regardless of which commit they were written against.
 
 ---
 
@@ -353,7 +354,7 @@ Compile output is **never** stored in the database. The compile endpoint generat
 | POST | `/api/v1/articles/{id}/reviews/{rid}/messages` | Post thread reply |
 | GET | `/api/v1/articles/{id}/citations` | Citation graph |
 | POST | `/api/v1/citations/click` | Record citation click |
-| POST | `/api/v1/articles/{id}/merge-proposals` | Create merge proposal |
+| POST | `/api/v1/articles/{id}/merge-proposals` | Create merge proposal (auth required; proposer_id from JWT) |
 | GET | `/api/v1/search` | Full-text search |
 | POST | `/api/v1/compile-preview` | Compile Markdown/Typst → HTML/SVG |
 | GET | `/api/v1/users` | List users |
@@ -382,9 +383,9 @@ Compile output is **never** stored in the database. The compile endpoint generat
 
 | Suite | Tests | Framework |
 |-------|-------|-----------|
-| Backend | 384 | pytest |
-| Frontend | 492 | vitest |
-| Rust | 79 | cargo test |
+| Backend | 540 | pytest |
+| Frontend | 522 | vitest |
+| Rust | 16 | cargo test |
 
 ### 7.2 CI Pipeline
 
@@ -474,4 +475,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-11 · 384 backend tests · 492 frontend tests · 79 Rust tests · 9 DB entities · L4 article sync (auto-backup + conflict resolution) · Draft-first creation*
+*Last updated: 2026-06-12 · 540 backend tests · 522 frontend tests · 16 Rust tests · 9 DB entities · L4 article sync (auto-backup + conflict resolution) · Draft-first creation · Auth hardening · Score accumulation · Async Tauri*

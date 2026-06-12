@@ -2164,6 +2164,11 @@
             }
           }
         },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -2172,6 +2177,9 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "description": "Authentication required"
           },
           "422": {
             "description": "Validation Error",
@@ -2231,6 +2239,11 @@
         ],
         "summary": "Api Accept Merge",
         "operationId": "api_accept_merge_api_v1_articles__article_id__merge_proposals__proposal_id__accept_post",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "article_id",
@@ -2280,6 +2293,11 @@
         ],
         "summary": "Api Reject Merge",
         "operationId": "api_reject_merge_api_v1_articles__article_id__merge_proposals__proposal_id__reject_post",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "article_id",
@@ -2832,10 +2850,6 @@
           "fork_article_id": {
             "type": "string",
             "title": "Fork Article Id"
-          },
-          "proposer_id": {
-            "type": "string",
-            "title": "Proposer Id"
           }
         },
         "type": "object",
