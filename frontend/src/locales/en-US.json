@@ -22,11 +22,9 @@
     "statusConnected": "Connected",
     "statusLocal": "Local mode",
     "statusOffline": "Offline",
-    "syncIdle": "Sync",
+    "syncConnectAria": "Sync — tap to connect",
     "syncConnecting": "Connecting…",
-    "syncSynced": "Synced",
-    "syncConnectAria": "Connect to server",
-    "syncDisconnectAria": "Disconnect from server"
+    "syncDisconnectAria": "Synced — tap to disconnect"
   },
   "schools": {
     "subtitle": "Discover researchers. Follow people whose work you find interesting."
