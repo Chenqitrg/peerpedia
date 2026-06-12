@@ -37,7 +37,7 @@ function disconnect() {
 }
 
 function notifySuccess() {
-  // Only promote to synced if user initiated connection.
+  // Only promote to synced if user initiated connection (via connect() → ping()).
   // Prevents: (a) stale ping() promises after disconnect, (b) axios interceptor
   // auto-connecting the user without a tap.
   if (connectionState.value !== 'connecting') return
