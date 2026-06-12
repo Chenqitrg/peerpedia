@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 
-const FAILURE_THRESHOLD = 2
+const FAILURE_THRESHOLD = 1
 
 // Module-level singleton — all callers share the same isOnline state.
 // If each useNetworkStatus() call created its own ref, App.vue's

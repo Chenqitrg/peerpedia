@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
-import { getUser, getFollowing, followUser, unfollowUser } from '../api/users'
+import { getUser, getFollowing, getFollowers, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
@@ -60,16 +60,21 @@ const { data: user, loading, error, execute: loadUser } = useAsyncResource(
     // Self in local mode — use viewer profile directly.
     if (isLocal.value && isSelf.value && userStore.viewer) return userStore.viewer
     // Other user in local mode — look up from browser-local accounts.
-    // When online, also check the server API (local accounts may not include
-    // users registered solely on the server).
     if (isLocal.value && !isSelf.value) {
       const accts = await tauri.listAccounts()
       if (accts && !('error' in accts) && Array.isArray(accts)) {
         const found = accts.find(a => a.id === id.value)
         if (found) return _localUserToProfile(found)
       }
-      // Fall back to server API when online — the user may be a server-only user.
-      if (isOnline.value) return getUser(id.value)
+      // Online — fetch from server, then cache for offline.
+      if (isOnline.value) {
+        const profile = await getUser(id.value)
+        useFollowCache().setCachedUserProfile(id.value, profile).catch(() => {})
+        return profile
+      }
+      // Offline — try cached profile for followed users.
+      const cached = await useFollowCache().getCachedUserProfile(id.value)
+      if (cached) return cached
       throw new Error('User not found')
     }
     return getUser(id.value)
@@ -93,19 +98,25 @@ const followLoading = ref(false)
       // Offline — read from local cache.
       const cache = useFollowCache()
       const ids = await cache.getCachedFollowingIds(userStore.viewer.id)
-      if (ids && isSelf.value && user.value) {
-        user.value = { ...user.value, following_count: ids.length }
+      if (isSelf.value && user.value) {
+        if (ids !== null && ids.length > 0) {
+          user.value = { ...user.value, following_count: ids.length }
+        }
       } else if (ids) {
         isFollowing.value = ids.includes(id.value)
       }
       return
     }
-    // Online — use server REST API.
+    // Online — use server REST API. Fetch both following + followers counts.
     try {
-      const following = await getFollowing(userStore.viewer.id)
+      const [following, followers] = await Promise.all([
+        getFollowing(userStore.viewer.id),
+        getFollowers(userStore.viewer.id),
+      ])
       const followed = Array.isArray(following) ? following : (following as any)?.users || []
+      const followerList = Array.isArray(followers) ? followers : (followers as any)?.users || []
       if (isSelf.value && user.value) {
-        user.value = { ...user.value, following_count: followed.length }
+        user.value = { ...user.value, following_count: followed.length, followers_count: followerList.length }
       } else {
         isFollowing.value = followed.some((u: any) => u.id === id.value)
       }
@@ -141,7 +152,15 @@ async function loadArticles() {
       const artData = await getArticles({ author_id: id.value, page: 1, size: 50 })
       const serverArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
       merged.push(...serverArticles)
+      // Cache for offline browsing.
+      useFollowCache().setCachedUserArticles(id.value, serverArticles).catch(() => {})
     } catch { /* server unreachable in Tauri offline mode */ }
+  } else if (tauri.isTauri.value && !isSelf.value) {
+    // Offline Tauri mode — read cached article cards for followed users.
+    try {
+      const cached = await useFollowCache().getCachedUserArticles(id.value)
+      if (cached) merged.push(...cached)
+    } catch { /* cache miss */ }
   }
 
   // 2. Tauri local drafts (only for current user's own page)

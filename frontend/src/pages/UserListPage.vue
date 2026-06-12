@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getFollowers, getFollowing, getUsers } from '../api/users'
+import { getFollowers, getFollowing, getUser, getUsers } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
 import { useFollowCache } from '../composables/useFollowCache'
@@ -23,6 +23,7 @@ const userId = computed(() => route.params.id as string)
 const isFollowers = computed(() => route.path.endsWith('/followers'))
 
 const users = ref<UserSummary[]>([])
+const followingIds = ref<Set<string>>(new Set())
 const loading = ref(true)
 const error = ref('')
 
@@ -33,22 +34,34 @@ async function load() {
   error.value = ''
   try {
     if (!isOnline.value) {
-      // Offline — only the viewer's own following list is cached.
       const isSelf = userId.value === userStore.viewer?.id
+      const cache = useFollowCache()
       if (isSelf && !isFollowers.value) {
-        const cache = useFollowCache()
-        const ids = await cache.getCachedFollowingIds(userId.value)
-        if (ids) {
-          users.value = ids.map(id => ({
-            id, name: id.slice(0, 8) + '…', anonymous_name: '',
-            article_count: 0, reputation: {},
-          })) as UserSummary[]
-        }
+        // Offline own following: read cached UserSummary with real names.
+        const cached = await cache.getCachedFollowingUsers(userId.value)
+        if (cached) users.value = cached
       }
+      // Offline followers / other users: no cache available, show empty.
     } else {
       users.value = isFollowers.value
         ? await getFollowers(userId.value)
         : await getFollowing(userId.value)
+      // Cache the following list + profiles for offline use.
+      if (!isFollowers.value && userStore.viewer) {
+        const cache = useFollowCache()
+        cache.setCachedFollowingUsers(userId.value, users.value).catch(() => {})
+        // Cache each followed user's profile individually.
+        for (const u of users.value) {
+          getUser(u.id).then(p => cache.setCachedUserProfile(u.id, p).catch(() => {})).catch(() => {})
+        }
+      }
+      // Fetch viewer's following list to show correct button state on each card.
+      if (userStore.viewer) {
+        try {
+          const following = await getFollowing(userStore.viewer.id)
+          followingIds.value = new Set(following.map(u => u.id))
+        } catch { /* ignore */ }
+      }
     }
   } catch (e: any) {
     error.value = e.userMessage || t('common.error')
@@ -92,7 +105,7 @@ watch([userId, isFollowers], load, { immediate: true })
     </div>
 
     <div v-else class="space-y-2">
-      <UserCard v-for="u in users" :key="u.id" :user="u" />
+      <UserCard v-for="u in users" :key="u.id" :user="u" :is-following="followingIds.has(u.id)" />
     </div>
   </div>
 </template>
