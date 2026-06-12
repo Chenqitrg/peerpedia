@@ -39,7 +39,10 @@ async function load() {
       if (isSelf && !isFollowers.value) {
         // Offline own following: read cached UserSummary with real names.
         const cached = await cache.getCachedFollowingUsers(userId.value)
-        if (cached) users.value = cached
+        if (cached) {
+          users.value = cached
+          followingIds.value = new Set(cached.map(u => u.id))
+        }
       }
       // Offline followers / other users: no cache available, show empty.
     } else {
