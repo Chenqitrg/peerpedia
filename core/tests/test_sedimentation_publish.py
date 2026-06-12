@@ -19,7 +19,6 @@ import pytest
 from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import Article, ArticleAuthor, Review, User
 from peerpedia_core.workflow.sedimentation import (
-    compute_sink_eta,
     is_ready_to_publish,
     publish_ready_articles,
 )
@@ -81,20 +80,6 @@ class TestIsReadyToPublish:
         # Should not crash, and should correctly determine it's in the past
         result = is_ready_to_publish(past)
         assert result is True
-
-
-class TestComputeSinkEta:
-    """Sink ETA calculation with different scores."""
-
-    def test_max_score_min_time(self):
-        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
-        eta = compute_sink_eta(start, avg_score=5.0, min_days=2, max_days=180)
-        assert eta == start + timedelta(days=2)
-
-    def test_min_score_max_time(self):
-        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
-        eta = compute_sink_eta(start, avg_score=0.0, min_days=2, max_days=180)
-        assert eta == start + timedelta(days=180)
 
 
 def _build_score(orig=3, rig=3, comp=3, ped=3, imp=3):

@@ -7,25 +7,6 @@ from peerpedia_core.config.params import params
 from peerpedia_core.storage.db.models import Article
 
 
-def compute_sink_eta(
-    sink_start: datetime,
-    avg_score: float,
-    min_days: int = 2,
-    max_days: int = 180,
-) -> datetime:
-    """Compute when an article exits the sedimentation pool.
-
-    Uses a linear interpolation: score 5.0 → min_days, score 0.0 → max_days.
-    Higher scores mean shorter (faster) sink times.
-
-    The function is replaceable via params.score.score_to_sink_multiplier.
-    """
-    multiplier = params.score.score_to_sink_multiplier(avg_score)
-    # multiplier = 0 for 5.0 (shortest), multiplier = 1 for 0.0 (longest)
-    actual_days = min_days + multiplier * (max_days - min_days)
-    return sink_start + timedelta(days=actual_days)
-
-
 def is_ready_to_publish(sink_eta: datetime | None) -> bool:
     """Check if the sink time has elapsed. Returns False if sink_eta is None."""
     if sink_eta is None:

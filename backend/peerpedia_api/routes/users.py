@@ -14,6 +14,7 @@ from peerpedia_core.storage.db.crud_user import (
     unfollow_user,
 )
 from peerpedia_core.storage.db.models import User
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from peerpedia_api import deps
@@ -22,22 +23,36 @@ from peerpedia_api.schemas.user import UserCreate, UserProfile, UserSummary, Use
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+
+def _batch_article_counts(db: Session, user_ids: list[str]) -> dict[str, int]:
+    """Return {user_id: article_count} for a batch of users."""
+    from peerpedia_core.storage.db.models import Article, ArticleAuthor
+    if not user_ids:
+        return {}
+    rows = (
+        db.query(ArticleAuthor.author_id, func.count(Article.id))
+        .join(Article, Article.id == ArticleAuthor.article_id)
+        .filter(ArticleAuthor.author_id.in_(user_ids))
+        .group_by(ArticleAuthor.author_id)
+        .all()
+    )
+    return {row[0]: row[1] for row in rows}
+
+
 # ── Users ────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=list[UserSummary])
 def api_list_users(db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = list_users(db)
+    user_ids = [u.id for u in users]
+    counts = _batch_article_counts(db, user_ids)
     out = []
     for u in users:
-        article_count = db.query(Article).join(
-            ArticleAuthor, Article.id == ArticleAuthor.article_id
-        ).filter(ArticleAuthor.author_id == u.id).count()
         out.append(UserSummary(
             id=u.id, name=u.name, anonymous_name=u.anonymous_name,
             affiliation=u.affiliation, expertise=u.expertise,
             avatar_url=u.avatar_url,
-            article_count=article_count,
+            article_count=counts.get(u.id, 0),
             reputation=u.reputation or {},
         ))
     return out
@@ -122,34 +137,30 @@ def api_update_user(user_id: str, body: UserUpdate,
 
 @router.get("/{user_id}/followers", response_model=list[UserSummary])
 def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = get_followers(db, user_id)
+    user_ids = [u.id for u in users]
+    counts = _batch_article_counts(db, user_ids)
     out = []
     for u in users:
-        article_count = db.query(Article).join(
-            ArticleAuthor, Article.id == ArticleAuthor.article_id
-        ).filter(ArticleAuthor.author_id == u.id).count()
         out.append(UserSummary(
             id=u.id, name=u.name, affiliation=u.affiliation,
             expertise=u.expertise,
-            article_count=article_count, reputation=u.reputation or {},
+            article_count=counts.get(u.id, 0), reputation=u.reputation or {},
         ))
     return out
 
 
 @router.get("/{user_id}/following", response_model=list[UserSummary])
 def api_get_following(user_id: str, db: Session = Depends(deps.get_db)):
-    from peerpedia_core.storage.db.models import Article, ArticleAuthor
     users = get_following(db, user_id)
+    user_ids = [u.id for u in users]
+    counts = _batch_article_counts(db, user_ids)
     out = []
     for u in users:
-        article_count = db.query(Article).join(
-            ArticleAuthor, Article.id == ArticleAuthor.article_id
-        ).filter(ArticleAuthor.author_id == u.id).count()
         out.append(UserSummary(
             id=u.id, name=u.name, affiliation=u.affiliation,
             expertise=u.expertise,
-            article_count=article_count, reputation=u.reputation or {},
+            article_count=counts.get(u.id, 0), reputation=u.reputation or {},
         ))
     return out
 

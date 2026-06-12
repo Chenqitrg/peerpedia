@@ -6,6 +6,7 @@ from peerpedia_core.storage.db.crud_citation import (
     get_cited_by,
     get_cites,
 )
+from peerpedia_core.storage.db.models import Article
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -26,9 +27,16 @@ def api_get_citations(article_id: str, db: Session = Depends(deps.get_db)):
     cites = get_cites(db, article_id)
     cited_by = get_cited_by(db, article_id)
 
+    # Batch-load all referenced articles
+    ids = {c.to_article_id for c in cites} | {c.from_article_id for c in cited_by}
+    article_map = {}
+    if ids:
+        articles = db.query(Article).filter(Article.id.in_(ids)).all()
+        article_map = {a.id: a for a in articles}
+
     def _edge(article, direction: str) -> dict:
         aid = article.to_article_id if direction == "forward" else article.from_article_id
-        a = get_article(db, aid)
+        a = article_map.get(aid)
         return {
             "article_id": aid,
             "title": a.title if a else "Unknown",
