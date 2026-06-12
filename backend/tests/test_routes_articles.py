@@ -796,3 +796,216 @@ class TestArticleErrorPaths:
         hist2 = client.get(f"/api/v1/articles/{article_id}/history")
         assert hist2.status_code == 200
         assert len(hist2.json()["commits"]) >= 3
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Additional edge cases for uncovered branches
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestArticleCreateEdgeCases:
+    """Edge cases for article creation."""
+
+    def test_create_with_empty_authors_returns_422(self, client, seed_user):
+        """Creating an article with empty authors list returns 422."""
+        body = {
+            "authors": [],
+            "title": "Bad Article",
+            "content": "Content",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 422
+
+
+class TestArticleUpdateEdgeCases:
+    """Edge cases for article updates."""
+
+    def test_update_body_fields(self, client, seed_user):
+        """Update title, abstract, keywords, and categories."""
+        body = {
+            "authors": [seed_user],
+            "title": "Original Title",
+            "content": "Content",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        article_id = resp.json()["id"]
+
+        update = {
+            "title": "Updated Title",
+            "abstract": "Updated abstract text.",
+            "keywords": ["keyword1", "keyword2"],
+            "categories": ["category1", "category2"],
+        }
+        resp2 = client.put(f"/api/v1/articles/{article_id}", json=update)
+        assert resp2.status_code == 200
+        data = resp2.json()
+        assert data["title"] == "Updated Title"
+
+
+class TestHasForked:
+    """GET /articles/{id}/has-forked — check if user forked an article."""
+
+    def test_has_forked_returns_false(self, client, seed_user):
+        """Returns false when user hasn't forked the article."""
+        body = {
+            "authors": [seed_user],
+            "title": "Unforked",
+            "content": "Content",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        article_id = resp.json()["id"]
+
+        check = client.get(f"/api/v1/articles/{article_id}/has-forked")
+        assert check.status_code == 200
+        assert check.json()["has_forked"] is False
+
+    def test_has_forked_returns_true(self, client, seed_user):
+        """Returns true after user forks an article."""
+        body = {
+            "authors": [seed_user],
+            "title": "WillBeForked",
+            "content": "Content",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        article_id = resp.json()["id"]
+
+        # Fork it
+        fork_resp = client.post(f"/api/v1/articles/{article_id}/fork")
+        assert fork_resp.status_code == 201
+
+        # Now has_forked should return true
+        check = client.get(f"/api/v1/articles/{article_id}/has-forked")
+        assert check.status_code == 200
+        assert check.json()["has_forked"] is True
+
+    def test_fork_nonexistent_article_returns_404(self, client):
+        """Forking a non-existent article returns 404."""
+        resp = client.post("/api/v1/articles/nonexistent-id/fork")
+        assert resp.status_code == 404
+
+
+class TestDiffEdgeCases:
+    """Edge cases for git diff endpoints."""
+
+    def test_diff_invalid_hashes_returns_400(self, client, seed_user):
+        """Diff with non-existent commit hashes returns 400."""
+        body = {
+            "authors": [seed_user],
+            "title": "Diff Test",
+            "content": "Content for diff test.",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        article_id = resp.json()["id"]
+        # Try diff with invalid hashes
+        diff_resp = client.get(
+            f"/api/v1/articles/{article_id}/diff/badhash1/badhash2"
+        )
+        assert diff_resp.status_code == 400
+
+
+class TestExtendSinkEdgeCase:
+    """More extend_sink edge cases."""
+
+    def test_extend_sink_nonexistent_article_returns_404(self, client):
+        """Extending sink for a non-existent article returns 404."""
+        resp = client.put(
+            "/api/v1/articles/nonexistent-id/sink-extension",
+            json={"extra_days": 5},
+        )
+        assert resp.status_code == 404
+
+
+class TestArticleSource:
+    """Source file retrieval edge cases."""
+
+    def test_source_typst(self, client, seed_user):
+        """Getting Typst source returns correct format."""
+        body = {
+            "authors": [seed_user],
+            "title": "Typst Article",
+            "content": "= Hello\nWorld",
+            "format": "typst",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        article_id = resp.json()["id"]
+
+        src = client.get(f"/api/v1/articles/{article_id}/source")
+        assert src.status_code == 200
+        assert src.json()["format"] == "typst"
+
+    def test_source_not_found_returns_404(self, client):
+        """Missing source returns 404."""
+        resp = client.get("/api/v1/articles/nonexistent-id/source")
+        assert resp.status_code == 404
+
+
+class TestUpdatePublishWithContributions:
+    """Update + publish article with contributions to cover all branches."""
+
+    def test_update_publish_with_contributions(self, client, seed_user):
+        """Updating and publishing with self_review + contributions."""
+        body = {
+            "authors": [seed_user],
+            "title": "Contrib Test",
+            "content": "Initial content.",
+            "format": "markdown",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
+                           "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        article_id = resp.json()["id"]
+
+        update = {
+            "content": "Updated content with contributions.",
+            "publish": True,
+            "self_review": {"originality": 4, "rigor": 4, "completeness": 4,
+                           "pedagogy": 4, "impact": 4},
+            "contributions": {
+                seed_user: {"originality": 1.0, "rigor": 1.0, "completeness": 1.0,
+                            "pedagogy": 1.0, "impact": 1.0},
+            },
+        }
+        resp2 = client.put(f"/api/v1/articles/{article_id}", json=update)
+        assert resp2.status_code == 200
+
+
+class TestDownloadPdf:
+    """PDF download edge cases."""
+
+    def test_download_pdf_not_found_returns_404(self, client):
+        """Download PDF for non-existent article returns 404."""
+        resp = client.get("/api/v1/articles/nonexistent-id/download/pdf")
+        assert resp.status_code == 404
+
+    def test_download_source_not_found(self, client):
+        """Download source for non-existent article returns 404."""
+        resp = client.get("/api/v1/articles/nonexistent-id/download/source")
+        assert resp.status_code == 404
+
+
+class TestArticleNotFound:
+    """404 responses for various article endpoints."""
+
+    def test_get_nonexistent_article_source(self, client):
+        resp = client.get("/api/v1/articles/nonexistent-id/source")
+        assert resp.status_code == 404
+
+    def test_download_nonexistent_article_source(self, client):
+        resp = client.get("/api/v1/articles/nonexistent-id/download/source")
+        assert resp.status_code == 404

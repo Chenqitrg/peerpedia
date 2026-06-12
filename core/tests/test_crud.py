@@ -306,6 +306,32 @@ class TestReviewCRUD:
         assert "谢谢指出" in updated.thread[0]["content"]
         session.close()
 
+    def test_upsert_review_updates_existing(self, engine):
+        """upsert_review updates an existing review with same (article, reviewer, scope, commit_hash)."""
+        from peerpedia_core.storage.db.crud_review import (
+            create_review,
+            upsert_review,
+        )
+        session = get_session(engine)
+        rv = _make_user(session, "rv_upsert")
+        author = _make_user(session, "au_upsert")
+        article = _make_article(session, authors=[author.id])
+
+        # Create initial review
+        r1 = create_review(session, article_id=article.id, commit_hash="hash_u",
+                          reviewer_id=rv.id, scope="pool",
+                          scores={"originality": 1, "rigor": 1, "completeness": 1,
+                                  "pedagogy": 1, "impact": 1})
+
+        # Upsert with same keys → should update
+        new_scores = {"originality": 5, "rigor": 5, "completeness": 5,
+                      "pedagogy": 5, "impact": 5}
+        r2 = upsert_review(session, article_id=article.id, commit_hash="hash_u",
+                          reviewer_id=rv.id, scope="pool", scores=new_scores)
+        assert r2.id == r1.id
+        assert r2.scores["originality"] == 5
+        session.close()
+
 
 # ── User CRUD ────────────────────────────────────────────────────────────
 
@@ -562,4 +588,104 @@ class TestCitationCRUD:
         a1 = _make_article(session, authors=[author.id])
         with pytest.raises(ValueError):
             create_or_update_citation(session, a1.id, a1.id)
+        session.close()
+
+    def test_get_citations_all_edges(self, engine):
+        """get_citations returns both incoming and outgoing edges."""
+        from peerpedia_core.storage.db.crud_citation import (
+            create_or_update_citation,
+            get_citations,
+        )
+        session = get_session(engine)
+        author = _make_user(session, "cit_gc")
+        a1 = _make_article(session, authors=[author.id])
+        a2 = _make_article(session, authors=[author.id])
+        a3 = _make_article(session, authors=[author.id])
+        create_or_update_citation(session, a1.id, a2.id)  # a1 cites a2
+        create_or_update_citation(session, a3.id, a1.id)  # a3 cites a1
+        edges = get_citations(session, a1.id)
+        assert len(edges) == 2
+        session.close()
+
+
+# ── Update not-found edge cases ──────────────────────────────────────────
+
+class TestUpdateNotFound:
+    """ValueError raised when updating non-existent entities."""
+
+    def test_update_article_compiled_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_article import update_article_compiled
+        session = get_session(engine)
+        with pytest.raises(ValueError, match="not found"):
+            update_article_compiled(session, "no-such-id", "html", "hi", None)
+        session.close()
+
+    def test_update_article_status_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_article import update_article_status
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            update_article_status(session, "no-such-id", "published")
+        session.close()
+
+    def test_increment_fork_count_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_article import increment_fork_count
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            increment_fork_count(session, "no-such-id")
+        session.close()
+
+    def test_set_sink_start_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_article import set_sink_start
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            set_sink_start(session, "no-such-id", 7)
+        session.close()
+
+    def test_delete_article_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_article import delete_article
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            delete_article(session, "no-such-id")
+        session.close()
+
+    def test_extend_sink_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_article import extend_sink
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            extend_sink(session, "no-such-id", 5)
+        session.close()
+
+    def test_update_user_reputation_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_user import update_user_reputation
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            update_user_reputation(session, "no-such-id", {})
+        session.close()
+
+    def test_update_review_scores_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_review import update_review_scores
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            update_review_scores(session, "no-such-id", {})
+        session.close()
+
+    def test_add_thread_message_review_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_review import add_thread_message
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            add_thread_message(session, "no-such-id", {"content": "test"})
+        session.close()
+
+    def test_resolve_merge_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_merge import _resolve
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            _resolve(session, "no-such-id", "accepted")
+        session.close()
+
+    def test_add_merge_thread_message_not_found(self, engine):
+        from peerpedia_core.storage.db.crud_merge import add_merge_thread_message
+        session = get_session(engine)
+        with pytest.raises(ValueError):
+            add_merge_thread_message(session, "no-such-id", {"content": "test"})
         session.close()
