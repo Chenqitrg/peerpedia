@@ -39,6 +39,7 @@ import {
 } from 'lucide-vue-next'
 import { useArticleSync } from '../composables/useArticleSync'
 import { useFollowCache } from '../composables/useFollowCache'
+import { saveJSON, loadJSON } from '../composables/useLocalStorage'
 import DiffView from '../components/DiffView.vue'
 
 const route = useRoute()
@@ -452,6 +453,18 @@ function refreshArticle() {
   loadReviews()
 }
 
+function _syncBookmarkCache(viewerId: string, articleId: string, bookmarkId?: string) {
+  const cacheKey = `bookmarks-${viewerId}`
+  const bookmarks = loadJSON<{ id: string; user_id: string; article_id: string; created_at: string }[]>(cacheKey) || []
+  // Remove any existing bookmark for this article.
+  const filtered = bookmarks.filter(b => b.article_id !== articleId)
+  // If adding (not removing), append the new bookmark.
+  if (bookmarkId) {
+    filtered.push({ id: bookmarkId, user_id: viewerId, article_id: articleId, created_at: new Date().toISOString() })
+  }
+  saveJSON(cacheKey, filtered)
+}
+
 async function toggleBookmark() {
   if (!article.value || !userStore.viewer) return
 
@@ -484,8 +497,11 @@ async function toggleBookmark() {
     } else {
       if (wasBookmarked) {
         await removeBookmark(article.value.id)
+        _syncBookmarkCache(userStore.viewer.id, article.value.id)
       } else {
-        await addBookmark(article.value.id)
+        const result = await addBookmark(article.value.id)
+        // Update localStorage cache so bookmarks are visible offline.
+        _syncBookmarkCache(userStore.viewer.id, article.value.id, result.id)
       }
     }
   } catch {

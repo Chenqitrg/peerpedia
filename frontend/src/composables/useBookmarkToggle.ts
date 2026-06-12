@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from './useTauri'
 import { useNetworkStatus } from './useNetworkStatus'
+import { saveJSON, loadJSON } from './useLocalStorage'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
 import type { ArticleSummary } from '../api/types'
 
@@ -22,6 +23,16 @@ export function useBookmarkToggle(
   const { t } = useI18n()
   const { isOnline } = useNetworkStatus()
   const isLocal = (userStore.isTauriMode || userStore.isBrowserLocal) && !isOnline.value
+
+  function _syncBookmarkCache(viewerId: string, articleId: string, add: boolean) {
+    const cacheKey = `bookmarks-${viewerId}`
+    const bookmarks = loadJSON<{ id: string; user_id: string; article_id: string; created_at: string }[]>(cacheKey) || []
+    const filtered = bookmarks.filter((b: { article_id: string }) => b.article_id !== articleId)
+    if (add) {
+      filtered.push({ id: '', user_id: viewerId, article_id: articleId, created_at: new Date().toISOString() })
+    }
+    saveJSON(cacheKey, filtered)
+  }
 
   async function toggle(articleId: string, currentlyBookmarked: boolean) {
     if (!userStore.viewer) return
@@ -65,8 +76,10 @@ export function useBookmarkToggle(
       } else {
         if (currentlyBookmarked) {
           await removeBookmark(articleId)
+          _syncBookmarkCache(userStore.viewer.id, articleId, false)
         } else {
           await addBookmark(articleId)
+          _syncBookmarkCache(userStore.viewer.id, articleId, true)
         }
       }
     } catch (e: any) {
@@ -88,6 +101,7 @@ export function useBookmarkToggle(
         return
       } else {
         await removeBookmark(articleId)
+        _syncBookmarkCache(userStore.viewer.id, articleId, false)
       }
       const idx = articles.value.findIndex(a => a.id === articleId)
       if (idx !== -1) {
