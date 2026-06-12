@@ -53,7 +53,7 @@ def _create_article_with_user(db_engine, username="spec_user"):
 
 class TestSpec3ForkUserValidation:
 
-    def test_S3_2_fork_works_with_server_user(self, client, db_engine):
+    def test_fork_works_with_server_user(self, client, db_engine):
         aid, uid = _create_article_with_user(db_engine, "fork_user_1")
         s = get_session(db_engine)
         user = s.query(User).filter(User.id == uid).first()
@@ -69,7 +69,7 @@ class TestSpec3ForkUserValidation:
         assert "id" in data
         assert data["forked_from"] == aid
 
-    def test_S3_2_fork_returns_404_for_nonexistent_article(self, client, db_engine):
+    def test_fork_returns_404_for_nonexistent_article(self, client, db_engine):
         _, uid = _create_article_with_user(db_engine, "fork_user_2")
         s = get_session(db_engine)
         user = s.query(User).filter(User.id == uid).first()

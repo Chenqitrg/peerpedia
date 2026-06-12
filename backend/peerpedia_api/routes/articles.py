@@ -23,12 +23,12 @@ from peerpedia_core.storage.db.crud_article import (
     update_article_status,
 )
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
-from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.db.crud_review import (
     create_review,
     get_reviews_for_article,
     upsert_review,
 )
+from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.git_backend import (
     commit_article,
