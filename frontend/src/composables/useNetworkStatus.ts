@@ -45,5 +45,13 @@ export function useNetworkStatus() {
     _listening = false
   }
 
-  return { isOnline, ping, _resetForTest }
+  /**
+   * Let axios (or any server-action caller) update isOnline based on real
+   * request outcomes. Call on success / non-network-error to mark online;
+   * call on ERR_NETWORK / connection-refused to mark offline.
+   */
+  function notifySuccess() { isOnline.value = true }
+  function notifyFailure() { isOnline.value = false }
+
+  return { isOnline, ping, notifySuccess, notifyFailure, _resetForTest }
 }
