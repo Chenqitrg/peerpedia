@@ -173,6 +173,15 @@ class TestPerCommitScoring:
         assert result is None
         session.close()
 
+    def test_unknown_article_returns_none(self, engine):
+        """compute_article_score_for_commit for non-existent article returns None."""
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.workflow.scoring import compute_article_score_for_commit
+        session = get_session(engine)
+        result = compute_article_score_for_commit(session, "no-such-article", "abc")
+        assert result is None
+        session.close()
+
     def test_reviewer_weights_applied(self, engine):
         """Reputation-based reviewer weights are applied in per-commit scoring."""
         from peerpedia_core.storage.db.engine import get_session
