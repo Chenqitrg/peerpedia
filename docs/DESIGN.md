@@ -67,7 +67,7 @@ Phase 1 桌面版完全离线可用：
 - **浏览即缓存**：阅读的每篇文章自动缓存到本地 SQLite。
 - **收藏即完整缓存**：收藏文章缓存评审 + 引用图。
 - **网络状态**：`useNetworkStatus` 以 Wifi/WifiOff 图标显示。启动时默认为离线，首次 ping 成功后翻转为在线——消除 60s 窗口期内离线功能被误放行的 bug。
-- **网络功能封锁**：`useOffline` 在本地/Tauri 模式下永久封锁 pool、schools、search.network。这些功能在导航栏显示为灰色禁用图标（带 tooltip），而非点到之后才报错。
+- **网络功能封锁**：`useOffline` 在本地/Tauri 模式下离线时封锁 pool、schools、search.network；服务器可达时恢复网络功能。这些功能在离线时导航栏显示为灰色禁用图标（带 tooltip），而非点到之后才报错。
 - **保存即 Git commit**：每次保存草稿创建或更新本地 Git 仓库（`local_git.rs`），离线可用 `git log` 查看提交历史。
 - **下载即已提交产物**：下载文件名包含 7 位提交哈希（如 `Title-a1b2c3d.html`）。首次保存前下载按钮禁用，确保每次下载对应一个已提交版本。源码下载使用 `FileCode` 图标，编译下载使用 `FileDown` 图标。文章页显示标签，编辑器工具栏仅显示图标并附带即时 tooltip。
 - **本地账号**：bcrypt + SQLite，多账号切换，无需服务器。

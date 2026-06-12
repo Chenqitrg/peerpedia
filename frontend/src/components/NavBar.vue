@@ -26,7 +26,7 @@ import {
 const router = useRouter()
 const userStore = useUserStore()
 const tauri = useTauri()
-const { canRead } = useOffline()
+const { canRead, isLocalOnly } = useOffline()
 const { isOnline } = useNetworkStatus()
 const { t, locale } = useI18n()
 const searchQuery = ref('')
@@ -91,7 +91,7 @@ function handleSearch(e: Event) {
   e.preventDefault()
   if (searchQuery.value.trim()) {
     const q = encodeURIComponent(searchQuery.value.trim())
-    const local = tauri.isTauri.value || tauri.isBrowserLocal.value ? '&mode=local' : ''
+    const local = isLocalOnly() ? '&mode=local' : ''
     router.push(`/search?q=${q}${local}`)
     searchQuery.value = ''
     close()

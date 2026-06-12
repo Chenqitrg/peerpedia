@@ -212,7 +212,7 @@ describe('SearchPage — local mode', () => {
     expect(mockSearchCached).not.toHaveBeenCalled()
   })
 
-  it('detects local mode from isBrowserLocal when mode not in URL', async () => {
+  it('uses network search when isBrowserLocal but online (isLocalOnly returns false)', async () => {
     mockRouteQuery.q = 'quantum'
     delete mockRouteQuery.mode
 
@@ -231,8 +231,10 @@ describe('SearchPage — local mode', () => {
     })
     await flushPromises()
 
-    expect(mockSearchDrafts).toHaveBeenCalled()
-    expect(mockSearchArticles).not.toHaveBeenCalled()
+    // isLocalOnly() checks ?tauri + !isOnline, not isBrowserLocal directly.
+    // Since isOnline is true (mock default), isLocalOnly() returns false → network search.
+    expect(mockSearchArticles).toHaveBeenCalled()
+    expect(mockSearchDrafts).not.toHaveBeenCalled()
   })
 
   it('mode=local search requires query to be non-empty', async () => {
