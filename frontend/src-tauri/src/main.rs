@@ -9,6 +9,9 @@ use peerpedia::AppState;
 use tokio::sync::Mutex;
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    log::info!("PeerPedia Tauri backend starting");
+
     let conn = init_db().expect("Failed to initialize database");
     let state = AppState {
         db: Mutex::new(conn),

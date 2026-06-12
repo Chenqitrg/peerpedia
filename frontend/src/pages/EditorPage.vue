@@ -484,6 +484,13 @@ async function handleSubmitToPool() {
       categories: categories.value ? categories.value.split(',').map((c: string) => c.trim()).filter(Boolean) : [],
     }
 
+    // Guard: server JWT required to publish. Local-only accounts must sync first.
+    if (!userStore.token) {
+      errorMsg.value = 'Your account needs to sync with the server before publishing. Please try again in a moment.'
+      submitting.value = false
+      return
+    }
+
     let result: { id: string }
     if (isEdit.value) {
       result = await articleStore.updateArticle(editId.value!, body)

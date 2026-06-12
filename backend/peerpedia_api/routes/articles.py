@@ -65,10 +65,11 @@ router = APIRouter(prefix="/articles", tags=["articles"])
 def compute_sink(a) -> tuple[datetime | None, int | None]:
     """Compute sink ETA and days remaining from article."""
     if a.sink_start and a.status == "sedimentation":
+        duration = getattr(a, "sink_duration_days", None) or 7
         st = a.sink_start
         if st.tzinfo is None:
             st = st.replace(tzinfo=timezone.utc)
-        eta = st + timedelta(days=a.sink_duration_days)
+        eta = st + timedelta(days=duration)
         now = datetime.now(timezone.utc)
         remaining = max(0, (eta - now).days)
         return eta, remaining
@@ -177,6 +178,15 @@ def api_create_article(
 ):
     if not body.authors:
         raise HTTPException(status_code=422, detail="authors must not be empty")
+    # Validate all authors exist in server DB — prevents FOREIGN KEY violation
+    # when a local-only account (not synced to server) is passed as author_id.
+    for author_id in body.authors:
+        if get_user(db, author_id) is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Author '{author_id}' is not synced to the server. "
+                       "Please log out and log in again while the server is running.",
+            )
     a = create_article(
         db,
         authors=body.authors,

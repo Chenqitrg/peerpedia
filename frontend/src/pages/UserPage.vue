@@ -126,6 +126,7 @@ const followLoading = ref(false)
 
 async function handleFollow() {
   if (!userStore.viewer) return
+  if (!userStore.token) return
   followLoading.value = true
   try {
     if (isFollowing.value) {
@@ -334,11 +335,11 @@ watch(() => route.params.id, () => {
             class="btn-sm shrink-0 transition-colors duration-200"
             :class="isFollowing
               ? 'btn-outline rounded-xl'
-              : canWrite('user.follow_graph')
+              : canWrite('user.follow_graph') && userStore.token
                 ? 'bg-accent text-page hover:brightness-110 rounded-xl'
                 : 'bg-[#21262d] text-ink-muted/50 cursor-not-allowed rounded-xl'"
-            :disabled="followLoading || !canWrite('user.follow_graph')"
-            :data-tooltip="!canWrite('user.follow_graph') ? t(getFallback('user.follow_graph')) : ''"
+            :disabled="followLoading || !canWrite('user.follow_graph') || !userStore.token"
+            :data-tooltip="!userStore.token ? 'Sign in to follow' : !canWrite('user.follow_graph') ? t(getFallback('user.follow_graph')) : ''"
             @click="handleFollow"
           >
             {{ isFollowing ? t('common.following') : t('common.follow') }}

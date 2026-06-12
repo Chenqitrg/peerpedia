@@ -2,6 +2,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,22 @@ from peerpedia_api.routes.search import router as search_router
 from peerpedia_api.routes.users import router as users_router
 
 logger = logging.getLogger(__name__)
+
+# ── File-based logging ───────────────────────────────────────────────────
+
+_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+_LOG_DIR.mkdir(exist_ok=True)
+
+_file_handler = logging.FileHandler(_LOG_DIR / "backend.log")
+_file_handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+))
+_file_handler.setLevel(logging.DEBUG)
+logging.getLogger().addHandler(_file_handler)
+logging.getLogger("peerpedia_api").setLevel(logging.DEBUG)
+logging.getLogger("peerpedia_core").setLevel(logging.DEBUG)
+
+logger.info("Backend starting — logs written to %s", _LOG_DIR / "backend.log")
 
 
 
@@ -74,6 +91,16 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def audit_request(request: Request, call_next):
+    """Log every request and its status for debugging."""
+    response = await call_next(request)
+    logger.debug(
+        "%s %s → %d", request.method, request.url.path, response.status_code,
+    )
+    return response
+
+
 @app.get("/health")
 async def health_check():
     """Liveness probe for the frontend network-status pinger."""
@@ -88,6 +115,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     """
     if isinstance(exc, HTTPException):
         raise exc
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
