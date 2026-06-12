@@ -464,11 +464,11 @@ async function toggleBookmark() {
   // If server is reachable but we have no token, try to sync local creds first
   const needsSync = (userStore.isTauriMode || userStore.isBrowserLocal)
     && isOnline.value
-    && !userStore.token?.value
+    && !userStore.token
 
   if (needsSync) {
     const synced = await userStore.trySyncServerAuth()
-    if (!synced || !userStore.token?.value) {
+    if (!synced || !userStore.token) {
       article.value.is_bookmarked = wasBookmarked
       return
     }

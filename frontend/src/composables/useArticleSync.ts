@@ -52,7 +52,7 @@ export function useArticleSync(
 
   /** First upload: POST to create server article, store sync mapping. */
   async function upload(): Promise<boolean> {
-    if (!userStore.token?.value) {
+    if (!userStore.token) {
       error.value = t('sync.loginRequired')
       return false
     }
@@ -140,7 +140,7 @@ export function useArticleSync(
   /** Push local changes to server (Keep Local in conflict resolution). */
   async function pushUpdate(): Promise<boolean> {
     const sid = serverArticleId()
-    if (!sid || !userStore.token?.value) {
+    if (!sid || !userStore.token) {
       error.value = t('sync.updateNoId')
       return false
     }

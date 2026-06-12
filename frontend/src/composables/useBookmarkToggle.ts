@@ -39,13 +39,13 @@ export function useBookmarkToggle(
     // would see "Authentication required" on every bookmark click.
     const needsSync = (userStore.isTauriMode || userStore.isBrowserLocal)
       && isOnline.value
-      && !userStore.token?.value
+      && !userStore.token
 
     if (needsSync) {
       console.log('[bookmark] needsSync, calling trySyncServerAuth')
       const synced = await userStore.trySyncServerAuth()
-      console.log('[bookmark] trySyncServerAuth result:', synced, 'token:', !!userStore.token?.value)
-      if (!synced || !userStore.token?.value) {
+      console.log('[bookmark] trySyncServerAuth result:', synced, 'token:', !!userStore.token)
+      if (!synced || !userStore.token) {
         article.is_bookmarked = previous
         if (onError) {
           onError(userStore.syncError?.value || t('bookmark.serverRequired'))
