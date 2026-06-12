@@ -14,18 +14,8 @@ export const apiClient = axios.create({
 })
 
 // ── Request interceptor: attach Bearer token ───────────────────────────
-// ── Request interceptor: skip when offline ─────────────────────────────
 
 apiClient.interceptors.request.use(config => {
-  // Cooldown guard: after a network failure, block new requests for a
-  // cooldown period to avoid spamming the console. The first request
-  // after cooldown expires acts as a probe — if it succeeds, isOnline
-  // flips to true; if it fails, cooldown resets.
-  if (!_getNS().shouldTry()) {
-    return Promise.reject(
-      new axios.Cancel('Server unreachable — cooling down')
-    )
-  }
   const token = loadString('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`

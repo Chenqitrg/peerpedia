@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { ref } from 'vue'
 import NavBar from '../NavBar.vue'
 
 const mockPush = vi.fn()
@@ -13,6 +14,11 @@ vi.mock('vue-router', () => ({
 const { mockUseNetworkStatus } = vi.hoisted(() => ({
   mockUseNetworkStatus: vi.fn(() => ({
     isOnline: { value: true },
+    isSynced: { value: true },
+    connectionState: ref('synced'),
+    flash: ref(false),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
     ping: vi.fn(),
   })),
 }))
@@ -155,6 +161,11 @@ describe('NavBar — WiFi connectivity icon', () => {
   it('shows green Wifi icon when server is reachable (isOnline=true)', () => {
     mockUseNetworkStatus.mockReturnValue({
       isOnline: { value: true },
+      isSynced: { value: true },
+      connectionState: ref('synced'),
+      flash: ref(false),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
       ping: vi.fn(),
     })
     const user = { id: 'u1', username: 'test', name: 'Test' }
@@ -165,14 +176,19 @@ describe('NavBar — WiFi connectivity icon', () => {
     const wrapper = mount(NavBar, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    // Green WiFi icon uses text-green-500 class
-    const wifiIcon = wrapper.find('.text-green-500')
-    expect(wifiIcon.exists()).toBe(true)
+    // SyncButton in synced state shows green dot
+    const syncBtn = wrapper.find('.sync-btn--synced')
+    expect(syncBtn.exists()).toBe(true)
   })
 
   it('shows gray WifiOff icon when server is unreachable in Tauri mode', () => {
     mockUseNetworkStatus.mockReturnValue({
       isOnline: { value: false },
+      isSynced: { value: false },
+      connectionState: ref('idle'),
+      flash: ref(false),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
       ping: vi.fn(),
     })
     // Simulate Tauri environment
@@ -185,9 +201,9 @@ describe('NavBar — WiFi connectivity icon', () => {
     const wrapper = mount(NavBar, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    // Gray icon — should NOT have text-green-500
-    expect(wrapper.find('.text-green-500').exists()).toBe(false)
-    // Should show a wifi icon (WifiOff when unreachable)
+    // SyncButton in idle state — should NOT be in synced state
+    expect(wrapper.find('.sync-btn--synced').exists()).toBe(false)
+    // Should show a wifi icon (WifiOff when idle)
     expect(wrapper.find('svg').exists()).toBe(true)
 
     delete (window as any).__TAURI__

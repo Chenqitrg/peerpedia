@@ -131,6 +131,8 @@ vi.mock('@/composables/useTauri', () => ({
 vi.mock('@/composables/useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
     isOnline: { value: true },
+    isSynced: { value: true },
+    connectionState: { value: 'synced' as const },
     ping: vi.fn(),
   })),
 }))
