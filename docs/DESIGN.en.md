@@ -362,6 +362,7 @@ Compile output is **never** stored in the database. The compile endpoint generat
 | DELETE | `/api/v1/users/{id}/follow` | Unfollow user |
 | GET | `/api/v1/pool` | Sedimentation pool feed |
 | GET | `/api/v1/feed` | Activity feed |
+| GET | `/api/v1/feed/cache` | Lightweight feed cache (following IDs + article metadata, no abstract) |
 
 ### 6.2 Key API Changes (P0 Refactor)
 
