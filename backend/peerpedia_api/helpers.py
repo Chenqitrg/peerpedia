@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from peerpedia_core.storage.db.crud_article import get_author_ids
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked as _is_bookmarked
-from peerpedia_core.storage.db.crud_user import get_user
+from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
 from sqlalchemy.orm import Session
 
@@ -16,9 +16,13 @@ from peerpedia_api.schemas.article import ArticleSummary, AuthorInfo
 
 def resolve_authors(db: Session, author_ids: list[str]) -> list[AuthorInfo]:
     """Resolve a list of author user IDs to AuthorInfo objects."""
+    if not author_ids:
+        return []
+    users = db.query(User).filter(User.id.in_(author_ids)).all()
+    user_map = {u.id: u for u in users}
     result: list[AuthorInfo] = []
     for uid in author_ids:
-        u = get_user(db, uid)
+        u = user_map.get(uid)
         if u:
             result.append(AuthorInfo(
                 id=u.id, name=u.name, anonymous_name=u.anonymous_name,

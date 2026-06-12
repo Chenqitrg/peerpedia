@@ -9,7 +9,6 @@ from peerpedia_core.storage.db.crud_review import (
     get_reviews_for_article,
     update_review_scores,
 )
-from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
 from peerpedia_core.workflow.scoring import compute_article_score_for_commit
@@ -25,8 +24,8 @@ from peerpedia_api.schemas.review import (
 router = APIRouter(prefix="/articles/{article_id}/reviews", tags=["reviews"])
 
 
-def _build_review_out(r, db: Session, article_authors: list[str]) -> ReviewOut:
-    u = get_user(db, r.reviewer_id)
+def _build_review_out(r, user_map: dict[str, User], article_authors: list[str]) -> ReviewOut:
+    u = user_map.get(r.reviewer_id)
     is_self = r.reviewer_id in article_authors
     reviewer_name = "unknown"
     if u is not None:
@@ -46,6 +45,14 @@ def _build_review_out(r, db: Session, article_authors: list[str]) -> ReviewOut:
     )
 
 
+def _batch_load_reviewers(db: Session, reviews) -> dict[str, User]:
+    ids = {r.reviewer_id for r in reviews}
+    if not ids:
+        return {}
+    users = db.query(User).filter(User.id.in_(ids)).all()
+    return {u.id: u for u in users}
+
+
 @router.get("", response_model=list[ReviewOut])
 def list_reviews(article_id: str, db: Session = Depends(deps.get_db)):
     article = get_article(db, article_id)
@@ -53,7 +60,8 @@ def list_reviews(article_id: str, db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=404, detail="Article not found")
     reviews = get_reviews_for_article(db, article_id)
     article_author_ids = get_author_ids(db, article_id)
-    return [_build_review_out(r, db, article_author_ids) for r in reviews]
+    user_map = _batch_load_reviewers(db, reviews)
+    return [_build_review_out(r, user_map, article_author_ids) for r in reviews]
 
 
 @router.post("", status_code=201, response_model=ReviewOut)
@@ -96,7 +104,8 @@ def submit_review(article_id: str, body: ReviewCreate,
     article_author_ids = get_author_ids(db, article_id)
     for author_id in article_author_ids:
         compute_author_reputation(db, author_id)
-    return _build_review_out(r, db, article_author_ids)
+    user_map = _batch_load_reviewers(db, [r])
+    return _build_review_out(r, user_map, article_author_ids)
 
 
 @router.post("/{review_id}/messages", status_code=201, response_model=dict)

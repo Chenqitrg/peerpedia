@@ -1,6 +1,6 @@
 """Sedimentation pool API routes."""
 from fastapi import APIRouter, Depends
-from peerpedia_core.storage.db.crud_article import get_author_ids, list_articles
+from peerpedia_core.storage.db.crud_article import get_author_ids_batch, list_articles
 from peerpedia_core.storage.db.crud_user import get_followers, get_following
 from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
@@ -15,6 +15,8 @@ router = APIRouter(prefix="/pool", tags=["pool"])
 
 @router.get("")
 def get_pool(
+    page: int = 1,
+    size: int = 20,
     current_user: User | None = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
@@ -33,9 +35,13 @@ def get_pool(
     articles = list_articles(db, status="sedimentation")
     now = datetime.now(timezone.utc)
 
+    # Batch-load all author IDs to avoid per-article queries
+    article_ids = [a.id for a in articles]
+    author_map = get_author_ids_batch(db, article_ids)
+
     summaries = []
     for a in articles:
-        if follow_circle is not None and not any(aid in follow_circle for aid in get_author_ids(db, a.id)):
+        if follow_circle is not None and not any(aid in follow_circle for aid in author_map.get(a.id, [])):
             continue
 
         # Compute sink ETA inline (same logic as helpers.compute_sink but kept local
@@ -58,4 +64,7 @@ def get_pool(
         ))
 
     summaries.sort(key=lambda s: s.days_remaining or 0, reverse=True)
-    return {"articles": [s.model_dump() for s in summaries], "total": len(summaries)}
+    total = len(summaries)
+    start = (page - 1) * size
+    summaries = summaries[start:start + size]
+    return {"articles": [s.model_dump() for s in summaries], "total": total, "page": page, "size": size}
