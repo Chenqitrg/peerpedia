@@ -152,7 +152,15 @@ async function loadArticles() {
       const artData = await getArticles({ author_id: id.value, page: 1, size: 50 })
       const serverArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])
       merged.push(...serverArticles)
+      // Cache for offline browsing.
+      useFollowCache().setCachedUserArticles(id.value, serverArticles).catch(() => {})
     } catch { /* server unreachable in Tauri offline mode */ }
+  } else if (tauri.isTauri.value && !isSelf.value) {
+    // Offline Tauri mode — read cached article cards for followed users.
+    try {
+      const cached = await useFollowCache().getCachedUserArticles(id.value)
+      if (cached) merged.push(...cached)
+    } catch { /* cache miss */ }
   }
 
   // 2. Tauri local drafts (only for current user's own page)
