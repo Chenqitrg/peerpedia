@@ -12,6 +12,8 @@ Contract:
   SP5 — Author reputations are recalculated after publish.
   SP6 — Returns count of articles published in this call.
 """
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from peerpedia_core.storage.db.engine import get_session
@@ -21,7 +23,6 @@ from peerpedia_core.workflow.sedimentation import (
     is_ready_to_publish,
     publish_ready_articles,
 )
-from datetime import datetime, timedelta, timezone
 
 
 def _make_user(session, name):
@@ -128,7 +129,7 @@ class TestPublishReadyArticles:
         even without a git repo directory (uses article.score fallback)."""
         author = _make_user(session, "elapsed")
         past_start = datetime.now(timezone.utc) - timedelta(days=200)
-        article = _make_article(
+        _make_article(
             session, [author.id],
             status="sedimentation",
             sink_start=past_start,
@@ -139,14 +140,15 @@ class TestPublishReadyArticles:
         assert count == 1
         # Verify status change
         session.expire_all()
-        articles = session.query(Article).filter(Article.status == "published").all()
-        assert len(articles) == 1
+        published = session.query(Article).filter(Article.status == "published").all()
+        assert len(published) == 1
 
     def test_publishes_article_with_git_repo(self, session):
         """SP1 — When .git directory exists, uses commit_hash for score."""
         import tempfile
         from pathlib import Path
-        from peerpedia_core.storage.git_backend import init_article_repo, commit_article, DEFAULT_ARTICLES_DIR
+
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
         author = _make_user(session, "has_git")
         past_start = datetime.now(timezone.utc) - timedelta(days=200)
