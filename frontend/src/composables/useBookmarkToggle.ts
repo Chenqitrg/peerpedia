@@ -1,4 +1,4 @@
-import { type Ref } from 'vue'
+import { type Ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from './useTauri'
@@ -22,8 +22,10 @@ export function useBookmarkToggle(
   const userStore = useUserStore()
   const tauri = useTauri()
   const { t } = useI18n()
-  const { isOnline } = useNetworkStatus()
-  const isLocal = (userStore.isTauriMode || userStore.isBrowserLocal) && !isOnline.value
+  const { connectionState } = useNetworkStatus()
+  const isLocal = computed(() =>
+    (userStore.isTauriMode || userStore.isBrowserLocal) && connectionState.value !== 'synced'
+  )
 
   async function _syncBookmarkCache(viewerId: string, articleId: string, add: boolean) {
     const cacheKey = `bookmarks-${viewerId}`
@@ -60,7 +62,7 @@ export function useBookmarkToggle(
     // Without this, Tauri users who registered locally while the server was down
     // would see "Authentication required" on every bookmark click.
     const needsSync = (userStore.isTauriMode || userStore.isBrowserLocal)
-      && isOnline.value
+      && connectionState.value === 'synced'
       && !userStore.token
 
     if (needsSync) {
@@ -77,7 +79,7 @@ export function useBookmarkToggle(
     }
 
     try {
-      if (isLocal) {
+      if (isLocal.value) {
         // L4: bookmarks require server connection — rollback optimistic update.
         article.is_bookmarked = previous
         if (onError) {
@@ -105,7 +107,7 @@ export function useBookmarkToggle(
   async function remove(articleId: string) {
     if (!userStore.viewer) return
     try {
-      if (isLocal) {
+      if (isLocal.value) {
         if (onError) {
           onError(t('bookmark.serverRequired'))
         }

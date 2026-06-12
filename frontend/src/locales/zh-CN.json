@@ -21,7 +21,12 @@
     "formatTypst": "学术排版，SVG 输出",
     "statusConnected": "已连接",
     "statusLocal": "本地模式",
-    "statusOffline": "离线"
+    "statusOffline": "离线",
+    "syncIdle": "同步",
+    "syncConnecting": "连接中…",
+    "syncSynced": "已同步",
+    "syncConnectAria": "连接服务器",
+    "syncDisconnectAria": "断开服务器连接"
   },
   "schools": {
     "subtitle": "发现研究者，关注你感兴趣的学术工作。"

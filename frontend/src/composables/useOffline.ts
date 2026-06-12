@@ -40,28 +40,28 @@ const offlineMatrix: Record<string, FeatureCapability> = {
 }
 
 export function useOffline() {
-  const { isOnline } = useNetworkStatus()
+  const { connectionState } = useNetworkStatus()
 
-  // Tauri / browser-local mock mode. When a server IS reachable (isOnline),
+  // Tauri / browser-local mock mode. When a server IS reachable (synced),
   // network-only features are unblocked — the app is in "connected" mode even
   // though it's running on Tauri. This lets a locally-running Python backend
   // serve pool, feed, schools, search, and publish features.
   function isLocalOnly(): boolean {
     if (typeof window === 'undefined') return false
     return ('__TAURI__' in window || new URLSearchParams(window.location.search).has('tauri'))
-      && !isOnline.value
+      && connectionState.value !== 'synced'
   }
 
   function canRead(feature: string): boolean {
     if (isLocalOnly() && NETWORK_ONLY_FEATURES.has(feature)) return false
-    if (isOnline.value) return true
+    if (connectionState.value === 'synced') return true
     const cap = offlineMatrix[feature]
     return cap ? cap.read !== 'blocked' : false
   }
 
   function canWrite(feature: string): boolean {
     if (isLocalOnly() && NETWORK_ONLY_FEATURES.has(feature)) return false
-    if (isOnline.value) return true
+    if (connectionState.value === 'synced') return true
     const cap = offlineMatrix[feature]
     return cap ? cap.write === 'full' : false
   }

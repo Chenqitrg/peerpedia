@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }))
 
-// Mock useNetworkStatus — Layer 1 test controls isOnline directly.
+// Mock useNetworkStatus — Layer 1 test controls connectionState directly.
 const mockIsOnline = ref(false)
 vi.mock('../useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
-    isOnline: mockIsOnline,
+    isOnline: computed(() => mockIsOnline.value),
+    isSynced: computed(() => mockIsOnline.value),
+    connectionState: computed(() => mockIsOnline.value ? 'synced' as const : 'idle' as const),
     ping: vi.fn(),
   })),
 }))

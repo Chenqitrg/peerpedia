@@ -21,7 +21,12 @@
     "formatTypst": "Academic typesetting with SVG output",
     "statusConnected": "Connected",
     "statusLocal": "Local mode",
-    "statusOffline": "Offline"
+    "statusOffline": "Offline",
+    "syncIdle": "Sync",
+    "syncConnecting": "Connecting…",
+    "syncSynced": "Synced",
+    "syncConnectAria": "Connect to server",
+    "syncDisconnectAria": "Disconnect from server"
   },
   "schools": {
     "subtitle": "Discover researchers. Follow people whose work you find interesting."
