@@ -270,6 +270,12 @@ class TestCitations:
 
 
 class TestMerge:
+    @staticmethod
+    def _auth(user):
+        """Create an auth header for the given user."""
+        from peerpedia_api.deps import create_token
+        return {"Authorization": f"Bearer {create_token(user.id)}"}
+
     def test_create_merge_proposal(self, client, db_engine):
         s = get_session(db_engine)
         author = User(username="user17", password_hash="", name="原文作者", anonymous_name="a1")
@@ -284,10 +290,49 @@ class TestMerge:
 
         resp = client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         assert resp.status_code == 201
         data = resp.json()
         assert data["status"] == "open"
+        # proposer_id should come from JWT, not request body
+        assert data["proposer_id"] == forker.id
+
+    def test_merge_create_requires_auth(self, client, db_engine):
+        """Unauthenticated merge creation returns 401."""
+        s = get_session(db_engine)
+        u = User(username="merge_noauth", password_hash="", name="X", anonymous_name="a")
+        a = Article(status="published")
+        s.add_all([u, a])
+        s.commit()
+        s.close()
+        resp = client.post(
+            f"/api/v1/articles/{a.id}/merge-proposals",
+            json={"fork_article_id": "irrelevant"})
+        assert resp.status_code == 401
+
+    def test_merge_create_uses_jwt_identity(self, client, db_engine):
+        """proposer_id is derived from JWT, not request body."""
+        s = get_session(db_engine)
+        author = User(username="user17b", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="user18b", password_hash="", name="F", anonymous_name="a2")
+        victim = User(username="user19b", password_hash="", name="V", anonymous_name="a3")
+        s.add_all([author, forker, victim])
+        s.commit()
+        original = Article(status="published")
+        fork = Article(status="draft", forked_from=original.id)
+        s.add_all([original, fork])
+        s.commit()
+        s.close()
+
+        # Authenticate as forker, but try to set proposer_id to victim
+        resp = client.post(
+            f"/api/v1/articles/{original.id}/merge-proposals",
+            json={"fork_article_id": fork.id, "proposer_id": victim.id},
+            headers=self._auth(forker))
+        assert resp.status_code == 201
+        # Should use forker's ID from JWT, ignore body's proposer_id
+        assert resp.json()["proposer_id"] == forker.id
 
     def test_list_merge_proposals(self, client, db_engine):
         s = get_session(db_engine)
@@ -303,7 +348,8 @@ class TestMerge:
 
         client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         resp = client.get(f"/api/v1/articles/{original.id}/merge-proposals")
         assert resp.status_code == 200
         assert len(resp.json()["proposals"]) == 1
@@ -322,12 +368,34 @@ class TestMerge:
 
         r = client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         pid = r.json()["id"]
 
-        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/accept")
+        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/accept",
+                           headers=self._auth(author))
         assert resp.status_code == 200
         assert resp.json()["status"] == "accepted"
+
+    def test_merge_accept_requires_auth(self, client, db_engine):
+        """Unauthenticated merge accept returns 401."""
+        s = get_session(db_engine)
+        author = User(username="user21x", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="user22x", password_hash="", name="F", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        original = Article(status="published")
+        fork = Article(status="draft", forked_from=original.id)
+        s.add_all([original, fork])
+        s.commit()
+        s.close()
+        r = client.post(
+            f"/api/v1/articles/{original.id}/merge-proposals",
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
+        pid = r.json()["id"]
+        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/accept")
+        assert resp.status_code == 401
 
     def test_reject_merge_proposal(self, client, db_engine):
         s = get_session(db_engine)
@@ -343,12 +411,34 @@ class TestMerge:
 
         r = client.post(
             f"/api/v1/articles/{original.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         pid = r.json()["id"]
 
-        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/reject")
+        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/reject",
+                           headers=self._auth(author))
         assert resp.status_code == 200
         assert resp.json()["status"] == "rejected"
+
+    def test_merge_reject_requires_auth(self, client, db_engine):
+        """Unauthenticated merge reject returns 401."""
+        s = get_session(db_engine)
+        author = User(username="user23x", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="user24x", password_hash="", name="F", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        original = Article(status="published")
+        fork = Article(status="draft", forked_from=original.id)
+        s.add_all([original, fork])
+        s.commit()
+        s.close()
+        r = client.post(
+            f"/api/v1/articles/{original.id}/merge-proposals",
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
+        pid = r.json()["id"]
+        resp = client.post(f"/api/v1/articles/{original.id}/merge-proposals/{pid}/reject")
+        assert resp.status_code == 401
 
     def test_merge_nonexistent_article_returns_404(self, client, db_engine):
         s = get_session(db_engine)
@@ -359,7 +449,8 @@ class TestMerge:
 
         resp = client.post(
             "/api/v1/articles/nonexistent-id/merge-proposals",
-            json={"fork_article_id": "irrelevant", "proposer_id": u.id})
+            json={"fork_article_id": "irrelevant"},
+            headers=self._auth(u))
         assert resp.status_code == 404
 
     def test_accept_nonexistent_proposal_returns_404(self, client, db_engine):
@@ -371,7 +462,8 @@ class TestMerge:
         s.commit()
         s.close()
 
-        resp = client.post(f"/api/v1/articles/{a.id}/merge-proposals/nonexistent/accept")
+        resp = client.post(f"/api/v1/articles/{a.id}/merge-proposals/nonexistent/accept",
+                           headers=self._auth(u))
         assert resp.status_code == 404
 
     def test_accept_wrong_article_returns_400(self, client, db_engine):
@@ -390,9 +482,11 @@ class TestMerge:
 
         r = client.post(
             f"/api/v1/articles/{target.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         pid = r.json()["id"]
-        resp = client.post(f"/api/v1/articles/{other.id}/merge-proposals/{pid}/accept")
+        resp = client.post(f"/api/v1/articles/{other.id}/merge-proposals/{pid}/accept",
+                           headers=self._auth(author))
         assert resp.status_code == 400
 
     def test_reject_wrong_article_returns_400(self, client, db_engine):
@@ -411,9 +505,11 @@ class TestMerge:
 
         r = client.post(
             f"/api/v1/articles/{target.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         pid = r.json()["id"]
-        resp = client.post(f"/api/v1/articles/{other.id}/merge-proposals/{pid}/reject")
+        resp = client.post(f"/api/v1/articles/{other.id}/merge-proposals/{pid}/reject",
+                           headers=self._auth(author))
         assert resp.status_code == 400
 
     def test_accept_already_resolved_proposal_returns_400(self, client, db_engine):
@@ -431,11 +527,14 @@ class TestMerge:
 
         r = client.post(
             f"/api/v1/articles/{target.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         pid = r.json()["id"]
-        client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept")
+        client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept",
+                    headers=self._auth(author))
         # Accept again — should return 400
-        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept")
+        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept",
+                           headers=self._auth(author))
         assert resp.status_code == 400
 
     def test_reject_already_resolved_proposal_returns_400(self, client, db_engine):
@@ -453,10 +552,13 @@ class TestMerge:
 
         r = client.post(
             f"/api/v1/articles/{target.id}/merge-proposals",
-            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
         pid = r.json()["id"]
-        client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept")
-        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/reject")
+        client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept",
+                    headers=self._auth(author))
+        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/reject",
+                           headers=self._auth(author))
         assert resp.status_code == 400
 
     def test_search_empty_q_with_category(self, client, db_engine):
