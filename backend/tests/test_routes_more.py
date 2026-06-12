@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
-from peerpedia_core.storage.db.models import Article, User
+from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
 
 
 @pytest.fixture
@@ -363,6 +363,8 @@ class TestMerge:
         original = Article(status="published")
         fork = Article(status="draft", forked_from=original.id)
         s.add_all([original, fork])
+        s.flush()
+        s.add(ArticleAuthor(article_id=original.id, author_id=author.id, position=0))
         s.commit()
         s.close()
 
@@ -406,6 +408,8 @@ class TestMerge:
         original = Article(status="published")
         fork = Article(status="draft", forked_from=original.id)
         s.add_all([original, fork])
+        s.flush()
+        s.add(ArticleAuthor(article_id=original.id, author_id=author.id, position=0))
         s.commit()
         s.close()
 
@@ -522,6 +526,8 @@ class TestMerge:
         target = Article(status="published")
         fork = Article(status="draft", forked_from=target.id)
         s.add_all([target, fork])
+        s.flush()
+        s.add(ArticleAuthor(article_id=target.id, author_id=author.id, position=0))
         s.commit()
         s.close()
 
@@ -547,6 +553,8 @@ class TestMerge:
         target = Article(status="published")
         fork = Article(status="draft", forked_from=target.id)
         s.add_all([target, fork])
+        s.flush()
+        s.add(ArticleAuthor(article_id=target.id, author_id=author.id, position=0))
         s.commit()
         s.close()
 
@@ -560,6 +568,56 @@ class TestMerge:
         resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/reject",
                            headers=self._auth(author))
         assert resp.status_code == 400
+
+    def test_merge_accept_non_author_forbidden(self, client, db_engine):
+        """Non-authors cannot accept merge proposals; others get 403."""
+        s = get_session(db_engine)
+        author = User(username="mp_na_au", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="mp_na_fk", password_hash="", name="F", anonymous_name="a2")
+        outsider = User(username="mp_na_out", password_hash="", name="O", anonymous_name="a3")
+        s.add_all([author, forker, outsider])
+        s.commit()
+        target = Article(status="published")
+        fork = Article(status="draft", forked_from=target.id)
+        s.add_all([target, fork])
+        s.flush()
+        s.add(ArticleAuthor(article_id=target.id, author_id=author.id, position=0))
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{target.id}/merge-proposals",
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
+        pid = r.json()["id"]
+        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept",
+                           headers=self._auth(outsider))
+        assert resp.status_code == 403
+
+    def test_merge_reject_non_author_forbidden(self, client, db_engine):
+        """Non-authors cannot reject merge proposals; others get 403."""
+        s = get_session(db_engine)
+        author = User(username="mp_na2_au", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="mp_na2_fk", password_hash="", name="F", anonymous_name="a2")
+        outsider = User(username="mp_na2_out", password_hash="", name="O", anonymous_name="a3")
+        s.add_all([author, forker, outsider])
+        s.commit()
+        target = Article(status="published")
+        fork = Article(status="draft", forked_from=target.id)
+        s.add_all([target, fork])
+        s.flush()
+        s.add(ArticleAuthor(article_id=target.id, author_id=author.id, position=0))
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{target.id}/merge-proposals",
+            json={"fork_article_id": fork.id},
+            headers=self._auth(forker))
+        pid = r.json()["id"]
+        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/reject",
+                           headers=self._auth(outsider))
+        assert resp.status_code == 403
 
     def test_search_empty_q_with_category(self, client, db_engine):
         """Search with only category filter, no query text."""

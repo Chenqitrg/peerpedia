@@ -1,6 +1,6 @@
 """Merge proposal API routes."""
 from fastapi import APIRouter, Depends, HTTPException
-from peerpedia_core.storage.db.crud_article import get_article
+from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
 from peerpedia_core.storage.db.crud_merge import (
     accept_merge_proposal,
     create_merge_proposal,
@@ -66,6 +66,8 @@ def api_accept_merge(article_id: str, proposal_id: str,
                       current_user: User = Depends(deps.require_user),
                       db: Session = Depends(deps.get_db)):
     mp = _validate_proposal_target(proposal_id, article_id, db)
+    if current_user.id not in get_author_ids(db, article_id):
+        raise HTTPException(status_code=403, detail="Only article authors can accept/reject merges")
     try:
         mp = accept_merge_proposal(db, proposal_id)
         return {"id": mp.id, "status": mp.status}
@@ -78,6 +80,8 @@ def api_reject_merge(article_id: str, proposal_id: str,
                       current_user: User = Depends(deps.require_user),
                       db: Session = Depends(deps.get_db)):
     _validate_proposal_target(proposal_id, article_id, db)
+    if current_user.id not in get_author_ids(db, article_id):
+        raise HTTPException(status_code=403, detail="Only article authors can accept/reject merges")
     try:
         mp = reject_merge_proposal(db, proposal_id)
         return {"id": mp.id, "status": mp.status}
