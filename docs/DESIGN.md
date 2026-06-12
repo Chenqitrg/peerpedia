@@ -1,6 +1,6 @@
 # PeerPedia（知诸网）— 设计文档
 
-> 2026-06-10 · 全部已实现功能 · JSON→join table 迁移完成 · 计划修复已合并（git-first 架构合规） · VSCode 风格多标签页
+> 2026-06-12 · v0.3.0 · 认证加固（PUT+merge 所有权检查）、跨 commit 评分累积、Tauri 异步命令、N+1 查询消除、引擎单例缓存、feed/pool 分页
 
 ---
 
@@ -306,7 +306,7 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 | GET | `/api/v1/articles` | 文章列表（状态/作者/分页筛选） |
 | POST | `/api/v1/articles` | 创建文章（Git commit + DB 元数据） |
 | GET | `/api/v1/articles/{id}` | 文章详情 |
-| PUT | `/api/v1/articles/{id}` | 更新文章 |
+| PUT | `/api/v1/articles/{id}` | 更新文章（需作者身份，非作者返回 403） |
 | GET | `/api/v1/articles/{id}/source` | 原始 Markdown/Typst 源码 |
 | GET | `/api/v1/articles/{id}/history` | Git 提交历史 |
 | GET | `/api/v1/articles/{id}/diff/{h1}/{h2}` | 逐行对比 |
@@ -317,7 +317,7 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 | POST | `/api/v1/articles/{id}/reviews/{rid}/messages` | 发送讨论回复 |
 | GET | `/api/v1/articles/{id}/citations` | 引用图 |
 | POST | `/api/v1/citations/click` | 记录引用点击 |
-| POST | `/api/v1/articles/{id}/merge-proposals` | 创建合并提案 |
+| POST | `/api/v1/articles/{id}/merge-proposals` | 创建合并提案（需认证；proposer_id 从 JWT 提取） |
 | GET | `/api/v1/search` | 全文搜索 |
 | POST | `/api/v1/compile-preview` | 编译 Markdown/Typst → HTML/SVG |
 | GET | `/api/v1/users` | 用户列表 |
@@ -345,8 +345,8 @@ Markdown 编译在 `frontend/src/utils/markdown.ts` 中使用四阶段管线：
 
 | 套件 | 测试数 | 框架 |
 |-------|-------|-----------|
-| 后端 | 353 | pytest |
-| 前端 | 425 | vitest |
+| 后端 | 540 | pytest |
+| 前端 | 522 | vitest |
 | Rust | 16 | cargo test |
 
 ### 7.2 CI 流水线
@@ -428,4 +428,4 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 ---
 
-*最后更新: 2026-06-10 · 353 后端测试 · 425 前端测试 · 16 Rust 测试 · 9 个 DB 实体*
+*最后更新: 2026-06-12 · 540 后端测试 · 522 前端测试 · 16 Rust 测试 · 9 个 DB 实体 · 认证加固 · 评分累积 · 异步 Tauri · N+1 消除 · 引擎缓存 · 分页*

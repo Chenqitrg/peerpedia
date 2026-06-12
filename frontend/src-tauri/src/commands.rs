@@ -4,29 +4,29 @@
 //
 // Security: all mutating commands require a session token. The token is validated
 // against the sessions table and mapped to an account_id before delegation.
+//
+// All commands are async. Database work acquires the lock, does sync operations,
+// drops the lock, then awaits any async work. Git and Typst subprocess calls are
+// wrapped in spawn_blocking to avoid blocking the async runtime.
 
 use crate::error::AppError;
 use crate::local_auth::{self, Account, AccountSummary, AccountWithToken};
 use crate::local_git;
 use crate::local_store::{self, CachedArticle, Draft, DraftSummary};
 use crate::AppState;
-use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use std::sync::MutexGuard;
 use tauri::State;
 
-/// Acquire the database lock, returning a clear error on poison instead of panicking.
-fn lock_db(state: &AppState) -> Result<MutexGuard<'_, Connection>, AppError> {
-    state
-        .db
-        .lock()
-        .map_err(|_| AppError::DatabaseError("Database lock poisoned".into()))
+/// Acquire the database lock asynchronously.
+async fn lock_db(
+    state: &AppState,
+) -> Result<tokio::sync::MutexGuard<'_, rusqlite::Connection>, AppError> {
+    Ok(state.db.lock().await)
 }
 
-/// Resolve a session token to an account_id. Used by all commands that need
-/// to know which account is making the request.
-fn resolve_account(state: &AppState, token: &str) -> Result<String, AppError> {
-    let conn = lock_db(state)?;
+/// Resolve a session token to an account_id.
+async fn resolve_account(state: &AppState, token: &str) -> Result<String, AppError> {
+    let conn = lock_db(state).await?;
     local_auth::verify_session(&conn, token)
 }
 
@@ -43,11 +43,11 @@ pub struct CreateAccountParams {
 }
 
 #[tauri::command]
-pub fn create_account(
+pub async fn create_account(
     state: State<'_, AppState>,
     params: CreateAccountParams,
 ) -> Result<Account, AppError> {
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_auth::create_account(
         &conn,
         &params.username,
@@ -64,17 +64,17 @@ pub struct LoginParams {
 }
 
 #[tauri::command]
-pub fn login(
+pub async fn login(
     state: State<'_, AppState>,
     params: LoginParams,
 ) -> Result<AccountWithToken, AppError> {
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_auth::login(&conn, &params.username, &params.password)
 }
 
 #[tauri::command]
-pub fn list_accounts(state: State<'_, AppState>) -> Result<Vec<AccountSummary>, AppError> {
-    let conn = lock_db(&state)?;
+pub async fn list_accounts(state: State<'_, AppState>) -> Result<Vec<AccountSummary>, AppError> {
+    let conn = lock_db(&state).await?;
     local_auth::list_accounts(&conn)
 }
 
@@ -84,8 +84,11 @@ pub struct LogoutParams {
 }
 
 #[tauri::command]
-pub fn logout(state: State<'_, AppState>, params: LogoutParams) -> Result<OkResponse, AppError> {
-    let conn = lock_db(&state)?;
+pub async fn logout(
+    state: State<'_, AppState>,
+    params: LogoutParams,
+) -> Result<OkResponse, AppError> {
+    let conn = lock_db(&state).await?;
     local_auth::logout_session(&conn, &params.token)?;
     Ok(OkResponse { ok: true })
 }
@@ -108,15 +111,18 @@ pub struct SaveDraftParams {
 }
 
 #[tauri::command]
-pub fn save_draft(state: State<'_, AppState>, params: SaveDraftParams) -> Result<Draft, AppError> {
+pub async fn save_draft(
+    state: State<'_, AppState>,
+    params: SaveDraftParams,
+) -> Result<Draft, AppError> {
     let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token)?
+        resolve_account(&state, token).await?
     } else if !params.account_id.is_empty() {
         params.account_id.clone()
     } else {
         return Err(AppError::AuthFailed("Authentication required".into()));
     };
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::save_draft(
         &conn,
         params.id.as_deref(),
@@ -137,18 +143,18 @@ pub struct ListDraftsParams {
 }
 
 #[tauri::command]
-pub fn list_drafts(
+pub async fn list_drafts(
     state: State<'_, AppState>,
     params: ListDraftsParams,
 ) -> Result<Vec<DraftSummary>, AppError> {
     let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token)?
+        resolve_account(&state, token).await?
     } else if !params.account_id.is_empty() {
         params.account_id.clone()
     } else {
         return Err(AppError::AuthFailed("Authentication required".into()));
     };
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::list_drafts(&conn, &account_id)
 }
 
@@ -161,17 +167,20 @@ pub struct GetDraftParams {
 }
 
 #[tauri::command]
-pub fn get_draft(state: State<'_, AppState>, params: GetDraftParams) -> Result<Draft, AppError> {
+pub async fn get_draft(
+    state: State<'_, AppState>,
+    params: GetDraftParams,
+) -> Result<Draft, AppError> {
     // Scope the first lock so conn is dropped before resolve_account,
     // which also calls lock_db. std::sync::Mutex is not reentrant.
     let draft = {
-        let conn = lock_db(&state)?;
+        let conn = lock_db(&state).await?;
         local_store::get_draft(&conn, &params.id)?
     }; // conn dropped here, lock released
 
     // When token is provided, verify ownership.
     if let Some(ref token) = params.token {
-        let account_id = resolve_account(&state, token)?;
+        let account_id = resolve_account(&state, token).await?;
         if draft.account_id != account_id {
             return Err(AppError::NotFound(format!(
                 "Draft '{}' not found",
@@ -194,14 +203,14 @@ pub struct OkResponse {
 }
 
 #[tauri::command]
-pub fn delete_draft(
+pub async fn delete_draft(
     state: State<'_, AppState>,
     params: DeleteDraftParams,
 ) -> Result<OkResponse, AppError> {
-    let account_id = resolve_account(&state, &params.token)?;
+    let account_id = resolve_account(&state, &params.token).await?;
 
     // Verify ownership before deletion.
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     let draft = local_store::get_draft(&conn, &params.id)?;
     if draft.account_id != account_id {
         return Err(AppError::NotFound(format!(
@@ -222,18 +231,18 @@ pub struct DeleteArticleParams {
 }
 
 #[tauri::command]
-pub fn delete_article(
+pub async fn delete_article(
     state: State<'_, AppState>,
     params: DeleteArticleParams,
 ) -> Result<OkResponse, AppError> {
     let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token)?
+        resolve_account(&state, token).await?
     } else if !params.account_id.is_empty() {
         params.account_id.clone()
     } else {
         return Err(AppError::AuthFailed("Authentication required".into()));
     };
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::delete_article(&conn, &params.id, &account_id)?;
     Ok(OkResponse { ok: true })
 }
@@ -249,18 +258,18 @@ pub struct SearchDraftsParams {
 }
 
 #[tauri::command]
-pub fn search_drafts(
+pub async fn search_drafts(
     state: State<'_, AppState>,
     params: SearchDraftsParams,
 ) -> Result<Vec<local_store::DraftSearchResult>, AppError> {
     let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token)?
+        resolve_account(&state, token).await?
     } else if !params.account_id.is_empty() {
         params.account_id.clone()
     } else {
         return Err(AppError::AuthFailed("Authentication required".into()));
     };
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::search_drafts(&conn, &params.q, &account_id)
 }
 
@@ -273,11 +282,11 @@ pub struct CacheArticleParams {
 }
 
 #[tauri::command]
-pub fn cache_article(
+pub async fn cache_article(
     state: State<'_, AppState>,
     params: CacheArticleParams,
 ) -> Result<OkResponse, AppError> {
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::cache_article(&conn, &params.id, &params.article_json)?;
     Ok(OkResponse { ok: true })
 }
@@ -288,11 +297,11 @@ pub struct GetCachedArticleParams {
 }
 
 #[tauri::command]
-pub fn get_cached_article(
+pub async fn get_cached_article(
     state: State<'_, AppState>,
     params: GetCachedArticleParams,
 ) -> Result<Option<CachedArticle>, AppError> {
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::get_cached_article(&conn, &params.id)
 }
 
@@ -302,11 +311,11 @@ pub struct SearchCachedArticlesParams {
 }
 
 #[tauri::command]
-pub fn search_cached_articles(
+pub async fn search_cached_articles(
     state: State<'_, AppState>,
     params: SearchCachedArticlesParams,
 ) -> Result<Vec<local_store::DraftSearchResult>, AppError> {
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::search_cached_articles(&conn, &params.q)
 }
 
@@ -321,12 +330,12 @@ pub struct RecordVisitParams {
 }
 
 #[tauri::command]
-pub fn record_visit(
+pub async fn record_visit(
     state: State<'_, AppState>,
     params: RecordVisitParams,
 ) -> Result<OkResponse, AppError> {
-    let account_id = resolve_account(&state, &params.token)?;
-    let conn = lock_db(&state)?;
+    let account_id = resolve_account(&state, &params.token).await?;
+    let conn = lock_db(&state).await?;
     local_store::record_visit(
         &conn,
         &account_id,
@@ -353,18 +362,18 @@ fn default_size() -> i64 {
 }
 
 #[tauri::command]
-pub fn get_history(
+pub async fn get_history(
     state: State<'_, AppState>,
     params: GetHistoryParams,
 ) -> Result<Vec<local_store::HistoryEntry>, AppError> {
-    let account_id = resolve_account(&state, &params.token)?;
-    let conn = lock_db(&state)?;
+    let account_id = resolve_account(&state, &params.token).await?;
+    let conn = lock_db(&state).await?;
     local_store::get_history(&conn, &account_id, params.page, params.size)
 }
 
 #[tauri::command]
-pub fn get_cached_article_ids(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
-    let conn = lock_db(&state)?;
+pub async fn get_cached_article_ids(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
+    let conn = lock_db(&state).await?;
     local_store::get_cached_article_ids(&conn)
 }
 
@@ -385,14 +394,17 @@ pub struct GitInitParams {
 }
 
 #[tauri::command]
-pub fn git_init(params: GitInitParams) -> Result<local_git::GitCommitResult, AppError> {
-    local_git::git_init(
-        &params.article_id,
-        &params.content,
-        &params.format,
-        &params.commit_message,
-        &params.author,
-    )
+pub async fn git_init(params: GitInitParams) -> Result<local_git::GitCommitResult, AppError> {
+    let article_id = params.article_id;
+    let content = params.content;
+    let format = params.format;
+    let commit_message = params.commit_message;
+    let author = params.author;
+    tokio::task::spawn_blocking(move || {
+        local_git::git_init(&article_id, &content, &format, &commit_message, &author)
+    })
+    .await
+    .map_err(|e| AppError::IoError(format!("git_init panicked: {}", e)))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -408,14 +420,17 @@ pub struct GitCommitParams {
 }
 
 #[tauri::command]
-pub fn git_commit(params: GitCommitParams) -> Result<local_git::GitCommitResult, AppError> {
-    local_git::git_commit(
-        &params.article_id,
-        &params.content,
-        &params.format,
-        &params.commit_message,
-        &params.author,
-    )
+pub async fn git_commit(params: GitCommitParams) -> Result<local_git::GitCommitResult, AppError> {
+    let article_id = params.article_id;
+    let content = params.content;
+    let format = params.format;
+    let commit_message = params.commit_message;
+    let author = params.author;
+    tokio::task::spawn_blocking(move || {
+        local_git::git_commit(&article_id, &content, &format, &commit_message, &author)
+    })
+    .await
+    .map_err(|e| AppError::IoError(format!("git_commit panicked: {}", e)))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -424,8 +439,13 @@ pub struct GitHistoryParams {
 }
 
 #[tauri::command]
-pub fn git_history(params: GitHistoryParams) -> Result<Vec<local_git::CommitEntry>, AppError> {
-    local_git::git_history(&params.article_id)
+pub async fn git_history(
+    params: GitHistoryParams,
+) -> Result<Vec<local_git::CommitEntry>, AppError> {
+    let article_id = params.article_id;
+    tokio::task::spawn_blocking(move || local_git::git_history(&article_id))
+        .await
+        .map_err(|e| AppError::IoError(format!("git_history panicked: {}", e)))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -435,9 +455,15 @@ pub struct GitShowParams {
 }
 
 #[tauri::command]
-pub fn git_show(params: GitShowParams) -> Result<String, AppError> {
-    let (content, _format) = local_git::git_show(&params.article_id, &params.commit_hash)?;
-    Ok(content)
+pub async fn git_show(params: GitShowParams) -> Result<String, AppError> {
+    let article_id = params.article_id;
+    let commit_hash = params.commit_hash;
+    tokio::task::spawn_blocking(move || {
+        let (content, _format) = local_git::git_show(&article_id, &commit_hash)?;
+        Ok(content)
+    })
+    .await
+    .map_err(|e| AppError::IoError(format!("git_show panicked: {}", e)))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -448,8 +474,13 @@ pub struct GitDiffParams {
 }
 
 #[tauri::command]
-pub fn git_diff(params: GitDiffParams) -> Result<local_git::DiffResult, AppError> {
-    local_git::git_diff(&params.article_id, &params.hash1, &params.hash2)
+pub async fn git_diff(params: GitDiffParams) -> Result<local_git::DiffResult, AppError> {
+    let article_id = params.article_id;
+    let hash1 = params.hash1;
+    let hash2 = params.hash2;
+    tokio::task::spawn_blocking(move || local_git::git_diff(&article_id, &hash1, &hash2))
+        .await
+        .map_err(|e| AppError::IoError(format!("git_diff panicked: {}", e)))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -460,8 +491,15 @@ pub struct GitRollbackParams {
 }
 
 #[tauri::command]
-pub fn git_rollback(params: GitRollbackParams) -> Result<local_git::GitCommitResult, AppError> {
-    local_git::git_rollback(&params.article_id, &params.commit_hash, &params.author)
+pub async fn git_rollback(
+    params: GitRollbackParams,
+) -> Result<local_git::GitCommitResult, AppError> {
+    let article_id = params.article_id;
+    let commit_hash = params.commit_hash;
+    let author = params.author;
+    tokio::task::spawn_blocking(move || local_git::git_rollback(&article_id, &commit_hash, &author))
+        .await
+        .map_err(|e| AppError::IoError(format!("git_rollback panicked: {}", e)))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -470,11 +508,11 @@ pub struct InvalidateCacheParams {
 }
 
 #[tauri::command]
-pub fn invalidate_article_cache(
+pub async fn invalidate_article_cache(
     state: State<'_, AppState>,
     params: InvalidateCacheParams,
 ) -> Result<(), AppError> {
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::delete_cached_article(&conn, &params.article_id)
 }
 
@@ -487,8 +525,12 @@ pub struct CompileTypstParams {
 }
 
 #[tauri::command]
-pub fn compile_typst(params: CompileTypstParams) -> Result<String, AppError> {
-    local_store::compile_typst(&params.content, &params.format)
+pub async fn compile_typst(params: CompileTypstParams) -> Result<String, AppError> {
+    let content = params.content;
+    let format = params.format;
+    tokio::task::spawn_blocking(move || local_store::compile_typst(&content, &format))
+        .await
+        .map_err(|e| AppError::IoError(format!("compile_typst panicked: {}", e)))?
 }
 
 #[derive(Deserialize)]
@@ -497,8 +539,11 @@ pub struct CompileTypstPdfParams {
 }
 
 #[tauri::command]
-pub fn compile_typst_pdf(params: CompileTypstPdfParams) -> Result<String, AppError> {
-    local_store::compile_typst_pdf(&params.content)
+pub async fn compile_typst_pdf(params: CompileTypstPdfParams) -> Result<String, AppError> {
+    let content = params.content;
+    tokio::task::spawn_blocking(move || local_store::compile_typst_pdf(&content))
+        .await
+        .map_err(|e| AppError::IoError(format!("compile_typst_pdf panicked: {}", e)))?
 }
 
 // ── Article full cache command ──────────────────────────────────────────
@@ -510,11 +555,11 @@ pub struct CacheArticleFullParams {
 }
 
 #[tauri::command]
-pub fn cache_article_full(
+pub async fn cache_article_full(
     state: State<'_, AppState>,
     params: CacheArticleFullParams,
 ) -> Result<OkResponse, AppError> {
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     local_store::cache_article_full(&conn, &params.id, &params.article_json)?;
     Ok(OkResponse { ok: true })
 }
@@ -532,19 +577,19 @@ pub struct SetServerArticleIdParams {
 }
 
 #[tauri::command]
-pub fn set_server_article_id(
+pub async fn set_server_article_id(
     state: State<'_, AppState>,
     params: SetServerArticleIdParams,
 ) -> Result<OkResponse, AppError> {
     let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token)?
+        resolve_account(&state, token).await?
     } else if !params.account_id.is_empty() {
         params.account_id.clone()
     } else {
         return Err(AppError::AuthFailed("Authentication required".into()));
     };
 
-    let conn = lock_db(&state)?;
+    let conn = lock_db(&state).await?;
     let mut draft = local_store::get_draft(&conn, &params.draft_id)?;
     if draft.account_id != account_id {
         return Err(AppError::AuthFailed(
@@ -577,6 +622,9 @@ pub struct ExportArticleParams {
 }
 
 #[tauri::command]
-pub fn export_article(params: ExportArticleParams) -> Result<String, AppError> {
-    local_git::export_article(&params.article_id)
+pub async fn export_article(params: ExportArticleParams) -> Result<String, AppError> {
+    let article_id = params.article_id;
+    tokio::task::spawn_blocking(move || local_git::export_article(&article_id))
+        .await
+        .map_err(|e| AppError::IoError(format!("export_article panicked: {}", e)))?
 }

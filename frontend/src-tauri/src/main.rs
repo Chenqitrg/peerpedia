@@ -6,7 +6,7 @@
 use peerpedia::commands;
 use peerpedia::db::init_db;
 use peerpedia::AppState;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 fn main() {
     let conn = init_db().expect("Failed to initialize database");

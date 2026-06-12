@@ -508,36 +508,34 @@ fn find_typst_binary() -> String {
 ///
 /// Returns an error if `typst` is not installed, content is invalid, or
 /// the format is not "typst".
-pub fn compile_typst(content: &str, format: &str) -> Result<String, AppError> {
+/// Shared Typst compilation logic. Spawns the typst CLI, waits for completion
+/// (blocking — callers should wrap in spawn_blocking), and returns the output.
+fn compile_typst_inner(
+    content: &str,
+    output_ext: &str,
+    typst_args: &[&str],
+) -> Result<(std::path::PathBuf, Vec<u8>), AppError> {
     use std::io::Read;
-    use std::time::Duration;
-
-    if format != "typst" {
-        return Err(AppError::AuthFailed(
-            "Only typst format is supported for compilation".into(),
-        ));
-    }
 
     let tmp_dir = std::env::temp_dir().join(format!("peerpedia-compile-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&tmp_dir)?;
 
     let input_path = tmp_dir.join("input.typ");
-    let output_path = tmp_dir.join("output.svg");
+    let output_path = tmp_dir.join(format!("output.{output_ext}"));
 
     std::fs::write(&input_path, content)?;
 
-    // Try common typst installation paths — the Tauri app bundle may not
-    // inherit the user's shell PATH, so `typst` alone may fail.
     let typst_bin = find_typst_binary();
 
+    let mut args = vec![
+        "compile",
+        input_path.to_str().unwrap_or("input.typ"),
+        output_path.to_str().unwrap_or("output.svg"),
+    ];
+    args.extend_from_slice(typst_args);
+
     let mut child = std::process::Command::new(&typst_bin)
-        .args([
-            "compile",
-            input_path.to_str().unwrap_or("input.typ"),
-            output_path.to_str().unwrap_or("output.svg"),
-            "--format",
-            "svg",
-        ])
+        .args(&args)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -548,144 +546,54 @@ pub fn compile_typst(content: &str, format: &str) -> Result<String, AppError> {
             ))
         })?;
 
-    let start = std::time::Instant::now();
-    const TIMEOUT: Duration = Duration::from_secs(30);
+    // Wait for process completion (OS-level blocking, not busy-wait polling).
+    let status = child
+        .wait()
+        .map_err(|e| AppError::IoError(format!("Typst process error: {}", e)))?;
 
-    loop {
-        if start.elapsed() > TIMEOUT {
-            let _ = child.kill();
-            let _ = std::fs::remove_dir_all(&tmp_dir);
-            return Err(AppError::IoError(
-                "Typst compilation timed out (30s)".into(),
-            ));
-        }
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    let stderr = child
-                        .stderr
-                        .take()
-                        .map(|s| {
-                            let mut buf = String::new();
-                            let _ = std::io::BufReader::new(s).read_to_string(&mut buf);
-                            buf
-                        })
-                        .unwrap_or_default();
-                    let _ = std::fs::remove_dir_all(&tmp_dir);
-                    return Err(AppError::IoError(format!(
-                        "Typst compilation failed: {}",
-                        if stderr.is_empty() {
-                            "Unknown error"
-                        } else {
-                            stderr.trim()
-                        }
-                    )));
-                }
-                break;
+    if !status.success() {
+        let stderr = child
+            .stderr
+            .take()
+            .map(|s| {
+                let mut buf = String::new();
+                let _ = std::io::BufReader::new(s).read_to_string(&mut buf);
+                buf
+            })
+            .unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        return Err(AppError::IoError(format!(
+            "Typst compilation failed: {}",
+            if stderr.is_empty() {
+                "Unknown error"
+            } else {
+                stderr.trim()
             }
-            Ok(None) => {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            Err(e) => {
-                let _ = std::fs::remove_dir_all(&tmp_dir);
-                return Err(AppError::IoError(format!("Typst process error: {}", e)));
-            }
-        }
+        )));
     }
 
-    let svg = std::fs::read_to_string(&output_path)
+    let output = std::fs::read(&output_path)
         .map_err(|_| AppError::IoError("Typst compilation produced no output".into()))?;
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
-    Ok(svg)
+    Ok((tmp_dir, output))
+}
+
+pub fn compile_typst(content: &str, format: &str) -> Result<String, AppError> {
+    if format != "typst" {
+        return Err(AppError::AuthFailed(
+            "Only typst format is supported for compilation".into(),
+        ));
+    }
+    let (_tmp_dir, svg_bytes) = compile_typst_inner(content, "svg", &["--format", "svg"])?;
+    Ok(String::from_utf8_lossy(&svg_bytes).to_string())
 }
 
 /// Compile Typst content to PDF, returning base64-encoded bytes.
 /// Used by the DownloadButton in Tauri/local mode to produce downloadable PDFs
 /// without requiring the REST backend server.
 pub fn compile_typst_pdf(content: &str) -> Result<String, AppError> {
-    use std::io::Read;
-    use std::time::Duration;
-
-    let tmp_dir =
-        std::env::temp_dir().join(format!("peerpedia-compile-pdf-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&tmp_dir)?;
-
-    let input_path = tmp_dir.join("input.typ");
-    let output_path = tmp_dir.join("output.pdf");
-
-    std::fs::write(&input_path, content)?;
-
-    let typst_bin = find_typst_binary();
-
-    let mut child = std::process::Command::new(&typst_bin)
-        .args([
-            "compile",
-            input_path.to_str().unwrap_or("input.typ"),
-            output_path.to_str().unwrap_or("output.pdf"),
-            "--format",
-            "pdf",
-        ])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| {
-            AppError::IoError(format!(
-                "Failed to run typst CLI: {}. Is typst installed? (https://github.com/typst/typst)",
-                e
-            ))
-        })?;
-
-    let start = std::time::Instant::now();
-    const TIMEOUT: Duration = Duration::from_secs(30);
-
-    loop {
-        if start.elapsed() > TIMEOUT {
-            let _ = child.kill();
-            let _ = std::fs::remove_dir_all(&tmp_dir);
-            return Err(AppError::IoError(
-                "Typst PDF compilation timed out (30s)".into(),
-            ));
-        }
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    let stderr = child
-                        .stderr
-                        .take()
-                        .map(|s| {
-                            let mut buf = String::new();
-                            let _ = std::io::BufReader::new(s).read_to_string(&mut buf);
-                            buf
-                        })
-                        .unwrap_or_default();
-                    let _ = std::fs::remove_dir_all(&tmp_dir);
-                    return Err(AppError::IoError(format!(
-                        "Typst PDF compilation failed: {}",
-                        if stderr.is_empty() {
-                            "Unknown error"
-                        } else {
-                            stderr.trim()
-                        }
-                    )));
-                }
-                break;
-            }
-            Ok(None) => {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            Err(e) => {
-                let _ = std::fs::remove_dir_all(&tmp_dir);
-                return Err(AppError::IoError(format!("Typst PDF process error: {}", e)));
-            }
-        }
-    }
-
-    let pdf_bytes = std::fs::read(&output_path)
-        .map_err(|_| AppError::IoError("Typst PDF compilation produced no output".into()))?;
-
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-
+    let (_tmp_dir, pdf_bytes) = compile_typst_inner(content, "pdf", &["--format", "pdf"])?;
     use base64::{engine::general_purpose::STANDARD, Engine};
     Ok(STANDARD.encode(&pdf_bytes))
 }
