@@ -70,7 +70,7 @@ export function useBookmarkToggle(
       if (!synced || !userStore.token) {
         article.is_bookmarked = previous
         if (onError) {
-          onError(userStore.syncError?.value || t('bookmark.serverRequired'))
+          onError(userStore.syncError || t('bookmark.serverRequired'))
         }
         return
       }
