@@ -208,9 +208,9 @@ async function loadArticles() {
   articles.value = merged
 }
 
-// Load articles after user fetch completes (sequential)
+// Load articles + follow state in parallel after user fetch.
 watch(user, (u) => {
-  if (u) { loadArticles(); loadFollowState() }
+  if (u) { Promise.all([loadArticles(), loadFollowState()]) }
 }, { immediate: true })
 
 // TODO(tech-debt): showFollowers, showFollowing, followers, following are
