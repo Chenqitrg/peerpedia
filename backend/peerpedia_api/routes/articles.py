@@ -367,10 +367,10 @@ def api_has_forked(
     db: Session = Depends(deps.get_db),
 ):
     """Check if a user has already forked this article."""
-    all_articles = list_articles(db)
-    for a in all_articles:
-        if a.forked_from == article_id and current_user.id in get_author_ids(db, a.id):
-            return {"has_forked": True, "fork_article_id": a.id}
+    from peerpedia_core.storage.db.crud_article import get_article_by_fork_and_author
+    a = get_article_by_fork_and_author(db, forked_from=article_id, author_id=current_user.id)
+    if a is not None:
+        return {"has_forked": True, "fork_article_id": a.id}
     return {"has_forked": False, "fork_article_id": None}
 
 
