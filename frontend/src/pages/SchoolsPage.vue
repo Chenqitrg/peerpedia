@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getUsers } from '../api/users'
+import { getUsers, followUser, unfollowUser, getFollowing } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import ReputationBadges from '../components/ReputationBadges.vue'
-import { followUser, unfollowUser } from '../api/users'
 import { useTauri } from '../composables/useTauri'
+import { useFollowCache } from '../composables/useFollowCache'
 import { useOffline } from '../composables/useOffline'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
@@ -17,18 +18,41 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const tauri = useTauri()
-const { canRead, getFallback } = useOffline()
+const { canRead, canWrite, getFallback } = useOffline()
+const { isOnline } = useNetworkStatus()
 const following = ref<Set<string>>(new Set())
 
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
 
+async function loadFollowState() {
+  if (!userStore.viewer) return
+  const ids = new Set<string>()
+
+  if (!isOnline.value) {
+    // Offline — read from local cache.
+    const cache = useFollowCache()
+    const cachedIds = await cache.getCachedFollowingIds(userStore.viewer.id)
+    if (cachedIds) for (const id of cachedIds) ids.add(id)
+  } else {
+    // Online — use server REST API.
+    try {
+      const following_users = await getFollowing(userStore.viewer.id)
+      const list = Array.isArray(following_users) ? following_users : (following_users as any)?.users || []
+      for (const u of list) ids.add(u.id)
+    } catch { /* fall through */ }
+  }
+
+  following.value = ids
+}
+
 const { data: users, loading, error, execute } = useAsyncResource(
   async () => {
-    // Block data fetch when offline or in local mode — schools requires
-    // a server connection and should never show local accounts.
     if (!canRead('schools')) return [] as UserSummary[]
     const list = await getUsers()
     list.sort((a: UserSummary, b: UserSummary) => b.article_count - a.article_count)
+    // Load follow state after users arrive, in same async context
+    // to avoid racing with toggleFollow.
+    if (userStore.viewer) await loadFollowState()
     return list
   },
   [] as UserSummary[],
@@ -44,30 +68,33 @@ async function toggleFollow(u: UserSummary) {
   } else {
     following.value.add(u.id)
   }
-  // Persist locally in dev-mock mode, via REST API otherwise.
-  if (isLocal.value) {
+  // Persist to server (follow requires network).
+  try {
     if (isCurrentlyFollowing) {
-      await tauri.unfollowUser({ follower_id: userStore.viewer.id, followed_id: u.id })
+      await unfollowUser(u.id)
     } else {
-      await tauri.followUser({ follower_id: userStore.viewer.id, followed_id: u.id })
+      await followUser(u.id)
     }
-  } else {
-    try {
-      if (isCurrentlyFollowing) {
-        await unfollowUser(u.id)
-      } else {
-        await followUser(u.id)
-      }
-    } catch {
-      // Revert on failure when server is available.
-      if (isCurrentlyFollowing) {
-        following.value.add(u.id)
-      } else {
-        following.value.delete(u.id)
-      }
+    // Refresh offline cache.
+    useFollowCache().refreshCache(userStore.viewer.id).catch(() => {})
+  } catch (e: any) {
+    console.error('[SchoolsPage] follow error:', e?.response?.status, e?.response?.data?.detail || e?.message || e)
+    // Revert on failure.
+    if (isCurrentlyFollowing) {
+      following.value.add(u.id)
+    } else {
+      following.value.delete(u.id)
     }
   }
 }
+
+// If isOnline was false at mount time, useAsyncResource immediate was false
+// and users never loaded. Re-trigger when the network comes online.
+watch(isOnline, (online) => {
+  if (online && users.value.length === 0 && !loading.value) {
+    execute()
+  }
+})
 
 function goToUser(id: string) {
   router.push(`/user/${id}`)
@@ -142,6 +169,8 @@ function goToUser(id: string) {
             :class="following.has(u.id)
               ? 'bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20'
               : 'bg-accent text-[#0d1117] hover:brightness-110'"
+            :disabled="!canWrite('user.follow_graph')"
+            :title="!canWrite('user.follow_graph') ? getFallback('user.follow_graph') : ''"
             @click.stop="toggleFollow(u)"
         >
           <UserCheck v-if="following.has(u.id)" class="w-3 h-3" stroke-width="2" />
