@@ -1,5 +1,6 @@
 """Shared route helpers — used by articles, feed, pool, and search routes."""
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
 
@@ -35,16 +36,14 @@ def repo_path(article_id: str) -> Path:
 
 
 def get_commit_hash(article_id: str) -> str:
-    """Get HEAD commit hash for an article, or empty string."""
-    rp = repo_path(article_id)
-    if not (rp / ".git").is_dir():
-        return ""
-    commits = get_commit_history(rp, max_count=1)
-    return commits[0]["hash"][:8] if commits else ""
+    """Get HEAD commit hash for an article, or empty string. Uses cached meta."""
+    h, _ = get_git_meta(article_id)
+    return h
 
 
+@lru_cache(maxsize=512)
 def get_content_preview(article_id: str, max_chars: int = 200) -> str:
-    """Get first ~max_chars characters of article source content."""
+    """Get first ~max_chars characters of article source content. Cached."""
     rp = repo_path(article_id)
     for ext in [".md", ".typ"]:
         f = rp / f"article{ext}"
@@ -56,15 +55,14 @@ def get_content_preview(article_id: str, max_chars: int = 200) -> str:
 
 
 def get_commit_count(article_id: str) -> int:
-    """Get total number of commits for an article."""
-    rp = repo_path(article_id)
-    if not (rp / ".git").is_dir():
-        return 0
-    return len(get_commit_history(rp))
+    """Get total number of commits for an article. Uses cached meta."""
+    _, c = get_git_meta(article_id)
+    return c
 
 
+@lru_cache(maxsize=512)
 def get_git_meta(article_id: str) -> tuple[str, int]:
-    """Get both HEAD hash (short) and commit count from a single git-log call."""
+    """Get both HEAD hash (short) and commit count from a single git-log call. Cached."""
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         return "", 0
