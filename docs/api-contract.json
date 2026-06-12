@@ -1798,6 +1798,65 @@
         }
       }
     },
+    "/api/v1/feed/cache": {
+      "get": {
+        "tags": [
+          "feed"
+        ],
+        "summary": "Get Feed Cache",
+        "description": "Lightweight feed data for offline cache refresh. Returns following IDs plus article metadata (no abstract or content_preview). Requires authentication.",
+        "operationId": "get_feed_cache_api_v1_feed_cache_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "following_ids": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "articles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "title": { "type": "string" },
+                          "status": { "type": "string" },
+                          "authors": { "type": "array" },
+                          "commit_hash": { "type": "string" },
+                          "fork_count": { "type": "integer" },
+                          "forked_from": { "type": "string" },
+                          "score": { "type": "object" },
+                          "created_at": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
     "/api/v1/search": {
       "get": {
         "tags": [

@@ -31,8 +31,8 @@ arXiv solved **distribution**. But it didn't solve **filtering** — the problem
 **Phase 1 — Tauri Desktop（冷启动）✅**
 A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. 5MB install, 30MB RAM. Useful alone — the key to cold-start users.
 
-**Phase 1.5 — Polish & Ship（打磨分发）✅ v0.2.0**
-Delete, diff view (with word-level highlighting), Typst SVG preview (dark-theme compatible, responsive sizing) + PDF download, draft search, editor UX (save-as-commit, per-save commit message, disabled-when-clean save button, VSCode-style tab system with KeepAlive caching for simultaneous multi-article editing), CodeMirror 6 Markdown editor (syntax highlighting, bracket matching, ⌘S compile), architecture remediation (git-first write/read path per DESIGN.md §2.3, useCommitFlow composable, useTauri 3-file split), self-bookmark rejection (backend 400 + frontend guard), format choice modal (Markdown/Typst on creation), DeleteButton unified component, design system alignment (Tailwind tokens, color consistency). Desktop app is solid.
+**Phase 1.5 — Polish & Ship（打磨分发）✅ v0.2.3**
+Delete, diff view, Typst SVG + PDF, draft search, editor UX (save-as-commit, VSCode-style tab system), CodeMirror 6, git-first architecture. Follow/bookmark with server as source of truth (REST API), offline cache via article_cache. Article sync (L4): auto-backup to server, conflict resolution. Schools page with follow state. Desktop app is solid.
 
 **Phase 2 — Score arXiv（包围城市）**
 Community scoring layer on top of preprints. A quality filter that doesn't belong to any publisher.
@@ -49,13 +49,13 @@ Phase 1 + 1.5（Tauri Desktop — 离线写作 + 打磨）
 ┌─────────────────────────────────────────────────────────┐
 │  Vue 3 → IPC → Rust → SQLite + Git（本地）                │
 │  离线写作 · 客户端编译 · 版本控制 · 浏览即缓存               │
-│  git-first 写入 · CodeMirror 6 · useCommitFlow            │
+│  git-first 写入 · 关注走服务器 API · 文章自动备份           │
 └─────────────────────────────────────────────────────────┘
 
 Phase 2+（Web — 社区协作）
 ┌─────────────────────────────────────────────────────────┐
 │  Vue 3 SPA → REST → FastAPI → SQLite + Git（服务器）       │
-│  沉淀池 · 社区评审 · 信誉系统 · 引用图                      │
+│  沉淀池 · 社区评审 · 信誉系统 · 引用图 · 关注/信息流         │
 └─────────────────────────────────────────────────────────┘
 ```
 
