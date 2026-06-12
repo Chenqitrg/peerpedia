@@ -11,8 +11,6 @@ It must reliably:
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from peerpedia_core.storage.compiler import (
     CompileResult,
     MarkdownBackend,
@@ -317,7 +315,8 @@ class TestTypstBackendWithoutCLI:
     def test_compile_typst_not_installed(self):
         """When typst is not on PATH, returns error result with install message."""
         from unittest.mock import patch
-        from peerpedia_core.storage.compiler import TypstBackend, CompileResult
+
+        from peerpedia_core.storage.compiler import TypstBackend
 
         with patch("shutil.which", return_value=None):
             backend = TypstBackend()
@@ -339,7 +338,6 @@ class TestMarkdownFallback:
     def test_markdown_fallback_renders_basic_html(self):
         """When markdown library is unavailable, falls back to basic <p> tags."""
         import builtins
-        from unittest.mock import patch
         import importlib
 
         real_import = builtins.__import__
