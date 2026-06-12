@@ -79,6 +79,7 @@ def get_article(session: Session, article_id: str) -> Article | None:
 
 def list_articles(session: Session, status: str | None = None,
                   author_id: str | None = None,
+                  follower_id: str | None = None,
                   limit: int | None = None, offset: int = 0) -> list[Article]:
     q = session.query(Article)
     if status:
@@ -86,6 +87,14 @@ def list_articles(session: Session, status: str | None = None,
     if author_id:
         q = q.join(ArticleAuthor, Article.id == ArticleAuthor.article_id).filter(
             ArticleAuthor.author_id == author_id
+        )
+    if follower_id:
+        from peerpedia_core.storage.db.models import Follow
+        q = (
+            q.join(ArticleAuthor, Article.id == ArticleAuthor.article_id)
+            .join(Follow, ArticleAuthor.author_id == Follow.followed_id)
+            .filter(Follow.follower_id == follower_id)
+            .distinct()
         )
     q = q.order_by(Article.created_at.desc())
     if limit is not None:
