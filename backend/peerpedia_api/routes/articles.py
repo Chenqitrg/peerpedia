@@ -23,6 +23,7 @@ from peerpedia_core.storage.db.crud_article import (
     update_article_status,
 )
 from peerpedia_core.storage.db.crud_bookmark import is_bookmarked
+from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.db.crud_review import (
     create_review,
     get_reviews_for_article,
@@ -338,6 +339,14 @@ def api_fork_article(
     original = get_article(db, article_id)
     if original is None:
         raise HTTPException(status_code=404, detail="Article not found")
+
+    # Verify user exists in server DB — local-only accounts can't fork.
+    user = get_user(db, current_user.id)
+    if user is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Your account is not synced to the server. Please log out and log in again while the server is running.",
+        )
 
     fork_id = str(uuid.uuid4())
     src = repo_path(article_id)
