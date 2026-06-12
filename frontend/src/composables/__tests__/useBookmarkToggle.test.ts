@@ -10,8 +10,7 @@ const mockIsOnline = ref(false)
 vi.mock('../useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
     isOnline: mockIsOnline,
-    startPing: vi.fn(),
-    stopPing: vi.fn(),
+    ping: vi.fn(),
   })),
 }))
 

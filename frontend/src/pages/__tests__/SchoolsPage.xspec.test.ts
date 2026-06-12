@@ -93,8 +93,7 @@ vi.mock('../../composables/useOffline', () => ({
 vi.mock('../../composables/useNetworkStatus', () => ({
   useNetworkStatus: () => ({
     isOnline: mockIsOnline,
-    startPing: vi.fn(),
-    stopPing: vi.fn(),
+    ping: vi.fn(),
   }),
 }))
 

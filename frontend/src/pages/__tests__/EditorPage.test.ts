@@ -31,8 +31,7 @@ vi.mock('vue-router', () => ({
 vi.mock('@/composables/useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
     isOnline: { value: true },
-    startPing: vi.fn(),
-    stopPing: vi.fn(),
+    ping: vi.fn(),
   })),
 }))
 

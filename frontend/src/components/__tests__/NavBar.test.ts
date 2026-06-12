@@ -13,8 +13,7 @@ vi.mock('vue-router', () => ({
 const { mockUseNetworkStatus } = vi.hoisted(() => ({
   mockUseNetworkStatus: vi.fn(() => ({
     isOnline: { value: true },
-    startPing: vi.fn(),
-    stopPing: vi.fn(),
+    ping: vi.fn(),
   })),
 }))
 vi.mock('@/composables/useNetworkStatus', () => ({
@@ -156,8 +155,7 @@ describe('NavBar — WiFi connectivity icon', () => {
   it('shows green Wifi icon when server is reachable (isOnline=true)', () => {
     mockUseNetworkStatus.mockReturnValue({
       isOnline: { value: true },
-      startPing: vi.fn(),
-      stopPing: vi.fn(),
+      ping: vi.fn(),
     })
     const user = { id: 'u1', username: 'test', name: 'Test' }
     localStorage.setItem('viewer', JSON.stringify(user))
@@ -175,8 +173,7 @@ describe('NavBar — WiFi connectivity icon', () => {
   it('shows gray WifiOff icon when server is unreachable in Tauri mode', () => {
     mockUseNetworkStatus.mockReturnValue({
       isOnline: { value: false },
-      startPing: vi.fn(),
-      stopPing: vi.fn(),
+      ping: vi.fn(),
     })
     // Simulate Tauri environment
     ;(window as any).__TAURI__ = {}

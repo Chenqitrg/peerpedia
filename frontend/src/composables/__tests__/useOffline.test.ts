@@ -13,8 +13,7 @@ const mockedUseNetworkStatus = useNetworkStatus as ReturnType<typeof vi.fn>
 function setOnline(online: boolean) {
   mockedUseNetworkStatus.mockReturnValue({
     isOnline: { value: online },
-    startPing: vi.fn(),
-    stopPing: vi.fn(),
+    ping: vi.fn(),
   })
 }
 

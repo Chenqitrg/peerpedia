@@ -63,7 +63,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const tabStore = useTabStore()
-const { startPing, stopPing, isOnline } = useNetworkStatus()
+const { ping, isOnline } = useNetworkStatus()
 
 const isEditorPage = computed(() => route.path.startsWith('/edit'))
 
@@ -158,7 +158,7 @@ async function saveAndClose() {
 // ── Restore session and tabs on mount ──────────────────────────
 
 onMounted(async () => {
-  startPing(10_000)
+  ping()
   await userStore.restoreSession()
   tabStore.restoreTabs()
   if (loadString('showAuthModal') === 'true') {

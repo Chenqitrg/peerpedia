@@ -54,7 +54,7 @@ vi.mock('../../api/feed', () => ({
 }))
 
 vi.mock('../../composables/useNetworkStatus', () => ({
-  useNetworkStatus: () => ({ isOnline: { value: true }, startPing: vi.fn(), stopPing: vi.fn() }),
+  useNetworkStatus: () => ({ isOnline: { value: true }, ping: vi.fn(), stopPing: vi.fn() }),
 }))
 
 function setLoggedIn() {
