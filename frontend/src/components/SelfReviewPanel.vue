@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useUserStore } from '../stores/useUserStore'
 import StarRating from './StarRating.vue'
 import { SCORE_DIMS } from '../api/constants'
-import { SlidersHorizontal } from 'lucide-vue-next'
 
 const { t } = useI18n()
-const userStore = useUserStore()
 
 const open = defineModel<boolean>({ required: true })
 const commitMsg = defineModel<string>('commitMsg', { default: '' })
@@ -15,11 +12,9 @@ const scores = defineModel<Record<string, number>>('scores', { required: true })
 const keywords = defineModel<string>('keywords', { default: '' })
 const categories = defineModel<string>('categories', { default: '' })
 const abstract = defineModel<string>('abstract', { default: '' })
-const contributions = defineModel<Record<string, number>>('contributions', { required: true })
 
 defineProps<{
   submitting: boolean
-  totalContribution: number
 }>()
 
 const emit = defineEmits<{
@@ -107,35 +102,6 @@ const show = computed({
             :placeholder="t('editor.abstractPlaceholder2')"
             class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
           />
-        </div>
-
-        <!-- Contribution -->
-        <div class="mb-6">
-          <label class="text-xs font-semibold text-ink-muted flex items-center gap-1.5 mb-3">
-            <SlidersHorizontal class="w-3 h-3" />
-            {{ t('editor.contribution') || 'Contribution' }}
-          </label>
-          <div
-            v-for="(pct, authorId) in contributions"
-            :key="authorId"
-            class="flex items-center gap-3 mb-2"
-          >
-            <span class="text-xs text-ink-muted w-20 truncate">
-              {{ authorId === userStore.viewer?.id ? 'You' : authorId.substring(0, 8) }}
-            </span>
-            <input
-              type="range"
-              :value="pct"
-              min="0"
-              max="100"
-              class="flex-1 h-1.5 accent-accent"
-              @input="contributions[authorId] = Number(($event.target as HTMLInputElement).value)"
-            />
-            <span class="text-xs text-ink font-mono w-8 text-right">{{ pct }}%</span>
-          </div>
-          <p v-if="totalContribution !== 100" class="text-[10px] text-danger">
-            {{ t('editor.contributionMustTotal100') || 'Contributions must total 100%. Currently:' }} {{ totalContribution }}%
-          </p>
         </div>
 
         <!-- Actions -->

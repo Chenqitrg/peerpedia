@@ -175,7 +175,7 @@ describe('EditorPage', () => {
     expect(html.length).toBeGreaterThan(0)
   })
 
-  it('self-assessment modal shows contribution slider', async () => {
+  it('self-assessment modal does not include contribution section', async () => {
     const { useUserStore } = await import('../../stores/useUserStore')
     const pinia = setActivePinia(createPinia())
     const userStore = useUserStore()
@@ -192,10 +192,11 @@ describe('EditorPage', () => {
     await publishBtn.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toMatch(/contribution|Contribution|slider/i)
+    // Contribution section removed — should not appear in the modal
+    expect(wrapper.text()).not.toMatch(/contribution|Contribution/i)
   })
 
-  it('preserves contribution slider values when publish modal is reopened', async () => {
+  it('self-assessment modal opens without contributions state', async () => {
     const { useUserStore } = await import('../../stores/useUserStore')
     const pinia = setActivePinia(createPinia())
     const userStore = useUserStore()
@@ -208,18 +209,11 @@ describe('EditorPage', () => {
     await flushPromises()
 
     const vm = wrapper.vm as any
-
+    // contributions should not exist on the component
+    expect(vm.contributions).toBeUndefined()
+    // handlePublish should just open the modal, no contributions init
     await vm.handlePublish()
-    expect(vm.contributions).toEqual({ u1: 100 })
-
-    vm.contributions['u1'] = 50
-    expect(vm.contributions['u1']).toBe(50)
-
-    vm.showSelfReview = false
-
-    await vm.handlePublish()
-    expect(vm.contributions['u1']).toBe(50)
-    expect(vm.contributions).toEqual({ u1: 50 })
+    expect(vm.showSelfReview).toBe(true)
   })
 
   // Regression: saveDraft must trigger git init in Tauri/local mode
