@@ -224,3 +224,37 @@ class TestPublishReadyArticles:
 
         count = publish_ready_articles(session)
         assert count == 3
+
+    def test_edit_during_sedimentation_preserves_score(self, session):
+        """Reviews on old commits still count after article is edited."""
+        author = _make_user(session, "edit_during")
+        reviewer = _make_user(session, "rv_edit_during")
+        past_start = datetime.now(timezone.utc) - timedelta(days=200)
+
+        article = _make_article(
+            session, [author.id],
+            status="sedimentation",
+            sink_start=past_start,
+            sink_duration_days=7,
+        )
+        # Review was written against commit "old_hash"
+        _make_review(
+            session, article.id, "old_hash", reviewer.id, "pool",
+            _build_score(5, 5, 5, 5, 5),
+        )
+
+        # Simulate an edit: create a review against a new commit "new_hash"
+        # The article was "edited" so reviews exist on two different commits.
+        _make_review(
+            session, article.id, "new_hash", reviewer.id, "pool",
+            _build_score(3, 3, 3, 3, 3),
+        )
+
+        count = publish_ready_articles(session)
+        assert count == 1
+
+        # Score should be the average of both reviews (5 and 3 → 4.0)
+        session.refresh(article)
+        assert article.status == "published"
+        assert article.score is not None
+        assert article.score["originality"] == 4.0

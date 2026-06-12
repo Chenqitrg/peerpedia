@@ -224,6 +224,9 @@ def api_update_article(
     if a is None:
         raise HTTPException(status_code=404, detail="Article not found")
 
+    if current_user.id not in get_author_ids(db, article_id):
+        raise HTTPException(status_code=403, detail="Only authors can edit their articles")
+
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=400, detail="Article repo not found")

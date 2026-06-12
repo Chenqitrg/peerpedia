@@ -108,7 +108,7 @@ class TestSedimentation:
 
 
 class TestPerCommitScoring:
-    """Per-commit score computation: each commit scored independently."""
+    """Score computation: aggregates reviews across all commits."""
 
     def _make_user(self, session, name):
         from peerpedia_core.storage.db.models import User
@@ -132,8 +132,8 @@ class TestPerCommitScoring:
         return create_review(session, article_id=article_id, commit_hash=commit_hash,
                              reviewer_id=reviewer_id, scope=scope, scores=scores)
 
-    def test_filters_by_commit_hash(self, engine):
-        """Only reviews for the target commit contribute to the score."""
+    def test_accumulate_scores_across_commits(self, engine):
+        """Reviews from different commits are averaged together."""
         from peerpedia_core.storage.db.engine import get_session
         session = get_session(engine)
 
@@ -151,17 +151,15 @@ class TestPerCommitScoring:
                            "pedagogy": 1, "impact": 1})
 
         from peerpedia_core.workflow.scoring import compute_article_score_for_commit
-        score_abc = compute_article_score_for_commit(session, article.id, "abc")
-        score_def = compute_article_score_for_commit(session, article.id, "def")
+        score = compute_article_score_for_commit(session, article.id)
 
-        assert score_abc is not None
-        assert score_def is not None
-        assert score_abc["originality"] == 5.0
-        assert score_def["originality"] == 1.0
+        assert score is not None
+        # Two reviews: scores 5 and 1 → average 3.0 per dimension
+        assert score["originality"] == 3.0
         session.close()
 
-    def test_no_reviews_for_commit_returns_none(self, engine):
-        """If no reviews exist for a commit, return None."""
+    def test_no_reviews_returns_none(self, engine):
+        """If no reviews exist for the article, return None."""
         from peerpedia_core.storage.db.engine import get_session
         session = get_session(engine)
 
@@ -169,7 +167,7 @@ class TestPerCommitScoring:
         article = self._make_article(session, [author.id])
 
         from peerpedia_core.workflow.scoring import compute_article_score_for_commit
-        result = compute_article_score_for_commit(session, article.id, "no_such_hash")
+        result = compute_article_score_for_commit(session, article.id)
         assert result is None
         session.close()
 
