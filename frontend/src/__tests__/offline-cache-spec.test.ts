@@ -268,6 +268,57 @@ describe('SPEC: Offline Cache Behavior', () => {
     })
   })
 
+  // ── S8: Bookmarks ──────────────────────────────────────────────
+
+  describe('S8 — Bookmarks stored with article metadata, visible offline', () => {
+    const bookmarkCacheKey = (userId: string) => `bookmarks-${userId}`
+
+    it('stores bookmarked article metadata in cache, not just IDs', async () => {
+      // Simulate what the bookmark toggle should do: store ArticleSummary.
+      const articles = [
+        { ...sampleArticleSummary('art-bm1', 'Bookmarked Paper'), is_bookmarked: true },
+      ]
+      const payload = JSON.stringify({ articles, cached_at: new Date().toISOString() })
+      await mockTauri.cacheArticle({ id: '_bookmarks_viewer-1', article_json: payload })
+
+      const r = await mockTauri.getCachedArticle({ id: '_bookmarks_viewer-1' })
+      expect(r).not.toBeNull()
+      const parsed = JSON.parse(r!.json!)
+      expect(parsed.articles).toHaveLength(1)
+      expect(parsed.articles[0].title).toBe('Bookmarked Paper')
+    })
+
+    it('removing a bookmark removes it from cache', async () => {
+      const articles = [
+        { ...sampleArticleSummary('art-a', 'Paper A'), is_bookmarked: true },
+        { ...sampleArticleSummary('art-b', 'Paper B'), is_bookmarked: true },
+      ]
+      await mockTauri.cacheArticle({
+        id: '_bookmarks_viewer-1',
+        article_json: JSON.stringify({ articles, cached_at: new Date().toISOString() }),
+      })
+
+      // Remove Paper A
+      const r = await mockTauri.getCachedArticle({ id: '_bookmarks_viewer-1' })
+      const parsed = JSON.parse(r!.json!)
+      const filtered = parsed.articles.filter((a: any) => a.id !== 'art-a')
+      await mockTauri.cacheArticle({
+        id: '_bookmarks_viewer-1',
+        article_json: JSON.stringify({ articles: filtered, cached_at: new Date().toISOString() }),
+      })
+
+      const r2 = await mockTauri.getCachedArticle({ id: '_bookmarks_viewer-1' })
+      const parsed2 = JSON.parse(r2!.json!)
+      expect(parsed2.articles).toHaveLength(1)
+      expect(parsed2.articles[0].title).toBe('Paper B')
+    })
+
+    it('returns null when no bookmarks cached', async () => {
+      const r = await mockTauri.getCachedArticle({ id: '_bookmarks_viewer-1' })
+      expect(r).toBeNull()
+    })
+  })
+
   // ── S7: Cache overwrite (eng review decision) ──────────────────
 
   describe('S7 — Cache overwrite on refresh', () => {

@@ -26,10 +26,13 @@ export function useBookmarkToggle(
 
   function _syncBookmarkCache(viewerId: string, articleId: string, add: boolean) {
     const cacheKey = `bookmarks-${viewerId}`
-    const bookmarks = loadJSON<{ id: string; user_id: string; article_id: string; created_at: string }[]>(cacheKey) || []
-    const filtered = bookmarks.filter((b: { article_id: string }) => b.article_id !== articleId)
+    const items = loadJSON<ArticleSummary[]>(cacheKey) || []
+    const filtered = items.filter(a => a.id !== articleId)
     if (add) {
-      filtered.push({ id: '', user_id: viewerId, article_id: articleId, created_at: new Date().toISOString() })
+      const article = articles.value.find(a => a.id === articleId)
+      if (article) {
+        filtered.push({ ...article, is_bookmarked: true })
+      }
     }
     saveJSON(cacheKey, filtered)
   }

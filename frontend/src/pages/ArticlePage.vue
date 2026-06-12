@@ -453,14 +453,33 @@ function refreshArticle() {
   loadReviews()
 }
 
-function _syncBookmarkCache(viewerId: string, articleId: string, bookmarkId?: string) {
+function _syncBookmarkCache(viewerId: string, articleId: string, add: boolean) {
   const cacheKey = `bookmarks-${viewerId}`
-  const bookmarks = loadJSON<{ id: string; user_id: string; article_id: string; created_at: string }[]>(cacheKey) || []
-  // Remove any existing bookmark for this article.
-  const filtered = bookmarks.filter(b => b.article_id !== articleId)
-  // If adding (not removing), append the new bookmark.
-  if (bookmarkId) {
-    filtered.push({ id: bookmarkId, user_id: viewerId, article_id: articleId, created_at: new Date().toISOString() })
+  const items = loadJSON<import('../api/types').ArticleSummary[]>(cacheKey) || []
+  // Remove existing entry for this article.
+  const filtered = items.filter((a: { id: string }) => a.id !== articleId)
+  if (add && article.value) {
+    // Build a minimal ArticleSummary from the current article detail.
+    filtered.push({
+      id: article.value.id,
+      title: article.value.title,
+      status: article.value.status,
+      authors: article.value.authors,
+      abstract: null,
+      content_preview: articleSourceContent.value.slice(0, 200),
+      commit_hash: article.value.commit_hash,
+      fork_count: article.value.fork_count,
+      forked_from: article.value.forked_from,
+      commit_count: article.value.commit_count,
+      score: article.value.score,
+      sink_eta: null,
+      days_remaining: null,
+      sink_duration_days: null,
+      is_bookmarked: true,
+      is_own_article: false,
+      created_at: article.value.created_at,
+      updated_at: article.value.updated_at,
+    })
   }
   saveJSON(cacheKey, filtered)
 }

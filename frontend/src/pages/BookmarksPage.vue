@@ -29,30 +29,28 @@ const { loading, error, execute: loadBookmarks } = useAsyncResource(
 
     const cacheKey = `bookmarks-${userStore.viewer.id}`
 
-    // Local-only mode: load from localStorage cache
+    // Offline: load ArticleSummary[] directly from localStorage.
     if (isLocalOnly()) {
-      const cached = loadJSON<Bookmark[]>(cacheKey)
+      const cached = loadJSON<ArticleSummary[]>(cacheKey)
       if (cached && cached.length > 0) {
         isOfflineCache.value = true
-        const results = await Promise.all(
-          cached.map((b: Bookmark) => getArticle(b.article_id).catch(() => null)),
-        )
-        articles.value = results.filter((r): r is ArticleSummary => r !== null)
-        return articles.value
+        articles.value = cached
+        return cached
       }
       articles.value = []
       return []
     }
 
-    // Online: fetch from API and cache for offline use
+    // Online: fetch bookmarks, resolve to ArticleSummary, cache full data.
     const bookmarks: Bookmark[] = await fetchBookmarks()
-    saveJSON(cacheKey, bookmarks)
     isOfflineCache.value = false
     const results = await Promise.all(
       bookmarks.map((b: Bookmark) => getArticle(b.article_id).catch(() => null)),
     )
-    articles.value = results.filter((r): r is ArticleSummary => r !== null)
-    return articles.value
+    const resolved = results.filter((r): r is ArticleSummary => r !== null)
+    saveJSON(cacheKey, resolved)
+    articles.value = resolved
+    return resolved
   },
   null,
   { immediate: true },
