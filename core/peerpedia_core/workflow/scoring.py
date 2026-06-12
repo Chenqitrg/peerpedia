@@ -1,10 +1,10 @@
 """Score aggregation — weighted average of reviews."""
+from sqlalchemy.orm import Session
+
 from peerpedia_core.config.params import params
 from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
 from peerpedia_core.storage.db.crud_review import get_reviews_for_article
-from peerpedia_core.storage.db.models import Review
 from peerpedia_core.workflow.reputation import get_reviewer_weight
-from sqlalchemy.orm import Session
 
 DIMS = ["originality", "rigor", "completeness", "pedagogy", "impact"]
 
