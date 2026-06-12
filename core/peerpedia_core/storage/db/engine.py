@@ -50,8 +50,18 @@ class Base(DeclarativeBase):
     pass
 
 
+_engine_cache: dict[str, Engine] = {}
+
+
 def get_engine(database_url: str) -> Engine:
-    """Create a SQLAlchemy engine. Uses SQLite with WAL mode for concurrency."""
+    """Return a cached SQLAlchemy engine, creating one on first call per URL.
+
+    Caching avoids creating a new engine + connection pool on every request.
+    SQLAlchemy Engine is thread-safe and designed to be a process singleton.
+    """
+    if database_url in _engine_cache:
+        return _engine_cache[database_url]
+
     engine = create_engine(
         database_url,
         connect_args={"check_same_thread": False} if "sqlite" in database_url else {},
@@ -67,6 +77,7 @@ def get_engine(database_url: str) -> Engine:
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 
+    _engine_cache[database_url] = engine
     return engine
 
 
