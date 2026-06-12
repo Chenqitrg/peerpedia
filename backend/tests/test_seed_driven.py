@@ -218,10 +218,11 @@ class TestForkMergeFlow:
                            "pedagogy": 3, "impact": 3},
         }, headers=headers)
 
-        # Propose merge
+        # Propose merge (authenticated as feynman)
         merge_resp = client.post(
             f"/api/v1/articles/{parent.id}/merge-proposals",
-            json={"fork_article_id": fork_id, "proposer_id": feynman_id},
+            json={"fork_article_id": fork_id},
+            headers=headers,
         )
         assert merge_resp.status_code == 201, merge_resp.json()
         proposal_id = merge_resp.json()["id"]

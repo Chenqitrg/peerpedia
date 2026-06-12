@@ -216,11 +216,11 @@ class TestJourneyForkEditMerge:
         # 5. Forker proposes merge back to original
         merge_body = {
             "fork_article_id": fork_id,
-            "proposer_id": forker["user"]["id"],
         }
         merge_resp = client.post(
             f"/api/v1/articles/{original_id}/merge-proposals",
             json=merge_body,
+            headers=forker_headers,
         )
         assert merge_resp.status_code == 201, f"Merge proposal failed: {merge_resp.json()}"
         proposal = merge_resp.json()
@@ -236,6 +236,7 @@ class TestJourneyForkEditMerge:
         # 7. Original author accepts the merge
         accept_resp = client.post(
             f"/api/v1/articles/{original_id}/merge-proposals/{proposal_id}/accept",
+            headers=orig_headers,
         )
         assert accept_resp.status_code == 200, f"Accept merge failed: {accept_resp.json()}"
         assert accept_resp.json()["status"] == "accepted"

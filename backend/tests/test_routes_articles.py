@@ -50,6 +50,16 @@ def seed_user(db_engine):
 
 
 @pytest.fixture
+def auth_user_id(db_engine):
+    """Return the ID of the client's implicit auth user (test_articles_auth)."""
+    s = get_session(db_engine)
+    u = s.query(User).filter(User.username == "test_articles_auth").first()
+    uid = u.id
+    s.close()
+    return uid
+
+
+@pytest.fixture
 def seed_article(db_engine, seed_user):
     s = get_session(db_engine)
     a = Article(status="published", fork_count=0)
@@ -148,10 +158,10 @@ class TestCreateArticle:
 
 
 class TestUpdateArticle:
-    def test_update_content_flow(self, client, seed_user):
+    def test_update_content_flow(self, client, seed_user, auth_user_id):
         """Full flow: create article, then edit it."""
         create_body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "content": "# Original\n\nHello world.",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -173,10 +183,10 @@ class TestUpdateArticle:
         assert data["id"] == article_id
         assert data["status"] == "draft"
 
-    def test_update_no_content_change(self, client, seed_user):
+    def test_update_no_content_change(self, client, seed_user, auth_user_id):
         """Edit without content change: commits, stays draft unless publish=true."""
         create_body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "content": "# Test",
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
@@ -199,20 +209,62 @@ class TestUpdateArticle:
         resp = client.put("/api/v1/articles/nonexistent", json={"content": "x"})
         assert resp.status_code == 404
 
-    def test_update_no_repo(self, client, seed_user, db_engine):
+    def test_update_no_repo(self, client, seed_user, db_engine, auth_user_id):
         """Update article that has no git repo (edge case)."""
         from peerpedia_core.storage.db.engine import get_session
-        from peerpedia_core.storage.db.models import Article
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor
 
         s = get_session(db_engine)
         a = Article(status="draft")
         s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=auth_user_id, position=0))
         s.commit()
         aid = a.id
         s.close()
 
         resp = client.put(f"/api/v1/articles/{aid}", json={"content": "x"})
         assert resp.status_code == 400
+
+    def test_update_non_author_forbidden(self, client, seed_user, db_engine, auth_user_id):
+        """Non-authors cannot edit; others get 403."""
+        # Create article owned by seed_user + auth_user
+        create_body = {
+            "authors": [seed_user],
+            "content": "# Test\n\nContent.",
+            "format": "markdown",
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        article_id = resp.json()["id"]
+
+        # Create a third user who is NOT an author
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import User
+        s = get_session(db_engine)
+        other = User(username="other_editor", password_hash="",
+                      name="OtherEditor", anonymous_name="anon_other", affiliation="X")
+        s.add(other)
+        s.commit()
+        other_id = other.id
+        s.close()
+
+        # Switch auth to the non-author user
+        from peerpedia_api import deps
+        s2 = get_session(db_engine)
+        other_obj = s2.get(User, other_id)
+        app = client.app
+        old = app.dependency_overrides.get(deps.require_user)
+        try:
+            app.dependency_overrides[deps.require_user] = lambda: other_obj
+            edit_body = {"content": "# Hacked\n\nEvil edit."}
+            resp = client.put(f"/api/v1/articles/{article_id}", json=edit_body)
+            assert resp.status_code == 403
+        finally:
+            if old is not None:
+                app.dependency_overrides[deps.require_user] = old
+            s2.close()
 
 
 class TestHistoryWithScores:
@@ -239,10 +291,10 @@ class TestHistoryWithScores:
             if commit == data["commits"][0]:
                 assert commit["score"] is not None
 
-    def test_history_multiple_commits_independent_scores(self, client, seed_user):
+    def test_history_multiple_commits_independent_scores(self, client, seed_user, auth_user_id):
         """After editing, each commit gets its own score."""
         create_body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "content": "# V1",
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
@@ -264,15 +316,15 @@ class TestHistoryWithScores:
         data = history.json()
         assert len(data["commits"]) >= 2
 
-        # Latest commit should have score from the edit self-review
+        # Scores are now aggregated across all commits — both commits
+        # should reflect the combined review pool (avg of 3 and 5 = 4.0)
         latest = data["commits"][0]
         assert latest["score"] is not None
-        assert latest["score"]["originality"] == 5.0
+        assert latest["score"]["originality"] == 4.0
 
-        # Older commit should have its own score
         older = data["commits"][1]
         assert older["score"] is not None
-        assert older["score"]["originality"] == 3.0
+        assert older["score"]["originality"] == 4.0
 
 
 class TestScoreBackfill:
@@ -310,10 +362,10 @@ class TestScoreBackfill:
 class TestScoreNotCleared:
     """Regression tests: article.score must not be cleared when latest commit has no reviews."""
 
-    def test_edit_without_self_review_preserves_score(self, client, seed_user):
+    def test_edit_without_self_review_preserves_score(self, client, seed_user, auth_user_id):
         """Editing content without self_review should not set score to None."""
         create_body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "content": "# V1",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -331,7 +383,7 @@ class TestScoreNotCleared:
         # Score should NOT be None — should fall back to latest commit with reviews
         assert resp2.json()["score"] is not None
 
-    def test_backfill_walks_commits_for_score(self, client, seed_user, db_engine):
+    def test_backfill_walks_commits_for_score(self, client, seed_user, db_engine, auth_user_id):
         """Backfill should find a score from older commit if latest has none."""
         from peerpedia_core.storage.db.engine import get_session
         from peerpedia_core.storage.db.models import Article
@@ -622,10 +674,10 @@ class TestArticleLifecycle:
         assert resp.status_code == 201
         assert resp.json()["status"] == "draft"
 
-    def test_edit_re_enters_pool(self, client, seed_user):
+    def test_edit_re_enters_pool(self, client, seed_user, auth_user_id):
         """Editing an article should update sink_start and re-enter sedimentation."""
         create_body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "content": "# V1\n\nFirst.",
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
@@ -751,10 +803,10 @@ class TestArticleErrorPaths:
         resp = client.post("/api/v1/articles/nonexistent/rollback/abc123")
         assert resp.status_code == 404
 
-    def test_rollback_creates_revert_commit(self, client, seed_user):
+    def test_rollback_creates_revert_commit(self, client, seed_user, auth_user_id):
         """Happy path: create article with 2 commits, rollback to first, verify content restored."""
         body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
                             "pedagogy": 3, "impact": 3},
             "title": "Rollback Test",
@@ -822,10 +874,10 @@ class TestArticleCreateEdgeCases:
 class TestArticleUpdateEdgeCases:
     """Edge cases for article updates."""
 
-    def test_update_body_fields(self, client, seed_user):
+    def test_update_body_fields(self, client, seed_user, auth_user_id):
         """Update title, abstract, keywords, and categories."""
         body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "title": "Original Title",
             "content": "Content",
             "format": "markdown",
@@ -958,10 +1010,10 @@ class TestArticleSource:
 class TestUpdatePublishWithContributions:
     """Update + publish article with contributions to cover all branches."""
 
-    def test_update_publish_with_contributions(self, client, seed_user):
+    def test_update_publish_with_contributions(self, client, seed_user, auth_user_id):
         """Updating and publishing with self_review + contributions."""
         body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "title": "Contrib Test",
             "content": "Initial content.",
             "format": "markdown",
