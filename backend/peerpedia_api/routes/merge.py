@@ -8,6 +8,7 @@ from peerpedia_core.storage.db.crud_merge import (
     get_merge_proposals_for_article,
     reject_merge_proposal,
 )
+from peerpedia_core.storage.db.models import User
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -18,17 +19,17 @@ router = APIRouter(tags=["merge"])
 
 class MergeProposalCreate(BaseModel):
     fork_article_id: str
-    proposer_id: str
 
 
 @router.post("/articles/{article_id}/merge-proposals", status_code=201)
 def api_create_merge(article_id: str, body: MergeProposalCreate,
+                      current_user: User = Depends(deps.require_user),
                       db: Session = Depends(deps.get_db)):
     if get_article(db, article_id) is None:
         raise HTTPException(status_code=404, detail="Article not found")
     mp = create_merge_proposal(db, fork_id=body.fork_article_id,
                                 target_id=article_id,
-                                proposer_id=body.proposer_id)
+                                proposer_id=current_user.id)
     return {
         "id": mp.id, "fork_article_id": mp.fork_article_id,
         "target_article_id": mp.target_article_id,
@@ -62,6 +63,7 @@ def _validate_proposal_target(proposal_id: str, article_id: str, db: Session):
 
 @router.post("/articles/{article_id}/merge-proposals/{proposal_id}/accept")
 def api_accept_merge(article_id: str, proposal_id: str,
+                      current_user: User = Depends(deps.require_user),
                       db: Session = Depends(deps.get_db)):
     mp = _validate_proposal_target(proposal_id, article_id, db)
     try:
@@ -73,6 +75,7 @@ def api_accept_merge(article_id: str, proposal_id: str,
 
 @router.post("/articles/{article_id}/merge-proposals/{proposal_id}/reject")
 def api_reject_merge(article_id: str, proposal_id: str,
+                      current_user: User = Depends(deps.require_user),
                       db: Session = Depends(deps.get_db)):
     _validate_proposal_target(proposal_id, article_id, db)
     try:
