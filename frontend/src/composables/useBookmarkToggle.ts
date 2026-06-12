@@ -5,6 +5,7 @@ import { useTauri } from './useTauri'
 import { useNetworkStatus } from './useNetworkStatus'
 import { saveJSON, loadJSON } from './useLocalStorage'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
+import { getArticle } from '../api/articles'
 import type { ArticleSummary } from '../api/types'
 
 /**
@@ -24,12 +25,19 @@ export function useBookmarkToggle(
   const { isOnline } = useNetworkStatus()
   const isLocal = (userStore.isTauriMode || userStore.isBrowserLocal) && !isOnline.value
 
-  function _syncBookmarkCache(viewerId: string, articleId: string, add: boolean) {
+  async function _syncBookmarkCache(viewerId: string, articleId: string, add: boolean) {
     const cacheKey = `bookmarks-${viewerId}`
     const items = loadJSON<ArticleSummary[]>(cacheKey) || []
-    const filtered = items.filter(a => a.id !== articleId)
+    let filtered = items.filter(a => a.id !== articleId)
     if (add) {
-      const article = articles.value.find(a => a.id === articleId)
+      let article = articles.value.find(a => a.id === articleId)
+      // If not in the current page's articles, fetch from API.
+      if (!article) {
+        try {
+          const detail = await getArticle(articleId)
+          article = { ...detail, abstract: null, content_preview: '' } as unknown as ArticleSummary
+        } catch { /* can't fetch, skip */ }
+      }
       if (article) {
         filtered.push({ ...article, is_bookmarked: true })
       }
@@ -79,10 +87,10 @@ export function useBookmarkToggle(
       } else {
         if (currentlyBookmarked) {
           await removeBookmark(articleId)
-          _syncBookmarkCache(userStore.viewer.id, articleId, false)
+          await _syncBookmarkCache(userStore.viewer.id, articleId, false)
         } else {
           await addBookmark(articleId)
-          _syncBookmarkCache(userStore.viewer.id, articleId, true)
+          await _syncBookmarkCache(userStore.viewer.id, articleId, true)
         }
       }
     } catch (e: any) {
@@ -104,7 +112,7 @@ export function useBookmarkToggle(
         return
       } else {
         await removeBookmark(articleId)
-        _syncBookmarkCache(userStore.viewer.id, articleId, false)
+        await _syncBookmarkCache(userStore.viewer.id, articleId, false)
       }
       const idx = articles.value.findIndex(a => a.id === articleId)
       if (idx !== -1) {
