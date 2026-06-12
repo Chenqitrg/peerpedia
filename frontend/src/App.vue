@@ -158,7 +158,7 @@ async function saveAndClose() {
 // ── Restore session and tabs on mount ──────────────────────────
 
 onMounted(async () => {
-  startPing()
+  startPing(10_000)
   await userStore.restoreSession()
   tabStore.restoreTabs()
   if (loadString('showAuthModal') === 'true') {

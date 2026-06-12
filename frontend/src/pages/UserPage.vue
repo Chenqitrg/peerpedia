@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
-import { getUser, getFollowing, followUser, unfollowUser } from '../api/users'
+import { getUser, getFollowing, getFollowers, followUser, unfollowUser } from '../api/users'
 import { getArticles } from '../api/articles'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
@@ -93,19 +93,25 @@ const followLoading = ref(false)
       // Offline — read from local cache.
       const cache = useFollowCache()
       const ids = await cache.getCachedFollowingIds(userStore.viewer.id)
-      if (ids && isSelf.value && user.value) {
-        user.value = { ...user.value, following_count: ids.length }
+      if (isSelf.value && user.value) {
+        if (ids !== null && ids.length > 0) {
+          user.value = { ...user.value, following_count: ids.length }
+        }
       } else if (ids) {
         isFollowing.value = ids.includes(id.value)
       }
       return
     }
-    // Online — use server REST API.
+    // Online — use server REST API. Fetch both following + followers counts.
     try {
-      const following = await getFollowing(userStore.viewer.id)
+      const [following, followers] = await Promise.all([
+        getFollowing(userStore.viewer.id),
+        getFollowers(userStore.viewer.id),
+      ])
       const followed = Array.isArray(following) ? following : (following as any)?.users || []
+      const followerList = Array.isArray(followers) ? followers : (followers as any)?.users || []
       if (isSelf.value && user.value) {
-        user.value = { ...user.value, following_count: followed.length }
+        user.value = { ...user.value, following_count: followed.length, followers_count: followerList.length }
       } else {
         isFollowing.value = followed.some((u: any) => u.id === id.value)
       }

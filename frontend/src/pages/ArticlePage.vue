@@ -38,6 +38,7 @@ import {
   Loader,
 } from 'lucide-vue-next'
 import { useArticleSync } from '../composables/useArticleSync'
+import { useFollowCache } from '../composables/useFollowCache'
 import DiffView from '../components/DiffView.vue'
 
 const route = useRoute()
@@ -177,12 +178,34 @@ async function loadArticle(articleId: string) {
     commitHash.value = article.value.commit_hash || ''
     await loadCompiledContent()
     loadReviews()
+    // Cache explicitly opened article for offline reading.
+    if (articleSourceContent.value) {
+      useFollowCache().setCachedArticle(articleId, article.value, {
+        content: articleSourceContent.value,
+        format: articleFormat.value,
+      }).catch(() => {})
+    }
     return
   } catch (e: any) {
-    // 2. In Tauri/dev-mock mode: metadata from draft, content from git.
+    // 2. In Tauri/dev-mock mode: try cached article first, then draft, then git.
     //    Git is the source of truth — no cache chain to get stale.
     const isOffline = tauri.isTauri.value || tauri.isBrowserLocal.value
     if (isOffline) {
+      // Try cached article (explicitly opened earlier).
+      const cache = useFollowCache()
+      const cached = await cache.getCachedArticle(articleId)
+      if (cached) {
+        article.value = cached.detail
+        articleFormat.value = cached.source.format as 'markdown' | 'typst'
+        articleSourceContent.value = cached.source.content
+        if (cached.source.content) {
+          const { parseMarkdown } = await import('../utils/markdown')
+          compiledHtml.value = parseMarkdown(cached.source.content)
+        }
+        loadReviews()
+        return
+      }
+      // Try local draft (own articles).
       const draft = await tauri.getDraft({ id: articleId })
       if (draft && !('error' in draft)) {
         const draftData = draft as { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }

@@ -23,46 +23,36 @@ describe('useNetworkStatus', () => {
     expect(isOnline.value).toBe(false)
   })
 
-  it('startPing fires immediate ping and stays offline on failures', async () => {
-    // startPing fires an immediate ping, so we need 2 rejection slots:
-    // 1 for the immediate ping, 2 for the interval pings.
+  it('startPing fires immediate ping and goes offline on first failure', async () => {
+    // With FAILURE_THRESHOLD=1, a single failure flips to offline.
     globalThis.fetch = vi.fn()
       .mockRejectedValueOnce(new Error('Network error'))   // immediate (0ms)
-      .mockRejectedValueOnce(new Error('Network error'))   // interval (100ms)
 
     const { isOnline, startPing } = useNetworkStatus()
     expect(isOnline.value).toBe(false) // defaults to offline
     startPing(100)
 
-    // After 100ms: immediate ping (0ms) failed + interval ping (100ms) failed
-    // That's 2 ≥ FAILURE_THRESHOLD → stays offline.
-    await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(false)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(isOnline.value).toBe(false) // 1 failure — offline
   })
 
-  it('recovers to online after a successful ping', async () => {
-    // startPing fires an immediate ping, so the sequence is:
-    // immediate (0ms) → interval (100ms) → interval (200ms) → interval (300ms)
+  it('recovers to online on first successful ping after failure', async () => {
+    // With FAILURE_THRESHOLD=1: 1 failure → offline, 1 success → online.
     globalThis.fetch = vi.fn()
-      .mockRejectedValueOnce(new Error('fail'))   // immediate ping (0ms)
-      .mockRejectedValueOnce(new Error('fail'))   // interval (100ms)
-      .mockRejectedValueOnce(new Error('fail'))   // interval (200ms)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) }) // interval (300ms)
+      .mockRejectedValueOnce(new Error('fail'))   // immediate ping (0ms) → offline
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) }) // interval (100ms) → online
 
     const { isOnline, startPing } = useNetworkStatus()
     startPing(100)
 
-    // immediate + 100ms + 200ms → 3 failures, still offline
-    await vi.advanceTimersByTimeAsync(100)
-    await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(false)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(isOnline.value).toBe(false) // 1 failure → offline
 
-    // 300ms → one success → back online
     await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(true)
+    expect(isOnline.value).toBe(true) // 1 success → back online
   })
 
-  it('isOnline stays true on single intermittent failure', async () => {
+  it('flips offline on first failure and recovers on first success', async () => {
     globalThis.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) })
       .mockRejectedValueOnce(new Error('fail'))
@@ -71,14 +61,14 @@ describe('useNetworkStatus', () => {
     const { isOnline, startPing } = useNetworkStatus()
     startPing(100)
 
-    await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(true) // success
+    await vi.advanceTimersByTimeAsync(0)
+    expect(isOnline.value).toBe(true) // success — online
 
     await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(true) // 1 failure — not enough to flip
+    expect(isOnline.value).toBe(false) // 1 failure — flips offline (threshold=1)
 
     await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(true) // success
+    expect(isOnline.value).toBe(true) // 1 success — back online
   })
 
   it('stopPing stops the interval', async () => {
@@ -107,7 +97,6 @@ describe('useNetworkStatus', () => {
     // read their own copies that stay false forever.
     globalThis.fetch = vi.fn()
       .mockRejectedValueOnce(new Error('fail'))
-      .mockRejectedValueOnce(new Error('fail'))
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) })
 
     const a = useNetworkStatus() // caller A — e.g., useOffline
@@ -120,8 +109,7 @@ describe('useNetworkStatus', () => {
 
     c.startPing(100)
 
-    // After 200ms: immediate (fail, 0ms) + 100ms interval (fail) + 200ms interval (success)
-    await vi.advanceTimersByTimeAsync(100)
+    // After 100ms: immediate (fail, 0ms) + 100ms interval (success)
     await vi.advanceTimersByTimeAsync(100)
     expect(c.isOnline.value).toBe(true)
 

@@ -5,6 +5,8 @@ import { useUserStore } from '../stores/useUserStore'
 import { fetchFeed } from '../api/feed'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import { useBookmarkToggle } from '../composables/useBookmarkToggle'
+import { useFollowCache } from '../composables/useFollowCache'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import ArticleCard from '../components/ArticleCard.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import ErrorState from '../components/ErrorState.vue'
@@ -14,13 +16,30 @@ import { Waypoints } from 'lucide-vue-next'
 
 const userStore = useUserStore()
 const { t } = useI18n()
+const { isOnline } = useNetworkStatus()
 const isLoggedIn = computed(() => !!userStore.viewer)
 
 const pageSize = 20
 const currentPage = ref(1)
 
 const { data: feed, loading, error, execute: loadFeed } = useAsyncResource(
-  () => fetchFeed(),
+  async (): Promise<FeedResponse | null> => {
+    if (!isOnline.value && userStore.viewer) {
+      // Offline — read cached feed articles (card metadata only).
+      const cache = useFollowCache()
+      const cachedArticles = await cache.getCachedFeed(userStore.viewer.id)
+      if (cachedArticles) {
+        return { articles: cachedArticles as any, total: cachedArticles.length }
+      }
+      return { articles: [], total: 0 }
+    }
+    // Online — fetch from server, then refresh cache.
+    const result = await fetchFeed()
+    if (userStore.viewer) {
+      useFollowCache().refreshCache(userStore.viewer.id).catch(() => {})
+    }
+    return result
+  },
   null as FeedResponse | null,
   { immediate: false, resetOnExecute: false },
 )
@@ -43,13 +62,11 @@ function goToPage(page: number) {
 }
 
 onMounted(() => {
-  if (isLoggedIn.value && !userStore.isTauriMode && !userStore.isBrowserLocal) loadFeed()
+  if (isLoggedIn.value) loadFeed()
 })
 
-// Re-fetch feed when user logs in (modal doesn't remount the page)
-// Skip in Tauri mode — no server to fetch from.
 watch(isLoggedIn, (loggedIn) => {
-  if (loggedIn && !userStore.isTauriMode && !userStore.isBrowserLocal) loadFeed()
+  if (loggedIn) loadFeed()
 })
 </script>
 
