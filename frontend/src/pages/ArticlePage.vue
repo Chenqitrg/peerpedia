@@ -258,6 +258,17 @@ async function loadCompiledContent() {
   if (isLocal) {
     srcContent = article.value.compiled_output || ''
     srcFormat = article.value.compiled_format || 'markdown'
+    // Server articles (not local drafts): fetch source from server for compilation.
+    if (!srcContent) {
+      try {
+        const src = await getArticleSource(id)
+        srcContent = src.content
+        srcFormat = src.format
+      } catch {
+        compiledHtml.value = ''
+        return
+      }
+    }
   } else {
     // Web mode: fetch source from server to determine real format.
     // compiled_format is never populated in the DB (on-demand compile).

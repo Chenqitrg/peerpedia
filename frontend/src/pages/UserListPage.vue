@@ -23,6 +23,7 @@ const userId = computed(() => route.params.id as string)
 const isFollowers = computed(() => route.path.endsWith('/followers'))
 
 const users = ref<UserSummary[]>([])
+const followingIds = ref<Set<string>>(new Set())
 const loading = ref(true)
 const error = ref('')
 
@@ -49,6 +50,13 @@ async function load() {
       users.value = isFollowers.value
         ? await getFollowers(userId.value)
         : await getFollowing(userId.value)
+      // Fetch viewer's following list to show correct button state on each card.
+      if (userStore.viewer) {
+        try {
+          const following = await getFollowing(userStore.viewer.id)
+          followingIds.value = new Set(following.map(u => u.id))
+        } catch { /* ignore */ }
+      }
     }
   } catch (e: any) {
     error.value = e.userMessage || t('common.error')
@@ -92,7 +100,7 @@ watch([userId, isFollowers], load, { immediate: true })
     </div>
 
     <div v-else class="space-y-2">
-      <UserCard v-for="u in users" :key="u.id" :user="u" />
+      <UserCard v-for="u in users" :key="u.id" :user="u" :is-following="followingIds.has(u.id)" />
     </div>
   </div>
 </template>
