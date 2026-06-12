@@ -16,9 +16,10 @@ const tauri = useTauri()
 
 const props = defineProps<{
   user: UserSummary
+  isFollowing?: boolean
 }>()
 
-const isFollowing = ref(false)
+const isFollowing = ref(props.isFollowing ?? false)
 const followLoading = ref(false)
 const isLocal = userStore.isTauriMode || userStore.isBrowserLocal
 

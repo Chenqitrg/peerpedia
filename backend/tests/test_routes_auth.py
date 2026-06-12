@@ -47,6 +47,8 @@ class TestRegister:
         data = resp.json()
         assert data["user"]["username"] == "newton"
         assert data["user"]["name"] == "Isaac Newton"
+        assert data["user"]["followers_count"] == 0
+        assert data["user"]["following_count"] == 0
         assert data["token"] != ""
 
     def test_register_duplicate_username_returns_409(self, client):
@@ -134,6 +136,8 @@ class TestLogin:
         data = resp.json()
         assert data["user"]["username"] == "fermat"
         assert data["user"]["name"] == "Pierre de Fermat"
+        assert data["user"]["followers_count"] == 0
+        assert data["user"]["following_count"] == 0
         assert data["token"] != ""
 
     def test_login_with_wrong_password_returns_401(self, client):
@@ -213,6 +217,8 @@ class TestMe:
         data = resp2.json()
         assert data["user"]["username"] == "curie"
         assert data["user"]["name"] == "Marie Curie"
+        assert data["user"]["followers_count"] == 0
+        assert data["user"]["following_count"] == 0
 
     def test_me_without_token_returns_401(self, client):
         resp = client.get("/api/v1/auth/me")

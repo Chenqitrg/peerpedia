@@ -38,6 +38,7 @@ import {
   Loader,
 } from 'lucide-vue-next'
 import { useArticleSync } from '../composables/useArticleSync'
+import { useFollowCache } from '../composables/useFollowCache'
 import DiffView from '../components/DiffView.vue'
 
 const route = useRoute()
@@ -177,12 +178,43 @@ async function loadArticle(articleId: string) {
     commitHash.value = article.value.commit_hash || ''
     await loadCompiledContent()
     loadReviews()
+    // Cache explicitly opened article for offline reading.
+    if (articleSourceContent.value) {
+      useFollowCache().setCachedArticle(articleId, article.value, {
+        content: articleSourceContent.value,
+        format: articleFormat.value,
+      }).catch(() => {})
+    }
     return
   } catch (e: any) {
-    // 2. In Tauri/dev-mock mode: metadata from draft, content from git.
+    // 2. In Tauri/dev-mock mode: try cached article first, then draft, then git.
     //    Git is the source of truth — no cache chain to get stale.
     const isOffline = tauri.isTauri.value || tauri.isBrowserLocal.value
     if (isOffline) {
+      // Try cached article (explicitly opened earlier).
+      const cache = useFollowCache()
+      const cached = await cache.getCachedArticle(articleId)
+      if (cached) {
+        article.value = cached.detail
+        articleFormat.value = cached.source.format as 'markdown' | 'typst'
+        articleSourceContent.value = cached.source.content
+        if (cached.source.content) {
+          if (cached.source.format === 'typst') {
+            try {
+              const result = await tauri.compileTypst({ content: cached.source.content, format: 'typst' })
+              if (result && typeof result === 'string') {
+                compiledHtml.value = `<div class="typst-preview">${sanitizeTypstSvg(result)}</div>`
+              }
+            } catch { compiledHtml.value = '' }
+          } else {
+            const { parseMarkdown } = await import('../utils/markdown')
+            compiledHtml.value = renderMathInHtml(parseMarkdown(cached.source.content))
+          }
+        }
+        try { loadReviews() } catch { /* offline — no reviews available */ }
+        return
+      }
+      // Try local draft (own articles).
       const draft = await tauri.getDraft({ id: articleId })
       if (draft && !('error' in draft)) {
         const draftData = draft as { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }
@@ -258,6 +290,17 @@ async function loadCompiledContent() {
   if (isLocal) {
     srcContent = article.value.compiled_output || ''
     srcFormat = article.value.compiled_format || 'markdown'
+    // Server articles (not local drafts): fetch source from server for compilation.
+    if (!srcContent) {
+      try {
+        const src = await getArticleSource(id)
+        srcContent = src.content
+        srcFormat = src.format
+      } catch {
+        compiledHtml.value = ''
+        return
+      }
+    }
   } else {
     // Web mode: fetch source from server to determine real format.
     // compiled_format is never populated in the DB (on-demand compile).

@@ -53,6 +53,10 @@ vi.mock('../../api/feed', () => ({
   }),
 }))
 
+vi.mock('../../composables/useNetworkStatus', () => ({
+  useNetworkStatus: () => ({ isOnline: { value: true }, startPing: vi.fn(), stopPing: vi.fn() }),
+}))
+
 function setLoggedIn() {
   localStorage.setItem('viewer', JSON.stringify({ id: 'u1', username: 'test', name: 'Test' }))
   localStorage.setItem('token', 'test-token')
