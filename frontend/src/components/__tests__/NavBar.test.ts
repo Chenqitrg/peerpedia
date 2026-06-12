@@ -114,7 +114,7 @@ describe('NavBar — search routing', () => {
     setActivePinia(createPinia())
   })
 
-  it('routes to /search?mode=local when in browser-local mode', async () => {
+  it('routes without mode=local when online (even in browser-local mode)', async () => {
     localStorage.setItem('peerpedia_browser_local', '1')
 
     const wrapper = mount(NavBar, {
@@ -127,7 +127,9 @@ describe('NavBar — search routing', () => {
     await input.setValue('quantum physics')
     await wrapper.find('form').trigger('submit')
 
-    expect(mockPush).toHaveBeenCalledWith('/search?q=quantum%20physics&mode=local')
+    // isLocalOnly() checks ?tauri + !isOnline; localStorage alone doesn't trigger it.
+    // Since isOnline is true (mock default), no &mode=local is appended.
+    expect(mockPush).toHaveBeenCalledWith('/search?q=quantum%20physics')
   })
 
   it('routes to /search without mode when in web mode', async () => {
