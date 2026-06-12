@@ -78,6 +78,25 @@ class TestFiveDimScores:
         result = s.weighted_average([1, 1, 1, 1, 1])
         assert result == pytest.approx(3.4)
 
+    def test_weighted_average_zero_weights(self):
+        """全零权重返回 0.0 而不是除零错误"""
+        s = FiveDimScores(
+            originality=3.0, rigor=3.0, completeness=3.0,
+            pedagogy=3.0, impact=3.0,
+        )
+        result = s.weighted_average([0, 0, 0, 0, 0])
+        assert result == 0.0
+
+    def test_weighted_average_custom_weights(self):
+        """自定义权重影响各维度贡献"""
+        s = FiveDimScores(
+            originality=5.0, rigor=5.0, completeness=1.0,
+            pedagogy=1.0, impact=1.0,
+        )
+        # 只重视 originality 和 rigor
+        result = s.weighted_average([0.5, 0.5, 0, 0, 0])
+        assert result == 5.0
+
 
 class TestReputationScores:
     """用户四维信誉评分"""

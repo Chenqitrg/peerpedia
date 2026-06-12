@@ -27,6 +27,62 @@ class TestFeed:
         assert resp.status_code == 200
         assert resp.json()["articles"] == []
 
+    def test_feed_unauthenticated_returns_all(self, client, db_engine):
+        """Without auth header, the feed returns all visible articles."""
+        s = get_session(db_engine)
+        u = User(username="feed_unauth_au", password_hash="", name="A", anonymous_name="a")
+        s.add(u)
+        a = Article(status="published", title="Public Article")
+        s.add(a)
+        s.commit()
+        s.close()
+        resp = client.get("/api/v1/feed")
+        assert resp.status_code == 200
+        assert len(resp.json()["articles"]) >= 1
+
+    def test_feed_cache_requires_auth(self, client):
+        """GET /feed/cache requires authentication."""
+        resp = client.get("/api/v1/feed/cache")
+        assert resp.status_code in (401, 403)
+
+    def test_feed_cache_empty_following(self, client, db_engine):
+        """Feed cache for user with no following returns empty."""
+        from peerpedia_api.deps import create_token
+        s = get_session(db_engine)
+        u = User(username="fc_empty", password_hash="", name="FC", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        s.close()
+        token = create_token(u.id)
+        resp = client.get("/api/v1/feed/cache", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["following_ids"] == []
+        assert data["articles"] == []
+
+    def test_feed_cache_with_following(self, client, db_engine):
+        """Feed cache for user with following returns article metadata."""
+        from peerpedia_api.deps import create_token
+        from peerpedia_core.storage.db.models import ArticleAuthor, Follow
+        s = get_session(db_engine)
+        reader = User(username="fc_reader", password_hash="", name="R", anonymous_name="a1")
+        writer = User(username="fc_writer", password_hash="", name="W", anonymous_name="a2")
+        s.add_all([reader, writer])
+        s.commit()
+        s.add(Follow(follower_id=reader.id, followed_id=writer.id))
+        a = Article(status="published", title="Cached Article")
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=writer.id, position=0))
+        s.commit()
+        s.close()
+        token = create_token(reader.id)
+        resp = client.get("/api/v1/feed/cache", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert writer.id in data["following_ids"]
+        assert len(data["articles"]) >= 1
+
     def test_feed_from_followed(self, client, db_engine):
         s = get_session(db_engine)
         reader = User(username="user12", password_hash="", name="读者", anonymous_name="a1")
@@ -176,6 +232,42 @@ class TestCitations:
         })
         assert resp.status_code == 201
 
+    def test_citations_nonexistent_article_returns_404(self, client):
+        """Requesting citations for non-existent article returns 404."""
+        resp = client.get("/api/v1/articles/no-such-article/citations")
+        assert resp.status_code == 404
+
+    def test_citations_with_actual_edges(self, client, db_engine):
+        """GET citations for an article that has citation edges."""
+        from peerpedia_core.storage.db.crud_citation import create_or_update_citation
+        s = get_session(db_engine)
+        u = User(username="cit_edge_au", password_hash="", name="A", anonymous_name="a")
+        s.add(u)
+        s.commit()
+        a1 = Article(status="published", title="Article One")
+        a2 = Article(status="published", title="Article Two")
+        a3 = Article(status="published", title="Article Three")
+        s.add_all([a1, a2, a3])
+        s.commit()
+        # Create citation edges
+        create_or_update_citation(s, a1.id, a2.id, forward=0.5, backward=0.2)
+        create_or_update_citation(s, a3.id, a1.id, forward=0.3, backward=0.1)
+        s.close()
+
+        resp = client.get(f"/api/v1/articles/{a1.id}/citations")
+        assert resp.status_code == 200
+        data = resp.json()
+        # a1 cites a2 (forward edge)
+        assert len(data["cites"]) >= 1
+        # a1 is cited by a3 (incoming edge)
+        assert len(data["cited_by"]) >= 1
+        # Check edge structure
+        edge = data["cites"][0]
+        assert "article_id" in edge
+        assert "title" in edge
+        assert "forward_prob" in edge
+        assert "backward_prob" in edge
+
 
 class TestMerge:
     def test_create_merge_proposal(self, client, db_engine):
@@ -281,6 +373,91 @@ class TestMerge:
 
         resp = client.post(f"/api/v1/articles/{a.id}/merge-proposals/nonexistent/accept")
         assert resp.status_code == 404
+
+    def test_accept_wrong_article_returns_400(self, client, db_engine):
+        """Accepting a merge proposal targeting a different article returns 400."""
+        s = get_session(db_engine)
+        author = User(username="mp_wrong_au", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="mp_wrong_fk", password_hash="", name="F", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        target = Article(status="published")
+        fork = Article(status="draft", forked_from=target.id)
+        other = Article(status="published")
+        s.add_all([target, fork, other])
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{target.id}/merge-proposals",
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+        pid = r.json()["id"]
+        resp = client.post(f"/api/v1/articles/{other.id}/merge-proposals/{pid}/accept")
+        assert resp.status_code == 400
+
+    def test_reject_wrong_article_returns_400(self, client, db_engine):
+        """Rejecting a merge proposal for a different article returns 400."""
+        s = get_session(db_engine)
+        author = User(username="mp_rej_wr_au", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="mp_rej_wr_fk", password_hash="", name="F", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        target = Article(status="published")
+        fork = Article(status="draft", forked_from=target.id)
+        other = Article(status="published")
+        s.add_all([target, fork, other])
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{target.id}/merge-proposals",
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+        pid = r.json()["id"]
+        resp = client.post(f"/api/v1/articles/{other.id}/merge-proposals/{pid}/reject")
+        assert resp.status_code == 400
+
+    def test_accept_already_resolved_proposal_returns_400(self, client, db_engine):
+        """Accepting an already-accepted merge proposal returns 400."""
+        s = get_session(db_engine)
+        author = User(username="mp_res_au", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="mp_res_fk", password_hash="", name="F", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        target = Article(status="published")
+        fork = Article(status="draft", forked_from=target.id)
+        s.add_all([target, fork])
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{target.id}/merge-proposals",
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+        pid = r.json()["id"]
+        client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept")
+        # Accept again — should return 400
+        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept")
+        assert resp.status_code == 400
+
+    def test_reject_already_resolved_proposal_returns_400(self, client, db_engine):
+        """Rejecting an already-accepted merge proposal returns 400."""
+        s = get_session(db_engine)
+        author = User(username="mp_rej2_au", password_hash="", name="A", anonymous_name="a1")
+        forker = User(username="mp_rej2_fk", password_hash="", name="F", anonymous_name="a2")
+        s.add_all([author, forker])
+        s.commit()
+        target = Article(status="published")
+        fork = Article(status="draft", forked_from=target.id)
+        s.add_all([target, fork])
+        s.commit()
+        s.close()
+
+        r = client.post(
+            f"/api/v1/articles/{target.id}/merge-proposals",
+            json={"fork_article_id": fork.id, "proposer_id": forker.id})
+        pid = r.json()["id"]
+        client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/accept")
+        resp = client.post(f"/api/v1/articles/{target.id}/merge-proposals/{pid}/reject")
+        assert resp.status_code == 400
 
     def test_search_empty_q_with_category(self, client, db_engine):
         """Search with only category filter, no query text."""
@@ -477,3 +654,151 @@ class TestCompileDownload:
             "format": "unknown",
         })
         assert resp.status_code == 400
+
+
+class TestCompileHelpersDirect:
+    """Direct tests for compile helper functions."""
+
+    def test_compile_typst_svg_error_path(self):
+        """_compile_typst_svg raises 500 when backend fails."""
+        from unittest.mock import patch
+
+        from fastapi import HTTPException
+        from peerpedia_core.storage.compiler import CompileResult
+
+        with patch(
+            "peerpedia_core.storage.compiler.TypstBackend.compile"
+        ) as mock_compile:
+            mock_compile.return_value = CompileResult(
+                success=False, format="typst",
+                error="Simulated compilation failure",
+            )
+            import pytest
+            from peerpedia_api.routes.compile import _compile_typst_svg
+            with pytest.raises(HTTPException) as exc:
+                _compile_typst_svg("= test content")
+            assert exc.value.status_code == 500
+
+    def test_compile_typst_pdf_error_path(self):
+        """_compile_typst_pdf raises 500 when backend fails."""
+        from unittest.mock import patch
+
+        from fastapi import HTTPException
+        from peerpedia_core.storage.compiler import CompileResult
+
+        with patch(
+            "peerpedia_core.storage.compiler.TypstBackend.compile"
+        ) as mock_compile:
+            mock_compile.return_value = CompileResult(
+                success=False, format="typst",
+                error="Simulated PDF failure",
+            )
+            import pytest
+            from peerpedia_api.routes.compile import _compile_typst_pdf
+            with pytest.raises(HTTPException) as exc:
+                _compile_typst_pdf("= test")
+            assert exc.value.status_code == 500
+
+    def test_compile_markdown_error_path(self):
+        """_compile_markdown raises 500 when backend fails."""
+        from unittest.mock import patch
+
+        from fastapi import HTTPException
+        from peerpedia_core.storage.compiler import CompileResult
+
+        with patch(
+            "peerpedia_core.storage.compiler.MarkdownBackend.compile"
+        ) as mock_compile:
+            mock_compile.return_value = CompileResult(
+                success=False, format="markdown",
+                error="Simulated markdown failure",
+            )
+            import pytest
+            from peerpedia_api.routes.compile import _compile_markdown
+            with pytest.raises(HTTPException) as exc:
+                _compile_markdown("# test")
+            assert exc.value.status_code == 500
+
+    def test_compile_typst_svg_output_path_fallback(self):
+        """Read SVG from output path when html_content is empty."""
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from peerpedia_core.storage.compiler import CompileResult
+
+        with tempfile.TemporaryDirectory() as tmp:
+            svg_file = Path(tmp) / "out" / "article.svg"
+            svg_file.parent.mkdir()
+            svg_file.write_text("<svg>Mock SVG</svg>")
+
+            result = CompileResult(
+                success=True, format="typst-svg",
+                output_path=str(svg_file),
+                html_content=None,  # Force file read path
+            )
+
+            with patch(
+                "peerpedia_core.storage.compiler.TypstBackend.compile",
+                return_value=result,
+            ):
+                from peerpedia_api.routes.compile import _compile_typst_svg
+                output = _compile_typst_svg("= test")
+                assert output == "<svg>Mock SVG</svg>"
+
+    def test_compile_typst_pdf_output_not_found(self):
+        """_compile_typst_pdf raises 500 when PDF output file not found."""
+        from unittest.mock import patch
+
+        from fastapi import HTTPException
+        from peerpedia_core.storage.compiler import CompileResult
+
+        result = CompileResult(
+            success=True, format="typst-pdf",
+            output_path="/nonexistent/path/file.pdf",
+            html_content=None,
+        )
+
+        with patch(
+            "peerpedia_core.storage.compiler.TypstBackend.compile",
+            return_value=result,
+        ):
+            import pytest
+            from peerpedia_api.routes.compile import _compile_typst_pdf
+            with pytest.raises(HTTPException) as exc:
+                _compile_typst_pdf("= test")
+            assert "PDF output not found" in str(exc.value.detail)
+
+
+class TestCompileRouteErrorHandlers:
+    """Exception handler catch-all paths in compile routes."""
+
+    def test_compile_preview_catches_unexpected_error(self, client):
+        """When _compile_markdown throws a non-HTTPException, it becomes 500."""
+        from unittest.mock import patch
+
+        with patch(
+            "peerpedia_api.routes.compile._compile_markdown",
+            side_effect=RuntimeError("Unexpected runtime error"),
+        ):
+            resp = client.post("/api/v1/compile-preview", json={
+                "content": "# Test",
+                "format": "markdown",
+            })
+            assert resp.status_code == 500
+            assert "Unexpected runtime error" in resp.json()["detail"]
+
+    def test_compile_download_catches_unexpected_error(self, client):
+        """When _compile_markdown throws a non-HTTPException, it becomes 500."""
+        from unittest.mock import patch
+
+        with patch(
+            "peerpedia_api.routes.compile._compile_markdown",
+            side_effect=RuntimeError("Download runtime error"),
+        ):
+            resp = client.post("/api/v1/compile-download", json={
+                "content": "# Test",
+                "format": "markdown",
+            })
+            assert resp.status_code == 500
+            assert "Download runtime error" in resp.json()["detail"]

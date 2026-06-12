@@ -239,6 +239,111 @@ class TestUserProfileEdgeCases:
         assert u.followers_count == 100
 
 
+class TestRegisterRequestValidation:
+    """RegisterRequest: username, password, email, name validators."""
+
+    def test_username_too_long(self):
+        from peerpedia_api.schemas.auth import RegisterRequest
+        with pytest.raises(ValidationError, match="32"):
+            RegisterRequest(
+                username="a" * 33,
+                password="valid123",
+                email="valid@test.com",
+                name="Valid Name",
+            )
+
+    def test_username_special_chars(self):
+        from peerpedia_api.schemas.auth import RegisterRequest
+        with pytest.raises(ValidationError, match="only letters"):
+            RegisterRequest(
+                username="bad user!",
+                password="valid123",
+                email="valid@test.com",
+                name="Valid Name",
+            )
+
+    def test_password_too_short(self):
+        from peerpedia_api.schemas.auth import RegisterRequest
+        with pytest.raises(ValidationError, match="6"):
+            RegisterRequest(
+                username="valid_user",
+                password="12345",
+                email="valid@test.com",
+                name="Valid Name",
+            )
+
+    def test_name_whitespace_only(self):
+        from peerpedia_api.schemas.auth import RegisterRequest
+        with pytest.raises(ValidationError, match="required"):
+            RegisterRequest(
+                username="valid_user",
+                password="valid123",
+                email="valid@test.com",
+                name="   ",
+            )
+
+    def test_username_max_32_is_valid(self):
+        from peerpedia_api.schemas.auth import RegisterRequest
+        r = RegisterRequest(
+            username="a" * 32,
+            password="valid123",
+            email="valid@test.com",
+            name="Valid Name",
+        )
+        assert len(r.username) == 32
+
+
+class TestReviewCreateContributions:
+    """ReviewCreate with optional contributions validation."""
+
+    def test_valid_contributions(self):
+        from peerpedia_api.schemas.review import ReviewCreate
+        r = ReviewCreate(
+            article_id="a1", commit_hash="abc",
+            scope="pool",
+            scores={"originality": 4, "rigor": 3, "completeness": 4,
+                    "pedagogy": 3, "impact": 3},
+            contributions={"u1": {"originality": 0.5, "rigor": 0.3,
+                                  "completeness": 0.2, "pedagogy": 0.0,
+                                  "impact": 0.0}},
+        )
+        assert r.contributions is not None
+
+    def test_contributions_missing_dimension(self):
+        from peerpedia_api.schemas.review import ReviewCreate
+        with pytest.raises(ValidationError):
+            ReviewCreate(
+                article_id="a1", commit_hash="abc",
+                scope="pool",
+                scores={"originality": 4, "rigor": 3, "completeness": 4,
+                        "pedagogy": 3, "impact": 3},
+                contributions={"u1": {"originality": 0.5}}  # missing 4 dims
+            )
+
+    def test_contributions_out_of_range(self):
+        from peerpedia_api.schemas.review import ReviewCreate
+        with pytest.raises(ValidationError):
+            ReviewCreate(
+                article_id="a1", commit_hash="abc",
+                scope="pool",
+                scores={"originality": 4, "rigor": 3, "completeness": 4,
+                        "pedagogy": 3, "impact": 3},
+                contributions={"u1": {"originality": 1.5, "rigor": 0.3,
+                                      "completeness": 0.2, "pedagogy": 0.0,
+                                      "impact": 0.0}},
+            )
+
+    def test_scores_above_five(self):
+        from peerpedia_api.schemas.review import ReviewCreate
+        with pytest.raises(ValidationError):
+            ReviewCreate(
+                article_id="a1", commit_hash="abc",
+                scope="pool",
+                scores={"originality": 6, "rigor": 3, "completeness": 4,
+                        "pedagogy": 3, "impact": 3},
+            )
+
+
 class TestValidationEdgeCases:
     """Validation of edge-case inputs."""
 
