@@ -13,6 +13,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 bcrypt = "0.15"
 uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
+tokio = { version = "1", features = ["sync", "rt"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

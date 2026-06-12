@@ -10,9 +10,11 @@ pub mod local_git;
 pub mod local_store;
 
 use rusqlite::Connection;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 /// Shared database connection, protected by a Mutex for thread safety.
+/// Uses tokio::sync::Mutex so the guard can be held safely across
+/// async command boundaries.
 pub struct AppState {
     pub db: Mutex<Connection>,
 }
