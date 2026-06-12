@@ -34,22 +34,22 @@ async function load() {
   error.value = ''
   try {
     if (!isOnline.value) {
-      // Offline — only the viewer's own following list is cached.
       const isSelf = userId.value === userStore.viewer?.id
+      const cache = useFollowCache()
       if (isSelf && !isFollowers.value) {
-        const cache = useFollowCache()
-        const ids = await cache.getCachedFollowingIds(userId.value)
-        if (ids) {
-          users.value = ids.map(id => ({
-            id, name: id.slice(0, 8) + '…', anonymous_name: '',
-            article_count: 0, reputation: {},
-          })) as UserSummary[]
-        }
+        // Offline own following: read cached UserSummary with real names.
+        const cached = await cache.getCachedFollowingUsers(userId.value)
+        if (cached) users.value = cached
       }
+      // Offline followers / other users: no cache available, show empty.
     } else {
       users.value = isFollowers.value
         ? await getFollowers(userId.value)
         : await getFollowing(userId.value)
+      // Cache the following list for offline use.
+      if (!isFollowers.value && userStore.viewer) {
+        useFollowCache().setCachedFollowingUsers(userId.value, users.value).catch(() => {})
+      }
       // Fetch viewer's following list to show correct button state on each card.
       if (userStore.viewer) {
         try {
