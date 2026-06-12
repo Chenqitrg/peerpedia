@@ -10,8 +10,6 @@ The dependency injection layer provides:
 import os
 import time
 
-import bcrypt
-import jwt
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -52,8 +50,8 @@ class TestJWTToken:
         assert user_id == "user-123"
 
     def test_decode_expired_token(self):
-        from peerpedia_api.deps import decode_token
         import jwt as pyjwt
+        from peerpedia_api.deps import decode_token
         secret = os.environ.get("JWT_SECRET", "peerpedia-dev-secret")
         expired = pyjwt.encode(
             {"sub": "user-x", "iat": int(time.time()) - 10,
@@ -90,7 +88,7 @@ class TestGetDb:
         """After the generator is properly closed, the session is closed."""
         from peerpedia_api.deps import get_db
         gen = get_db()
-        session = next(gen)
+        _ = next(gen)  # verify session is created, then close
         # Properly close the generator — triggers finally block
         gen.close()
         # Session should be closed via the finally block

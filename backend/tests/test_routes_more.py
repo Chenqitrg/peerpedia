@@ -47,7 +47,7 @@ class TestFeed:
 
     def test_feed_cache_empty_following(self, client, db_engine):
         """Feed cache for user with no following returns empty."""
-        from peerpedia_api.deps import create_token, get_db
+        from peerpedia_api.deps import create_token
         s = get_session(db_engine)
         u = User(username="fc_empty", password_hash="", name="FC", anonymous_name="a")
         s.add(u)
@@ -662,6 +662,7 @@ class TestCompileHelpersDirect:
     def test_compile_typst_svg_error_path(self):
         """_compile_typst_svg raises 500 when backend fails."""
         from unittest.mock import patch
+
         from fastapi import HTTPException
         from peerpedia_core.storage.compiler import CompileResult
 
@@ -672,8 +673,8 @@ class TestCompileHelpersDirect:
                 success=False, format="typst",
                 error="Simulated compilation failure",
             )
-            from peerpedia_api.routes.compile import _compile_typst_svg
             import pytest
+            from peerpedia_api.routes.compile import _compile_typst_svg
             with pytest.raises(HTTPException) as exc:
                 _compile_typst_svg("= test content")
             assert exc.value.status_code == 500
@@ -681,6 +682,7 @@ class TestCompileHelpersDirect:
     def test_compile_typst_pdf_error_path(self):
         """_compile_typst_pdf raises 500 when backend fails."""
         from unittest.mock import patch
+
         from fastapi import HTTPException
         from peerpedia_core.storage.compiler import CompileResult
 
@@ -691,8 +693,8 @@ class TestCompileHelpersDirect:
                 success=False, format="typst",
                 error="Simulated PDF failure",
             )
-            from peerpedia_api.routes.compile import _compile_typst_pdf
             import pytest
+            from peerpedia_api.routes.compile import _compile_typst_pdf
             with pytest.raises(HTTPException) as exc:
                 _compile_typst_pdf("= test")
             assert exc.value.status_code == 500
@@ -700,6 +702,7 @@ class TestCompileHelpersDirect:
     def test_compile_markdown_error_path(self):
         """_compile_markdown raises 500 when backend fails."""
         from unittest.mock import patch
+
         from fastapi import HTTPException
         from peerpedia_core.storage.compiler import CompileResult
 
@@ -710,8 +713,8 @@ class TestCompileHelpersDirect:
                 success=False, format="markdown",
                 error="Simulated markdown failure",
             )
-            from peerpedia_api.routes.compile import _compile_markdown
             import pytest
+            from peerpedia_api.routes.compile import _compile_markdown
             with pytest.raises(HTTPException) as exc:
                 _compile_markdown("# test")
             assert exc.value.status_code == 500
@@ -721,6 +724,7 @@ class TestCompileHelpersDirect:
         import tempfile
         from pathlib import Path
         from unittest.mock import patch
+
         from peerpedia_core.storage.compiler import CompileResult
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -745,6 +749,7 @@ class TestCompileHelpersDirect:
     def test_compile_typst_pdf_output_not_found(self):
         """_compile_typst_pdf raises 500 when PDF output file not found."""
         from unittest.mock import patch
+
         from fastapi import HTTPException
         from peerpedia_core.storage.compiler import CompileResult
 
@@ -758,8 +763,8 @@ class TestCompileHelpersDirect:
             "peerpedia_core.storage.compiler.TypstBackend.compile",
             return_value=result,
         ):
-            from peerpedia_api.routes.compile import _compile_typst_pdf
             import pytest
+            from peerpedia_api.routes.compile import _compile_typst_pdf
             with pytest.raises(HTTPException) as exc:
                 _compile_typst_pdf("= test")
             assert "PDF output not found" in str(exc.value.detail)

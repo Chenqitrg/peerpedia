@@ -77,7 +77,7 @@ class TestAutoPublishLoop:
     def test_auto_publish_loop_can_run(self):
         """The auto_publish_loop can complete one iteration without error."""
         import asyncio
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import AsyncMock, patch
 
         # Patch the asyncio.sleep to avoid waiting 60 seconds
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -98,7 +98,7 @@ class TestAutoPublishLoop:
     def test_auto_publish_loop_catches_errors(self):
         """The auto_publish_loop handles exceptions gracefully and continues."""
         import asyncio
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import patch
 
         # Make the first sleep succeed (loop body runs) then cancel on second
         call_count = 0
@@ -109,7 +109,7 @@ class TestAutoPublishLoop:
             if call_count >= 2:
                 raise asyncio.CancelledError()
 
-        with patch("asyncio.sleep", side_effect=side_effect) as mock_sleep:
+        with patch("asyncio.sleep", side_effect=side_effect):
             from peerpedia_api.main import _auto_publish_loop
 
             async def run():
@@ -154,6 +154,7 @@ class TestGlobalExceptionHandler:
     def test_http_exception_re_raised(self):
         """HTTPException is re-raised by the global handler (not converted to 500)."""
         import asyncio
+
         from fastapi import HTTPException, Request
         from peerpedia_api.main import app
 
@@ -185,6 +186,7 @@ class TestGlobalExceptionHandler:
     def test_unhandled_exception_returns_500(self):
         """An unhandled ValueError returns a clean 500 JSON response."""
         import asyncio
+
         from fastapi import Request
         from peerpedia_api.main import app
 
@@ -200,7 +202,6 @@ class TestGlobalExceptionHandler:
 
         if handler:
             async def run():
-                from fastapi.responses import JSONResponse
                 resp = await handler(request, ValueError("Something broke"))
                 return resp
 
