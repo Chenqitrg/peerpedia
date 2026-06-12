@@ -63,7 +63,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const tabStore = useTabStore()
-const { startPing, stopPing, isOnline } = useNetworkStatus()
+const { ping, isSynced } = useNetworkStatus()
 
 const isEditorPage = computed(() => route.path.startsWith('/edit'))
 
@@ -92,9 +92,9 @@ router.afterEach((to) => {
 
 // ── L4: Auto-sync local account to server when network or login state changes ──
 watch(
-  [isOnline, () => userStore.localToken?.value, () => userStore.hasPendingCreds],
+  [isSynced, () => userStore.localToken?.value, () => userStore.hasPendingCreds],
   ([online, localTok, pending]) => {
-    console.log('[App] isOnline:', online, 'localToken:', !!localTok, 'pendingCreds:', pending)
+    console.log('[App] isSynced:', online, 'localToken:', !!localTok, 'pendingCreds:', pending)
     if (online && (localTok || pending)) {
       console.log('[App] calling trySyncServerAuth')
       userStore.trySyncServerAuth()
@@ -158,7 +158,7 @@ async function saveAndClose() {
 // ── Restore session and tabs on mount ──────────────────────────
 
 onMounted(async () => {
-  startPing(10_000)
+  ping()
   await userStore.restoreSession()
   tabStore.restoreTabs()
   if (loadString('showAuthModal') === 'true') {

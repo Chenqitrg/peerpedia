@@ -37,9 +37,9 @@ const mockToken = ref<string | null>('test-token')
 const mockLocalToken = ref<string | null>('local-token')
 vi.mock('../../stores/useUserStore', () => ({
   useUserStore: vi.fn(() => ({
-    viewer: mockViewer,
-    token: mockToken,
-    localToken: mockLocalToken,
+    get viewer() { return mockViewer.value },
+    get token() { return mockToken.value },
+    get localToken() { return mockLocalToken.value },
     isTauriMode: false,
     isBrowserLocal: false,
     trySyncServerAuth: vi.fn(),
@@ -122,6 +122,26 @@ describe('useArticleSync — SPEC-SYNC state machine', () => {
     expect(mockUpdateArticle).toHaveBeenCalled()
     expect(mockSetServerArticleId).toHaveBeenCalledWith(
       expect.objectContaining({ draft_id: 'd1', server_article_id: 's1', server_commit_hash: 'new_hash' }),
+    )
+  })
+
+  it('SPEC-SYNC-REGRESSION-1: upload() sends viewer.id not viewer.name as author', async () => {
+    // Regression: useArticleSync was passing viewer.name || viewer.username
+    // to createArticle, causing FK violation on the server (author_id must be UUID).
+    mockViewer.value = { id: 'u1', name: 'ChenqiMeng', username: 'test' }
+    const { upload } = useArticleSync(() => 'd1', () => null, () => null, () => 'abc123')
+    await upload()
+    expect(mockCreateArticle).toHaveBeenCalledWith(
+      expect.objectContaining({ authors: ['u1'] }),
+    )
+  })
+
+  it('SPEC-SYNC-REGRESSION-2: upload() falls back to Anonymous when viewer is null', async () => {
+    mockViewer.value = null
+    const { upload } = useArticleSync(() => 'd1', () => null, () => null, () => 'abc123')
+    await upload()
+    expect(mockCreateArticle).toHaveBeenCalledWith(
+      expect.objectContaining({ authors: ['Anonymous'] }),
     )
   })
 })

@@ -1,63 +1,88 @@
-import { ref, type Ref } from 'vue'
+import { ref, computed, type Ref, type ComputedRef } from 'vue'
 
-const FAILURE_THRESHOLD = 1
+type ConnectionState = 'idle' | 'connecting' | 'synced'
+const CONNECT_TIMEOUT_MS = 10_000
 
-// Module-level singleton — all callers share the same isOnline state.
-// If each useNetworkStatus() call created its own ref, App.vue's
-// startPing() would update one instance while useOffline reads another
-// that stays false forever.
-const isOnline: Ref<boolean> = ref(false)
-let intervalId: ReturnType<typeof setInterval> | null = null
-let consecutiveFailures = 0
+// Module-level singleton — all callers share the same connection state.
+const connectionState: Ref<ConnectionState> = ref('idle')
+const flash: Ref<boolean> = ref(false)
+let connectTimer: ReturnType<typeof setTimeout> | null = null
+let flashTimer: ReturnType<typeof setTimeout> | null = null
+
+async function ping(): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    connectionState.value = 'idle'
+    return
+  }
+  try {
+    const resp = await fetch('http://localhost:8080/health')
+    if (resp.ok) { notifySuccess() } else { notifyFailure() }
+  } catch { notifyFailure() }
+}
+
+function connect() {
+  if (connectionState.value === 'connecting') return
+  connectionState.value = 'connecting'
+  ping()
+  // Only arm the timeout if ping() didn't immediately resolve (e.g. navigator.onLine = false
+  // causes ping() to synchronously set state back to 'idle').
+  if (connectionState.value === 'connecting') {
+    connectTimer = setTimeout(() => { notifyFailure() }, CONNECT_TIMEOUT_MS)
+  }
+}
+
+function disconnect() {
+  connectionState.value = 'idle'
+  if (connectTimer !== null) { clearTimeout(connectTimer); connectTimer = null }
+}
+
+function notifySuccess() {
+  // Only promote to synced if user initiated connection (via connect() → ping()).
+  // Prevents: (a) stale ping() promises after disconnect, (b) axios interceptor
+  // auto-connecting the user without a tap.
+  if (connectionState.value !== 'connecting') return
+  connectionState.value = 'synced'
+  if (connectTimer !== null) { clearTimeout(connectTimer); connectTimer = null }
+}
+
+function notifyFailure() {
+  // Ignore failures when already idle — nothing to disconnect from.
+  if (connectionState.value === 'idle') return
+  const wasConnecting = connectionState.value === 'connecting'
+  connectionState.value = 'idle'
+  if (connectTimer !== null) { clearTimeout(connectTimer); connectTimer = null }
+  if (wasConnecting) {
+    // Connection attempt failed — show red flash.
+    flash.value = true
+    if (flashTimer !== null) clearTimeout(flashTimer)
+    flashTimer = setTimeout(() => { flash.value = false }, 500)
+  }
+  // else: was synced → auto-disconnect on network error (S6), no flash.
+}
+
+const isSynced: ComputedRef<boolean> = computed(() => connectionState.value === 'synced')
+// Backward compat: existing consumers that destructure isOnline.
+const isOnline: ComputedRef<boolean> = isSynced
+
+// Browser network events — registered once at module level
+let _listening = false
+function _setupListeners() {
+  if (_listening || typeof window === 'undefined') return
+  _listening = true
+  window.addEventListener('offline', () => disconnect())
+  // 'online' event intentionally does nothing — user controls connection
+}
+
+// Exposed for tests.
+function _resetForTest() {
+  connectionState.value = 'idle'
+  flash.value = false
+  _listening = false
+  if (connectTimer !== null) { clearTimeout(connectTimer); connectTimer = null }
+  if (flashTimer !== null) { clearTimeout(flashTimer); flashTimer = null }
+}
 
 export function useNetworkStatus() {
-
-  async function ping(): Promise<void> {
-    try {
-      // Must use absolute URL — relative /health resolves to tauri://localhost
-      // in Tauri webview, not the Python backend on localhost:8080.
-      const resp = await fetch('http://localhost:8080/health')
-      if (resp.ok) {
-        consecutiveFailures = 0
-        isOnline.value = true
-      } else {
-        consecutiveFailures++
-        if (consecutiveFailures >= FAILURE_THRESHOLD) {
-          isOnline.value = false
-        }
-      }
-    } catch {
-      consecutiveFailures++
-      if (consecutiveFailures >= FAILURE_THRESHOLD) {
-        isOnline.value = false
-      }
-    }
-  }
-
-  // Exposed for tests — reset singleton state between test cases.
-  function _resetForTest() {
-    isOnline.value = false
-    stopPing()
-    consecutiveFailures = 0
-  }
-
-  function startPing(intervalMs = 30000): void {
-    // No fetch in test environment (jsdom) — skip silently.
-    if (typeof fetch === 'undefined') return
-    stopPing()
-    consecutiveFailures = 0
-    // Fire an immediate first ping so we don't wait intervalMs before
-    // discovering whether the server is reachable.
-    ping()
-    intervalId = setInterval(ping, intervalMs)
-  }
-
-  function stopPing(): void {
-    if (intervalId !== null) {
-      clearInterval(intervalId)
-      intervalId = null
-    }
-  }
-
-  return { isOnline, startPing, stopPing, _resetForTest }
+  _setupListeners()
+  return { connectionState, flash, isSynced, isOnline, connect, disconnect, ping, notifySuccess, notifyFailure, _resetForTest }
 }

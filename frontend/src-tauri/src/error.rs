@@ -21,6 +21,7 @@ pub enum AppError {
 impl AppError {
     /// Return a structured payload suitable for IPC serialization.
     pub fn to_payload(&self) -> AppErrorPayload {
+        log::error!("{}", self);
         match self {
             AppError::NotFound(msg) => AppErrorPayload {
                 code: "NOT_FOUND".into(),

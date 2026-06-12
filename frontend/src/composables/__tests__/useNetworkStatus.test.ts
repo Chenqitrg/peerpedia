@@ -3,135 +3,215 @@ import { useNetworkStatus } from '../useNetworkStatus'
 
 describe('useNetworkStatus', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
-    // Singleton refs persist across tests — reset them.
     useNetworkStatus()._resetForTest()
-    // Default: fetch succeeds
+    vi.useFakeTimers()
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ ok: true }),
+    })
+    Object.defineProperty(navigator, 'onLine', {
+      value: true, writable: true, configurable: true,
     })
   })
 
   afterEach(() => {
-    vi.useRealTimers()
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
-  it('isOnline defaults to false', () => {
-    const { isOnline } = useNetworkStatus()
+  // ── S1: Initial state ──────────────────────────────────────────────
+
+  it('S1: starts in idle state, isSynced false, isOnline false', () => {
+    const { connectionState, isSynced, isOnline } = useNetworkStatus()
+    expect(connectionState.value).toBe('idle')
+    expect(isSynced.value).toBe(false)
     expect(isOnline.value).toBe(false)
   })
 
-  it('startPing fires immediate ping and goes offline on first failure', async () => {
-    // With FAILURE_THRESHOLD=1, a single failure flips to offline.
-    globalThis.fetch = vi.fn()
-      .mockRejectedValueOnce(new Error('Network error'))   // immediate (0ms)
+  // ── S2: Connect success ────────────────────────────────────────────
 
-    const { isOnline, startPing } = useNetworkStatus()
-    expect(isOnline.value).toBe(false) // defaults to offline
-    startPing(100)
+  it('S2: connect() transitions idle → connecting → synced on success', async () => {
+    const { connectionState, isSynced, connect } = useNetworkStatus()
+    connect()
+    expect(connectionState.value).toBe('connecting')
+    expect(isSynced.value).toBe(false)
 
-    await vi.advanceTimersByTimeAsync(0)
-    expect(isOnline.value).toBe(false) // 1 failure — offline
+    await vi.runAllTimersAsync()
+    expect(connectionState.value).toBe('synced')
+    expect(isSynced.value).toBe(true)
   })
 
-  it('recovers to online on first successful ping after failure', async () => {
-    // With FAILURE_THRESHOLD=1: 1 failure → offline, 1 success → online.
-    globalThis.fetch = vi.fn()
-      .mockRejectedValueOnce(new Error('fail'))   // immediate ping (0ms) → offline
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) }) // interval (100ms) → online
-
-    const { isOnline, startPing } = useNetworkStatus()
-    startPing(100)
-
-    await vi.advanceTimersByTimeAsync(0)
-    expect(isOnline.value).toBe(false) // 1 failure → offline
-
-    await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(true) // 1 success → back online
+  it('S2: after synced, performing another server action stays synced', async () => {
+    const { connectionState, connect, notifySuccess } = useNetworkStatus()
+    connect()
+    await vi.runAllTimersAsync()
+    expect(connectionState.value).toBe('synced')
+    // Simulate a successful API response after connect
+    notifySuccess()
+    expect(connectionState.value).toBe('synced')
   })
 
-  it('flips offline on first failure and recovers on first success', async () => {
-    globalThis.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) })
-      .mockRejectedValueOnce(new Error('fail'))
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) })
+  // ── S3: Connect failure (timeout) ──────────────────────────────────
 
-    const { isOnline, startPing } = useNetworkStatus()
-    startPing(100)
+  it('S3: unreachable server → timeout → idle', async () => {
+    // Use a promise that never resolves to simulate unreachable server.
+    globalThis.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
+    const { connectionState, connect } = useNetworkStatus()
 
-    await vi.advanceTimersByTimeAsync(0)
-    expect(isOnline.value).toBe(true) // success — online
+    connect()
+    expect(connectionState.value).toBe('connecting')
 
-    await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(false) // 1 failure — flips offline (threshold=1)
-
-    await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(true) // 1 success — back online
+    // Advance past the 10s timeout.
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(connectionState.value).toBe('idle')
   })
 
-  it('stopPing stops the interval', async () => {
-    // startPing fires an immediate ping + interval pings.
-    globalThis.fetch = vi.fn()
-      .mockRejectedValue(new Error('fail'))
+  it('S3: timeout triggers red flash for 500ms', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
+    const { connectionState, flash, connect } = useNetworkStatus()
 
-    const { isOnline, startPing, stopPing } = useNetworkStatus()
-    expect(isOnline.value).toBe(false)
-    startPing(100)
+    connect()
+    // Advance just to the timeout.
+    vi.advanceTimersByTime(10_000)
+    expect(connectionState.value).toBe('idle')
+    expect(flash.value).toBe(true)
 
-    // Immediate ping already fired, 100ms interval fires → 2 failures so far.
-    await vi.advanceTimersByTimeAsync(100)
-    expect(isOnline.value).toBe(false) // still offline
-
-    stopPing()
-
-    // Advance more — should not change because interval stopped.
-    await vi.advanceTimersByTimeAsync(500)
-    expect(isOnline.value).toBe(false) // still unchanged
+    // Flash clears after 500ms.
+    vi.advanceTimersByTime(500)
+    expect(flash.value).toBe(false)
   })
 
-  it('isOnline is a singleton — shared across multiple useNetworkStatus() calls', async () => {
-    // Bug: if each useNetworkStatus() call creates its own ref, App.vue's
-    // startPing() updates one instance while useOffline + NetworkStatusBadge
-    // read their own copies that stay false forever.
-    globalThis.fetch = vi.fn()
-      .mockRejectedValueOnce(new Error('fail'))
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) })
+  it('S3: after timeout, isSynced stays false', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('fail'))
+    const { isSynced, connect } = useNetworkStatus()
 
-    const a = useNetworkStatus() // caller A — e.g., useOffline
-    const b = useNetworkStatus() // caller B — e.g., NetworkStatusBadge
-    const c = useNetworkStatus() // caller C — e.g., App.vue (starts ping)
-
-    expect(a.isOnline.value).toBe(false)
-    expect(b.isOnline.value).toBe(false)
-    expect(c.isOnline.value).toBe(false)
-
-    c.startPing(100)
-
-    // After 100ms: immediate (fail, 0ms) + 100ms interval (success)
-    await vi.advanceTimersByTimeAsync(100)
-    expect(c.isOnline.value).toBe(true)
-
-    // All callers share the same ref
-    expect(a.isOnline.value).toBe(true)
-    expect(b.isOnline.value).toBe(true)
+    connect()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(isSynced.value).toBe(false)
   })
 
-  it('ping sends request to http://localhost:8080/health (absolute URL)', async () => {
-    // Bug: relative /health resolves to tauri://localhost/health in Tauri webview.
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ ok: true }),
-    })
+  // ── S4: Manual disconnect ──────────────────────────────────────────
 
-    const { startPing, stopPing } = useNetworkStatus()
-    startPing(100)
+  it('S4: disconnect() from synced → idle', async () => {
+    const { connectionState, connect, disconnect } = useNetworkStatus()
+    connect()
+    await vi.runAllTimersAsync()
+    expect(connectionState.value).toBe('synced')
 
-    // Immediate ping fires at 0ms.
-    await vi.advanceTimersByTimeAsync(0)
-    stopPing()
+    disconnect()
+    expect(connectionState.value).toBe('idle')
+  })
 
+  it('S4: after disconnect, isSynced returns false', async () => {
+    const { isSynced, connect, disconnect } = useNetworkStatus()
+    connect()
+    await vi.runAllTimersAsync()
+
+    disconnect()
+    expect(isSynced.value).toBe(false)
+  })
+
+  // ── S5: Cancel connecting ──────────────────────────────────────────
+
+  it('S5: tap during connecting → disconnect() → idle, timeout does NOT fire', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(
+      () => new Promise(resolve => setTimeout(() => resolve({ ok: true } as any), 5000))
+    )
+    const { connectionState, connect, disconnect } = useNetworkStatus()
+    connect()
+    expect(connectionState.value).toBe('connecting')
+
+    disconnect()
+    expect(connectionState.value).toBe('idle')
+
+    // Advance past the fetch resolution — should NOT promote to synced
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(connectionState.value).toBe('idle')
+
+    // Advance past the 10s timeout — should NOT fire (timer was cleared)
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(connectionState.value).toBe('idle')
+  })
+
+  // ── S6: Auto-disconnect ───────────────────────────────────────────
+
+  it('S6: disconnect() called on offline event returns to idle', () => {
+    // The offline event handler simply calls disconnect(). Verify disconnect() behavior.
+    const { connectionState, disconnect } = useNetworkStatus()
+    // Simulate API-driven promotion to synced
+    connectionState.value = 'synced'
+
+    disconnect()
+    expect(connectionState.value).toBe('idle')
+  })
+
+  it('S6: notifyFailure during synced auto-disconnects to idle (no flash)', async () => {
+    const { connectionState, connect, notifyFailure, flash } = useNetworkStatus()
+    connect()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(connectionState.value).toBe('synced')
+
+    // Simulate network error on a server action while synced (S6.1)
+    notifyFailure()
+    expect(connectionState.value).toBe('idle')
+    expect(flash.value).toBe(false) // no flash — was already synced, not an active attempt
+  })
+
+  // ── Guards ─────────────────────────────────────────────────────────
+
+  it('notifySuccess from idle does NOT promote (only connecting→synced)', () => {
+    const { connectionState, notifySuccess } = useNetworkStatus()
+    expect(connectionState.value).toBe('idle')
+
+    notifySuccess()
+    expect(connectionState.value).toBe('idle') // guard: not connecting
+  })
+
+  it('connect() when navigator.onLine is false does not arm timer', () => {
+    ;(navigator as any).onLine = false
+    const { connectionState, connect } = useNetworkStatus()
+    connect()
+    expect(connectionState.value).toBe('idle') // ping() synchronously reverts
+
+    // Timer was NOT armed — advancing should not trigger notifyFailure side effects
+    vi.advanceTimersByTime(10000)
+    expect(connectionState.value).toBe('idle')
+    ;(navigator as any).onLine = true
+  })
+
+  // ── Module-level singleton ─────────────────────────────────────────
+
+  it('connectionState is a singleton — shared across multiple useNetworkStatus() calls', async () => {
+    const a = useNetworkStatus()
+    const b = useNetworkStatus()
+    const c = useNetworkStatus()
+
+    expect(a.connectionState.value).toBe('idle')
+    expect(b.connectionState.value).toBe('idle')
+    expect(c.connectionState.value).toBe('idle')
+
+    c.connect()
+    expect(a.connectionState.value).toBe('connecting')
+    expect(b.connectionState.value).toBe('connecting')
+
+    await vi.runAllTimersAsync()
+    expect(a.connectionState.value).toBe('synced')
+    expect(b.connectionState.value).toBe('synced')
+    expect(c.connectionState.value).toBe('synced')
+  })
+
+  // ── Legacy: ping() still works for direct probing ──────────────────
+
+  it('ping sends request to http://localhost:8080/health', async () => {
+    const { ping } = useNetworkStatus()
+    await ping()
     expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/health')
+  })
+
+  it('ping from idle does not change state', async () => {
+    const { connectionState, ping } = useNetworkStatus()
+    await ping()
+    // ping calls notifySuccess() but guard blocks promotion from idle
+    expect(connectionState.value).toBe('idle')
   })
 })

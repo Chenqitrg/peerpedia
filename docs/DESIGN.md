@@ -1,6 +1,6 @@
 # PeerPedia（知诸网）— 设计文档
 
-> 2026-06-12 · v0.3.0 · 认证加固（PUT+merge 所有权检查）、跨 commit 评分累积、Tauri 异步命令、N+1 查询消除、引擎单例缓存、feed/pool 分页
+> 2026-06-13 · v0.3.1 · 三态同步按钮（电话模型）、带守卫的 notifySuccess/notifyFailure、移除 axios 冷却期、NetworkStatusBadge 废弃
 
 ---
 
@@ -66,7 +66,7 @@ Phase 1 桌面版完全离线可用：
 
 - **浏览即缓存**：阅读的每篇文章自动缓存到本地 SQLite。
 - **收藏即完整缓存**：收藏文章缓存评审 + 引用图。
-- **网络状态**：`useNetworkStatus` 以 Wifi/WifiOff 图标显示。启动时默认为离线，首次 ping 成功后翻转为在线——消除 60s 窗口期内离线功能被误放行的 bug。
+- **网络状态**：`useNetworkStatus` 三态 `SyncButton`（电话模型）。默认 idle（灰色，WifiOff），用户点击连接 → ping 服务器 → 成功则 synced（绿色光晕，Wifi），10s 超时则红色闪烁后回 idle。网络错误或 `navigator.onLine → false` 时自动断开。无后台轮询——用户手动控制连接。
 - **网络功能封锁**：`useOffline` 在本地/Tauri 模式下离线时封锁 pool、schools、search.network；服务器可达时恢复网络功能。这些功能在离线时导航栏显示为灰色禁用图标（带 tooltip），而非点到之后才报错。
 - **保存即 Git commit**：每次保存草稿创建或更新本地 Git 仓库（`local_git.rs`），离线可用 `git log` 查看提交历史。
 - **下载即已提交产物**：下载文件名包含 7 位提交哈希（如 `Title-a1b2c3d.html`）。首次保存前下载按钮禁用，确保每次下载对应一个已提交版本。源码下载使用 `FileCode` 图标，编译下载使用 `FileDown` 图标。文章页显示标签，编辑器工具栏仅显示图标并附带即时 tooltip。
@@ -428,4 +428,4 @@ SQLite 是 Phase 1 数据库。Phase 2 将迁移至 PostgreSQL。无业务逻辑
 
 ---
 
-*最后更新: 2026-06-12 · 540 后端测试 · 522 前端测试 · 16 Rust 测试 · 9 个 DB 实体 · 认证加固 · 评分累积 · 异步 Tauri · N+1 消除 · 引擎缓存 · 分页*
+*最后更新: 2026-06-13 · 540 后端测试 · 556 前端测试 · 16 Rust 测试 · 9 个 DB 实体 · 认证加固 · 评分累积 · 异步 Tauri · N+1 消除 · 引擎缓存 · 分页 · 三态同步按钮*

@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
 import { useOffline } from '../composables/useOffline'
-import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { saveString } from '../composables/useLocalStorage'
+import SyncButton from './SyncButton.vue'
 import {
   Bookmark,
   Waypoints,
@@ -16,8 +16,6 @@ import {
   Search,
   User,
   ChevronDown,
-  Wifi,
-  WifiOff,
   Landmark,
   Waves,
   X,
@@ -27,7 +25,6 @@ const router = useRouter()
 const userStore = useUserStore()
 const tauri = useTauri()
 const { canRead, isLocalOnly } = useOffline()
-const { isOnline } = useNetworkStatus()
 const { t, locale } = useI18n()
 const searchQuery = ref('')
 const mobileOpen = ref(false)
@@ -44,13 +41,6 @@ onMounted(() => document.addEventListener('click', onDocClick))
 onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 const isLoggedIn = computed(() => !!userStore.viewer)
-
-// Connection status: Tauri/dev-mock without server=local, server reachable=online
-const connectionStatus = computed(() => {
-  if (isOnline.value) return 'online'
-  if (tauri.isTauri.value || tauri.isBrowserLocal.value) return 'local'
-  return 'offline'
-})
 
 function toggleLocale() {
   locale.value = locale.value === 'zh-CN' ? 'en-US' : 'zh-CN'
@@ -158,18 +148,7 @@ function handleLogout() {
 
 <!-- Actions — logged in -->
       <div v-if="isLoggedIn" class="flex items-center gap-1">
-        <!-- Connection status -->
-        <span
-          class="flex items-center justify-center w-8 h-8 rounded-lg"
-          :class="{
-            'text-green-500': connectionStatus === 'online',
-            'text-ink-muted': connectionStatus === 'offline' || connectionStatus === 'local',
-          }"
-          :data-tooltip="connectionStatus === 'local' ? t('nav.statusLocal') : connectionStatus === 'online' ? t('nav.statusConnected') : t('nav.statusOffline')"
-        >
-          <Wifi v-if="connectionStatus === 'online'" class="w-4 h-4" stroke-width="2" />
-          <WifiOff v-else class="w-4 h-4" stroke-width="2" />
-        </span>
+        <SyncButton />
         <!-- Language toggle -->
         <button
           class="flex items-center justify-center w-8 h-8 rounded-lg

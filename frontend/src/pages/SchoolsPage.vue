@@ -61,6 +61,8 @@ const { data: users, loading, error, execute } = useAsyncResource(
 
 async function toggleFollow(u: UserSummary) {
   if (!userStore.viewer) return
+  // Guard: server JWT required for follow (follows went server-only in 5602445)
+  if (!userStore.token) return
   const isCurrentlyFollowing = following.value.has(u.id)
   // Optimistic UI update — toggle immediately.
   if (isCurrentlyFollowing) {
@@ -169,8 +171,8 @@ function goToUser(id: string) {
             :class="following.has(u.id)
               ? 'bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20'
               : 'bg-accent text-[#0d1117] hover:brightness-110'"
-            :disabled="!canWrite('user.follow_graph')"
-            :title="!canWrite('user.follow_graph') ? getFallback('user.follow_graph') : ''"
+            :disabled="!canWrite('user.follow_graph') || !userStore.token"
+            :title="!userStore.token ? 'Sign in to follow' : !canWrite('user.follow_graph') ? getFallback('user.follow_graph') : ''"
             @click.stop="toggleFollow(u)"
         >
           <UserCheck v-if="following.has(u.id)" class="w-3 h-3" stroke-width="2" />

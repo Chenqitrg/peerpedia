@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-12 · v0.3.0 · Auth hardening (PUT+merge ownership), score accumulation across commits, async Tauri commands, N+1 query elimination, engine singleton cache, feed/pool pagination
+> 2026-06-13 · v0.3.1 · Three-state sync button (phone model), guarded notifySuccess/notifyFailure, axios cooldown removed, NetworkStatusBadge deprecated
 
 ---
 
@@ -100,7 +100,7 @@ Phase 1 desktop is fully offline-capable (with L4 auto-backup when online):
 
 - **Browse = cache**: every article read is automatically cached in local SQLite.
 - **Bookmark = full cache**: bookmarked articles cache reviews + citation graph.
-- **Network status**: `useNetworkStatus` with Wifi/WifiOff icon. Starts offline, flips online on first successful ping — no 60s window where offline features incorrectly appear accessible.
+- **Network status**: `useNetworkStatus` with three-state `SyncButton` (phone model). Defaults to idle (gray, WifiOff). User taps to connect → ping server → synced (green glow, Wifi) on success, red flash + return to idle on 10s timeout. Synced state auto-disconnects on network error or `navigator.onLine → false`. No background polling — user controls connection.
 - **Network-blocked features**: `useOffline` permanently blocks pool and search.network in local/Tauri mode. Schools is available in Tauri mode (user list fetched from server API). Follow/unfollow requires server connection — offline shows disabled button with tooltip. Following list reads from local article_cache when offline.
 - **Save = Git commit**: every draft save creates or updates a local Git repository (`local_git.rs`). Commit history is available offline via `git log`.
 - **Download = committed artifact**: download filenames embed the 7-char commit hash (e.g., `Title-a1b2c3d.pdf`). Downloads are disabled until the first save — every downloaded file is tied to a committed version. Source downloads use `.typ`/`.md` extension, compiled Markdown → `.html`, compiled Typst → `.pdf` (via server-side `/compile-download` API). In the article page, labels are shown; in the editor toolbar, icons only with instant tooltips.
@@ -475,4 +475,4 @@ All tunable parameters live in `core/peerpedia_core/config/params.py`:
 
 ---
 
-*Last updated: 2026-06-12 · 540 backend tests · 522 frontend tests · 16 Rust tests · 9 DB entities · L4 article sync (auto-backup + conflict resolution) · Draft-first creation · Auth hardening · Score accumulation · Async Tauri*
+*Last updated: 2026-06-13 · 540 backend tests · 556 frontend tests · 16 Rust tests · 9 DB entities · L4 article sync (auto-backup + conflict resolution) · Draft-first creation · Auth hardening · Score accumulation · Async Tauri · Three-state sync button*

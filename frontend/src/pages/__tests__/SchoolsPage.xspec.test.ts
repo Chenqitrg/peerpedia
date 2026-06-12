@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { nextTick, computed } from 'vue'
 
 // ── Hoisted mock data ────────────────────────────────────────────────────
 
@@ -93,8 +93,9 @@ vi.mock('../../composables/useOffline', () => ({
 vi.mock('../../composables/useNetworkStatus', () => ({
   useNetworkStatus: () => ({
     isOnline: mockIsOnline,
-    startPing: vi.fn(),
-    stopPing: vi.fn(),
+    isSynced: computed(() => mockIsOnline.value),
+    connectionState: computed(() => mockIsOnline.value ? 'synced' as const : 'idle' as const),
+    ping: vi.fn(),
   }),
 }))
 

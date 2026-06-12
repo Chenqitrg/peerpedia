@@ -167,7 +167,7 @@ Phase 1 Tauri desktop is fully offline-capable:
 - Bookmark = full cache: bookmarked articles include reviews + history
 - **Auto-backup: every save silently syncs to server (draft, never auto-published)**
 - **Conflict resolution: when server version differs from local, forced Keep Local / Use Remote choice**
-- Network status indicator shows real-time online/offline state
+- Network status: three-state sync button (phone model) — tap to check server reachability, green glow when connected, red flash on failure. User controls connection; no background polling.
 - **Local follow graph**: follow/unfollow stored in local SQLite, works fully offline
 - Network-dependent features (pool, online search) show clear offline states, not errors
 - Schools page available in Tauri mode via server API, local follows reflected in UI
@@ -182,7 +182,7 @@ peerpedia/
 ├── frontend/                   # Vue 3 SPA + Tauri
 │   ├── src/
 │   │   ├── api/                # Axios API modules + types.ts
-│   │   ├── components/         # 17 components (ReviewPanel, NetworkStatusBadge, ScoreBadges, etc.)
+│   │   ├── components/         # 17 components (SyncButton, ReviewPanel, ScoreBadges, etc.)
 │   │   ├── composables/        # useLocalStorage, useTauri, useNetworkStatus, useOffline, etc.
 │   │   ├── locales/            # i18n (zh-CN, en-US)
 │   │   ├── pages/              # 10 pages

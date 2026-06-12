@@ -21,7 +21,10 @@
     "formatTypst": "学术排版，SVG 输出",
     "statusConnected": "已连接",
     "statusLocal": "本地模式",
-    "statusOffline": "离线"
+    "statusOffline": "离线",
+    "syncConnectAria": "同步 — 点击连接",
+    "syncConnecting": "连接中…",
+    "syncDisconnectAria": "已同步 — 点击断开"
   },
   "schools": {
     "subtitle": "发现研究者，关注你感兴趣的学术工作。"

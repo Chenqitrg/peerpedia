@@ -28,6 +28,7 @@ from peerpedia_core.storage.db.crud_review import (
     get_reviews_for_article,
     upsert_review,
 )
+from peerpedia_core.storage.db.crud_user import get_user
 from peerpedia_core.storage.db.models import User
 from peerpedia_core.storage.git_backend import (
     commit_article,
@@ -64,10 +65,11 @@ router = APIRouter(prefix="/articles", tags=["articles"])
 def compute_sink(a) -> tuple[datetime | None, int | None]:
     """Compute sink ETA and days remaining from article."""
     if a.sink_start and a.status == "sedimentation":
+        duration = getattr(a, "sink_duration_days", None) or 7
         st = a.sink_start
         if st.tzinfo is None:
             st = st.replace(tzinfo=timezone.utc)
-        eta = st + timedelta(days=a.sink_duration_days)
+        eta = st + timedelta(days=duration)
         now = datetime.now(timezone.utc)
         remaining = max(0, (eta - now).days)
         return eta, remaining
@@ -176,6 +178,15 @@ def api_create_article(
 ):
     if not body.authors:
         raise HTTPException(status_code=422, detail="authors must not be empty")
+    # Validate all authors exist in server DB — prevents FOREIGN KEY violation
+    # when a local-only account (not synced to server) is passed as author_id.
+    for author_id in body.authors:
+        if get_user(db, author_id) is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Author '{author_id}' is not synced to the server. "
+                       "Please log out and log in again while the server is running.",
+            )
     a = create_article(
         db,
         authors=body.authors,
@@ -338,6 +349,14 @@ def api_fork_article(
     original = get_article(db, article_id)
     if original is None:
         raise HTTPException(status_code=404, detail="Article not found")
+
+    # Verify user exists in server DB — local-only accounts can't fork.
+    user = get_user(db, current_user.id)
+    if user is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Your account is not synced to the server. Please log out and log in again while the server is running.",
+        )
 
     fork_id = str(uuid.uuid4())
     src = repo_path(article_id)
