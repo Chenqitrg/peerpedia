@@ -99,7 +99,7 @@ export function useArticleSync(
         title: d.title || 'Untitled',
         content: contentResult as string,
         format: (d.format as 'markdown' | 'typst') || 'markdown',
-        authors: viewer ? [viewer.name || viewer.username] : ['Anonymous'],
+        authors: viewer ? [viewer.id] : ['Anonymous'],
         keywords: [],
         categories: [],
         abstract: '',
