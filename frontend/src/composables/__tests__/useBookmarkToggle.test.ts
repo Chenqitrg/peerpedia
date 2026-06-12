@@ -28,19 +28,20 @@ vi.mock('../useTauri', () => ({
   })),
 }))
 
-// Mock useUserStore
-const mockViewer = ref<{ id: string } | null>({ id: 'u1' })
-const mockIsTauriMode = ref(false)
-const mockToken = ref<string | null>(null)
-const mockSyncError = ref<string | null>(null)
+// Mock useUserStore — Pinia auto-unwraps refs, so store properties are plain values.
+// Use getters so mutations to the let variables are visible to consumers.
+let mockViewer: { id: string } | null = { id: 'u1' }
+let mockIsTauriMode = false
+let mockToken: string | null = null
+let mockSyncError: string | null = null
 const mockTrySyncServerAuth = vi.fn().mockResolvedValue(false)
 vi.mock('../../stores/useUserStore', () => ({
   useUserStore: vi.fn(() => ({
-    viewer: mockViewer,
-    isTauriMode: mockIsTauriMode,
+    get viewer() { return mockViewer },
+    get isTauriMode() { return mockIsTauriMode },
     isBrowserLocal: false,
-    token: mockToken,
-    syncError: mockSyncError,
+    get token() { return mockToken },
+    get syncError() { return mockSyncError },
     trySyncServerAuth: mockTrySyncServerAuth,
   })),
 }))
@@ -65,16 +66,16 @@ describe('useBookmarkToggle', () => {
     ])
     mockIsOnline.value = false
     mockIsTauri.value = false
-    mockIsTauriMode.value = false
-    mockViewer.value = { id: 'u1' }
+    mockIsTauriMode = false
+    mockViewer = { id: 'u1' }
   })
 
   describe('S-BM1: Tauri + server reachable → REST API', () => {
     beforeEach(() => {
       mockIsTauri.value = true
-      mockIsTauriMode.value = true
+      mockIsTauriMode = true
       mockIsOnline.value = true // Server reachable
-      mockToken.value = 'existing-jwt' // Already have server token, skip sync
+      mockToken = 'existing-jwt' // Already have server token, skip sync
     })
 
     it('routes add bookmark through REST API', async () => {
@@ -109,7 +110,7 @@ describe('useBookmarkToggle', () => {
   describe('S-BM2: Tauri + server unreachable → IPC', () => {
     beforeEach(() => {
       mockIsTauri.value = true
-      mockIsTauriMode.value = true
+      mockIsTauriMode = true
       mockIsOnline.value = false // Server unreachable
       mockAddBookmarkIpc.mockRejectedValue(new Error('command not found'))
       mockRemoveBookmarkIpc.mockRejectedValue(new Error('command not found'))
@@ -139,7 +140,7 @@ describe('useBookmarkToggle', () => {
     })
 
     it('does nothing when viewer is null', async () => {
-      mockViewer.value = null
+      mockViewer = null
       const { toggle } = useBookmarkToggle(articles)
       await toggle('a1', false)
       expect(addBookmark).not.toHaveBeenCalled()
@@ -149,15 +150,15 @@ describe('useBookmarkToggle', () => {
   describe('SPEC-AUTH-BM-2: Bookmark awaits sync when no token', () => {
     beforeEach(() => {
       mockIsTauri.value = true
-      mockIsTauriMode.value = true
+      mockIsTauriMode = true
       mockIsOnline.value = true // Server reachable
-      mockToken.value = null    // No token — need sync
+      mockToken = null    // No token — need sync
       mockTrySyncServerAuth.mockReset()
     })
 
     it('calls trySyncServerAuth and rolls back on sync failure', async () => {
       mockTrySyncServerAuth.mockResolvedValue(false)
-      mockSyncError.value = '服务器上已有用户 alice'
+      mockSyncError = '服务器上已有用户 alice'
 
       const { toggle } = useBookmarkToggle(articles)
       await toggle('a1', false)
@@ -170,7 +171,7 @@ describe('useBookmarkToggle', () => {
     it('proceeds with REST API when sync succeeds', async () => {
       // Simulate sync populating the token
       mockTrySyncServerAuth.mockImplementation(async () => {
-        mockToken.value = 'newly-synced-jwt'
+        mockToken = 'newly-synced-jwt'
         return true
       })
 
