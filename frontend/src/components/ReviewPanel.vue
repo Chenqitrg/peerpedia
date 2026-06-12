@@ -40,7 +40,7 @@ defineProps<{
 const emit = defineEmits<{
   'submit-review': []
   'update-score': [reviewId: string, dim: string, value: number]
-  'send-reply': [reviewId: string]
+  'send-reply': [reviewId: string, text: string]
   'toggle-thread': [reviewId: string]
   'sign-in': []
 }>()
@@ -168,7 +168,7 @@ const emit = defineEmits<{
                 <ThreadReplyInput
                   :model-value="replyTexts[review.id] || ''"
                   :disabled="sendingReplies[review.id]"
-                  @send="emit('send-reply', review.id)"
+                  @send="(text: string) => emit('send-reply', review.id, text)"
                 />
                 <p v-if="replyErrors[review.id]" class="text-[10px] text-danger mt-1">{{ replyErrors[review.id] }}</p>
               </div>

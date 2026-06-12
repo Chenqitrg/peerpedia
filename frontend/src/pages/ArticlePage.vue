@@ -571,14 +571,11 @@ async function updateSingleScore(reviewId: string, dim: string, value: number) {
   }
 }
 
-async function handleReply(reviewId: string) {
-  const text = replyTexts[reviewId]?.trim()
-  if (!text) return
+async function handleReply(reviewId: string, text: string) {
   sendingReplies[reviewId] = true
   replyErrors[reviewId] = ''
   try {
     await reviewStore.sendReply(id, reviewId, text)
-    replyTexts[reviewId] = ''
   } catch {
     replyErrors[reviewId] = 'Failed to send'
     setTimeout(() => { replyErrors[reviewId] = '' }, 3000)

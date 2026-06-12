@@ -68,7 +68,6 @@ const scores = ref({ originality: 3, rigor: 3, completeness: 3, pedagogy: 3, imp
 const keywords = ref('')
 const categories = ref('')
 const abstract = ref('')
-const contributions = ref<Record<string, number>>({})
 
 // UI state
 const submitting = ref(false)
@@ -98,9 +97,6 @@ const { splitRatio, splitterEl, isDragging, onSplitterMouseDown } = useSplitPane
 const draftUid = computed(() => userStore.viewer?.id || 'anonymous')
 const DRAFT_KEY = computed(() => `editor-draft-${draftUid.value}-${editId.value || 'new'}`)
 const DRAFT_ID_KEY = computed(() => `editor-draft-id-${draftUid.value}-${editId.value || 'new'}`)
-const totalContribution = computed(() =>
-  Object.values(contributions.value).reduce((sum, v) => sum + v, 0)
-)
 
 // Draft persistence — Tauri IPC when available, REST + localStorage fallback.
 const draftPersistence = useDraftPersistence()
@@ -199,7 +195,6 @@ watch(() => route.query.new, (val) => {
     keywords.value = ''
     categories.value = ''
     abstract.value = ''
-    contributions.value = {}
     currentDraftId.value = undefined
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
@@ -454,10 +449,6 @@ async function handleSaveDraft() {
 }
 
 function handlePublish() {
-  if (userStore.viewer && !(userStore.viewer.id in contributions.value)) {
-    // Only initialize contributions if not already set — preserves user adjustments
-    contributions.value = { ...contributions.value, [userStore.viewer.id]: 100 }
-  }
   showSelfReview.value = true
 }
 
@@ -491,7 +482,6 @@ async function handleSubmitToPool() {
       publish: true,
       keywords: keywords.value ? keywords.value.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
       categories: categories.value ? categories.value.split(',').map((c: string) => c.trim()).filter(Boolean) : [],
-      contributions: { ...contributions.value },
     }
 
     let result: { id: string }
@@ -514,7 +504,7 @@ async function handleSubmitToPool() {
   }
 }
 
-defineExpose({ contributions, handlePublish, showSelfReview, totalContribution })
+defineExpose({ handlePublish, showSelfReview })
 </script>
 
 <template>
@@ -784,8 +774,6 @@ defineExpose({ contributions, handlePublish, showSelfReview, totalContribution }
       v-model:keywords="keywords"
       v-model:categories="categories"
       v-model:abstract="abstract"
-      v-model:contributions="contributions"
-      :total-contribution="totalContribution"
       :submitting="submitting"
       @submit="handleSubmitToPool"
     />
