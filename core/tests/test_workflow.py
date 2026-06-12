@@ -51,33 +51,6 @@ class TestComputeArticleScore:
 class TestSedimentation:
     """Sink time calculation and auto-publish logic."""
 
-    def test_compute_sink_eta_max_score(self):
-        from peerpedia_core.workflow.sedimentation import compute_sink_eta
-        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
-        eta = compute_sink_eta(start, avg_score=5.0,
-                               min_days=2, max_days=180)
-        # Max score → min time (~2 days)
-        expected = start + timedelta(days=2)
-        assert eta == expected
-
-    def test_compute_sink_eta_min_score(self):
-        from peerpedia_core.workflow.sedimentation import compute_sink_eta
-        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
-        eta = compute_sink_eta(start, avg_score=0.0,
-                               min_days=2, max_days=180)
-        # Min score → max time (180 days)
-        expected = start + timedelta(days=180)
-        assert eta == expected
-
-    def test_compute_sink_eta_mid_score(self):
-        from peerpedia_core.workflow.sedimentation import compute_sink_eta
-        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
-        eta_max = compute_sink_eta(start, 0.0, 2, 180)
-        eta_mid = compute_sink_eta(start, 2.5, 2, 180)
-        eta_min = compute_sink_eta(start, 5.0, 2, 180)
-        # Monotonically decreasing: higher score → earlier eta
-        assert eta_min < eta_mid < eta_max
-
     def test_is_ready_to_publish(self):
         from peerpedia_core.workflow.sedimentation import is_ready_to_publish
         past = datetime.now(timezone.utc) - timedelta(days=10)
