@@ -3,6 +3,12 @@ import { ref, type Ref } from 'vue'
 // Module-level singleton — all callers share the same isOnline state.
 const isOnline: Ref<boolean> = ref(false)
 
+// Cooldown: after a network failure, block new requests for COOLDOWN_MS.
+// The first request after cooldown acts as a probe — succeeds → online,
+// fails → reset cooldown. Limits console noise to max 1 per cooldown.
+const COOLDOWN_MS = 30_000
+let lastFailedAt = 0
+
 // Whether we've registered the navigator.onLine event listeners.
 let _listening = false
 
@@ -43,15 +49,27 @@ export function useNetworkStatus() {
   function _resetForTest() {
     isOnline.value = false
     _listening = false
+    lastFailedAt = 0
   }
 
   /**
-   * Let axios (or any server-action caller) update isOnline based on real
-   * request outcomes. Call on success / non-network-error to mark online;
-   * call on ERR_NETWORK / connection-refused to mark offline.
+   * Should axios attempt a real network request?
+   * - Always yes when isOnline (server is known reachable).
+   * - When offline: only after cooldown expires (probe to detect recovery).
    */
-  function notifySuccess() { isOnline.value = true }
-  function notifyFailure() { isOnline.value = false }
+  function shouldTry(): boolean {
+    if (isOnline.value) return true
+    return Date.now() - lastFailedAt >= COOLDOWN_MS
+  }
 
-  return { isOnline, ping, notifySuccess, notifyFailure, _resetForTest }
+  /** Call on any successful server response. */
+  function notifySuccess() { isOnline.value = true }
+
+  /** Call on ERR_NETWORK / connection-refused — start cooldown. */
+  function notifyFailure() {
+    isOnline.value = false
+    lastFailedAt = Date.now()
+  }
+
+  return { isOnline, ping, shouldTry, notifySuccess, notifyFailure, _resetForTest }
 }
