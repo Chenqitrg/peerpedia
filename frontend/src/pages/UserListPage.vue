@@ -2,9 +2,11 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getFollowers, getFollowing } from '../api/users'
+import { getFollowers, getFollowing, getUsers } from '../api/users'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { useFollowCache } from '../composables/useFollowCache'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import UserCard from '../components/UserCard.vue'
 import ErrorState from '../components/ErrorState.vue'
 import type { UserSummary } from '../api/types'
@@ -15,6 +17,7 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const tauri = useTauri()
+const { isOnline } = useNetworkStatus()
 
 const userId = computed(() => route.params.id as string)
 const isFollowers = computed(() => route.path.endsWith('/followers'))
@@ -28,20 +31,19 @@ const title = computed(() => isFollowers.value ? t('common.followers') : t('comm
 async function load() {
   loading.value = true
   error.value = ''
-  const isLocal = userStore.isTauriMode || userStore.isBrowserLocal
   try {
-    if (isLocal) {
-      const result = isFollowers.value
-        ? await tauri.getFollowers({ user_id: userId.value })
-        : await tauri.getFollowing({ user_id: userId.value })
-      if (result && !('error' in result) && Array.isArray(result)) {
-        users.value = result.map(a => ({
-          id: a.id,
-          name: a.username,
-          anonymous_name: '',
-          article_count: 0,
-          reputation: {},
-        })) as UserSummary[]
+    if (!isOnline.value) {
+      // Offline — only the viewer's own following list is cached.
+      const isSelf = userId.value === userStore.viewer?.id
+      if (isSelf && !isFollowers.value) {
+        const cache = useFollowCache()
+        const ids = await cache.getCachedFollowingIds(userId.value)
+        if (ids) {
+          users.value = ids.map(id => ({
+            id, name: id.slice(0, 8) + '…', anonymous_name: '',
+            article_count: 0, reputation: {},
+          })) as UserSummary[]
+        }
       }
     } else {
       users.value = isFollowers.value
@@ -74,7 +76,7 @@ watch([userId, isFollowers], load, { immediate: true })
       {{ title }}
     </h1>
     <p class="text-sm text-ink-muted mb-6">
-      {{ t('common.articles') }}
+      {{ users.length }} {{ isFollowers ? t('common.followers') : t('common.following') }}
     </p>
 
     <div v-if="loading" class="space-y-2 animate-pulse">

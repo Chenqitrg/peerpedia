@@ -56,23 +56,6 @@ export interface GetCachedArticleParams {
   id: string
 }
 
-export interface FollowUserParams {
-  token?: string
-  follower_id?: string  // backward compat — _invoke replaces with token
-  followed_id: string
-}
-
-export interface IsFollowingParams {
-  token?: string
-  follower_id?: string  // backward compat
-  followed_id: string
-}
-
-export interface GetFollowListParams {
-  token?: string
-  user_id?: string  // backward compat — used to query followers of another user
-}
-
 export interface BookmarkParams {
   token?: string
   user_id?: string  // backward compat

@@ -68,6 +68,8 @@ pub fn logout_session(conn: &Connection, token: &str) -> Result<(), AppError> {
 }
 
 /// Create a new local account. Returns an error if the username already exists.
+/// Validation rules match the server's RegisterRequest to prevent silent
+/// 422 failures when syncing to the server via apiRegister.
 pub fn create_account(
     conn: &Connection,
     username: &str,
@@ -76,11 +78,44 @@ pub fn create_account(
     name: &str,
 ) -> Result<Account, AppError> {
     let username = username.trim();
-    if username.is_empty() {
-        return Err(AppError::AuthFailed("Username cannot be empty".into()));
+    if username.len() < 3 {
+        return Err(AppError::AuthFailed(
+            "Username must be at least 3 characters".into(),
+        ));
     }
-    if password.is_empty() {
-        return Err(AppError::AuthFailed("Password cannot be empty".into()));
+    if username.len() > 32 {
+        return Err(AppError::AuthFailed(
+            "Username must be at most 32 characters".into(),
+        ));
+    }
+    if !username
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err(AppError::AuthFailed(
+            "Username must contain only letters, numbers, and underscores".into(),
+        ));
+    }
+    if password.len() < 6 {
+        return Err(AppError::AuthFailed(
+            "Password must be at least 6 characters".into(),
+        ));
+    }
+    let email = email.trim();
+    // Must match the server's email regex: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$
+    if !email.is_empty() {
+        let has_at = email.contains('@');
+        let after_at = email.rfind('@').map(|i| &email[i + 1..]).unwrap_or("");
+        let has_dot_with_tld = after_at
+            .rfind('.')
+            .is_some_and(|i| after_at[i + 1..].len() >= 2);
+        if !has_at || !has_dot_with_tld {
+            return Err(AppError::AuthFailed("Invalid email format".into()));
+        }
+    }
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(AppError::AuthFailed("Display name is required".into()));
     }
 
     let id = Uuid::new_v4().to_string();
@@ -203,8 +238,8 @@ mod tests {
     #[test]
     fn test_create_duplicate_username_fails() {
         let conn = setup();
-        create_account(&conn, "alice", "pass1", "", "Alice").unwrap();
-        let result = create_account(&conn, "alice", "pass2", "", "Alice2");
+        create_account(&conn, "alice", "password1", "", "Alice").unwrap();
+        let result = create_account(&conn, "alice", "password2", "", "Alice2");
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AppError::Duplicate(_)));
     }
@@ -312,8 +347,8 @@ mod tests {
     #[test]
     fn test_list_accounts_populated() {
         let conn = setup();
-        create_account(&conn, "alice", "pass1", "", "Alice").unwrap();
-        create_account(&conn, "bob", "pass2", "", "Bob").unwrap();
+        create_account(&conn, "alice", "password1", "", "Alice").unwrap();
+        create_account(&conn, "bob", "password2", "", "Bob").unwrap();
         let accounts = list_accounts(&conn).unwrap();
         assert_eq!(accounts.len(), 2);
         assert_eq!(accounts[0].username, "alice"); // alphabetical

@@ -237,8 +237,9 @@ describe('SPEC-AUTH: server token sync', () => {
 
   it('SPEC-AUTH-6: loginLocal captures email and name from Tauri login result', async () => {
     const authMocks = await import('../../api/auth')
-    // apiLogin fails during loginLocal (server unreachable)
+    // apiLogin AND apiRegister fail during loginLocal (server unreachable)
     ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Network Error'))
 
     const { useUserStore } = await import('../useUserStore')
     const store = useUserStore()
@@ -266,8 +267,9 @@ describe('SPEC-AUTH: server token sync', () => {
 
   it('SPEC-AUTH-7: falls back to apiRegister when apiLogin fails', async () => {
     const authMocks = await import('../../api/auth')
-    // apiLogin fails during loginLocal (server unreachable)
+    // apiLogin AND apiRegister fail during loginLocal (server unreachable)
     ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Network Error'))
 
     const { useUserStore } = await import('../useUserStore')
     const store = useUserStore()
@@ -289,8 +291,9 @@ describe('SPEC-AUTH: server token sync', () => {
 
   it('SPEC-AUTH-8: sets syncError on username conflict', async () => {
     const authMocks = await import('../../api/auth')
-    // apiLogin fails during loginLocal (server unreachable)
+    // apiLogin AND apiRegister fail during loginLocal (server unreachable)
     ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Network Error'))
 
     const { useUserStore } = await import('../useUserStore')
     const store = useUserStore()
@@ -311,8 +314,9 @@ describe('SPEC-AUTH: server token sync', () => {
 
   it('SPEC-AUTH-9: keeps credentials after failed sync for retry', async () => {
     const authMocks = await import('../../api/auth')
-    // apiLogin fails during loginLocal (server unreachable)
+    // apiLogin AND apiRegister fail during loginLocal (server unreachable)
     ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Network Error'))
 
     const { useUserStore } = await import('../useUserStore')
     const store = useUserStore()
@@ -399,7 +403,9 @@ describe('SPEC-SYNC-CLOSED-LOOP-1: Cold start — register local, server comes u
 
   it('viewer profile uses name from Tauri login, not only username', async () => {
     const authMocks = await import('../../api/auth')
+    // Both apiLogin and apiRegister fail during loginLocal (server unreachable)
     ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Network Error'))
 
     const { useUserStore } = await import('../useUserStore')
     const store = useUserStore()
@@ -432,6 +438,7 @@ describe('SPEC-SYNC-CLOSED-LOOP-2: Retry recovery — first attempt fails, serve
     // ── Step 1: User logs in locally while server is down ───────────────
     const authMocks = await import('../../api/auth')
     ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Network Error'))
 
     const { useUserStore } = await import('../useUserStore')
     const store = useUserStore()
@@ -470,6 +477,7 @@ describe('SPEC-SYNC-CLOSED-LOOP-2: Retry recovery — first attempt fails, serve
   it('logout clears pending credentials and syncError', async () => {
     const authMocks = await import('../../api/auth')
     ;(authMocks.login as any).mockRejectedValueOnce(new Error('Network Error'))
+    ;(authMocks.register as any).mockRejectedValueOnce(new Error('Network Error'))
 
     const { useUserStore } = await import('../useUserStore')
     const store = useUserStore()

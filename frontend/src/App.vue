@@ -1,6 +1,16 @@
 <template>
   <div id="app" class="min-h-screen bg-page flex flex-col">
     <NavBar />
+    <!-- Server sync error banner -->
+    <div
+      v-if="userStore.syncError"
+      class="fixed top-16 left-1/2 -translate-x-1/2 z-50
+             bg-[#d73a49]/10 border border-[#d73a49]/30 rounded-lg px-4 py-2
+             text-sm text-[#d73a49] max-w-content w-[calc(100%-2rem)]"
+    >
+      {{ userStore.syncError }}
+      <button class="ml-2 text-ink-muted hover:text-ink" @click="userStore.syncError = null">✕</button>
+    </div>
     <div class="flex-1 relative">
       <TabDrawer @close-tab="onCloseTab" />
       <main
@@ -82,10 +92,10 @@ router.afterEach((to) => {
 
 // ── L4: Auto-sync local account to server when network or login state changes ──
 watch(
-  [isOnline, () => userStore.localToken?.value],
-  ([online, localToken]) => {
-    console.log('[App] isOnline:', online, 'localToken:', !!localToken)
-    if (online && localToken) {
+  [isOnline, () => userStore.localToken?.value, () => userStore.hasPendingCreds],
+  ([online, localTok, pending]) => {
+    console.log('[App] isOnline:', online, 'localToken:', !!localTok, 'pendingCreds:', pending)
+    if (online && (localTok || pending)) {
       console.log('[App] calling trySyncServerAuth')
       userStore.trySyncServerAuth()
     }

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { login as apiLogin, register as apiRegister, getMe } from '../api/auth'
 import { useTauri } from '../composables/useTauri'
+import { useFollowCache } from '../composables/useFollowCache'
 import { loadString, loadJSON, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import type { UserProfile } from '../api/types'
 import type { Account, AccountSummary } from '../composables/useTauri'
@@ -110,15 +111,43 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
+      // Refresh offline follow cache.
+      useFollowCache().refreshCache(serverUser.id).catch(() => {})
     } catch (e: any) {
-      console.log('[loginLocal] apiLogin failed, storing pending creds:', username)
-      // Server unreachable — store credentials for later sync
-      _savePendingCreds({
-        username,
-        password,
-        email: acctWithToken.email || `${username}@peerpedia.local`,
-        name: acctWithToken.name || username,
-      })
+      console.log('[loginLocal] apiLogin failed, trying apiRegister:', e?.response?.status)
+      // User doesn't exist on server yet — try apiRegister immediately.
+      try {
+        const { user: serverUser, token: t } = await apiRegister({
+          username,
+          password,
+          email: acctWithToken.email || `${username}@peerpedia.local`,
+          name: acctWithToken.name || username,
+        })
+        token.value = t
+        saveString('token', t)
+        viewer.value = serverUser
+        saveJSON('viewer', serverUser)
+        _savePendingCreds(null)
+        syncError.value = null
+        useFollowCache().refreshCache(serverUser.id).catch(() => {})
+      } catch (regErr: any) {
+        const detail = regErr?.response?.data?.detail
+        console.error('[loginLocal] apiRegister 422:', JSON.stringify(detail))
+        // Only show validation errors (422) — network errors will retry silently.
+        if (regErr?.response?.status === 422) {
+          syncError.value = Array.isArray(detail)
+            ? detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
+            : detail || '注册数据不合规'
+          throw new Error(syncError.value)
+        }
+        // Server unreachable — store credentials for later retry.
+        _savePendingCreds({
+          username,
+          password,
+          email: acctWithToken.email || `${username}@peerpedia.local`,
+          name: acctWithToken.name || username,
+        })
+      }
     }
   }
 
@@ -162,14 +191,25 @@ export const useUserStore = defineStore('user', () => {
 
     // Try to register on backend — sync identity with server.
     try {
-      const { user: serverUser, token: t } = await apiRegister({ username, password, email, name })
+      const { user: serverUser, token: t } = await apiRegister({
+        username,
+        password,
+        email: email || `${username}@peerpedia.local`,
+        name: name || username,
+      })
       token.value = t
       saveString('token', t)
       viewer.value = serverUser
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
-    } catch {
+    } catch (e: any) {
+      // Show validation errors to user, re-throw for AuthModal.
+      const detail = e?.response?.data?.detail
+      if (Array.isArray(detail) && detail.length > 0) {
+        syncError.value = detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
+        throw new Error(syncError.value)
+      }
       // Server unreachable — store credentials for later sync
       _savePendingCreds({ username, password, email, name })
     }
@@ -232,6 +272,7 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
+      useFollowCache().refreshCache(serverUser.id).catch(() => {})
       return true
     } catch (e: any) {
       console.log('[sync] apiLogin failed:', e?.response?.status, e?.response?.data?.detail || e?.message || e)
@@ -253,14 +294,22 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
+      useFollowCache().refreshCache(serverUser.id).catch(() => {})
       return true
     } catch (regErr: any) {
-      console.log('[sync] apiRegister failed:', regErr?.response?.status, regErr?.response?.data?.detail || regErr?.message || regErr)
-      const detail = regErr?.response?.data?.detail || regErr?.userMessage || ''
-      if (detail.includes('already exists') || detail.includes('taken') || detail.includes('unique')) {
-        syncError.value = `服务器上已有用户 ${creds.username}。请输入该账号的服务器密码进行关联。`
+      const detail = regErr?.response?.data?.detail
+      console.error('[sync] apiRegister failed:', regErr?.response?.status, JSON.stringify(detail))
+      // Show validation / conflict errors to the user.
+      if (Array.isArray(detail) && detail.length > 0) {
+        syncError.value = detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
+      } else if (typeof detail === 'string') {
+        const isConflict = detail.includes('already exists') || detail.includes('taken') || detail.includes('unique')
+        syncError.value = isConflict
+          ? `服务器上已有用户 ${creds.username}。请输入该账号的服务器密码进行关联。`
+          : detail
+      } else {
+        syncError.value = `无法同步到服务器（HTTP ${regErr?.response?.status}）`
       }
-      // Keep credentials for retry
       return false
     }
   }
@@ -345,6 +394,7 @@ export const useUserStore = defineStore('user', () => {
     logout,
     restoreSession,
     clear,
+    hasPendingCreds: computed(() => !!_pendingServerCreds),
     trySyncServerAuth,
     syncProfileToServer,
   }

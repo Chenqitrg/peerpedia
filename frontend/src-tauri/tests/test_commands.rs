@@ -67,8 +67,8 @@ fn test_token_list_drafts_flow() {
 
     // Create account + login to get token
     let account =
-        peerpedia::local_auth::create_account(&conn, "writer", "pass", "", "Writer").unwrap();
-    let logged = peerpedia::local_auth::login(&conn, "writer", "pass").unwrap();
+        peerpedia::local_auth::create_account(&conn, "writer", "password", "", "Writer").unwrap();
+    let logged = peerpedia::local_auth::login(&conn, "writer", "password").unwrap();
 
     // Save a draft using raw account_id (simulates initial save)
     let draft = peerpedia::local_store::save_draft(
@@ -105,7 +105,7 @@ fn test_get_draft_backward_compat_no_token() {
     let conn = setup();
 
     let account =
-        peerpedia::local_auth::create_account(&conn, "reader", "pass", "", "Reader").unwrap();
+        peerpedia::local_auth::create_account(&conn, "reader", "password", "", "Reader").unwrap();
 
     let draft = peerpedia::local_store::save_draft(
         &conn,
@@ -134,7 +134,7 @@ fn test_list_drafts_backward_compat_account_id() {
     let conn = setup();
 
     let account =
-        peerpedia::local_auth::create_account(&conn, "writer2", "pass", "", "Writer2").unwrap();
+        peerpedia::local_auth::create_account(&conn, "writer2", "password", "", "Writer2").unwrap();
 
     peerpedia::local_store::save_draft(
         &conn,
@@ -166,7 +166,7 @@ fn test_save_draft_backward_compat_account_id() {
     let conn = setup();
 
     let account =
-        peerpedia::local_auth::create_account(&conn, "saver", "pass", "", "Saver").unwrap();
+        peerpedia::local_auth::create_account(&conn, "saver", "password", "", "Saver").unwrap();
 
     // Save draft with bare account_id — no token, no login.
     // This simulates the frontend sending { account_id: 'xxx' } before token restore.
@@ -200,7 +200,7 @@ fn test_full_draft_flow() {
 
     // Create account first
     let account =
-        peerpedia::local_auth::create_account(&conn, "writer", "pass", "", "Writer").unwrap();
+        peerpedia::local_auth::create_account(&conn, "writer", "password", "", "Writer").unwrap();
 
     // Save draft
     let draft = peerpedia::local_store::save_draft(
@@ -253,7 +253,7 @@ fn test_delete_article_removes_db_row_and_git_repo() {
 
     let conn = setup();
     let account =
-        peerpedia::local_auth::create_account(&conn, "deleter", "pass", "", "Deleter").unwrap();
+        peerpedia::local_auth::create_account(&conn, "deleter", "password", "", "Deleter").unwrap();
 
     // Save a draft + init git repo (like EditorPage does: saveDraft + gitInit)
     let draft = peerpedia::local_store::save_draft(
@@ -409,7 +409,8 @@ fn test_full_cache_flow() {
 fn test_search_drafts_fts() {
     let conn = setup();
     let account =
-        peerpedia::local_auth::create_account(&conn, "searcher", "pass", "", "Searcher").unwrap();
+        peerpedia::local_auth::create_account(&conn, "searcher", "password", "", "Searcher")
+            .unwrap();
 
     // Save drafts with distinct titles
     peerpedia::local_store::save_draft(
@@ -459,7 +460,8 @@ fn test_search_drafts_fts() {
 fn test_search_drafts_empty_query_returns_all() {
     let conn = setup();
     let account =
-        peerpedia::local_auth::create_account(&conn, "searcher2", "pass", "", "Searcher2").unwrap();
+        peerpedia::local_auth::create_account(&conn, "searcher2", "password", "", "Searcher2")
+            .unwrap();
 
     peerpedia::local_store::save_draft(
         &conn,
@@ -492,7 +494,8 @@ fn test_search_drafts_empty_query_returns_all() {
 fn test_search_drafts_fts_content() {
     let conn = setup();
     let account =
-        peerpedia::local_auth::create_account(&conn, "searcher3", "pass", "", "Searcher3").unwrap();
+        peerpedia::local_auth::create_account(&conn, "searcher3", "password", "", "Searcher3")
+            .unwrap();
 
     peerpedia::local_store::save_draft(
         &conn,
@@ -527,10 +530,10 @@ fn test_search_drafts_fts_content() {
 fn test_search_drafts_account_isolation() {
     let conn = setup();
     let account1 =
-        peerpedia::local_auth::create_account(&conn, "searcher4a", "pass", "", "Searcher4a")
+        peerpedia::local_auth::create_account(&conn, "searcher4a", "password", "", "Searcher4a")
             .unwrap();
     let account2 =
-        peerpedia::local_auth::create_account(&conn, "searcher4b", "pass", "", "Searcher4b")
+        peerpedia::local_auth::create_account(&conn, "searcher4b", "password", "", "Searcher4b")
             .unwrap();
 
     peerpedia::local_store::save_draft(
