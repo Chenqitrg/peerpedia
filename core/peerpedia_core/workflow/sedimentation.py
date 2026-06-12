@@ -55,7 +55,7 @@ def publish_ready_articles(session: Session) -> int:
     """Scan all articles in sedimentation, publish those whose sink time has elapsed.
 
     For each ready article:
-    1. Compute the final score from reviews for the current commit.
+    1. Compute the final score by aggregating all reviews across all commits.
     2. If there are zero community reviews, apply the no-review penalty.
     3. Update status to "published" and save the score.
     4. Recalculate reputations for all authors.
@@ -64,7 +64,6 @@ def publish_ready_articles(session: Session) -> int:
     """
     from peerpedia_core.storage.db.crud_article import get_author_ids
     from peerpedia_core.storage.db.crud_review import get_reviews_for_article
-    from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, get_commit_history
     from peerpedia_core.workflow.reputation import compute_author_reputation
     from peerpedia_core.workflow.scoring import compute_article_score_for_commit
 
@@ -84,19 +83,8 @@ def publish_ready_articles(session: Session) -> int:
         if not is_ready_to_publish(eta):
             continue
 
-        # Get the latest commit hash for score computation
-        rp = DEFAULT_ARTICLES_DIR / article.id
-        commit_hash = None
-        if (rp / ".git").is_dir():
-            commits = get_commit_history(rp)
-            if commits:
-                commit_hash = commits[0]["hash"]
-
-        # Compute final score
-        if commit_hash:
-            score = compute_article_score_for_commit(session, article.id, commit_hash)
-        else:
-            score = article.score
+        # Compute score by aggregating all reviews across all commits
+        score = compute_article_score_for_commit(session, article.id)
 
         # Check for community reviews and apply penalty if none
         all_reviews = get_reviews_for_article(session, article.id)

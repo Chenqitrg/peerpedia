@@ -1,7 +1,10 @@
 """Score aggregation — weighted average of reviews."""
-from sqlalchemy.orm import Session
-
 from peerpedia_core.config.params import params
+from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
+from peerpedia_core.storage.db.crud_review import get_reviews_for_article
+from peerpedia_core.storage.db.models import Review
+from peerpedia_core.workflow.reputation import get_reviewer_weight
+from sqlalchemy.orm import Session
 
 DIMS = ["originality", "rigor", "completeness", "pedagogy", "impact"]
 
@@ -61,34 +64,29 @@ def compute_article_score(
 def compute_article_score_for_commit(
     session: Session,
     article_id: str,
-    commit_hash: str,
+    commit_hash: str | None = None,
 ) -> dict | None:
-    """Compute the score for a specific commit from reviews written against it.
+    """Compute the score for an article by aggregating all reviews.
 
-    Filters all reviews for *article_id* to only those whose ``commit_hash``
-    matches *commit_hash*, builds reviewer reputation weights, then delegates
-    to :func:`compute_article_score`.
+    Aggregates reviews across all commits; editing a sedimentation article
+    no longer erases existing review scores. The optional *commit_hash*
+    parameter is kept for backward compatibility but no longer filters.
 
-    Returns ``None`` if no reviews exist for the given commit.
+    Returns ``None`` if no reviews exist for the article.
     """
-    from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
-    from peerpedia_core.storage.db.crud_review import get_reviews_for_article
-    from peerpedia_core.workflow.reputation import get_reviewer_weight
-
     article = get_article(session, article_id)
     if article is None:
         return None
 
     all_reviews = get_reviews_for_article(session, article_id)
-    commit_reviews = [r for r in all_reviews if r.commit_hash == commit_hash]
-    if not commit_reviews:
+    if not all_reviews:
         return None
 
     authors = get_author_ids(session, article_id)
     review_dicts: list[dict] = []
     reviewer_weights: dict[str, float] = {}
 
-    for r in commit_reviews:
+    for r in all_reviews:
         review_dicts.append({
             "scores": r.scores,
             "is_self": r.reviewer_id in authors,

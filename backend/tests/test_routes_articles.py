@@ -316,15 +316,15 @@ class TestHistoryWithScores:
         data = history.json()
         assert len(data["commits"]) >= 2
 
-        # Latest commit should have score from the edit self-review
+        # Scores are now aggregated across all commits — both commits
+        # should reflect the combined review pool (avg of 3 and 5 = 4.0)
         latest = data["commits"][0]
         assert latest["score"] is not None
-        assert latest["score"]["originality"] == 5.0
+        assert latest["score"]["originality"] == 4.0
 
-        # Older commit should have its own score
         older = data["commits"][1]
         assert older["score"] is not None
-        assert older["score"]["originality"] == 3.0
+        assert older["score"]["originality"] == 4.0
 
 
 class TestScoreBackfill:
