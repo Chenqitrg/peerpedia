@@ -54,11 +54,10 @@ def apply_no_review_penalty(scores: dict | None) -> dict:
 def publish_ready_articles(session: Session) -> int:
     """Scan all articles in sedimentation, publish those whose sink time has elapsed.
 
-    For each ready article:
-    1. Compute the final score by aggregating all reviews across all commits.
-    2. If there are zero community reviews, apply the no-review penalty.
-    3. Update status to "published" and save the score.
-    4. Recalculate reputations for all authors.
+    Uses a two-phase transaction: (1) batch all article status changes in one
+    commit, then (2) recompute reputations for all affected authors in a second
+    commit. This prevents data loss where the last article's reputation updates
+    were never committed under the old per-article commit pattern.
 
     Returns the number of articles published in this call.
     """
@@ -70,7 +69,9 @@ def publish_ready_articles(session: Session) -> int:
     articles = session.query(Article).filter(Article.status == "sedimentation").all()
 
     published_count = 0
+    all_author_ids: set[str] = set()
 
+    # Phase 1: mark ready articles and collect affected authors
     for article in articles:
         if article.sink_start is None:
             continue
@@ -93,16 +94,25 @@ def publish_ready_articles(session: Session) -> int:
         if len(community_reviews) == 0:
             score = apply_no_review_penalty(score)
 
-        # Update article
+        # Mark article (committed in batch below)
         article.status = "published"
         if score:
             article.score = score
-        session.commit()
 
-        # Recalculate reputation for all authors
         for author_id in authors:
-            compute_author_reputation(session, author_id)
+            all_author_ids.add(author_id)
 
         published_count += 1
+
+    if published_count == 0:
+        return 0
+
+    # Commit all article status changes at once
+    session.commit()
+
+    # Phase 2: recompute reputations for all affected authors
+    for author_id in all_author_ids:
+        compute_author_reputation(session, author_id)
+    session.commit()
 
     return published_count
