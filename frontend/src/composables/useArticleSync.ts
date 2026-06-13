@@ -123,7 +123,7 @@ export function useArticleSync(
         draft_id: id,
         server_article_id: serverId,
         server_commit_hash: headHash,
-        token: userStore.localToken?.value || undefined,
+        token: (userStore.localToken || undefined) || undefined,
         account_id: userStore.viewer?.id || '',
       }
       await tauri.setServerArticleId(sidParams)
@@ -177,7 +177,7 @@ export function useArticleSync(
         draft_id: id,
         server_article_id: sid,
         server_commit_hash: headHash,
-        token: userStore.localToken?.value || undefined,
+        token: (userStore.localToken || undefined) || undefined,
         account_id: userStore.viewer?.id || '',
       }
       await tauri.setServerArticleId(sidParams)
@@ -211,7 +211,7 @@ export function useArticleSync(
         draft_id: id,
         server_article_id: sid || '',
         server_commit_hash: remoteCommitHash,
-        token: userStore.localToken?.value || undefined,
+        token: (userStore.localToken || undefined) || undefined,
         account_id: userStore.viewer?.id || '',
       }
       await tauri.setServerArticleId(sidParams)

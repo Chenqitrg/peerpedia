@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { getStatusInfo, useStatusLabel } from '../composables/useStatusMap'
@@ -32,6 +32,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const { t } = useI18n()
+const showDeleteConfirm = ref(false)
 
 const progressPercent = computed(() => {
   const a = props.article

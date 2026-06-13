@@ -102,7 +102,7 @@ const myExistingReview = computed(() => {
 })
 
 const canUserReview = computed(() => {
-  return userStore.viewer && !isOwnArticle.value
+  return !!(userStore.viewer && !isOwnArticle.value)
 })
 
 // ── Review comment state ─────────────────────────────────────────────────
@@ -516,11 +516,11 @@ async function toggleBookmark() {
     } else {
       if (wasBookmarked) {
         await removeBookmark(article.value.id)
-        _syncBookmarkCache(userStore.viewer.id, article.value.id)
+        _syncBookmarkCache(userStore.viewer.id, article.value.id, false)
       } else {
         const result = await addBookmark(article.value.id)
         // Update localStorage cache so bookmarks are visible offline.
-        _syncBookmarkCache(userStore.viewer.id, article.value.id, result.id)
+        _syncBookmarkCache(userStore.viewer.id, article.value.id, true)
       }
     }
   } catch {

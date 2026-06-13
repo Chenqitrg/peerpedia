@@ -10,7 +10,6 @@ const mockIsSynced = ref(false)
 vi.mock('../useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
     isSynced: computed(() => mockIsSynced.value),
-    isSynced: computed(() => mockIsSynced.value),
     connectionState: computed(() => mockIsSynced.value ? 'synced' as const : 'idle' as const),
     ping: vi.fn(),
   })),
@@ -57,7 +56,7 @@ import { useBookmarkToggle } from '../useBookmarkToggle'
 import { addBookmark, removeBookmark } from '../../api/bookmarks'
 
 describe('useBookmarkToggle', () => {
-  let articles: ReturnType<typeof ref<{ id: string; is_bookmarked: boolean; is_own_article: boolean }[]>>
+  let articles: any
 
   beforeEach(() => {
     vi.clearAllMocks()

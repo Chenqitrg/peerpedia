@@ -13,7 +13,6 @@ const mockedUseNetworkStatus = useNetworkStatus as ReturnType<typeof vi.fn>
 function setSynced(online: boolean) {
   mockedUseNetworkStatus.mockReturnValue({
     isSynced: { value: online },
-    isSynced: { value: online },
     connectionState: { value: online ? 'synced' as const : 'idle' as const },
     ping: vi.fn(),
   })

@@ -25,7 +25,7 @@ export const useArticleStore = defineStore('article', () => {
 
   async function createArticleAction(body: ArticleCreatePayload) {
     const newArticle = await createArticle(body)
-    articles.value.push(newArticle as ArticleSummary)
+    articles.value.push(newArticle as unknown as ArticleSummary)
     return newArticle
   }
 
@@ -33,7 +33,7 @@ export const useArticleStore = defineStore('article', () => {
     const updated = await updateArticle(id, body)
     // Update in list if present
     const idx = articles.value.findIndex(a => a.id === id)
-    if (idx !== -1) articles.value[idx] = updated as ArticleSummary
+    if (idx !== -1) articles.value[idx] = updated as unknown as ArticleSummary
     // Update current article if it's the same
     if (currentArticle.value?.id === id) currentArticle.value = updated
     return updated

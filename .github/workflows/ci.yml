@@ -107,13 +107,13 @@ jobs:
         run: npm install
       - name: Type check
         working-directory: frontend
-        run: npx vue-tsc --noEmit 2>&1 || echo "⚠️ vue-tsc not clean yet"
+        run: npx vue-tsc --noEmit
 
   frontend-lint:
     name: Frontend — eslint
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    continue-on-error: true  # no eslint config yet — don't block
+    # eslint now enforced — blocks on error
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

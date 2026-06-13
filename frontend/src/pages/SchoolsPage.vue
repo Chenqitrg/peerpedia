@@ -93,7 +93,7 @@ async function toggleFollow(u: UserSummary) {
 // If isSynced was false at mount time, useAsyncResource immediate was false
 // and users never loaded. Re-trigger when the network comes online.
 watch(isSynced, (synced) => {
-  if (synced && users.value.length === 0 && !loading.value) {
+  if (synced && users.value?.length === 0 && !loading.value) {
     execute()
   }
 })
