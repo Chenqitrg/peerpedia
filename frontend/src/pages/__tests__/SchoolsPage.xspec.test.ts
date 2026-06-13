@@ -92,7 +92,6 @@ vi.mock('../../composables/useOffline', () => ({
 
 vi.mock('../../composables/useNetworkStatus', () => ({
   useNetworkStatus: () => ({
-    isSynced: mockIsSynced,
     isSynced: computed(() => mockIsSynced.value),
     connectionState: computed(() => mockIsSynced.value ? 'synced' as const : 'idle' as const),
     ping: vi.fn(),

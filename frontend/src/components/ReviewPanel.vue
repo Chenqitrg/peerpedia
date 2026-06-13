@@ -185,7 +185,7 @@ const emit = defineEmits<{
               :model-value="replyTexts[review.id] || ''"
               :placeholder="t('article.startConversation')"
               :disabled="sendingReplies[review.id]"
-              @send="emit('send-reply', review.id)"
+              @send="(text: string) => emit('send-reply', review.id, text)"
             />
             <p v-if="replyErrors[review.id]" class="text-[10px] text-danger mt-1">{{ replyErrors[review.id] }}</p>
           </div>

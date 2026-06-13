@@ -92,7 +92,7 @@ router.afterEach((to) => {
 
 // ── L4: Auto-sync local account to server when network or login state changes ──
 watch(
-  [isSynced, () => userStore.localToken?.value, () => userStore.hasPendingCreds],
+  [isSynced, () => userStore.localToken, () => userStore.hasPendingCreds],
   ([online, localTok, pending]) => {
     console.log('[App] isSynced:', online, 'localToken:', !!localTok, 'pendingCreds:', pending)
     if (online && (localTok || pending)) {
@@ -145,14 +145,16 @@ async function saveAndClose() {
   window.dispatchEvent(new CustomEvent('tab-save-and-close', { detail: { tabId } }))
 
   // Watch for save completion — when dirty becomes false, close the tab
-  const unwatch = watch(() => {
-    const tab = tabStore.tabs.find(t => t.id === tabId)
-    if (tab && !tab.dirty) {
-      tabStore.removeTab(tabId)
-      closingTabId.value = null
-      unwatch()
-    }
-  })
+  const unwatch = watch(
+    () => tabStore.tabs.find(t => t.id === tabId)?.dirty,
+    (dirty) => {
+      if (dirty === false) {
+        tabStore.removeTab(tabId)
+        closingTabId.value = null
+        unwatch()
+      }
+    },
+  )
 }
 
 // ── Restore session and tabs on mount ──────────────────────────

@@ -7,7 +7,6 @@ import { SCORE_DIMS } from '../api/constants'
 const { t } = useI18n()
 
 const open = defineModel<boolean>({ required: true })
-const commitMsg = defineModel<string>('commitMsg', { default: '' })
 const scores = defineModel<Record<string, number>>('scores', { required: true })
 const keywords = defineModel<string>('keywords', { default: '' })
 const categories = defineModel<string>('categories', { default: '' })
@@ -37,19 +36,6 @@ const show = computed({
       <div class="bg-card border border-divider rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-heading font-semibold text-ink mb-1">{{ t('editor.selfAssessment') }}</h3>
         <p class="text-xs text-ink-muted mb-5">{{ t('editor.selfAssessmentHint') }}</p>
-
-        <!-- Commit message -->
-        <div class="mb-5">
-          <label class="text-xs font-semibold text-ink-muted block mb-1.5">
-            {{ t('editor.commitMessage') }} <span class="text-danger">*</span>
-          </label>
-          <input
-            v-model="commitMsg"
-            type="text"
-            :placeholder="t('editor.commitMessagePlaceholder')"
-            class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-        </div>
 
         <!-- 5-dim scores — use StarRating like the article review panel -->
         <div class="mb-5">

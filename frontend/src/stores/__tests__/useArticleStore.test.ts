@@ -21,8 +21,10 @@ describe('useArticleStore', () => {
         { id: '2', title: 'Paper 2', status: 'draft', authors: ['Bob'], fork_count: 0, review_count: 0 },
       ],
       total: 2,
+      page: 1,
+      size: 10,
     }
-    vi.mocked(getArticles).mockResolvedValue(mockArticles)
+    vi.mocked(getArticles).mockResolvedValue(mockArticles as any)
 
     const { useArticleStore } = await import('../useArticleStore')
     const store = useArticleStore()
@@ -36,7 +38,7 @@ describe('useArticleStore', () => {
   it('fetchArticle sets currentArticle', async () => {
     const { getArticle } = await import('../../api/articles')
     const mockArticle = { id: '1', title: 'Paper 1', status: 'published', authors: ['Alice'], fork_count: 0, review_count: 0 }
-    vi.mocked(getArticle).mockResolvedValue(mockArticle)
+    vi.mocked(getArticle).mockResolvedValue(mockArticle as any)
 
     const { useArticleStore } = await import('../useArticleStore')
     const store = useArticleStore()
@@ -48,9 +50,9 @@ describe('useArticleStore', () => {
 
   it('createArticle adds to articles and returns new article', async () => {
     const { createArticle } = await import('../../api/articles')
-    const body = { authors: ['Alice'], self_review: { originality: 5, rigor: 4, completeness: 3, pedagogy: 5, impact: 4 } }
+    const body = { authors: ['Alice'], commit_message: 'test', self_review: { originality: 5, rigor: 4, completeness: 3, pedagogy: 5, impact: 4 } }
     const newArticle = { id: '3', title: 'New Paper', status: 'draft', authors: ['Alice'], fork_count: 0, review_count: 0 }
-    vi.mocked(createArticle).mockResolvedValue(newArticle)
+    vi.mocked(createArticle).mockResolvedValue(newArticle as any)
 
     const { useArticleStore } = await import('../useArticleStore')
     const store = useArticleStore()

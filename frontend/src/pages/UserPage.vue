@@ -168,8 +168,7 @@ async function loadArticles() {
   if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && isSelf.value) {
     try {
       const drafts = await tauri.listDrafts({ account_id: id.value })
-      // TODO(tech-debt): drafts can be null or {error:string} — add null guard
-      // and error-shape check before iterating (vue-tsc TS2488/TS18047)
+      if (!drafts || 'error' in drafts) return
       for (const d of drafts) {
         // Avoid duplicates — skip if already loaded from server
         if (!merged.some(a => a.id === d.id)) {
@@ -181,15 +180,15 @@ async function loadArticles() {
               hash = history[0].hash
             }
           } catch { /* optional */ }
-          // TODO(tech-debt): push object doesn't satisfy ArticleSummary — field types
-          // inferred as 'any' because drafts union includes {error:string} (TS2345)
           merged.push({
             id: d.id,
             title: d.title || 'Untitled',
-            status: 'draft',
+            status: 'draft' as const,
             authors: [{ id: id.value, name: user.value?.name || id.value, anonymous_name: '' }],
+            abstract: null as string | null,
             content_preview: '',
             commit_hash: hash,
+            sink_eta: null as string | null,
             fork_count: 0,
             forked_from: null,
             commit_count: 0,
@@ -214,18 +213,8 @@ watch(user, (u) => {
   if (u) { Promise.all([loadArticles(), loadFollowState()]) }
 }, { immediate: true })
 
-// TODO(tech-debt): showFollowers, showFollowing, followers, following are
-// never declared — this block will throw ReferenceError at runtime.
-// Either declare the refs or remove the dead watch (route change already
-// triggers user reload via useAsyncResource + watch(user, ...)).
-watch(() => route.params.id, () => {
-  showFollowers.value = false
-  showFollowing.value = false
-  followers.value = []
-  following.value = []
-  loadUser()
-  loadArticles()
-})
+// Route change triggers user reload via useAsyncResource + watch(user, ...) —
+// no explicit route watcher needed here.
 
 
 </script>

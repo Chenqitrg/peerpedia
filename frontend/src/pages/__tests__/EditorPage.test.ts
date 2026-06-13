@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft, mockCompileTypst } = vi.hoisted(() => ({
+const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCommit, mockGitHistory, mockGetDraft, mockCompileTypst, mockUpdateArticle, mockCreateArticle } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockReplace: vi.fn(),
   mockRoute: { params: { id: undefined } as any, path: '/edit', fullPath: '/edit', query: {} as Record<string, string | undefined> },
@@ -12,6 +12,8 @@ const { mockPush, mockReplace, mockRoute, mockSaveDraft, mockGitInit, mockGitCom
   mockGitHistory: vi.fn().mockResolvedValue([]),
   mockGetDraft: vi.fn().mockResolvedValue(null),
   mockCompileTypst: vi.fn().mockResolvedValue('<svg xmlns="http://www.w3.org/2000/svg"><text>Typst SVG output</text></svg>'),
+  mockUpdateArticle: vi.fn().mockResolvedValue({ id: 'art-99', status: 'sedimentation' }),
+  mockCreateArticle: vi.fn().mockResolvedValue({ id: 'art-new', status: 'draft' }),
 }))
 
 const RouterLinkStub = {
@@ -30,7 +32,6 @@ vi.mock('vue-router', () => ({
 // Mock the network composable so publish is enabled in tests.
 vi.mock('@/composables/useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
-    isSynced: { value: true },
     isSynced: { value: true },
     connectionState: { value: 'synced' as const },
     ping: vi.fn(),
@@ -71,6 +72,16 @@ vi.mock('@/composables/useTauri', () => ({
 const mockUseEditorTab = vi.fn()
 vi.mock('@/composables/useTabIntegration', () => ({
   useEditorTab: mockUseEditorTab,
+}))
+
+// Mock useArticleStore — used by handleSubmitToPool
+vi.mock('../../stores/useArticleStore', () => ({
+  useArticleStore: vi.fn(() => ({
+    currentArticle: null,
+    fetchArticle: vi.fn().mockResolvedValue(undefined),
+    updateArticle: mockUpdateArticle,
+    createArticle: mockCreateArticle,
+  })),
 }))
 
 describe('EditorPage', () => {
@@ -714,5 +725,160 @@ describe('EditorPage', () => {
     })
     await flushPromises()
     expect(mockUseEditorTab).toHaveBeenCalled()
+  })
+
+  // ── Publish flow: disabled states ──────────────────────────────────
+
+  it('publish button is disabled when unsaved (hasSaved=false)', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    // Fresh editor: hasSaved is false (no currentDraftId, no commitHash)
+    vm.currentDraftId = undefined
+    vm.commitHash = ''
+    vm.content = '# New article'
+    await flushPromises()
+
+    const publishBtn = wrapper.find('[aria-label="Publish"]')
+    expect(publishBtn.exists()).toBe(true)
+    expect((publishBtn.element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('publish button is disabled when dirty (isClean=false)', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.currentDraftId = 'draft-99'
+    vm.content = '# Saved content'
+    vm.savedContent = '# Different content'
+    vm.title = 'T'
+    vm.savedTitle = 'T'
+    await flushPromises()
+
+    const publishBtn = wrapper.find('[aria-label="Publish"]')
+    expect((publishBtn.element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('publish button is enabled when saved and clean', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const pinia = setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice', username: 'alice' } as any
+    userStore.token = 'test-jwt'
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.currentDraftId = 'draft-99'
+    vm.content = '# Saved content'
+    vm.savedContent = '# Saved content'
+    vm.title = 'T'
+    vm.savedTitle = 'T'
+    await flushPromises()
+
+    const publishBtn = wrapper.find('[aria-label="Publish"]')
+    expect((publishBtn.element as HTMLButtonElement).disabled).toBe(false)
+    expect(publishBtn.attributes('data-tooltip')).toBe('Publish')
+  })
+
+  // ── Publish flow: handleSubmitToPool ───────────────────────────────
+
+  it('handleSubmitToPool calls updateArticle when currentDraftId is set', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const pinia = setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice', username: 'alice' } as any
+    userStore.token = 'test-jwt'
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.currentDraftId = 'draft-99'
+    vm.content = '# Test'
+    vm.title = 'Test'
+    vm.scores = { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 }
+
+    mockUpdateArticle.mockClear()
+    mockCreateArticle.mockClear()
+
+    await vm.handleSubmitToPool()
+    await flushPromises()
+
+    expect(mockUpdateArticle).toHaveBeenCalledWith('draft-99', expect.objectContaining({
+      publish: true,
+      commit_message: '',
+    }))
+    expect(mockCreateArticle).not.toHaveBeenCalled()
+  })
+
+  it('handleSubmitToPool calls createArticle when no currentDraftId and not editing', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const pinia = setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice', username: 'alice' } as any
+    userStore.token = 'test-jwt'
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    // Fresh editor: no id param, no currentDraftId
+    vm.currentDraftId = undefined
+    vm.commitHash = ''
+    vm.content = '# Brand new'
+    vm.title = 'New'
+    vm.scores = { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 }
+
+    mockUpdateArticle.mockClear()
+    mockCreateArticle.mockClear()
+
+    await vm.handleSubmitToPool()
+    await flushPromises()
+
+    expect(mockCreateArticle).toHaveBeenCalledWith(expect.objectContaining({
+      publish: true,
+      commit_message: '',
+    }))
+    expect(mockUpdateArticle).not.toHaveBeenCalled()
+  })
+
+  // ── SelfReviewPanel: no commit message field ───────────────────────
+
+  it('SelfReviewPanel renders without commit message input', async () => {
+    const { useUserStore } = await import('../../stores/useUserStore')
+    const pinia = setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.showSelfReview = true
+    await flushPromises()
+
+    // The SelfReviewPanel modal should be visible
+    const modal = wrapper.find('.fixed.inset-0.z-50')
+    expect(modal.exists()).toBe(true)
+    // Commit message label should NOT be present
+    expect(modal.text()).not.toMatch(/Commit Message/i)
   })
 })

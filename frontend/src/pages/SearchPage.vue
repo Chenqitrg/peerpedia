@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useOffline } from '../composables/useOffline'
+import type { ArticleSummary } from '../api/types'
 import { searchArticles } from '../api/search'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
@@ -130,11 +131,11 @@ const { data: result, loading, error, execute: doSearch } = useAsyncResource(
   { immediate: false },
 )
 
-const results = computed(() => result.value?.articles ?? [])
+const results = computed(() => (result.value?.articles ?? []) as ArticleSummary[])
 const total = computed(() => result.value?.total ?? 0)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
-const { toggle: handleToggleBookmark } = useBookmarkToggle(results)
+const { toggle: handleToggleBookmark } = useBookmarkToggle(results as any)
 
 onMounted(() => {
   const q = route.query.q as string
