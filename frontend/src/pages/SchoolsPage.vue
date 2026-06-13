@@ -19,7 +19,7 @@ const { t } = useI18n()
 const userStore = useUserStore()
 const tauri = useTauri()
 const { canRead, canWrite, getFallback } = useOffline()
-const { isOnline } = useNetworkStatus()
+const { isSynced } = useNetworkStatus()
 const following = ref<Set<string>>(new Set())
 
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
@@ -28,7 +28,7 @@ async function loadFollowState() {
   if (!userStore.viewer) return
   const ids = new Set<string>()
 
-  if (!isOnline.value) {
+  if (!isSynced.value) {
     // Offline — read from local cache.
     const cache = useFollowCache()
     const cachedIds = await cache.getCachedFollowingIds(userStore.viewer.id)
@@ -90,10 +90,10 @@ async function toggleFollow(u: UserSummary) {
   }
 }
 
-// If isOnline was false at mount time, useAsyncResource immediate was false
+// If isSynced was false at mount time, useAsyncResource immediate was false
 // and users never loaded. Re-trigger when the network comes online.
-watch(isOnline, (online) => {
-  if (online && users.value.length === 0 && !loading.value) {
+watch(isSynced, (synced) => {
+  if (synced && users.value?.length === 0 && !loading.value) {
     execute()
   }
 })

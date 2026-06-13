@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ArticleCard from '../ArticleCard.vue'
@@ -17,6 +17,7 @@ function makeArticle(overrides = {}) {
       { id: 'u1', name: 'Alice Chen', anonymous_name: 'anonymous1' },
       { id: 'u2', name: 'Bob Lee', anonymous_name: 'anonymous2' },
     ],
+    abstract: null as string | null,
     content_preview: 'This paper explores the fundamental principles of quantum computing, including superposition, entanglement, and quantum gates. We present a novel approach to error correction...',
     commit_hash: 'a1b2c3d',
     fork_count: 3,

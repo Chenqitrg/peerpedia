@@ -79,6 +79,7 @@ async function handleDownload() {
       if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
         // Tauri/local: compile Typst → PDF via Rust sidecar (no REST backend needed)
         const base64 = await tauri.compileTypstPdf({ content: props.content })
+        if (!base64 || typeof base64 !== 'string') return
         const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
         const pdfBlob = new Blob([binary], { type: 'application/pdf' })
         const url = URL.createObjectURL(pdfBlob)

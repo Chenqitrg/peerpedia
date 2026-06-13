@@ -125,10 +125,7 @@ export const useTabStore = defineStore('tab', () => {
 
   function activateTab(tabId: string): void {
     const tab = findById(tabId)
-    if (!tab) {
-      if (import.meta.env.DEV) console.error(`activateTab: tab ${tabId} not found`)
-      return
-    }
+    if (!tab) return  // tab already closed — silent no-op
     activeTabId.value = tabId
     persist()
     if (router) router.push(tab.routePath)
@@ -136,10 +133,7 @@ export const useTabStore = defineStore('tab', () => {
 
   function updateTab(tabId: string, patch: Partial<Pick<Tab, 'title' | 'dirty' | 'status' | 'scrollTop' | 'cursorPosition'>>): void {
     const tab = findById(tabId)
-    if (!tab) {
-      if (import.meta.env.DEV) console.error(`updateTab: tab ${tabId} not found`)
-      return
-    }
+    if (!tab) return  // tab already closed — silent no-op
     if (patch.title !== undefined) tab.title = patch.title
     if (patch.dirty !== undefined) tab.dirty = patch.dirty
     if (patch.status !== undefined) tab.status = patch.status

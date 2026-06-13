@@ -35,7 +35,7 @@ describe('articles API', () => {
 
   it('createArticle calls POST /articles with body', async () => {
     const { createArticle } = await import('../articles')
-    const body = { authors: ['user1'], self_review: { originality: 5, rigor: 4, completeness: 3, pedagogy: 5, impact: 4 } }
+    const body = { authors: ['user1'], commit_message: 'test', self_review: { originality: 5, rigor: 4, completeness: 3, pedagogy: 5, impact: 4 } }
     mockClient.post.mockResolvedValue({ data: { id: 'new' } })
     const result = await createArticle(body)
     expect(mockClient.post).toHaveBeenCalledWith('/articles', body)

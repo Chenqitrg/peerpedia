@@ -5,7 +5,6 @@ import { createPinia, setActivePinia } from 'pinia'
 // Mock useNetworkStatus so canRead('search.network') passes in tests
 vi.mock('@/composables/useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
-    isOnline: { value: true },
     isSynced: { value: true },
     connectionState: { value: 'synced' as const },
     ping: vi.fn(),

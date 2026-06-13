@@ -86,6 +86,19 @@ const isClean = computed(() => content.value === savedContent.value && title.val
  *  because git commit may not always succeed (e.g., running before login). */
 const hasSaved = computed(() => !!currentDraftId.value || !!commitHash.value)
 
+// Publish button state — mirrors download button pattern
+const publishDisabledReason = computed(() => {
+  if (!content.value.trim()) return 'Content is empty'
+  if (!hasSaved.value) return 'Save before publishing'
+  if (!isClean.value) return 'Unsaved changes — save before publishing'
+  if (!canWrite('editor.publish_pool')) return t(getFallback('editor.publish_pool'))
+  return ''
+})
+
+const publishDisabled = computed(() =>
+  submitting.value || !content.value.trim() || !hasSaved.value || !isClean.value || !canWrite('editor.publish_pool')
+)
+
 // Tab integration — register this editor as a tab and sync state
 const editorAreaRef = ref<HTMLElement | null>(null)
 const tabId = tabStore.ensureTab('editor', route.fullPath)
@@ -101,7 +114,7 @@ const DRAFT_ID_KEY = computed(() => `editor-draft-id-${draftUid.value}-${editId.
 // Draft persistence — Tauri IPC when available, REST + localStorage fallback.
 const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
-const { isOnline } = useNetworkStatus()
+const { isSynced } = useNetworkStatus()
 
 // ── L4 Auto-upload: silently backup to server on save ──────────────────
 const _draftId = () => currentDraftId.value || editId.value || ''
@@ -111,7 +124,7 @@ const _lh = ref<string | null>(null)
 const { upload: autoUpload } = useArticleSync(_draftId, () => _sid.value, () => _sch.value, () => _lh.value)
 
 async function _tryAutoUpload() {
-  if (!isOnline.value || !(tauri.isTauri.value || tauri.isBrowserLocal.value)) return
+  if (!isSynced.value || !(tauri.isTauri.value || tauri.isBrowserLocal.value)) return
   const id = _draftId()
   if (!id) return
 
@@ -436,7 +449,7 @@ async function handleSaveDraft() {
     await articleStore.updateArticle(editId.value, {
       title: title.value,
       content: content.value,
-      commit_message: commitMsg.value.trim(),
+      commit_message: '',
       publish: false,
     })
     savedMsg.value = true
@@ -457,10 +470,6 @@ async function handleSubmitToPool() {
     errorMsg.value = 'Content is required'
     return
   }
-  if (!commitMsg.value.trim()) {
-    errorMsg.value = 'Commit message is required — summarize your changes'
-    return
-  }
   if (!userStore.viewer) {
     errorMsg.value = 'Please log in first'
     return
@@ -471,12 +480,12 @@ async function handleSubmitToPool() {
   successMsg.value = ''
 
   try {
-    const body: ArticleCreatePayload | ArticleUpdatePayload = {
+    const body = {
       title: title.value,
       abstract: abstract.value || title.value,
       content: content.value,
       format: format.value,
-      commit_message: commitMsg.value.trim(),
+      commit_message: '',
       self_review: { ...scores.value },
       authors: [userStore.viewer.id],
       publish: true,
@@ -495,6 +504,24 @@ async function handleSubmitToPool() {
     if (isEdit.value) {
       result = await articleStore.updateArticle(editId.value!, body)
       successMsg.value = 'Article updated and submitted to pool!'
+    } else if (currentDraftId.value) {
+      // Already saved as draft — update it with publish:true instead of creating a duplicate.
+      // In Tauri/local mode, currentDraftId is a local draft ID. Resolve the server
+      // article ID from the draft's auto-upload metadata so we don't 404.
+      let serverId: string | undefined
+      if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+        const draft = await tauri.getDraft({ id: currentDraftId.value })
+        if (draft && typeof draft === 'object' && !('error' in draft)) {
+          serverId = (draft as any).server_article_id || undefined
+        }
+      }
+      const publishId = serverId || currentDraftId.value
+      result = await articleStore.updateArticle(publishId, body)
+      successMsg.value = 'Article submitted to pool!'
+      remove(DRAFT_KEY.value)
+      setTimeout(() => {
+        router.push(`/articles/${result.id}`)
+      }, 1500)
     } else {
       result = await articleStore.createArticle(body)
       successMsg.value = 'Article created and submitted to pool!'
@@ -673,12 +700,12 @@ defineExpose({ handlePublish, showSelfReview })
         <button
           class="flex items-center justify-center w-9 h-9 rounded-lg
                  transition-colors duration-200"
-          :class="canWrite('editor.publish_pool')
-            ? 'text-accent hover:text-accent hover:bg-accent/10'
-            : 'text-ink-muted/30 cursor-not-allowed'"
-          :disabled="submitting || !canWrite('editor.publish_pool')"
+          :class="publishDisabled
+            ? 'text-ink-muted/30 cursor-not-allowed'
+            : 'text-accent hover:text-accent hover:bg-accent/10'"
+          :disabled="publishDisabled"
           :aria-label="t('editor.publish')"
-          :data-tooltip="canWrite('editor.publish_pool') ? t('editor.publish') : t(getFallback('editor.publish_pool'))"
+          :data-tooltip="publishDisabledReason || t('editor.publish')"
           @click="handlePublish"
         >
           <Send class="w-4 h-4" stroke-width="2" />
@@ -776,7 +803,6 @@ defineExpose({ handlePublish, showSelfReview })
     <!-- Self-review panel -->
     <SelfReviewPanel
       v-model="showSelfReview"
-      v-model:commit-msg="commitMsg"
       v-model:scores="scores"
       v-model:keywords="keywords"
       v-model:categories="categories"

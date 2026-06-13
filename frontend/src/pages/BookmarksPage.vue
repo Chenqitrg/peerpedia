@@ -47,7 +47,7 @@ const { loading, error, execute: loadBookmarks } = useAsyncResource(
     const results = await Promise.all(
       bookmarks.map((b: Bookmark) => getArticle(b.article_id).catch(() => null)),
     )
-    const resolved = results.filter((r): r is ArticleSummary => r !== null)
+    const resolved = results.filter((r): r is any => r !== null) as ArticleSummary[]
     saveJSON(cacheKey, resolved)
     articles.value = resolved
     return resolved

@@ -16,7 +16,7 @@ import { Waypoints } from 'lucide-vue-next'
 
 const userStore = useUserStore()
 const { t } = useI18n()
-const { isOnline } = useNetworkStatus()
+const { isSynced } = useNetworkStatus()
 const isLoggedIn = computed(() => !!userStore.viewer)
 
 const pageSize = 20
@@ -24,7 +24,7 @@ const currentPage = ref(1)
 
 const { data: feed, loading, error, execute: loadFeed } = useAsyncResource(
   async (): Promise<FeedResponse | null> => {
-    if (!isOnline.value && userStore.viewer) {
+    if (!isSynced.value && userStore.viewer) {
       // Offline — read cached feed articles (card metadata only).
       const cache = useFollowCache()
       const cachedArticles = await cache.getCachedFeed(userStore.viewer.id)
