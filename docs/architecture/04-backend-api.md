@@ -233,9 +233,9 @@ SQLite is the Phase 1 database. It handles concurrent reads well but serializes 
 
 No rate limiting on any endpoint. `/health` could be hammered. Auth endpoints have no brute-force protection. Acceptable for solo developer phase, critical before public launch.
 
-### I10: JWT secret in code
+### I10: JWT fallback secret for development
 
-`SECRET_KEY` is hardcoded in `backend/peerpedia_api/auth.py`. Should be an environment variable. If the code is ever public, anyone can forge JWTs.
+`JWT_SECRET` comes from `os.environ.get("JWT_SECRET")` with fallback to `"peerpedia-dev-secret"` + `warnings.warn()`. Standard dev pattern. Production deployment must set the env var.
 
 ### I11: Git repos grow unbounded
 

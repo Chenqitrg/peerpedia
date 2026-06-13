@@ -30,12 +30,12 @@ Every chapter ends with an "Issues" section. Here's the full list:
 | I7 | Conflict resolution requires full page refresh — stale on failure | 03 | Low |
 | I8 | SQLite in production — write serialization bottleneck | 04 | High |
 | I9 | No rate limiting — /health and auth unprotected | 04 | High |
-| I10 | JWT secret hardcoded in source | 04 | Critical |
+| I10 | JWT fallback secret for dev — must set env var in production | 04 | Low |
 | I11 | Git repos grow unbounded — no GC, no pruning | 04 | Low |
-| I12 | Typst sidecar blocks UI thread — synchronous IPC | 05 | Medium |
+| I12 | Typst compilation has no progress indicator | 05 | Low |
 | I13 | No CSP in Tauri config — XSS vector | 05 | High |
 | I14 | SQLite connection not pooled — writes block reads | 05 | Low |
-| I15 | No backup/export for ~/.peerpedia/ local data | 05 | Medium |
+| I15 | Export exists (export_article) but no automated backup | 05 | Low |
 | I16 | No Markdown→PDF on desktop — server-only path | 06 | Medium |
 | I17 | Typst compilation blocks UI — no progress bar | 06 | Medium |
 | I18 | Compilation cache never expires — unbounded growth | 06 | Low |

@@ -170,9 +170,9 @@ This allows full frontend development without Rust compilation.
 
 ## 9. Design Issues
 
-### I12: Typst sidecar blocks UI thread
+### I12: Typst compilation has no progress indicator
 
-`compile_typst` is synchronous in the Tauri command handler. The Rust function blocks until Typst CLI exits. For a 50-page document, this could be ~2 seconds of frozen UI. Should be async with progress callback.
+Typst subprocess calls are correctly wrapped in `tokio::task::spawn_blocking` (per `commands.rs` line 8-10), so they don't block the async runtime. However, the frontend receives no progress updates during compilation — the user sees a spinner with no indication of how long it will take.
 
 ### I13: No CSP
 
@@ -182,6 +182,6 @@ This allows full frontend development without Rust compilation.
 
 `store.rs` creates a single SQLite connection. All Tauri commands share it. SQLite allows concurrent reads but serializes writes. If a write is in progress, reads block. For a single-user desktop app this is fine, but it could cause micro-stutters during auto-save.
 
-### I15: No backup/export for local data
+### I15: Export exists but no automated backup
 
-`~/.peerpedia/` contains all user data (Git repos + SQLite). No built-in backup, export, or migration tool. If this directory is lost, all local articles are gone. Server-synced articles can be recovered, but local-only drafts are permanently lost.
+`local_git.rs:151` has `export_article()` which creates a tar.gz of an article's Git repo, exposed via IPC command. Manual export works. However, there's no automated/background backup — users must remember to export. Server-synced articles are recoverable; local-only drafts rely on manual export.
