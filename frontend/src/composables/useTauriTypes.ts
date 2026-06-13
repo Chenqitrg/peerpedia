@@ -106,6 +106,11 @@ export interface GitRollbackParams {
   author_id: string    // UUID
 }
 
+export interface GitResetParams {
+  article_id: string
+  commit_hash: string
+}
+
 export interface PendingOp {
   id: string
   title: string

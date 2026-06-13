@@ -542,6 +542,22 @@ pub async fn git_rollback(
     .map_err(|e| AppError::IoError(format!("git_rollback panicked: {}", e)))?
 }
 
+#[tauri::command]
+pub async fn git_reset_hard(params: GitResetParams) -> Result<OkResponse, AppError> {
+    tokio::task::spawn_blocking(move || {
+        local_git::git_reset_hard(&params.article_id, &params.commit_hash)?;
+        Ok(OkResponse { ok: true })
+    })
+    .await
+    .map_err(|e| AppError::IoError(format!("git_reset_hard panicked: {}", e)))?
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitResetParams {
+    pub article_id: String,
+    pub commit_hash: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct InvalidateCacheParams {
     pub article_id: String,

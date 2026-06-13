@@ -22,7 +22,7 @@ export type {
   GetDraftParams, DeleteDraftParams, DeleteArticleParams,
   CacheArticleParams, GetCachedArticleParams,
   BookmarkParams, GetBookmarksParams,
-  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
+  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, GitResetParams, InvalidateCacheParams,
   PendingOp, PendingOpsParams, PendingResolveParams,
   GitCommitResult, CommitEntry,
   Account, AccountSummary, Draft, DraftSummary, CachedArticle,
@@ -33,7 +33,7 @@ import type {
   GetDraftParams, DeleteDraftParams, DeleteArticleParams,
   CacheArticleParams, GetCachedArticleParams,
   BookmarkParams, GetBookmarksParams,
-  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, InvalidateCacheParams,
+  GitInitParams, GitCommitParams, GitHistoryParams, GitShowParams, GitRollbackParams, GitResetParams, InvalidateCacheParams,
   PendingOp, PendingOpsParams, PendingResolveParams,
   GitCommitResult, CommitEntry,
   Account, AccountSummary, Draft, DraftSummary, CachedArticle,
@@ -231,6 +231,9 @@ export function useTauri() {
     },
     async gitRollback(params: GitRollbackParams) {
       return _invoke<GitCommitResult>('git_rollback', params as unknown as Record<string, unknown>)
+    },
+    async gitResetHard(params: GitResetParams) {
+      return _invoke<{ ok: boolean }>('git_reset_hard', params as unknown as Record<string, unknown>)
     },
     async invalidateArticleCache(params: InvalidateCacheParams) {
       return _invoke<{ ok: boolean }>('invalidate_article_cache', params as unknown as Record<string, unknown>)

@@ -150,10 +150,19 @@ async function onResolvePending(id: string, action: 'push' | 'discard' | 'confir
     try { await deleteArticle(id) } catch (e: unknown) { console.warn('Delete failed:', e) }
     try { await tauri.deleteArticle({ id, account_id: userStore.viewer?.id || 'local' }) } catch { /* best-effort */ }
   } else if (action === 'discard') {
-    // Discard: remove local draft + git repo.
-    try { await tauri.deleteArticle({ id, account_id: userStore.viewer?.id || 'local' }) } catch { /* best-effort */ }
-    // Invalidate article cache so cards disappear from lists.
-    try { await tauri.invalidateArticleCache({ article_id: id }) } catch { /* best-effort */ }
+    // Discard: hard-reset git to before offline changes (no new commit).
+    const history = await tauri.gitHistory({ article_id: id })
+    if (history && Array.isArray(history) && history.length > 0) {
+      if (history.length === 1) {
+        // Only offline commits — article was created offline. Delete entirely.
+        try { await tauri.deleteArticle({ id, account_id: userStore.viewer?.id || 'local' }) } catch { /* best-effort */ }
+      } else {
+        // git history is newest-first. history[1] = last synced commit.
+        try {
+          await tauri.gitResetHard({ article_id: id, commit_hash: history[1].hash })
+        } catch (e: unknown) { console.warn('gitResetHard failed:', e) }
+      }
+    }
   } else if (action === 'restore') {
     // Restore from pending delete: clear marker, data was preserved.
   }

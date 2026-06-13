@@ -482,6 +482,21 @@ fn get_head_hash(repo_path: &PathBuf) -> Result<String, AppError> {
 
 // ── Rollback ──────────────────────────────────────────────────────────────
 
+/// Hard-reset to a previous commit. Does NOT create a new commit — the branch
+/// pointer moves back and all later commits are discarded. Use for discard/revert
+/// of offline changes where no trace should remain.
+pub fn git_reset_hard(article_id: &str, commit_hash: &str) -> Result<(), AppError> {
+    let rp = repo_path(article_id)?;
+    if !rp.join(".git").is_dir() {
+        return Err(AppError::NotFound(format!(
+            "Git repo not found for article '{}'",
+            article_id
+        )));
+    }
+    run_git(&rp, &["reset", "--hard", commit_hash])?;
+    Ok(())
+}
+
 /// Rollback to a previous commit by composing git_show + git_commit.
 /// Retrieves content at `commit_hash`, then commits it as a new "Rollback to ..." commit.
 pub fn git_rollback(
