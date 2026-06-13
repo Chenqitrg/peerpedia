@@ -216,25 +216,19 @@ pub fn search_drafts(
     Ok(results)
 }
 
-/// Soft-delete: mark article as deleted without removing data.
-/// Sets `deleted_at` so sync can detect and prompt for conflict resolution.
-/// This keeps all data intact — git repo, cache, history, and content.
-pub fn soft_delete_article(conn: &Connection, id: &str) -> Result<(), AppError> {
-    conn.execute(
-        "UPDATE drafts SET deleted_at = datetime('now') WHERE id = ?1",
-        [id],
-    )?;
-    Ok(())
-}
-
-/// Hard-delete: permanently remove all traces of an article.
-/// Used after server confirms deletion, or when server article no longer exists.
-/// Removes DB rows (drafts, cache, history) AND the git repository directory.
-pub fn hard_delete_article(conn: &Connection, id: &str) -> Result<(), AppError> {
+/// Delete an article entirely: removes DB rows (drafts, cache, history) AND the
+/// git repository directory. Does NOT fail if the article is not a draft — it may
+/// exist only in the article_cache (e.g., offline-cached server articles).
+pub fn delete_article(conn: &Connection, id: &str, _account_id: &str) -> Result<(), AppError> {
+    // Remove from drafts if present (ignore NotFound — article may be cache-only)
     let _ = conn.execute("DELETE FROM drafts WHERE id = ?1", [id]);
+
+    // Also clean article_cache and browsing_history so the article doesn't
+    // reappear from these tables after deletion.
     let _ = conn.execute("DELETE FROM article_cache WHERE id = ?1", [id]);
     let _ = conn.execute("DELETE FROM browsing_history WHERE article_id = ?1", [id]);
 
+    // Remove the git repository directory.
     let repo_path = crate::local_git::repo_path(id)?;
     if repo_path.exists() {
         std::fs::remove_dir_all(&repo_path)
@@ -242,29 +236,6 @@ pub fn hard_delete_article(conn: &Connection, id: &str) -> Result<(), AppError> 
     }
 
     Ok(())
-}
-
-/// Restore: clear the soft-delete marker, making the article visible again.
-pub fn restore_article(conn: &Connection, id: &str) -> Result<(), AppError> {
-    conn.execute("UPDATE drafts SET deleted_at = NULL WHERE id = ?1", [id])?;
-    Ok(())
-}
-
-/// Get IDs of drafts that have been soft-deleted but not yet hard-deleted.
-pub fn get_pending_deletes(conn: &Connection) -> Result<Vec<String>, AppError> {
-    let mut stmt = conn.prepare("SELECT id FROM drafts WHERE deleted_at IS NOT NULL")?;
-    let ids = stmt
-        .query_map([], |row| row.get::<_, String>(0))?
-        .filter_map(|r| r.ok())
-        .collect();
-    Ok(ids)
-}
-
-/// Legacy alias — existing callers use soft_delete for offline, hard_delete for confirmed.
-pub fn delete_article(conn: &Connection, id: &str, _account_id: &str) -> Result<(), AppError> {
-    // Kept for backward compat with existing command signature.
-    // Callers should migrate to soft_delete_article or hard_delete_article.
-    soft_delete_article(conn, id)
 }
 
 // ── Article Cache ───────────────────────────────────────────────────────

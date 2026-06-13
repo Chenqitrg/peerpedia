@@ -163,15 +163,6 @@ export function useTauri() {
     async deleteArticle(params: DeleteArticleParams) {
       return _invoke<{ ok: boolean }>('delete_article', params as unknown as Record<string, unknown>)
     },
-    async hardDeleteArticle(params: { id: string; account_id: string; token?: string }) {
-      return _invoke<{ ok: boolean }>('hard_delete_article', params as unknown as Record<string, unknown>)
-    },
-    async restoreArticle(params: { id: string }) {
-      return _invoke<{ ok: boolean }>('restore_article', params as unknown as Record<string, unknown>)
-    },
-    async getPendingDeletes() {
-      return _invoke<string[]>('get_pending_deletes')
-    },
 
     // Article cache
     async cacheArticle(params: CacheArticleParams) {

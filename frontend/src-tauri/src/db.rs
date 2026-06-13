@@ -14,7 +14,7 @@ use crate::error::AppError;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
-const CURRENT_SCHEMA_VERSION: i32 = 9;
+const CURRENT_SCHEMA_VERSION: i32 = 8;
 
 /// Resolve the database path: ~/.peerpedia/peerpedia.db
 fn get_db_path() -> Result<PathBuf, AppError> {
@@ -181,9 +181,6 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
         }
         8 => {
             tx.execute_batch("DROP TABLE IF EXISTS follows;")?;
-        }
-        9 => {
-            let _ = tx.execute("ALTER TABLE drafts ADD COLUMN deleted_at TEXT", []);
         }
         _ => {
             // Unknown migration — rollback and report.

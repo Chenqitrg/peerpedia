@@ -7,7 +7,7 @@ import { createArticle, updateArticle } from '../api/articles'
 import { extractErrorMessage } from './useLocalStorage'
 import type { Draft, SetServerArticleIdParams } from './useTauriTypes'
 
-export type SyncState = 'upload' | 'synced' | 'conflict' | 'delete_pending' | 'offline' | 'loading'
+export type SyncState = 'upload' | 'synced' | 'conflict' | 'offline' | 'loading'
 
 /** Check if a Tauri IPC result is an error shape: { error: string }. */
 function isTauriError(v: unknown): v is { error: string } {
@@ -17,20 +17,18 @@ function isTauriError(v: unknown): v is { error: string } {
 /**
  * Article sync state machine — L4 specification.
  *
- * Observable product states:
- *   upload         — no server_article_id (never uploaded)
- *   synced         — server_commit_hash === local HEAD (quiet, no icon)
- *   conflict       — server_commit_hash !== local HEAD (must resolve)
- *   delete_pending — soft-deleted offline, needs server confirmation
- *   offline        — network unavailable (hide icons)
- *   loading        — push in progress
+ * Three observable product states:
+ *   upload   — no server_article_id (never uploaded)
+ *   synced   — server_commit_hash === local HEAD (quiet, no icon)
+ *   conflict — server_commit_hash !== local HEAD (must resolve)
+ *   offline  — network unavailable (hide icons)
+ *   loading  — push in progress
  */
 export function useArticleSync(
   draftId: () => string,
   serverArticleId: () => string | null | undefined,
   serverCommitHash: () => string | null | undefined,
   localHeadHash: () => string | null,
-  deletedAt?: () => string | null | undefined,
 ) {
   const userStore = useUserStore()
   const tauri = useTauri()
@@ -43,8 +41,6 @@ export function useArticleSync(
   const syncState = computed<SyncState>(() => {
     if (!isSynced.value) return 'offline'
     if (pushing.value) return 'loading'
-    // Soft-delete takes precedence over content conflict
-    if (deletedAt?.()) return 'delete_pending'
     const sid = serverArticleId()
     const sch = serverCommitHash()
     const lh = localHeadHash()
@@ -239,49 +235,6 @@ export function useArticleSync(
     return result as string
   }
 
-  /** Delete from server + hard delete locally (resolve delete_pending). */
-  async function deleteOnServer(): Promise<boolean> {
-    const id = draftId()
-    const sid = serverArticleId()
-    if (!id || !userStore.token) {
-      error.value = t('sync.loginRequired')
-      return false
-    }
-    pushing.value = true
-    try {
-      // Delete from server if it has a server-side record
-      if (sid) {
-        const { deleteArticle } = await import('../api/articles')
-        await deleteArticle(sid)
-      }
-      // Hard delete locally
-      await tauri.hardDeleteArticle({
-        id,
-        account_id: userStore.viewer?.id || '',
-        token: userStore.token,
-      })
-      return true
-    } catch (e: any) {
-      error.value = extractErrorMessage(e)
-      return false
-    } finally {
-      pushing.value = false
-    }
-  }
-
-  /** Restore locally (undo soft delete, keep server version). */
-  async function restoreLocally(): Promise<boolean> {
-    const id = draftId()
-    if (!id) return false
-    try {
-      await tauri.restoreArticle({ id })
-      return true
-    } catch (e: any) {
-      error.value = extractErrorMessage(e)
-      return false
-    }
-  }
-
   function clearError() {
     error.value = null
   }
@@ -293,8 +246,6 @@ export function useArticleSync(
     upload,
     pushUpdate,
     useRemote,
-    deleteOnServer,
-    restoreLocally,
     getContentAtCommit,
     clearError,
   }

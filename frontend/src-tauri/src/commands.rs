@@ -247,53 +247,6 @@ pub async fn delete_article(
     Ok(OkResponse { ok: true })
 }
 
-#[derive(Debug, Deserialize)]
-pub struct HardDeleteArticleParams {
-    pub id: String,
-    pub token: Option<String>,
-    #[serde(default)]
-    pub account_id: String,
-}
-
-#[tauri::command]
-pub async fn hard_delete_article(
-    state: State<'_, AppState>,
-    params: HardDeleteArticleParams,
-) -> Result<OkResponse, AppError> {
-    let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token).await?
-    } else if !params.account_id.is_empty() {
-        params.account_id.clone()
-    } else {
-        return Err(AppError::AuthFailed("Authentication required".into()));
-    };
-    let _ = account_id;
-    let conn = lock_db(&state).await?;
-    local_store::hard_delete_article(&conn, &params.id)?;
-    Ok(OkResponse { ok: true })
-}
-
-#[derive(Debug, Deserialize)]
-pub struct RestoreArticleParams {
-    pub id: String,
-}
-
-#[tauri::command]
-pub async fn restore_article(
-    state: State<'_, AppState>,
-    params: RestoreArticleParams,
-) -> Result<OkResponse, AppError> {
-    let conn = lock_db(&state).await?;
-    local_store::restore_article(&conn, &params.id)?;
-    Ok(OkResponse { ok: true })
-}
-
-#[tauri::command]
-pub async fn get_pending_deletes(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
-    let conn = lock_db(&state).await?;
-    local_store::get_pending_deletes(&conn)
-}
-
 // ── Draft search command ────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
