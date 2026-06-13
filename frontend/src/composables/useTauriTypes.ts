@@ -77,7 +77,8 @@ export interface GitInitParams {
   content?: string
   format?: string
   commit_message?: string
-  author: string
+  author: string       // display name
+  author_id: string    // UUID
 }
 
 export interface GitCommitParams {
@@ -85,7 +86,8 @@ export interface GitCommitParams {
   content?: string
   format?: string
   commit_message?: string
-  author: string
+  author: string       // display name
+  author_id: string    // UUID
 }
 
 export interface GitHistoryParams {
@@ -100,7 +102,8 @@ export interface GitShowParams {
 export interface GitRollbackParams {
   article_id: string
   commit_hash: string
-  author: string
+  author: string       // display name
+  author_id: string    // UUID
 }
 
 export interface PendingOp {

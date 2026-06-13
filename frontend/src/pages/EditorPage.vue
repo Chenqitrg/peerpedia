@@ -278,11 +278,11 @@ async function restoreDraft() {
 }
 
 /** Git-backed save for Tauri/local mode — git is source of truth (DESIGN.md §2.3). */
-async function persistToGit(accountId: string, author: string, msg: string): Promise<boolean> {
+async function persistToGit(accountId: string, authorName: string, authorId: string, msg: string): Promise<boolean> {
   const existingId = currentDraftId.value
 
   if (!existingId) {
-    // New draft — create persistence entry first to get an ID, then gitInit.
+    // New draft — persistence entry first to get an ID.
     const result = await draftPersistence.save(
       accountId, title.value, content.value, format.value, undefined,
     )
@@ -290,34 +290,41 @@ async function persistToGit(accountId: string, author: string, msg: string): Pro
     currentDraftId.value = result.id
     saveString(DRAFT_ID_KEY.value, result.id)
 
-    try {
-      const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author })
-      if (r && 'hash' in r) commitHash.value = r.hash
-    } catch (e: unknown) {
-      errorMsg.value = e instanceof Error ? e.message : 'Git init failed — draft saved without version history'
+    // Online: server handles git repo + first commit via POST.
+    // Offline: init local git now so work can continue.
+    if (!isSynced.value) {
+      try {
+        const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
+        if (r && 'hash' in r) commitHash.value = r.hash
+      } catch (e: unknown) {
+        errorMsg.value = e instanceof Error ? e.message : 'Git init failed'
+      }
     }
     return true
   }
 
-  // Existing draft — git commit FIRST, then update DB index.
-  try {
-    const history = await tauri.gitHistory({ article_id: existingId })
-    const hasRepo = history && !('error' in history) && Array.isArray(history) && history.length > 0
-    if (hasRepo) {
-      const r = await tauri.gitCommit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
-      if (r && 'hash' in r) { commitHash.value = r.hash }
-      else { errorMsg.value = 'Git commit failed — draft not saved'; return false }
-    } else {
-      const r = await tauri.gitInit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author })
-      if (r && 'hash' in r) { commitHash.value = r.hash }
-      else { errorMsg.value = 'Git init failed — draft not saved'; return false }
+  // Existing draft.
+  // Online: server handles commit via PUT. Offline: commit locally.
+  if (!isSynced.value) {
+    try {
+      const history = await tauri.gitHistory({ article_id: existingId })
+      const hasRepo = history && !('error' in history) && Array.isArray(history) && history.length > 0
+      if (hasRepo) {
+        const r = await tauri.gitCommit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
+        if (r && 'hash' in r) { commitHash.value = r.hash }
+        else { errorMsg.value = 'Git commit failed'; return false }
+      } else {
+        const r = await tauri.gitInit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
+        if (r && 'hash' in r) { commitHash.value = r.hash }
+        else { errorMsg.value = 'Git init failed'; return false }
+      }
+    } catch (e: unknown) {
+      errorMsg.value = e instanceof Error ? e.message : 'Git operation failed'
+      return false
     }
-  } catch (e: unknown) {
-    errorMsg.value = e instanceof Error ? e.message : 'Git operation failed — draft not saved'
-    return false
   }
 
-  // Git succeeded — update the DB index.
+  // Update the DB index.
   await draftPersistence.save(accountId, title.value, content.value, format.value, existingId)
   return true
 }
@@ -347,11 +354,12 @@ function markSaved() {
 
 async function saveDraft() {
   const accountId = userStore.viewer?.id || 'local'
-  const author = userStore.viewer?.name || userStore.viewer?.username || 'local'
+  const authorName = userStore.viewer?.name || userStore.viewer?.username || 'local'
+  const authorId = accountId  // UUID identity for git commits
 
   if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
     const msg = commitMsg.value.trim()
-    const ok = await persistToGit(accountId, author, msg)
+    const ok = await persistToGit(accountId, authorName, authorId, msg)
     console.log('[saveDraft] persistToGit ok, draftId:', currentDraftId.value)
     if (!ok) return
     commitMsg.value = ''
