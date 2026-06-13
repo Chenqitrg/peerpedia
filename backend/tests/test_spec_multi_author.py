@@ -12,7 +12,6 @@ from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
 from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def _create_user(session, username, name):
@@ -63,15 +62,15 @@ def test_spec1_get_authors_extracts_unique_users(db_engine):
 
     # Commit by A
     repo.index.add(["article.md"])
-    c1 = repo.index.commit("first", author=git.Actor("Alice", email_a), committer=git.Actor("Alice", email_a))
+    repo.index.commit("first", author=git.Actor("Alice", email_a), committer=git.Actor("Alice", email_a))  # noqa: F841
     # Commit by B
     (rp / "article.md").write_text("# Test\nB's change.\n")
     repo.index.add(["article.md"])
-    c2 = repo.index.commit("second", author=git.Actor("Bob", email_b), committer=git.Actor("Bob", email_b))
+    repo.index.commit("second", author=git.Actor("Bob", email_b), committer=git.Actor("Bob", email_b))  # noqa: F841
     # Commit by A again
     (rp / "article.md").write_text("# Test\nB's change.\nA's fix.\n")
     repo.index.add(["article.md"])
-    c3 = repo.index.commit("third", author=git.Actor("Alice", email_a), committer=git.Actor("Alice", email_a))
+    repo.index.commit("third", author=git.Actor("Alice", email_a), committer=git.Actor("Alice", email_a))  # noqa: F841
 
     s = get_session(db_engine)
     result = get_authors_from_git(rp, s)
@@ -104,13 +103,13 @@ def test_spec2_incremental_scan_only_returns_new_authors(db_engine):
     email_c = f"{user_c.id}@peerpedia"
 
     repo.index.add(["article.md"])
-    c_a = repo.index.commit("A", author=git.Actor("A", email_a), committer=git.Actor("A", email_a))
+    repo.index.commit("A", author=git.Actor("A", email_a), committer=git.Actor("A", email_a))
     (rp / "article.md").write_text("# Test\nB\n")
     repo.index.add(["article.md"])
     c_b = repo.index.commit("B", author=git.Actor("B", email_b), committer=git.Actor("B", email_b))
     (rp / "article.md").write_text("# Test\nB\nC\n")
     repo.index.add(["article.md"])
-    c_c = repo.index.commit("C", author=git.Actor("C", email_c), committer=git.Actor("C", email_c))
+    repo.index.commit("C", author=git.Actor("C", email_c), committer=git.Actor("C", email_c))
 
     s = get_session(db_engine)
     # since_hash = B's commit → should only return C
@@ -191,7 +190,7 @@ def test_spec5_rebuild_updates_marker_hash(db_engine):
     article_id = a.id
 
     # Create git repo for this article
-    from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, init_article_repo, commit_article
+    from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, init_article_repo
     rp = init_article_repo(article_id, DEFAULT_ARTICLES_DIR)
     (rp / "article.md").write_text("# Test\n")
     head_hash = commit_article(rp, "init", "Alice", f"{user_a.id}@peerpedia")
@@ -214,9 +213,8 @@ def test_spec5_rebuild_updates_marker_hash(db_engine):
 
 def test_merge_git_repos_fast_forward(db_engine):
     """merge_git_repos: fast-forward merge succeeds, returns merge hash."""
-    from peerpedia_core.storage.git_backend import merge_git_repos
-
     import git
+    from peerpedia_core.storage.git_backend import merge_git_repos
     tmp = tempfile.mkdtemp()
     target = Path(tmp) / "target"
     fork = Path(tmp) / "fork"
@@ -250,9 +248,8 @@ def test_merge_git_repos_fast_forward(db_engine):
 
 def test_merge_git_repos_conflict_raises_error(db_engine):
     """merge_git_repos: conflict raises MergeConflictError, target unchanged."""
-    from peerpedia_core.storage.git_backend import MergeConflictError, merge_git_repos
-
     import git
+    from peerpedia_core.storage.git_backend import MergeConflictError, merge_git_repos
     tmp = tempfile.mkdtemp()
     target = Path(tmp) / "target"
     fork = Path(tmp) / "fork"
@@ -282,4 +279,106 @@ def test_merge_git_repos_conflict_raises_error(db_engine):
     # Target HEAD should be unchanged (merge aborted)
     assert target_repo.head.commit.hexsha == target_head_before
     shutil.rmtree(tmp)
+
+
+# ── SPEC-REGRESSION: UUID-only internal addressing ──────────────────────────
+
+def test_spec_regression_uuid_email_matched(db_engine):
+    """git emails with {UUID}@peerpedia → author found."""
+    from peerpedia_core.storage.db.crud_article import get_authors_from_git
+
+    s = get_session(db_engine)
+    u = _create_user(s, "alice", "Alice")
+    s.close()
+
+    import tempfile
+
+    import git
+    tmp = tempfile.mkdtemp()
+    rp = Path(tmp)
+    repo = git.Repo.init(rp)
+    (rp / "f.md").write_text("# T\n")
+    repo.index.add(["f.md"])
+    repo.index.commit("init", author=git.Actor("Alice", f"{u.id}@peerpedia"),
+                      committer=git.Actor("Alice", f"{u.id}@peerpedia"))
+
+    s = get_session(db_engine)
+    result = get_authors_from_git(rp, s)
+    s.close()
+    shutil.rmtree(tmp)
+
+    assert result == {u.id}, f"UUID email should match, got {result}"
+
+
+def test_spec_regression_username_email_rejected(db_engine):
+    """git emails with {username}@peerpedia → NOT matched (username is not UUID)."""
+    from peerpedia_core.storage.db.crud_article import get_authors_from_git
+
+    s = get_session(db_engine)
+    _create_user(s, "bob", "Bob")
+    s.close()
+
+    import tempfile
+
+    import git
+    tmp = tempfile.mkdtemp()
+    rp = Path(tmp)
+    repo = git.Repo.init(rp)
+    (rp / "f.md").write_text("# T\n")
+    # Deliberately use username in email — should NOT match
+    repo.index.add(["f.md"])
+    repo.index.commit("init", author=git.Actor("Bob", "bob@peerpedia"),
+                      committer=git.Actor("Bob", "bob@peerpedia"))
+
+    s = get_session(db_engine)
+    result = get_authors_from_git(rp, s)
+    s.close()
+    shutil.rmtree(tmp)
+
+    assert result == set(), (
+        f"Username-based email should NOT match (UUID only), got {result}"
+    )
+
+
+def test_spec_regression_name_lookup_rejected(db_engine):
+    """get_user by name-based email split → returns None (name is not UUID)."""
+    from peerpedia_core.storage.db.models import User
+    # Simulate what get_authors_from_git does: split email, lookup by that value
+    s = get_session(db_engine)
+    u = _create_user(s, "carol", "Carol")
+    s.close()
+
+    s2 = get_session(db_engine)
+    # This is what happens with old seed data: "richard.feynman@peerpedia"
+    fake_id = u.name.lower().replace(" ", ".")  # "carol" — NOT a UUID
+    result = s2.get(User, fake_id)
+    s2.close()
+
+    assert result is None, (
+        f"Username '{fake_id}' should NOT resolve as UUID. Use user.id, not user.name."
+    )
+
+
+def test_spec_regression_rebuild_sorts_by_username_not_uuid(db_engine):
+    """rebuild_article_authors sorts authors by username for display, not by UUID."""
+    from peerpedia_core.storage.db.crud_article import (
+        get_author_ids,
+        rebuild_article_authors,
+    )
+
+    s = get_session(db_engine)
+    user_z = _create_user(s, "zoe", "Zoe")
+    user_a = _create_user(s, "alice", "Alice")
+
+    a = _create_article_with_author(s, user_z.id)
+
+    # Rebuild with both — should sort by username: Alice before Zoe
+    rebuild_article_authors(s, a.id, {user_a.id, user_z.id})
+
+    result = get_author_ids(s, a.id)
+    s.close()
+
+    assert result == [user_a.id, user_z.id], (
+        f"Expected [Alice, Zoe] sorted by username, got {result}"
+    )
 

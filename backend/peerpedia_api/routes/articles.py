@@ -206,7 +206,6 @@ def api_create_article(
 
     # Rebuild authors from git history after first commit
     from peerpedia_core.storage.db.crud_article import (
-        get_authors_from_git,
         rebuild_article_authors,
     )
     rebuild_article_authors(db, a.id, set(author_list))

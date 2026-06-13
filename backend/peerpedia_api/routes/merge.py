@@ -70,7 +70,6 @@ def api_accept_merge(article_id: str, proposal_id: str,
         raise HTTPException(status_code=403, detail="Only article authors can accept/reject merges")
     try:
         # Execute git merge — fork repo contents merged into target
-        from peerpedia_api.helpers import repo_path
         from peerpedia_core.storage.db.crud_article import (
             get_authors_from_git,
             rebuild_article_authors,
@@ -79,6 +78,8 @@ def api_accept_merge(article_id: str, proposal_id: str,
             MergeConflictError,
             merge_git_repos,
         )
+
+        from peerpedia_api.helpers import repo_path
 
         target_repo = repo_path(article_id)
         fork_repo = repo_path(mp.fork_article_id)
