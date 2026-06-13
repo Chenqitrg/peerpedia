@@ -129,8 +129,8 @@ const extensions = computed<Extension[]>(() => {
   return exts
 })
 
-function onReady(view: EditorView) {
-  codemirrorView.value = view
+function onReady(payload: { view: EditorView }) {
+  codemirrorView.value = payload.view
 }
 
 function onUpdate(value: string) {

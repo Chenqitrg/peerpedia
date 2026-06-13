@@ -12,7 +12,7 @@ const savedLocale = loadString('locale', 'zh-CN')
 
 const i18n = createI18n({
   legacy: false,
-  locale: savedLocale,
+  locale: savedLocale || 'zh-CN',
   fallbackLocale: 'en-US',
   messages: { 'en-US': enUS, 'zh-CN': zhCN },
 })

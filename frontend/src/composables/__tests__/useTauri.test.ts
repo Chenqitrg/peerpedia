@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useTauri } from '../useTauri'
 
+/** Narrow Tauri IPC mock result — casts away the error union for test assertions. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ok<T>(result: any): T {
+  if (result && typeof result === 'object' && 'error' in result)
+    throw new Error(`Unexpected IPC error in test: ${result.error}`)
+  return result as T
+}
+
 describe('useTauri', () => {
   beforeEach(() => {
     delete (window as any).__TAURI__
@@ -412,7 +420,7 @@ describe('useTauri — session token sharing', () => {
     // Save draft with account_id
     await tauri.saveDraft({ account_id: accountId, title: 'Backward Compat Draft', content: '# Test', format: 'markdown' })
     // List drafts — _resolveToken should fall back to a.account_id since token is null
-    const drafts = await tauri.listDrafts({ account_id: accountId })
+    const drafts = ok<Array<{ title: string }>>(await tauri.listDrafts({ account_id: accountId }))
     expect(drafts).toHaveLength(1)
     expect(drafts[0].title).toBe('Backward Compat Draft')
   })
@@ -445,8 +453,7 @@ describe('useTauri — session token sharing', () => {
     tauri2.setSessionToken(restoredToken)
 
     // Phase 4: UserPage.loadArticles — list drafts
-    const drafts = await tauri2.listDrafts({ account_id: aid })
-    expect(Array.isArray(drafts)).toBe(true)
+    const drafts = ok<Array<{ title: string }>>(await tauri2.listDrafts({ account_id: aid }))
     expect(drafts.length).toBeGreaterThanOrEqual(1)
     expect(drafts[0].title).toBe('Test Draft')
   })
@@ -465,8 +472,7 @@ describe('useTauri — browserLocal searchCachedArticles', () => {
     await tauri.cacheArticle({ id: 'a2', article_json: JSON.stringify({ title: 'Classical Physics', content_preview: 'Newtonian' }) })
     await tauri.cacheArticle({ id: 'a3', article_json: JSON.stringify({ title: 'Quantum Computing', content_preview: 'Qubits' }) })
 
-    const results = await tauri.searchCachedArticles({ q: 'quantum' })
-    expect(Array.isArray(results)).toBe(true)
+    const results = ok<Array<{ id: string }>>(await tauri.searchCachedArticles({ q: 'quantum' }))
     expect(results.length).toBe(2)
     expect(results.map(r => r.id).sort()).toEqual(['a1', 'a3'])
   })
@@ -476,7 +482,7 @@ describe('useTauri — browserLocal searchCachedArticles', () => {
     await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'Article One', content_preview: 'About deep learning' }) })
     await tauri.cacheArticle({ id: 'a2', article_json: JSON.stringify({ title: 'Article Two', content_preview: 'About physics' }) })
 
-    const results = await tauri.searchCachedArticles({ q: 'deep learning' })
+    const results = ok<Array<{ id: string }>>(await tauri.searchCachedArticles({ q: 'deep learning' }))
     expect(results.length).toBe(1)
     expect(results[0].id).toBe('a1')
   })
@@ -486,7 +492,7 @@ describe('useTauri — browserLocal searchCachedArticles', () => {
     await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'A' }) })
     await tauri.cacheArticle({ id: 'a2', article_json: JSON.stringify({ title: 'B' }) })
 
-    const results = await tauri.searchCachedArticles({ q: '' })
+    const results = ok<Array<{ id: string }>>(await tauri.searchCachedArticles({ q: '' }))
     expect(results.length).toBe(2)
   })
 
@@ -509,7 +515,7 @@ describe('useTauri — browserLocal searchCachedArticles', () => {
     const tauri = useTauri()
     await tauri.cacheArticle({ id: 'a1', article_json: JSON.stringify({ title: 'Test Article', updated_at: '2026-06-01T00:00:00Z' }) })
 
-    const results = await tauri.searchCachedArticles({ q: 'test' })
+    const results = ok<Array<{ id: string; title: string }>>(await tauri.searchCachedArticles({ q: 'test' }))
     expect(results[0]).toHaveProperty('id', 'a1')
     expect(results[0]).toHaveProperty('title', 'Test Article')
     expect(results[0]).toHaveProperty('updated_at')
@@ -545,13 +551,12 @@ describe('useTauri — searchDrafts via account_id (SearchPage flow)', () => {
 
     // Step 4: Search — exactly what SearchPage does in local mode
     // SearchPage passes userStore.viewer?.id as account_id
-    const results = await tauri.searchDrafts({
+    const results = ok<Array<{ title: string }>>(await tauri.searchDrafts({
       q: 'quantum',
       account_id: accountId,
-    })
+    }))
 
     // Should find the draft by title
-    expect(Array.isArray(results)).toBe(true)
     expect(results.length).toBe(1)
     expect(results[0].title).toBe('Quantum Mechanics Draft')
   })
@@ -567,8 +572,7 @@ describe('useTauri — searchDrafts via account_id (SearchPage flow)', () => {
       format: 'markdown',
     })
 
-    const results = await tauri.searchDrafts({ q: '', account_id: acct.id })
-    expect(Array.isArray(results)).toBe(true)
+    const results = ok<Array<{ title: string }>>(await tauri.searchDrafts({ q: '', account_id: acct.id }))
     expect(results.length).toBeGreaterThanOrEqual(1)
     expect(results.some((r: any) => r.title === 'General Relativity Notes')).toBe(true)
   })
@@ -588,8 +592,7 @@ describe('useTauri — searchDrafts via account_id (SearchPage flow)', () => {
 
     // Now search with account_id but WITHOUT session token
     // This simulates SearchPage: userStore.viewer?.id as account_id
-    const results = await tauri.searchDrafts({ q: 'cosmology', account_id: acct.id })
-    expect(Array.isArray(results)).toBe(true)
+    const results = ok<Array<{ title: string }>>(await tauri.searchDrafts({ q: 'cosmology', account_id: acct.id }))
     expect(results.length).toBe(1)
     expect(results[0].title).toBe('Cosmology Notes')
   })
@@ -615,7 +618,7 @@ describe('useTauri — browserLocal deleteArticle', () => {
     })
 
     // Verify draft exists
-    let drafts = await tauri.listDrafts({ account_id: acct.id })
+    let drafts = ok<Array<{ id: string }>>(await tauri.listDrafts({ account_id: acct.id }))
     expect(drafts.length).toBe(1)
 
     // Delete it
@@ -623,7 +626,7 @@ describe('useTauri — browserLocal deleteArticle', () => {
     expect(result).toEqual({ ok: true })
 
     // Verify it's gone
-    drafts = await tauri.listDrafts({ account_id: acct.id })
+    drafts = ok<Array<{ id: string }>>(await tauri.listDrafts({ account_id: acct.id }))
     expect(drafts.length).toBe(0)
   })
 
@@ -639,9 +642,9 @@ describe('useTauri — browserLocal deleteArticle', () => {
     })
 
     // 1. Verify draft exists
-    const draftsBefore = await tauri.listDrafts({ account_id: acct.id })
+    const draftsBefore = ok<Array<{ id: string }>>(await tauri.listDrafts({ account_id: acct.id }))
     expect(draftsBefore.length).toBe(1)
-    const draftId = (draftsBefore as any[])[0].id
+    const draftId = draftsBefore[0].id
 
     // 2. Verify draft can be retrieved individually
     const draft = await tauri.getDraft({ id: draftId })
@@ -664,7 +667,7 @@ describe('useTauri — browserLocal deleteArticle', () => {
     expect(result).toEqual({ ok: true })
 
     // 6. Verify draft is gone from list
-    const draftsAfter = await tauri.listDrafts({ account_id: acct.id })
+    const draftsAfter = ok<Array<{ id: string }>>(await tauri.listDrafts({ account_id: acct.id }))
     expect(draftsAfter.length).toBe(0)
 
     // 7. Verify getDraft returns error (not found)

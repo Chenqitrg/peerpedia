@@ -17,7 +17,7 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const tauri = useTauri()
-const { isOnline } = useNetworkStatus()
+const { isSynced } = useNetworkStatus()
 
 const userId = computed(() => route.params.id as string)
 const isFollowers = computed(() => route.path.endsWith('/followers'))
@@ -33,7 +33,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    if (!isOnline.value) {
+    if (!isSynced.value) {
       const isSelf = userId.value === userStore.viewer?.id
       const cache = useFollowCache()
       if (isSelf && !isFollowers.value) {

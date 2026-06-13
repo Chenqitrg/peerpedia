@@ -22,7 +22,7 @@
     ],
     "withGlobalTauri": true,
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8080; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; media-src 'self'"
     }
   },
   "bundle": {

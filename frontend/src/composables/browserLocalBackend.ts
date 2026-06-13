@@ -67,7 +67,7 @@ export async function browserLocalInvoke(cmd: string, args?: Record<string, unkn
     case 'create_account': {
       if (accounts.find(x => x.username === a.username))
         return { code: 'DUPLICATE', message: 'Username exists' }
-      const acct: MockAccount = { id: crypto.randomUUID(), username: a.username, password: a.password }
+      const acct: MockAccount = { id: crypto.randomUUID(), username: a.username as string, password: a.password as string }
       accounts.push(acct)
       _save(_acctsKey, accounts)
       return { id: acct.id, username: acct.username }

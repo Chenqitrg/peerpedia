@@ -32,14 +32,14 @@ export function useArticleSync(
 ) {
   const userStore = useUserStore()
   const tauri = useTauri()
-  const { isOnline } = useNetworkStatus()
+  const { isSynced } = useNetworkStatus()
   const { t } = useI18n()
 
   const error = ref<string | null>(null)
   const pushing = ref(false)
 
   const syncState = computed<SyncState>(() => {
-    if (!isOnline.value) return 'offline'
+    if (!isSynced.value) return 'offline'
     if (pushing.value) return 'loading'
     const sid = serverArticleId()
     const sch = serverCommitHash()
@@ -123,7 +123,7 @@ export function useArticleSync(
         draft_id: id,
         server_article_id: serverId,
         server_commit_hash: headHash,
-        token: userStore.localToken?.value || undefined,
+        token: (userStore.localToken || undefined) || undefined,
         account_id: userStore.viewer?.id || '',
       }
       await tauri.setServerArticleId(sidParams)
@@ -177,7 +177,7 @@ export function useArticleSync(
         draft_id: id,
         server_article_id: sid,
         server_commit_hash: headHash,
-        token: userStore.localToken?.value || undefined,
+        token: (userStore.localToken || undefined) || undefined,
         account_id: userStore.viewer?.id || '',
       }
       await tauri.setServerArticleId(sidParams)
@@ -211,7 +211,7 @@ export function useArticleSync(
         draft_id: id,
         server_article_id: sid || '',
         server_commit_hash: remoteCommitHash,
-        token: userStore.localToken?.value || undefined,
+        token: (userStore.localToken || undefined) || undefined,
         account_id: userStore.viewer?.id || '',
       }
       await tauri.setServerArticleId(sidParams)

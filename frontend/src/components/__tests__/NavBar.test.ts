@@ -13,7 +13,6 @@ vi.mock('vue-router', () => ({
 // Mock useNetworkStatus — vi.mock is hoisted, so the factory must use vi.hoisted.
 const { mockUseNetworkStatus } = vi.hoisted(() => ({
   mockUseNetworkStatus: vi.fn(() => ({
-    isOnline: { value: true },
     isSynced: { value: true },
     connectionState: ref('synced'),
     flash: ref(false),
@@ -160,7 +159,6 @@ describe('NavBar — WiFi connectivity icon', () => {
 
   it('shows green Wifi icon when server is reachable (isOnline=true)', () => {
     mockUseNetworkStatus.mockReturnValue({
-      isOnline: { value: true },
       isSynced: { value: true },
       connectionState: ref('synced'),
       flash: ref(false),
@@ -183,7 +181,6 @@ describe('NavBar — WiFi connectivity icon', () => {
 
   it('shows gray WifiOff icon when server is unreachable in Tauri mode', () => {
     mockUseNetworkStatus.mockReturnValue({
-      isOnline: { value: false },
       isSynced: { value: false },
       connectionState: ref('idle'),
       flash: ref(false),

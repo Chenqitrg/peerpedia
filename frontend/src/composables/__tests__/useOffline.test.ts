@@ -10,9 +10,8 @@ import { useNetworkStatus } from '../useNetworkStatus'
 
 const mockedUseNetworkStatus = useNetworkStatus as ReturnType<typeof vi.fn>
 
-function setOnline(online: boolean) {
+function setSynced(online: boolean) {
   mockedUseNetworkStatus.mockReturnValue({
-    isOnline: { value: online },
     isSynced: { value: online },
     connectionState: { value: online ? 'synced' as const : 'idle' as const },
     ping: vi.fn(),
@@ -25,7 +24,7 @@ describe('useOffline', () => {
   })
 
   describe('when online', () => {
-    beforeEach(() => setOnline(true))
+    beforeEach(() => setSynced(true))
 
     it('all features canRead returns true', () => {
       const { canRead } = useOffline()
@@ -45,7 +44,7 @@ describe('useOffline', () => {
 
   describe('when in Tauri mode AND server reachable (online)', () => {
     beforeEach(() => {
-      setOnline(true) // pings say "online" — server is reachable
+      setSynced(true) // pings say "online" — server is reachable
       ;(window as any).__TAURI__ = {}
     })
 
@@ -93,7 +92,7 @@ describe('useOffline', () => {
 
   describe('when in Tauri mode AND server unreachable (offline)', () => {
     beforeEach(() => {
-      setOnline(false) // pings say "offline" — server is down
+      setSynced(false) // pings say "offline" — server is down
       ;(window as any).__TAURI__ = {}
     })
 
@@ -126,7 +125,7 @@ describe('useOffline', () => {
   })
 
   describe('when offline', () => {
-    beforeEach(() => setOnline(false))
+    beforeEach(() => setSynced(false))
 
     // Full-access features (local data available).
     it('feed is full', () => {

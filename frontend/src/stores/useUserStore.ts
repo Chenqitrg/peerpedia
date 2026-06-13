@@ -146,7 +146,7 @@ export const useUserStore = defineStore('user', () => {
           syncError.value = Array.isArray(detail)
             ? detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
             : detail || '注册数据不合规'
-          throw new Error(syncError.value)
+          throw new Error(syncError.value ?? '注册数据不合规')
         }
       }
     }

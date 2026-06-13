@@ -6,12 +6,11 @@ vi.mock('vue-i18n', () => ({
 }))
 
 // Mock useNetworkStatus — Layer 1 test controls connectionState directly.
-const mockIsOnline = ref(false)
+const mockIsSynced = ref(false)
 vi.mock('../useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
-    isOnline: computed(() => mockIsOnline.value),
-    isSynced: computed(() => mockIsOnline.value),
-    connectionState: computed(() => mockIsOnline.value ? 'synced' as const : 'idle' as const),
+    isSynced: computed(() => mockIsSynced.value),
+    connectionState: computed(() => mockIsSynced.value ? 'synced' as const : 'idle' as const),
     ping: vi.fn(),
   })),
 }))
@@ -57,7 +56,7 @@ import { useBookmarkToggle } from '../useBookmarkToggle'
 import { addBookmark, removeBookmark } from '../../api/bookmarks'
 
 describe('useBookmarkToggle', () => {
-  let articles: ReturnType<typeof ref<{ id: string; is_bookmarked: boolean; is_own_article: boolean }[]>>
+  let articles: any
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -65,7 +64,7 @@ describe('useBookmarkToggle', () => {
       { id: 'a1', is_bookmarked: false, is_own_article: false },
       { id: 'a2', is_bookmarked: true, is_own_article: false },
     ])
-    mockIsOnline.value = false
+    mockIsSynced.value = false
     mockIsTauri.value = false
     mockIsTauriMode = false
     mockViewer = { id: 'u1' }
@@ -75,7 +74,7 @@ describe('useBookmarkToggle', () => {
     beforeEach(() => {
       mockIsTauri.value = true
       mockIsTauriMode = true
-      mockIsOnline.value = true // Server reachable
+      mockIsSynced.value = true // Server reachable
       mockToken = 'existing-jwt' // Already have server token, skip sync
     })
 
@@ -112,7 +111,7 @@ describe('useBookmarkToggle', () => {
     beforeEach(() => {
       mockIsTauri.value = true
       mockIsTauriMode = true
-      mockIsOnline.value = false // Server unreachable
+      mockIsSynced.value = false // Server unreachable
       mockAddBookmarkIpc.mockRejectedValue(new Error('command not found'))
       mockRemoveBookmarkIpc.mockRejectedValue(new Error('command not found'))
     })
@@ -152,7 +151,7 @@ describe('useBookmarkToggle', () => {
     beforeEach(() => {
       mockIsTauri.value = true
       mockIsTauriMode = true
-      mockIsOnline.value = true // Server reachable
+      mockIsSynced.value = true // Server reachable
       mockToken = null    // No token — need sync
       mockTrySyncServerAuth.mockReset()
     })

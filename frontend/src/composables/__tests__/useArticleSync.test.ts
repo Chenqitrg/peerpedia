@@ -6,9 +6,9 @@ vi.mock('vue-i18n', () => ({
 }))
 
 // ── Mock useNetworkStatus ──────────────────────────────────────────────
-const mockIsOnline = ref(true)
+const mockIsSynced = ref(true)
 vi.mock('../useNetworkStatus', () => ({
-  useNetworkStatus: vi.fn(() => ({ isOnline: mockIsOnline })),
+  useNetworkStatus: vi.fn(() => ({ isSynced: mockIsSynced })),
 }))
 
 // ── Mock useTauri ──────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ import { useArticleSync } from '../useArticleSync'
 describe('useArticleSync — SPEC-SYNC state machine', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockIsOnline.value = true
+    mockIsSynced.value = true
     mockToken.value = 'test-token'
     mockLocalToken.value = 'local-token'
     mockViewer.value = { id: 'u1', name: 'Test User', username: 'test' }
@@ -98,7 +98,7 @@ describe('useArticleSync — SPEC-SYNC state machine', () => {
   })
 
   it('SPEC-SYNC-STATE-4: syncState is "offline" when not online', () => {
-    mockIsOnline.value = false
+    mockIsSynced.value = false
     const { syncState } = useArticleSync(() => 'd1', () => 's1', () => 'old', () => 'new')
     expect(syncState.value).toBe('offline')
   })
