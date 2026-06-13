@@ -201,3 +201,99 @@ class TestSpecSyncSource:
         data = resp.json()
         assert data["content"] == "# Remote Content"
         assert data["format"] == "markdown"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SPEC-SYNC-CLIENT-UUID — Client-generated UUID
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestSpecSyncClientUuid:
+    """SPEC-SYNC-CLIENT-UUID: POST with client-generated id."""
+
+    def test_client_uuid_accepted(self, client):
+        """POST with client id → 201, response id matches request."""
+        token, user = _register(client, f"clientuuid_{_UNIQ}")
+        cid = str(uuid.uuid4())
+        resp = client.post("/api/v1/articles", json={
+            "id": cid,
+            "title": "Client UUID Article",
+            "content": "# Client",
+            "format": "markdown",
+            "authors": [user["id"]],
+            "keywords": [],
+            "categories": [],
+            "abstract": "",
+            "commit_message": "test",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["id"] == cid
+
+    def test_duplicate_uuid_returns_409(self, client):
+        """POST with already-existing id → 409."""
+        token, user = _register(client, f"dupuid_{_UNIQ}")
+        cid = str(uuid.uuid4())
+        # First create succeeds.
+        resp1 = client.post("/api/v1/articles", json={
+            "id": cid,
+            "title": "First",
+            "content": "# First",
+            "format": "markdown",
+            "authors": [user["id"]],
+            "keywords": [],
+            "categories": [],
+            "abstract": "",
+            "commit_message": "test",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp1.status_code == 201
+        # Second create with same UUID → 409.
+        resp2 = client.post("/api/v1/articles", json={
+            "id": cid,
+            "title": "Second",
+            "content": "# Second",
+            "format": "markdown",
+            "authors": [user["id"]],
+            "keywords": [],
+            "categories": [],
+            "abstract": "",
+            "commit_message": "test",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp2.status_code == 409
+
+    def test_invalid_uuid_returns_422(self, client):
+        """POST with non-UUID id → 422."""
+        token, user = _register(client, f"baduid_{_UNIQ}")
+        resp = client.post("/api/v1/articles", json={
+            "id": "not-a-valid-uuid",
+            "title": "Bad UUID",
+            "content": "# Bad",
+            "format": "markdown",
+            "authors": [user["id"]],
+            "keywords": [],
+            "categories": [],
+            "abstract": "",
+            "commit_message": "test",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 422, resp.text
+
+    def test_no_uuid_still_auto_generates(self, client):
+        """POST without id field → 201, server auto-generates (backward compat)."""
+        token, user = _register(client, f"autogen_{_UNIQ}")
+        resp = client.post("/api/v1/articles", json={
+            "title": "Auto-generated",
+            "content": "# Auto",
+            "format": "markdown",
+            "authors": [user["id"]],
+            "keywords": [],
+            "categories": [],
+            "abstract": "",
+            "commit_message": "test",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 201, resp.text
+        assert "id" in resp.json()
+        # Server-generated UUID should be a valid UUID string.
+        uuid.UUID(resp.json()["id"])
