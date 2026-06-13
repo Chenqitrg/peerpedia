@@ -382,3 +382,155 @@ def test_spec_regression_rebuild_sorts_by_username_not_uuid(db_engine):
         f"Expected [Alice, Zoe] sorted by username, got {result}"
     )
 
+
+# ── SPEC-REGRESSION: merge_git_repos edge cases ────────────────────────────
+
+def test_merge_git_repos_no_main_or_master_raises_error(db_engine):
+    """merge_git_repos: fork with no main/master branch raises MergeConflictError."""
+    import tempfile
+
+    import git
+    from peerpedia_core.storage.git_backend import MergeConflictError, merge_git_repos
+    tmp = tempfile.mkdtemp()
+    target = Path(tmp) / "target"
+    fork = Path(tmp) / "fork"
+
+    # Create target with a commit on a non-standard branch
+    target_repo = git.Repo.init(target)
+    (target / "f.md").write_text("# T\n")
+    target_repo.index.add(["f.md"])
+    target_repo.index.commit("T", author=git.Actor("A", "a@t.com"),
+                             committer=git.Actor("A", "a@t.com"))
+    # Rename branch to something that's not main/master (default is "main" in newer git)
+    current_branch = target_repo.active_branch.name
+    target_repo.git.branch("-m", current_branch, "other")
+
+    # Create fork with same structure (copy, then rename branch)
+    import shutil
+    shutil.copytree(target, fork, symlinks=True)
+
+    with pytest.raises(MergeConflictError, match="Could not find main/master"):
+        merge_git_repos(target, fork, "Merger")
+
+    shutil.rmtree(tmp)
+
+
+def test_merge_git_repos_cleanup_on_abort_error(db_engine):
+    """merge_git_repos: delete_remote failure in finally is swallowed."""
+    import tempfile
+
+    import git
+    from peerpedia_core.storage.git_backend import MergeConflictError, merge_git_repos
+    tmp = tempfile.mkdtemp()
+    target = Path(tmp) / "target"
+    fork = Path(tmp) / "fork"
+
+    # Create repos with conflicting edits
+    target_repo = git.Repo.init(target, initial_branch="main")
+    (target / "f.md").write_text("# T1\n")
+    target_repo.index.add(["f.md"])
+    target_repo.index.commit("T1", author=git.Actor("A", "a@t.com"),
+                             committer=git.Actor("A", "a@t.com"))
+
+    fork_repo = git.Repo.init(fork, initial_branch="main")
+    (fork / "f.md").write_text("# T1\n")
+    fork_repo.index.add(["f.md"])
+    fork_repo.index.commit("T1", author=git.Actor("A", "a@t.com"),
+                           committer=git.Actor("A", "a@t.com"))
+    # Diverge
+    (target / "f.md").write_text("# Target edit\n")
+    target_repo.index.add(["f.md"])
+    target_repo.index.commit("Target", author=git.Actor("A", "a@t.com"),
+                             committer=git.Actor("A", "a@t.com"))
+    (fork / "f.md").write_text("# Fork edit\n")
+    fork_repo.index.add(["f.md"])
+    fork_repo.index.commit("Fork", author=git.Actor("B", "b@t.com"),
+                           committer=git.Actor("B", "b@t.com"))
+
+    # This should raise MergeConflictError (conflict), and the finally
+    # block should attempt delete_remote cleanup without crashing.
+    with pytest.raises(MergeConflictError, match="Merge conflict"):
+        merge_git_repos(target, fork, "Merger")
+
+    # Target should be unchanged
+    assert target_repo.head.commit.message.strip() == "Target"
+    shutil.rmtree(tmp)
+
+
+# ── Coverage: git_backend utility functions ────────────────────────────
+
+def test_get_commit_history_returns_commits():
+    """get_commit_history returns list of commit dicts."""
+    import shutil
+    import tempfile
+
+    from peerpedia_core.storage.git_backend import (
+        commit_article,
+        get_commit_history,
+        init_article_repo,
+    )
+
+    tmp = tempfile.mkdtemp()
+    rp = Path(tmp)
+    init_article_repo("test", rp)
+    repo_path = rp / "test"
+    (repo_path / "article.md").write_text("# V1\n")
+    h1 = commit_article(repo_path, "first", "A", "a@test.com")
+    (repo_path / "article.md").write_text("# V2\n")
+    h2 = commit_article(repo_path, "second", "A", "a@test.com")
+
+    history = get_commit_history(repo_path, max_count=10)
+    assert len(history) == 2
+    assert history[0]["hash"] == h2
+    assert history[1]["hash"] == h1
+    assert history[0]["parents"] == [h1]
+    shutil.rmtree(tmp)
+
+
+def test_get_diff_returns_patch():
+    """get_diff returns diff text and stats for a commit."""
+    import shutil
+    import tempfile
+
+    from peerpedia_core.storage.git_backend import (
+        commit_article,
+        get_diff,
+        init_article_repo,
+    )
+
+    tmp = tempfile.mkdtemp()
+    rp = Path(tmp)
+    init_article_repo("test", rp)
+    repo_path = rp / "test"
+    (repo_path / "article.md").write_text("# V1\n")
+    h1 = commit_article(repo_path, "first", "A", "a@test.com")
+    (repo_path / "article.md").write_text("# V2\n\nAdded line.\n")
+    h2 = commit_article(repo_path, "second", "A", "a@test.com")
+
+    diff = get_diff(repo_path, h2)
+    assert diff["commit_hash"] == h2
+    assert diff["parent_hash"] == h1
+    assert "article.md" in diff["files"]
+    assert "Added line" in diff["diff_text"]
+    shutil.rmtree(tmp)
+
+
+def test_get_commit_history_empty_repo():
+    """get_commit_history returns empty list for repo with no commits."""
+    import shutil
+    import tempfile
+
+    from peerpedia_core.storage.git_backend import (
+        get_commit_history,
+        init_article_repo,
+    )
+
+    tmp = tempfile.mkdtemp()
+    rp = Path(tmp)
+    rp2 = init_article_repo("empty", rp)
+    # Don't create any commits — just an empty initialized repo
+
+    history = get_commit_history(rp2)
+    assert history == []
+    shutil.rmtree(tmp)
+
