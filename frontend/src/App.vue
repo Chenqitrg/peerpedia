@@ -48,7 +48,7 @@
     </Transition>
 
     <AuthModal />
-    <ReconnectDialog
+    
       v-if="showReconnect"
       :items="pendingOps"
       @resolve="onResolvePending"
@@ -62,7 +62,7 @@ import { useRoute, useRouter } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import AuthModal from './components/AuthModal.vue'
 import TabDrawer from './components/TabDrawer.vue'
-import ReconnectDialog from './components/ReconnectDialog.vue'
+
 import { useUserStore } from './stores/useUserStore'
 import { useArticleStore } from './stores/useArticleStore'
 import { useTabStore } from './stores/useTabStore'
@@ -117,8 +117,8 @@ watch(
 
 // ── Reconnect: check pending ops when network comes back ─────────
 const tauri = useTauri()
-const pendingOps = ref<{ id: string; title: string; op_type: string; updated_at: string; offline_since?: string | null }[]>([])
-const showReconnect = ref(false)
+
+
 
 watch(isSynced, async (online) => {
   if (!online || !tauri.isTauri.value) return

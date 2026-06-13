@@ -21,7 +21,8 @@ import { loadString, saveString, saveJSON, remove } from '../composables/useLoca
 import { parseMarkdown } from '../utils/markdown'
 import { sanitizeTypstSvg } from '../utils/typst'
 import DownloadButton from '../components/DownloadButton.vue'
-import SelfReviewPanel from '../components/SelfReviewPanel.vue'
+import StarRating from '../components/StarRating.vue'
+import { SCORE_DIMS } from '../api/constants'
 import {
   ArrowLeft,
   Bookmark,
@@ -470,6 +471,12 @@ function handlePublish() {
   showSelfReview.value = true
 }
 
+const canSubmitSelfReview = computed(() => {
+  return abstract.value.trim().length > 0
+    && keywords.value.trim().length > 0
+    && Object.values(scores.value).every(s => s > 0)
+})
+
 async function handleSubmitToPool() {
   if (!content.value.trim()) {
     errorMsg.value = 'Content is required'
@@ -708,6 +715,38 @@ defineExpose({ handlePublish, showSelfReview })
       </div>
     </div>
 
+    <!-- Self-Review scorecard — inline slide-down -->
+    <Transition name="slide-down">
+      <div v-if="showSelfReview" class="px-4 py-4 bg-card border-x border-divider space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-heading font-semibold text-ink text-sm">{{ t('editor.selfAssessment') }}</h3>
+          <p class="text-xs text-ink-muted">{{ t('editor.allFieldsRequired') }}</p>
+        </div>
+        <!-- 5-dim scores -->
+        <div class="grid grid-cols-5 gap-2">
+          <div v-for="dim in SCORE_DIMS" :key="dim.key" class="flex flex-col items-center gap-1">
+            <span class="text-xs text-ink-muted">{{ dim.label }}</span>
+            <StarRating v-model="scores[dim.key]" :max="5" :size="14" />
+          </div>
+        </div>
+        <!-- Abstract -->
+        <textarea v-model="abstract" :placeholder="t('editor.abstractPlaceholder')"
+          class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted resize-none"
+          rows="2" maxlength="500" />
+        <!-- Keywords -->
+        <input v-model="keywords" :placeholder="t('editor.keywordsPlaceholder')"
+          class="w-full bg-[#0d1117] border border-divider rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted" />
+        <!-- Submit -->
+        <div class="flex justify-end gap-2">
+          <button class="px-3 py-1.5 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-lg transition-colors"
+            @click="showSelfReview = false">{{ t('editor.cancel') }}</button>
+          <button :disabled="!canSubmitSelfReview"
+            class="px-4 py-1.5 text-xs font-bold bg-accent text-[#0d1117] rounded-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            @click="handleSubmitToPool">{{ submitting ? '...' : t('editor.submitToPool') }}</button>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Messages -->
     <div v-if="errorMsg" class="px-4 py-2 text-xs text-ink-muted bg-card border-x border-divider">
       {{ errorMsg }}
@@ -794,15 +833,29 @@ defineExpose({ handlePublish, showSelfReview })
       <span>{{ content.length }} characters</span>
     </div>
 
-    <!-- Self-review panel -->
-    <SelfReviewPanel
-      v-model="showSelfReview"
-      v-model:scores="scores"
-      v-model:keywords="keywords"
-      v-model:categories="categories"
-      v-model:abstract="abstract"
-      :submitting="submitting"
-      @submit="handleSubmitToPool"
-    />
   </div>
 </template>
+
+<style scoped>
+.slide-down-enter-active, .slide-down-leave-active {
+  transition: all 250ms ease;
+}
+.slide-down-enter-from {
+  opacity: 0;
+  max-height: 0;
+  transform: translateY(-8px);
+}
+.slide-down-enter-to {
+  opacity: 1;
+  max-height: 300px;
+}
+.slide-down-leave-from {
+  opacity: 1;
+  max-height: 300px;
+}
+.slide-down-leave-to {
+  opacity: 0;
+  max-height: 0;
+  transform: translateY(-4px);
+}
+</style>
