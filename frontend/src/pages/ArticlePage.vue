@@ -187,7 +187,7 @@ async function loadArticle(articleId: string) {
       useFollowCache().setCachedArticle(articleId, article.value, {
         content: articleSourceContent.value,
         format: articleFormat.value,
-      }).catch(() => {})
+      }).catch((e: unknown) => { console.warn('Cache article failed:', e) })
     }
     return
   } catch (e: any) {

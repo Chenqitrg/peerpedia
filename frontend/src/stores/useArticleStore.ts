@@ -17,8 +17,9 @@ export const useArticleStore = defineStore('article', () => {
       const data = await getArticles(params)
       articles.value = data.articles ?? data
       total.value = data.total ?? 0
-    } catch {
-      // errors surface to caller via useAsyncState
+    } catch(e) {
+      console.warn('fetchArticles failed:', e)
+      throw e
     }
   }
 

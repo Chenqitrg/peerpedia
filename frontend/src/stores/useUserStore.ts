@@ -115,7 +115,7 @@ export const useUserStore = defineStore('user', () => {
       _savePendingCreds(null)
       syncError.value = null
       // Refresh offline follow cache.
-      useFollowCache().refreshCache(serverUser.id).catch(() => {})
+      useFollowCache().refreshCache(serverUser.id).catch((e: unknown) => { console.warn('refreshCache failed:', e) })
     } catch (e: any) {
       console.log('[loginLocal] apiLogin failed, trying apiRegister:', e?.response?.status)
       // User doesn't exist on server yet — try apiRegister immediately.
@@ -132,7 +132,7 @@ export const useUserStore = defineStore('user', () => {
         saveJSON('viewer', serverUser)
         _savePendingCreds(null)
         syncError.value = null
-        useFollowCache().refreshCache(serverUser.id).catch(() => {})
+        useFollowCache().refreshCache(serverUser.id).catch((e: unknown) => { console.warn('refreshCache failed:', e) })
       } catch (regErr: any) {
         const detail = regErr?.response?.data?.detail
         console.error('[loginLocal] apiRegister error:', regErr?.response?.status, JSON.stringify(detail))
@@ -276,7 +276,7 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
-      useFollowCache().refreshCache(serverUser.id).catch(() => {})
+      useFollowCache().refreshCache(serverUser.id).catch((e: unknown) => { console.warn('refreshCache failed:', e) })
       return true
     } catch (e: any) {
       console.log('[sync] apiLogin failed:', e?.response?.status, e?.response?.data?.detail || e?.message || e)
@@ -298,7 +298,7 @@ export const useUserStore = defineStore('user', () => {
       saveJSON('viewer', serverUser)
       _savePendingCreds(null)
       syncError.value = null
-      useFollowCache().refreshCache(serverUser.id).catch(() => {})
+      useFollowCache().refreshCache(serverUser.id).catch((e: unknown) => { console.warn('refreshCache failed:', e) })
       return true
     } catch (regErr: any) {
       const detail = regErr?.response?.data?.detail
