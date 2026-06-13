@@ -111,6 +111,7 @@ export function useArticleSync(
         article_id: id,
         commit_hash: remoteCommitHash,
         author: userStore.viewer?.name || 'PeerPedia',
+        author_id: userStore.viewer?.id || 'local',
       })
 
       return true

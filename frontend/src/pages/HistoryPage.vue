@@ -211,6 +211,7 @@ async function confirmRollback() {
         article_id: id,
         commit_hash: hash,
         author: 'User',
+        author_id: 'local',
       })
       if (result && 'error' in result) {
         rollbackError.value = typeof result.error === 'string' ? result.error : 'Rollback failed'

@@ -660,7 +660,7 @@ describe('useTauri — browserLocal deleteArticle', () => {
     expect(cachedBefore).toHaveProperty('id', draftId)
 
     // 4. Init git history for the draft
-    await tauri.gitInit({ article_id: draftId, content: '# Recursive', format: 'markdown', commit_message: 'init', author: 'rectest' })
+    await tauri.gitInit({ article_id: draftId, content: '# Recursive', format: 'markdown', commit_message: 'init', author: 'rectest', author_id: 'uuid-rectest' })
     const historyBefore = await tauri.gitHistory({ article_id: draftId })
     expect(Array.isArray(historyBefore)).toBe(true)
     expect((historyBefore as any[]).length).toBeGreaterThanOrEqual(1)
