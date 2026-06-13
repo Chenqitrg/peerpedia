@@ -579,3 +579,32 @@ def test_migrate_db_adds_column_when_missing(db_engine):
         assert "last_author_rebuild_hash" in cols_after, f"Columns after: {cols_after}"
         eng.dispose()
 
+
+# ── Coverage: remaining git_backend paths ────────────────────────────────
+
+def test_get_diff_between_two_commits():
+    """get_diff_between returns diff between two arbitrary commits."""
+    import shutil
+    import tempfile
+
+    from peerpedia_core.storage.git_backend import (
+        commit_article,
+        get_diff_between,
+        init_article_repo,
+    )
+
+    tmp = tempfile.mkdtemp()
+    rp = Path(tmp)
+    init_article_repo("test", rp)
+    repo_path = rp / "test"
+    (repo_path / "article.md").write_text("# V1\n")
+    h1 = commit_article(repo_path, "first", "A", "a@t.com")
+    (repo_path / "article.md").write_text("# V2\n")
+    h2 = commit_article(repo_path, "second", "A", "a@t.com")
+
+    diff = get_diff_between(repo_path, h1, h2)
+    assert diff["commit_hash"] == h2
+    assert diff["parent_hash"] == h1
+    assert "V2" in diff["diff_text"]
+    shutil.rmtree(tmp)
+
