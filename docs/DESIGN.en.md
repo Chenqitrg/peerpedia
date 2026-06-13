@@ -47,7 +47,7 @@ Phase 2+ (Web — community)
 
 **Git is the source of truth. Database is an index.**
 
-The write path for all article content follows this invariant:
+Local and server each hold a complete git history. There is no single "source of truth" — like GitHub, identity is generated client-side. Commit hashes are the atomic unit of synchronization.
 
 ```
 User request → Git commit (content) → success → DB upsert (metadata index)
@@ -66,6 +66,49 @@ User request → Git commit (content) → success → DB upsert (metadata index)
 - **Merge:** `merge_git_repos()` performs real git merge (add fork as remote, fetch, merge). On success, authors are rebuilt from the merged DAG. On conflict, the merge proposal stays open.
 - **Incremental scan:** `last_author_rebuild_hash` on Article tracks the last processed commit. `get_authors_from_git` uses `git rev-list since..HEAD` for DAG-safe incremental scans.
 - **UUID-only principle:** All internal addressing uses UUID. Username is a display field, never an index. Git emails use `{UUID}@peerpedia`, not `{username}@peerpedia`.
+
+### 2.3-bis UUID Unification — Client-Generated Identity (2026-06-14)
+
+**The client generates article UUIDs. The server accepts them as-is.**
+
+Before (v0.3.0): local draft had a UUID, server article had a different UUID. A `server_article_id` mapping field bridged them — and was the root cause of duplicate article creation, 404s on delete, and blank fork pages.
+
+After (v0.4.0): one UUID everywhere. The same ID identifies an article in local SQLite, the local git repo at `~/.peerpedia/articles/{id}/`, and the server database. No mapping table. No `server_article_id` column.
+
+```
+Before:  local-uuid → [mapping table] → server-uuid  (3 bugs per operation)
+After:   client generates UUID → server accepts it    (0 mapping bugs)
+```
+
+**Design invariants:**
+- `POST /articles` accepts an optional `id` field. Client provides → server uses it. Client omits → server auto-generates (backward compat for seed/web mode).
+- Invalid UUID → 422. Duplicate UUID → 409. These are the only two error states.
+- Authors are **always** derived from the JWT token (`current_user`), never from the client request body. The client UUID is trusted for identity, never for authorship.
+
+### 2.3-ter Online/Offline Architecture (2026-06-14)
+
+**Eight design rules governing every save, delete, and sync operation.**
+
+| # | Rule | Rationale |
+|---|------|-----------|
+| 1 | **Save = commit + push (online)** | One save, one server request. No duplicate POSTs. |
+| 2 | **Save = commit only (offline)** | Local-first. Connectivity is a privilege, not a requirement. |
+| 3 | **Reconnect = user decides** | Server is backup, not an obligation. User chooses what to push. |
+| 4 | **7-day offline expiry** | Server is backup, not free long-term storage. Commits older than 7 days are rejected. |
+| 5 | **Delete is protected by backup** | Offline delete marks "pending delete." Reconnect asks: delete server backup too? Cancel → restore from backup. |
+| 6 | **Publish is a gate, not a save** | Save = private push. Publish = visibility change. Three states: Private → Pool → Public. |
+| 7 | **Explicit over silent** | Every catch block must `console.warn`. Silent failures are debugging debt. |
+| 8 | **Mandatory resolution** | Pending sync operations block all functionality. No dismiss, no skip. |
+
+**Sync state machine:**
+```
+ONLINE                     OFFLINE                    RECONNECT
+Ctrl+S                     Ctrl+S                     Network restored
+  ├─ git commit              ├─ git commit              ├─ Scan pending_push/delete
+  ├─ POST/PUT /articles      └─ mark pending_push       ├─ Blocking dialog (no dismiss)
+  └─ UI updated                                         ├─ User resolves each item
+                                                        └─ Dialog closes → normal ops
+```
 
 ### 2.3-bis Git-First Content Loading (2026-06-10)
 
