@@ -191,6 +191,39 @@ No `.catch(() => {})` without at least `console.warn`. Every failure must leave 
 
 When pending sync operations exist (offline saves, offline deletes), the user cannot proceed until all are resolved. A blocking dialog — no dismiss, no skip. Sync debt must be paid before new work begins.
 
+### Local / Server Responsibility Split · 本地与服务器权责划分
+
+Every component in PeerPedia has exactly one role. Nothing straddles the boundary.
+
+| Responsibility | Local (Tauri Desktop) | Server (Python Backend) |
+|---------------|----------------------|------------------------|
+| **Article identity** | Generates UUID | Accepts and stores |
+| **Content storage** | Full git repo (source of truth) | Full git repo (backup + fork source) |
+| **Save** | git commit + push trigger | Accept push, store commit |
+| **Edit** | git commit + push | Accept push |
+| **Delete** | Clear local git + cache | Delete article + git repo |
+| **Publish** | Trigger (manual gate) | Change visibility: draft → pool |
+| **Fork** | Trigger (own articles only) | Copy git repo, create new article |
+| **Offline work** | Full create/edit/delete locally | None (pending markers stored locally) |
+| **Reconnect** | Scan pending, show blocking dialog | Accept/reject pushes (7-day expiry) |
+| **Cache** | SQLite article_cache + localStorage | Not involved |
+| **Auth** | Local accounts + session tokens | JWT authentication |
+| **Backup** | Not responsible | Stores every pushed commit |
+| **Rollback** | git rollback locally | git history on server |
+
+The boundary is simple: **if it touches a git repo, both sides do it. If it touches visibility, only the server does it. If it touches offline state, only the local side tracks it.**
+
+```
+    LOCAL (Productivity)                  SERVER (Backup + Collaboration)
+    ┌─────────────────────┐               ┌──────────────────────┐
+    │ Create, Edit, Save   │               │ Accept push          │
+    │ git commit + history │─── push ───▶  │ Store git history    │
+    │ Offline queue        │               │ Fork source          │
+    │ Local cache          │               │ Visibility (publish) │
+    │ Pending resolution   │◀── restore ── │ Backup (rescue)      │
+    └─────────────────────┘               └──────────────────────┘
+```
+
 ---
 
 ## Quick Start · 快速开始

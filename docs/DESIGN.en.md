@@ -122,6 +122,37 @@ After:  git → content (git_show) → compile → UI            (always fresh)
 
 The `article_cache` SQLite table is an optional network-speed optimization, never a content authority. ArticlePage in Tauri mode skips it entirely and sources content from git.
 
+### 2.3-quater Local/Server Responsibility Split (2026-06-14)
+
+Every component has exactly one role. The boundary: **local is the productivity home, server is backup + collaboration.**
+
+```
+    LOCAL (Tauri Desktop)                  SERVER (Python Backend)
+    ┌─────────────────────┐               ┌──────────────────────┐
+    │ UUID generation      │               │ UUID acceptance       │
+    │ git commit + history │─── push ───▶  │ git history backup    │
+    │ Article cache        │               │ Fork source           │
+    │ Offline pending queue│               │ Visibility (publish)  │
+    │ Local auth           │               │ JWT auth              │
+    │ Pending resolution   │◀── restore ── │ Backup rescue         │
+    └─────────────────────┘               └──────────────────────┘
+```
+
+| Responsibility | Local | Server |
+|---------------|-------|--------|
+| UUID generation | ✅ Generates (client-side) | Accepts and stores |
+| Content git repo | ✅ Full history (works offline) | ✅ Full history (fork source, rollback) |
+| Save | git commit + push trigger | Accept push, store commit |
+| Delete | Clear local git + cache + mark pending | DELETE article + git repo |
+| Publish | Trigger only | Changes visibility (draft → pool → public) |
+| Fork | Trigger (own articles, not pool) | Copy git repo, create article |
+| Offline work | Full create/edit/delete | None |
+| Reconnect resolution | Scan pending, blocking dialog | Accept/reject (7-day expiry) |
+| Cache | SQLite article_cache | Not involved |
+| Auth | Local accounts + session tokens | JWT tokens |
+
+**Rule of thumb:** if it touches a git repo, both sides do it. If it touches visibility, only the server. If it touches offline state, only the local side.
+
 ### 2.4 Article Sync (L4)
 
 Every save in Tauri mode auto-uploads the article to the server as a private draft (like a GitHub private repo). Publish is a separate, explicit action.
