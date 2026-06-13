@@ -15,7 +15,7 @@
       <button class="ml-2 text-ink-muted hover:text-ink" @click="userStore.syncError = null">✕</button>
     </div>
     <div class="flex-1 relative">
-      <TabDrawer @close-tab="onCloseTab" />
+      <TabDrawer v-if="pendingConflictCount === 0" @close-tab="onCloseTab" />
       <main
         :class="isEditorPage
           ? 'w-full px-2 pt-24 pb-2'
@@ -64,12 +64,11 @@ import AuthModal from './components/AuthModal.vue'
 import TabDrawer from './components/TabDrawer.vue'
 
 import { useUserStore } from './stores/useUserStore'
-import { useArticleStore } from './stores/useArticleStore'
 import { useTabStore } from './stores/useTabStore'
-import { deleteArticle } from './api/articles'
 import { loadString, remove } from './composables/useLocalStorage'
 import { useNetworkStatus } from './composables/useNetworkStatus'
 import { useTauri } from './composables/useTauri'
+import { pendingConflictCount } from './router'
 
 const route = useRoute()
 const router = useRouter()
@@ -124,52 +123,9 @@ watch(isSynced, async (online) => {
   if (!online || !tauri.isTauri.value) return
   const ops = await tauri.getPendingOps({ account_id: userStore.viewer?.id || 'local' })
   if (ops && Array.isArray(ops) && !('error' in ops) && ops.length > 0) {
-    pendingOps.value = ops
-    showReconnect.value = true
+    pendingConflictCount.value = ops.length
   }
 })
-
-const articleStore = useArticleStore()
-
-async function onResolvePending(id: string, action: 'push' | 'discard' | 'confirm_delete' | 'restore') {
-  const draft = await tauri.getDraft({ id })
-  if (action === 'push') {
-    if (draft && !('error' in draft)) {
-      try {
-        await articleStore.createArticle({
-          id: draft.id,
-          title: draft.title,
-          content: draft.content,
-          format: (draft.format as 'markdown' | 'typst') || 'markdown',
-          commit_message: 'Offline save',
-          self_review: { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 },
-        })
-      } catch (e: unknown) { console.warn('Push failed:', e) }
-    }
-  } else if (action === 'confirm_delete') {
-    try { await deleteArticle(id) } catch (e: unknown) { console.warn('Delete failed:', e) }
-    try { await tauri.deleteArticle({ id, account_id: userStore.viewer?.id || 'local' }) } catch { /* best-effort */ }
-  } else if (action === 'discard') {
-    // Discard: hard-reset git to before offline changes (no new commit).
-    const history = await tauri.gitHistory({ article_id: id })
-    if (history && Array.isArray(history) && history.length > 0) {
-      if (history.length === 1) {
-        // Only offline commits — article was created offline. Delete entirely.
-        try { await tauri.deleteArticle({ id, account_id: userStore.viewer?.id || 'local' }) } catch { /* best-effort */ }
-      } else {
-        // git history is newest-first. history[1] = last synced commit.
-        try {
-          await tauri.gitResetHard({ article_id: id, commit_hash: history[1].hash })
-        } catch (e: unknown) { console.warn('gitResetHard failed:', e) }
-      }
-    }
-  } else if (action === 'restore') {
-    // Restore from pending delete: clear marker, data was preserved.
-  }
-  await tauri.clearPending({ id })
-  pendingOps.value = pendingOps.value.filter(o => o.id !== id)
-  if (pendingOps.value.length === 0) showReconnect.value = false
-}
 
 // ── Close confirmation dialog (dirty tabs) ─────────────────────
 

@@ -379,7 +379,7 @@ async function saveDraft() {
               commit_message: msg,
               publish: false,
             })
-          } else if (!_pushedToServer) {
+          } else if (!_pushedToServer.value) {
             // New article, first push: POST create with client UUID.
             await articleStore.createArticle({
               id: currentDraftId.value,
@@ -389,7 +389,7 @@ async function saveDraft() {
               commit_message: msg,
               self_review: { ...scores.value },
             })
-            _pushedToServer = true
+            _pushedToServer.value = true
           } else {
             // Already created on server — use PUT update.
             await articleStore.updateArticle(currentDraftId.value!, {
@@ -726,7 +726,7 @@ defineExpose({ handlePublish, showSelfReview })
         <div class="grid grid-cols-5 gap-2">
           <div v-for="dim in SCORE_DIMS" :key="dim.key" class="flex flex-col items-center gap-1">
             <span class="text-xs text-ink-muted">{{ dim.label }}</span>
-            <StarRating v-model="scores[dim.key]" :max="5" :size="14" />
+            <StarRating v-model="scores[dim.key]" :max="5" size="sm" />
           </div>
         </div>
         <!-- Abstract -->

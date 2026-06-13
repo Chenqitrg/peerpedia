@@ -25,8 +25,25 @@
     "syncConnectAria": "Sync — tap to connect",
     "syncConnecting": "Connecting…",
     "syncDisconnectAria": "Synced — tap to disconnect"
-    "conflicts": "Conflicts",
-    "conflictsCount": "{count} conflict(s) to resolve",  },
+  },
+  "sync": {
+    "conflictsTitle": "Sync Conflicts",
+    "conflictsSubtitle": "Resolve each item before continuing.",
+    "pendingUpload": "Pending upload",
+    "pendingDelete": "Pending delete",
+    "pushToServer": "Push to Server",
+    "discard": "Discard",
+    "confirmDelete": "Confirm Delete",
+    "restoreFromServer": "Restore from Server",
+    "allResolved": "All Synced",
+    "allResolvedHint": "Your local changes are now in sync with the server.",
+    "progress": "Item {current} of {total}",
+    "untitled": "Untitled",
+    "lessThanHour": "Less than 1 hour ago",
+    "hoursAgo": "{n} hour(s) ago",
+    "daysAgo": "{n} day(s) ago",
+    "expiryNote": "Changes older than 7 days will be marked expired."
+  },
   "schools": {
     "subtitle": "Discover researchers. Follow people whose work you find interesting."
   },
@@ -144,6 +161,8 @@
     "categories": "Categories",
     "abstract": "Abstract",
     "abstractPlaceholder2": "Brief summary of your article...",
+    "allFieldsRequired": "All fields required before submit",
+    "submitToPool": "Submit to Pool",
     "allFieldsRequired": "All fields required before submit",
     "submitToPool": "Submit to Pool",    "cancel": "Cancel",
     "submitting": "Submitting...",
