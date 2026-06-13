@@ -45,6 +45,13 @@ pub fn init_db() -> Result<Connection, AppError> {
 
     run_migrations(&conn)?;
 
+    // Ensure a default local account exists so saves work before registration.
+    conn.execute(
+        "INSERT OR IGNORE INTO local_accounts (id, username, password_hash, email, name)
+         VALUES ('local', 'local', '', '', 'Local User')",
+        [],
+    )?;
+
     Ok(conn)
 }
 
