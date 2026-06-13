@@ -148,8 +148,12 @@ async function onResolvePending(id: string, action: 'push' | 'discard' | 'confir
     }
   } else if (action === 'confirm_delete') {
     try { await deleteArticle(id) } catch (e: unknown) { console.warn('Delete failed:', e) }
+    try { await tauri.deleteArticle({ id, account_id: userStore.viewer?.id || 'local' }) } catch { /* best-effort */ }
+  } else if (action === 'discard') {
+    // Discard: remove local draft + git repo, no server push.
+    try { await tauri.deleteArticle({ id, account_id: userStore.viewer?.id || 'local' }) } catch { /* best-effort */ }
   }
-  // discard / restore: just clear the pending marker
+  // restore: just clear the pending marker, keep data
   await tauri.clearPending({ id })
   pendingOps.value = pendingOps.value.filter(o => o.id !== id)
   if (pendingOps.value.length === 0) showReconnect.value = false

@@ -121,6 +121,7 @@ const { isSynced } = useNetworkStatus()
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
+const _pushedToServer = ref(false)
 
 function onSaveAndClose(e: Event) {
   const detail = (e as CustomEvent).detail
@@ -139,6 +140,7 @@ onMounted(() => {
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
     currentDraftId.value = undefined
+    _pushedToServer.value = false
   }
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('tab-save-and-close', onSaveAndClose)
@@ -370,15 +372,14 @@ async function saveDraft() {
       if (articleId) {
         try {
           if (editId.value) {
-            // Existing article: PUT update.
             await articleStore.updateArticle(editId.value, {
               title: title.value,
               content: content.value,
               commit_message: msg,
               publish: false,
             })
-          } else {
-            // New article: POST create on server with client UUID.
+          } else if (!_pushedToServer) {
+            // New article, first push: POST create with client UUID.
             await articleStore.createArticle({
               id: currentDraftId.value,
               title: title.value,
@@ -386,6 +387,15 @@ async function saveDraft() {
               format: format.value,
               commit_message: msg,
               self_review: { ...scores.value },
+            })
+            _pushedToServer = true
+          } else {
+            // Already created on server — use PUT update.
+            await articleStore.updateArticle(currentDraftId.value!, {
+              title: title.value,
+              content: content.value,
+              commit_message: msg,
+              publish: false,
             })
           }
         } catch (e: any) {

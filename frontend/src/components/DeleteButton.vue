@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { Trash2 } from 'lucide-vue-next'
 import { useTauri } from '../composables/useTauri'
 import { useUserStore } from '../stores/useUserStore'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { deleteArticle } from '../api/articles'
 
 const { t } = useI18n()
@@ -26,13 +27,14 @@ const deleting = ref(false)
 const errorMessage = ref('')
 const tauri = useTauri()
 const userStore = useUserStore()
+const { isSynced } = useNetworkStatus()
 
 async function handleDelete() {
   if (deleting.value) return
   deleting.value = true
   errorMessage.value = ''
   try {
-    const isOnline = !!userStore.token
+    const isOnline = !!userStore.token && isSynced.value
 
     if (isOnline) {
       // Server-first: delete from server, then clean up local
