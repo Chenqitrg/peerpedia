@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import DeleteButton from '../DeleteButton.vue'
 import { useTauri } from '../../composables/useTauri'
+import { useUserStore } from '../../stores/useUserStore'
 import { deleteArticle } from '../../api/articles'
 
 // Mock dependencies
@@ -20,6 +22,11 @@ vi.mock('../../api/articles', () => ({
 describe('DeleteButton', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
+    // Default: online (token present)
+    const userStore = useUserStore()
+    userStore.token = 'test-token'
+    userStore.viewer = { id: 'u1', username: 'test', name: 'Test', anonymous_name: 'anon', expertise: [], reputation: 0, followers_count: 0, following_count: 0, created_at: '' } as any
   })
 
   it('shows trash icon by default, no confirm UI', () => {
@@ -52,7 +59,7 @@ describe('DeleteButton', () => {
     expect(wrapper.text()).not.toContain('Confirm?')
   })
 
-  it('emits deleted on successful delete', async () => {
+  it('emits deleted on successful server delete', async () => {
     ;(deleteArticle as any).mockResolvedValueOnce({})
     const wrapper = mount(DeleteButton, {
       props: { articleId: 'test-1' },
@@ -61,11 +68,14 @@ describe('DeleteButton', () => {
     const deleteBtn = wrapper.findAll('button').find(b => b.text().includes('Delete'))
     await deleteBtn!.trigger('click')
     await wrapper.vm.$nextTick()
+    // Small wait for async delete to complete
+    await new Promise(r => setTimeout(r, 10))
+    expect(deleteArticle).toHaveBeenCalledWith('test-1')
     expect(wrapper.emitted('deleted')).toBeTruthy()
     expect(wrapper.emitted('deleted')![0]).toEqual(['test-1'])
   })
 
-  it('does not emit deleted on API failure, confirm still visible', async () => {
+  it('emits error on API failure, confirm still visible', async () => {
     ;(deleteArticle as any).mockRejectedValueOnce(new Error('fail'))
     const wrapper = mount(DeleteButton, {
       props: { articleId: 'test-1' },
@@ -74,6 +84,8 @@ describe('DeleteButton', () => {
     const deleteBtn = wrapper.findAll('button').find(b => b.text().includes('Delete'))
     await deleteBtn!.trigger('click')
     await wrapper.vm.$nextTick()
+    await new Promise(r => setTimeout(r, 10))
     expect(wrapper.emitted('deleted')).toBeFalsy()
+    expect(wrapper.emitted('error')).toBeTruthy()
   })
 })

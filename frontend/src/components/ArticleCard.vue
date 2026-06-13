@@ -63,7 +63,7 @@ function goToHistory() {
 async function goToFork() {
   try {
     const result = await forkArticle(props.article.id)
-    router.push(`/edit/${result.id}`)
+    router.push(`/articles/${result.id}`)
   } catch {
     // silent — error handled by the API interceptor
   }

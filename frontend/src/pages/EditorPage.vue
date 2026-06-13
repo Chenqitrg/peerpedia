@@ -487,7 +487,6 @@ async function handleSubmitToPool() {
       format: format.value,
       commit_message: '',
       self_review: { ...scores.value },
-      authors: [userStore.viewer.id],
       publish: true,
       keywords: keywords.value ? keywords.value.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
       categories: categories.value ? categories.value.split(',').map((c: string) => c.trim()).filter(Boolean) : [],

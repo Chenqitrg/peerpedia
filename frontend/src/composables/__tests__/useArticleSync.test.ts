@@ -125,23 +125,25 @@ describe('useArticleSync — SPEC-SYNC state machine', () => {
     )
   })
 
-  it('SPEC-SYNC-REGRESSION-1: upload() sends viewer.id not viewer.name as author', async () => {
-    // Regression: useArticleSync was passing viewer.name || viewer.username
-    // to createArticle, causing FK violation on the server (author_id must be UUID).
+  it('SPEC-SYNC-REGRESSION-1: upload() sends payload without hardcoded authors', async () => {
+    // Authors are now auto-derived by the backend from git history + auth token.
+    // Frontend no longer hardcodes authors — backend defaults to current_user.
     mockViewer.value = { id: 'u1', name: 'ChenqiMeng', username: 'test' }
     const { upload } = useArticleSync(() => 'd1', () => null, () => null, () => 'abc123')
     await upload()
-    expect(mockCreateArticle).toHaveBeenCalledWith(
-      expect.objectContaining({ authors: ['u1'] }),
-    )
+    expect(mockCreateArticle).toHaveBeenCalled()
+    // Verify authors field is NOT in the payload (backend handles it)
+    const callArg = mockCreateArticle.mock.calls[0][0]
+    expect(callArg.authors).toBeUndefined()
   })
 
-  it('SPEC-SYNC-REGRESSION-2: upload() falls back to Anonymous when viewer is null', async () => {
+  it('SPEC-SYNC-REGRESSION-2: upload() still works when viewer is null', async () => {
+    // Backend derives author from auth token, not request body.
     mockViewer.value = null
     const { upload } = useArticleSync(() => 'd1', () => null, () => null, () => 'abc123')
     await upload()
-    expect(mockCreateArticle).toHaveBeenCalledWith(
-      expect.objectContaining({ authors: ['Anonymous'] }),
-    )
+    expect(mockCreateArticle).toHaveBeenCalled()
+    const callArg = mockCreateArticle.mock.calls[0][0]
+    expect(callArg.authors).toBeUndefined()
   })
 })

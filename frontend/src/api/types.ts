@@ -82,7 +82,7 @@ export interface AuthorInfo {
 }
 
 export interface ArticleCreatePayload {
-  authors: string[]
+  authors?: string[]
   self_review: FiveDimScores
   contributions?: AuthorContributions
   commit_message: string

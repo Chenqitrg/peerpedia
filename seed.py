@@ -758,7 +758,7 @@ $$
             rp = init_article_repo(a.id, base_dir=articles_dir)
             (rp / "article.md").write_text(ad["content"])
             commit_article(rp, "Initial submission", author.name,
-                          f"{author.name.lower().replace(' ', '.')}@peerpedia",
+                          f"{author.id}@peerpedia",
                           allow_empty=True)
         except Exception as e:
             print(f"  Warning: git repo for {ad['title'][:40]} failed: {e}")
@@ -858,14 +858,14 @@ program and data. This is the von Neumann architecture.""",
             rp = init_article_repo(fork.id, base_dir=articles_dir)
             (rp / "article.md").write_text(content)
             commit_article(rp, "Fork with extensions", forker.name,
-                         f"{forker.name.lower().replace(' ', '.')}@peerpedia",
+                         f"{forker.id}@peerpedia",
                          allow_empty=True)
             # Second commit with improvements
             (rp / "article.md").write_text(content + "\n\n## Further Refinements\n"
                 "Additional improvements based on further analysis and peer feedback.\n"
                 f"\\n*— {forker_name}*")
             commit_article(rp, "Refinements after review", forker.name,
-                         f"{forker.name.lower().replace(' ', '.')}@peerpedia",
+                         f"{forker.id}@peerpedia",
                          allow_empty=True)
         except Exception as e:
             print(f"  Fork git warning: {e}")

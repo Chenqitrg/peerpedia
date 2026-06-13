@@ -41,6 +41,7 @@ class Article(Base):
     sink_extended_count = Column(Integer, nullable=False, default=0)
     forked_from = Column(String, nullable=True)
     fork_count = Column(Integer, nullable=False, default=0)
+    last_author_rebuild_hash = Column(String, nullable=True)  # HEAD commit hash of last author rebuild
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 

@@ -57,7 +57,6 @@ export function useDraftPersistence() {
             title, content, format,
             commit_message: 'Save draft',
             publish: false,
-            authors: [accountId],
             self_review: { originality: 0, rigor: 0, completeness: 0, pedagogy: 0, impact: 0 },
           })
         }
@@ -92,7 +91,6 @@ export function useDraftPersistence() {
         format,
         commit_message: 'Save draft',
         publish: false,
-        authors: [accountId],
         self_review: { originality: 0, rigor: 0, completeness: 0, pedagogy: 0, impact: 0 },
       }
       const { data } = await apiClient.post('/articles', payload)

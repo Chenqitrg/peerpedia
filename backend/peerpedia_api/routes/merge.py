@@ -69,8 +69,41 @@ def api_accept_merge(article_id: str, proposal_id: str,
     if current_user.id not in get_author_ids(db, article_id):
         raise HTTPException(status_code=403, detail="Only article authors can accept/reject merges")
     try:
+        # Execute git merge — fork repo contents merged into target
+        from peerpedia_core.storage.db.crud_article import (
+            get_authors_from_git,
+            rebuild_article_authors,
+        )
+        from peerpedia_core.storage.git_backend import (
+            MergeConflictError,
+            merge_git_repos,
+        )
+
+        from peerpedia_api.helpers import repo_path
+
+        target_repo = repo_path(article_id)
+        fork_repo = repo_path(mp.fork_article_id)
+
+        if not (target_repo / ".git").is_dir() or not (fork_repo / ".git").is_dir():
+            # Repos don't exist — accept the proposal without git merge
+            # (e.g., tests or articles created before git repos were added)
+            mp = accept_merge_proposal(db, proposal_id)
+            return {"id": mp.id, "status": mp.status}
+
+        merge_git_repos(target_repo, fork_repo, current_user.name)
+
+        # Rebuild authors from merged git history
+        all_authors = get_authors_from_git(target_repo, db)
+        rebuild_article_authors(db, article_id, all_authors)
+
         mp = accept_merge_proposal(db, proposal_id)
         return {"id": mp.id, "status": mp.status}
+    except MergeConflictError:
+        # Proposal stays open — both sides notified
+        return {
+            "status": "conflict",
+            "message": "Merge conflicts detected. Both authors need to resolve conflicts manually.",
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

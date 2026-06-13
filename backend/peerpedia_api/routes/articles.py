@@ -176,11 +176,11 @@ def api_create_article(
     current_user: User = Depends(deps.require_user),
     db: Session = Depends(deps.get_db),
 ):
-    if not body.authors:
-        raise HTTPException(status_code=422, detail="authors must not be empty")
+    # Default to current user when no authors specified
+    author_list = body.authors or [current_user.id]
     # Validate all authors exist in server DB — prevents FOREIGN KEY violation
     # when a local-only account (not synced to server) is passed as author_id.
-    for author_id in body.authors:
+    for author_id in author_list:
         if get_user(db, author_id) is None:
             raise HTTPException(
                 status_code=400,
@@ -189,7 +189,7 @@ def api_create_article(
             )
     a = create_article(
         db,
-        authors=body.authors,
+        authors=author_list,
         status="draft",
         title=body.title,
         abstract=body.abstract,
@@ -201,8 +201,15 @@ def api_create_article(
     ext = ".typ" if body.format == "typst" else ".md"
     (rp / f"article{ext}").write_text(body.content)
     commit_msg = body.commit_message or "Initial submission"
-    commit_hash = commit_article(rp, commit_msg, body.authors[0],
-                                  f"{body.authors[0]}@peerpedia", allow_empty=True)
+    commit_hash = commit_article(rp, commit_msg, author_list[0],
+                                  f"{author_list[0]}@peerpedia", allow_empty=True)
+
+    # Rebuild authors from git history after first commit
+    from peerpedia_core.storage.db.crud_article import (
+        rebuild_article_authors,
+    )
+    rebuild_article_authors(db, a.id, set(author_list))
+
     # L4: articles start as draft — publish is explicit via POST /articles/{id}/publish
 
     contributions = None
@@ -212,7 +219,7 @@ def api_create_article(
         db,
         article_id=a.id,
         commit_hash=commit_hash,
-        reviewer_id=body.authors[0],
+        reviewer_id=author_list[0],
         scope="pool",
         scores=body.self_review.model_dump(),
         contributions=contributions,
@@ -266,6 +273,14 @@ def api_update_article(
         a.categories = body.categories
 
     commit_hash = commit_article(rp, commit_msg, author, f"{author}@peerpedia")
+
+    # Rebuild authors from git history (incremental scan when marker exists)
+    from peerpedia_core.storage.db.crud_article import (
+        get_authors_from_git,
+        rebuild_article_authors,
+    )
+    git_authors = get_authors_from_git(rp, db, since_hash=a.last_author_rebuild_hash)
+    rebuild_article_authors(db, article_id, git_authors)
 
     if body.publish:
         sink_days = (
@@ -376,6 +391,18 @@ def api_fork_article(
         forked_from=article_id,
     )
     increment_fork_count(db, article_id)
+
+    # Rebuild authors from git history — the single source of truth.
+    # Fork preserves original commit history via shutil.copytree.
+    from peerpedia_core.storage.db.crud_article import (
+        get_authors_from_git,
+        rebuild_article_authors,
+    )
+    if (dst / ".git").is_dir():
+        git_authors = get_authors_from_git(dst, db)
+        git_authors.add(current_user.id)
+        rebuild_article_authors(db, fork_id, git_authors)
+
     return {"id": fork.id, "forked_from": article_id, "status": "draft"}
 
 

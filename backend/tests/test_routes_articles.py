@@ -857,18 +857,20 @@ class TestArticleErrorPaths:
 class TestArticleCreateEdgeCases:
     """Edge cases for article creation."""
 
-    def test_create_with_empty_authors_returns_422(self, client, seed_user):
-        """Creating an article with empty authors list returns 422."""
+    def test_create_with_empty_authors_defaults_to_current_user(self, client, seed_user):
+        """Creating an article with empty authors defaults to the current user (SPEC-11)."""
         body = {
             "authors": [],
-            "title": "Bad Article",
+            "title": "Solo Article",
             "content": "Content",
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
                            "pedagogy": 3, "impact": 3},
         }
         resp = client.post("/api/v1/articles", json=body)
-        assert resp.status_code == 422
+        assert resp.status_code == 201
+        data = resp.json()
+        assert len(data["authors"]) >= 1, f"Expected at least 1 author, got {data['authors']}"
 
 
 class TestArticleUpdateEdgeCases:
