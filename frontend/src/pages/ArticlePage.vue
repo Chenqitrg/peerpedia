@@ -604,7 +604,9 @@ async function handleFork() {
   try {
     const result = await forkArticle(id)
     isForked.value = true
-    router.push(`/edit/${result.id}`)
+    // Navigate to article view, not editor — fork is already a draft.
+    // Decision #10: eliminates "must save or lose it" anxiety.
+    router.push(`/articles/${result.id}`)
   } catch (e) {
     console.error('Fork failed:', e)
   }

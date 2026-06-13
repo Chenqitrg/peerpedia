@@ -115,7 +115,7 @@ class ArticleCreate(BaseModel):
     abstract: str = ""
     keywords: list[str] = []
     categories: list[str] = []
-    authors: list[str]
+    authors: list[str] = []  # optional: defaults to [current_user] in route handler
     content: str = ""               # article body (markdown or typst)
     format: str = "markdown"        # "markdown" | "typst"
     commit_message: str = ""        # git commit message (required for submit)

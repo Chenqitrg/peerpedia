@@ -224,6 +224,94 @@ def extend_sink(session: Session, article_id: str, extra_days: int, max_days: in
     return a
 
 
+# ── Multi-author: git-derived authors ──────────────────────────────────────
+
+
+def get_authors_from_git(
+    repo_path,
+    session: Session,
+    since_hash: str | None = None,
+) -> set[str]:
+    """Extract unique author user IDs from git commit log.
+
+    Scans commits reachable from HEAD. Uses git range notation
+    ``since..HEAD`` for incremental scans — handles merge DAGs
+    correctly without missing author chains.
+    """
+    import git
+
+    from peerpedia_core.storage.db.models import User
+
+    repo = git.Repo(repo_path)
+    if not repo.head.is_valid():
+        return set()
+
+    user_ids: set[str] = set()
+
+    if since_hash:
+        commits = repo.iter_commits(rev=f"{since_hash}..HEAD")
+    else:
+        commits = repo.iter_commits()
+
+    for commit in commits:
+        email = commit.author.email
+        user_id = email.split("@")[0]
+        if session.get(User, user_id):
+            user_ids.add(user_id)
+
+    return user_ids
+
+
+def rebuild_article_authors(
+    session: Session,
+    article_id: str,
+    new_author_ids: set[str],
+) -> None:
+    """Append new authors to article_authors (never delete existing ones).
+
+    Updates ``article.last_author_rebuild_hash`` to current repo HEAD.
+    """
+    from peerpedia_core.storage.db.models import User
+    from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
+
+    existing = set(get_author_ids(session, article_id))
+    merged = existing | new_author_ids
+
+    # Only rebuild join table when authors actually changed
+    if merged != existing:
+        # Resolve usernames for lexicographic sort
+        rows = (
+            session.query(User)
+            .filter(User.id.in_(list(merged)))
+            .all()
+        )
+        row_map = {u.id: u for u in rows}
+        sorted_ids = sorted(
+            [uid for uid in merged if uid in row_map],
+            key=lambda uid: row_map[uid].username,
+        )
+        # Add any IDs that exist in merged but not in DB (shouldn't happen)
+        sorted_ids.extend(uid for uid in merged if uid not in row_map)
+
+        # Rebuild join table
+        session.query(ArticleAuthor).filter(
+            ArticleAuthor.article_id == article_id
+        ).delete()
+        add_article_authors(session, article_id, sorted_ids)
+
+    # Update rebuild marker
+    import git
+    article = session.get(Article, article_id)
+    if article:
+        rp = DEFAULT_ARTICLES_DIR / article_id
+        if rp.exists() and (rp / ".git").is_dir():
+            repo = git.Repo(rp)
+            if repo.head.is_valid():
+                article.last_author_rebuild_hash = repo.head.commit.hexsha
+
+    session.commit()
+
+
 def get_article_by_fork_and_author(
     session: Session, forked_from: str, author_id: str,
 ) -> Article | None:

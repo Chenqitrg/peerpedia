@@ -94,12 +94,10 @@ export function useArticleSync(
         return false
       }
 
-      const viewer = userStore.viewer
       const result = await createArticle({
         title: d.title || 'Untitled',
         content: contentResult as string,
         format: (d.format as 'markdown' | 'typst') || 'markdown',
-        authors: viewer ? [viewer.id] : ['Anonymous'],
         keywords: [],
         categories: [],
         abstract: '',

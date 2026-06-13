@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Trash2 } from 'lucide-vue-next'
 import { useTauri } from '../composables/useTauri'
+import { useUserStore } from '../stores/useUserStore'
 import { deleteArticle } from '../api/articles'
 
 const { t } = useI18n()
@@ -14,29 +15,59 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   deleted: [articleId: string]
+  error: [message: string]
 }>()
 
 const showConfirm = ref(false)
 const deleting = ref(false)
+const errorMessage = ref('')
 const tauri = useTauri()
+const userStore = useUserStore()
 
 async function handleDelete() {
   if (deleting.value) return
   deleting.value = true
+  errorMessage.value = ''
   try {
-    if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+    const isOnline = !!userStore.token
+
+    if (isOnline) {
+      // Server-first: delete from server, then clean up local
+      await deleteArticle(props.articleId)
+      // If in Tauri mode, also clean local DB
+      if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+        try {
+          await tauri.deleteArticle({
+            id: props.articleId,
+            account_id: props.authorId || '',
+          })
+        } catch {
+          // Local cleanup is best-effort — server already succeeded
+        }
+      }
+    } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      // Offline: local delete only
       const result = await tauri.deleteArticle({
         id: props.articleId,
         account_id: props.authorId || '',
       })
-      if (result && 'error' in result) return
+      if (result && 'error' in result) {
+        errorMessage.value = 'Delete failed: ' + result.error
+        emit('error', errorMessage.value)
+        return
+      }
     } else {
-      await deleteArticle(props.articleId)
+      // Neither online nor Tauri — shouldn't happen
+      errorMessage.value = 'Cannot delete: not connected'
+      emit('error', errorMessage.value)
+      return
     }
+
     emit('deleted', props.articleId)
     showConfirm.value = false
-  } catch {
-    // Silent failure — article remains visible, user can retry
+  } catch (e: any) {
+    errorMessage.value = e?.response?.data?.detail || 'Delete failed — try again'
+    emit('error', errorMessage.value)
   } finally {
     deleting.value = false
   }
@@ -58,7 +89,9 @@ async function handleDelete() {
   </button>
 
   <!-- Confirmation: "Confirm?" + solid red Delete + Cancel -->
-  <div v-else class="flex items-center gap-1">
+  <div v-else class="flex flex-col gap-1">
+    <div v-if="errorMessage" class="text-xs text-danger">{{ errorMessage }}</div>
+    <div class="flex items-center gap-1">
     <span class="text-xs text-ink-muted">Confirm?</span>
     <button
       class="px-2 py-1 text-xs font-semibold bg-danger text-white rounded
@@ -75,5 +108,6 @@ async function handleDelete() {
     >
       Cancel
     </button>
+  </div>
   </div>
 </template>

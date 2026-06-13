@@ -217,3 +217,65 @@ def get_diff_between(
             "files": list(diff_files.keys()),
         },
     }
+
+
+# ── Merge ─────────────────────────────────────────────────────────────────
+
+
+class MergeConflictError(Exception):
+    """Raised when a git merge encounters conflicts that can't auto-resolve."""
+    pass
+
+
+def merge_git_repos(target: Path, fork: Path, author_name: str) -> str:
+    """Merge fork repo into target repo.
+
+    Adds fork as a remote, fetches, merges into target.
+    Returns the resulting HEAD commit hash.
+    Raises MergeConflictError if the merge has conflicts.
+    """
+    import git
+
+    target_repo = git.Repo(target)
+    fork_repo = git.Repo(fork)
+
+    remote_name = f"fork-{fork.name}"
+    try:
+        target_repo.create_remote(remote_name, str(fork))
+        target_repo.git.fetch(remote_name)
+
+        # Find the fork's HEAD ref
+        fork_ref = None
+        for branch_name in ["master", "main"]:
+            try:
+                fork_ref = target_repo.refs[f"{remote_name}/{branch_name}"]
+                break
+            except (IndexError, AttributeError):
+                continue
+
+        if fork_ref is None:
+            raise MergeConflictError(
+                f"Could not find main/master branch in fork"
+            )
+
+        author_email = f"{author_name}@peerpedia"
+        target_repo.git.merge(
+            fork_ref.commit.hexsha,
+            message=f"Merge fork: {fork.name}",
+        )
+
+        merge_hash = target_repo.head.commit.hexsha
+    except git.GitCommandError as e:
+        # Abort merge if in progress
+        try:
+            target_repo.git.merge("--abort")
+        except git.GitCommandError:
+            pass
+        raise MergeConflictError(f"Merge conflict: {e}") from e
+    finally:
+        try:
+            target_repo.delete_remote(target_repo.remotes[remote_name])
+        except (IndexError, AttributeError, git.GitCommandError):
+            pass
+
+    return merge_hash

@@ -66,6 +66,14 @@ async def _auto_publish_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background tasks on startup, cancel on shutdown."""
+    # Run DB init + migrations before serving requests
+    import os
+    from peerpedia_core.storage.db.engine import get_engine, init_db, migrate_db
+    db_url = os.environ.get("PEERPEDIA_DB", "sqlite:///peerpedia.db")
+    engine = get_engine(db_url)
+    init_db(engine)
+    migrate_db(engine)
+
     task = asyncio.create_task(_auto_publish_loop())
     logger.info("Auto-publish background task started")
     yield
