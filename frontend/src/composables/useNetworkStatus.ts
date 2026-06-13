@@ -15,7 +15,8 @@ async function ping(): Promise<void> {
     return
   }
   try {
-    const resp = await fetch('http://localhost:8080/health')
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+    const resp = await fetch(`${API_BASE}/health`)
     if (resp.ok) { notifySuccess() } else { notifyFailure() }
   } catch { notifyFailure() }
 }

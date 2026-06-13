@@ -138,6 +138,64 @@ cd frontend && npm run tauri dev
 
 ---
 
+## Tester Onboarding · 测试者上手
+
+> For testers joining the 2-person experiment. Give this README to your Claude — it has everything needed to guide you.
+
+### Prerequisites
+
+1. **[Tailscale](https://tailscale.com/download)** — create a free account, install the app, and ask the dev for the network invite link.
+2. **Python 3.12+, Node.js 18+, Rust** — required for Tauri. Install via [rustup](https://rustup.rs/) and your system package manager.
+3. **[Typst](https://github.com/typst/typst)** CLI — `brew install typst` (macOS) or follow the GitHub releases.
+
+### Setup
+
+```bash
+# 1. Clone and install
+git clone https://github.com/Chenqitrg/peerpedia.git
+cd peerpedia
+python -m venv .venv && source .venv/bin/activate
+pip install -e "core/" -e "backend/.[dev]"
+cd frontend && npm install
+
+# 2. Configure server address — copy .env.example, replace with Tailscale IP
+cp .env.example .env
+# Edit .env: VITE_API_BASE_URL=http://100.x.x.x:8080  ← dev's Tailscale IP
+
+# 3. Start Tauri
+npm run tauri dev
+```
+
+### Demo Users · 演示用户
+
+Register your own account, or use these for multi-user testing:
+
+| Name | Username | Password |
+|------|----------|----------|
+| Albert Einstein | `einstein` | `666666` |
+| Richard Feynman | `feynman` | `666666` |
+| …and 21 more | see list above | `666666` |
+
+### What to Test · 测试重点
+
+**Explore freely — no script.** Try anything a real user would do. But here are the high-risk areas:
+
+- **Fork → Merge flow**: Fork someone's article, edit, propose merge, accept. Check authors at each step.
+- **Offline/Online switching**: Toggle the sync button, see what breaks.
+- **Multi-account**: Register your own account, then switch to a demo user.
+- **Editor**: Save drafts, publish, Typst vs Markdown, diff view.
+- **Edge cases**: Empty title, very long content, rapid clicking.
+
+### Reporting Bugs · 报 Bug
+
+Send the dev:
+1. **What you did** (steps to reproduce)
+2. **What you expected**
+3. **What happened instead**
+4. **Screenshot or copy-paste any error messages** from the terminal where you ran `npm run tauri dev`
+
+---
+
 ## Core Concepts · 核心概念
 
 ### Articles as Git Repositories · 文章即 Git 仓库

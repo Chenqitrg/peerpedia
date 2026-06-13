@@ -9,8 +9,10 @@ function _getNS() {
   return _ns
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 export const apiClient = axios.create({
-  baseURL: 'http://localhost:8080/api/v1',
+  baseURL: `${API_BASE}/api/v1`,
 })
 
 // ── Request interceptor: attach Bearer token ───────────────────────────
