@@ -355,16 +355,30 @@ async function saveDraft() {
     if (!ok) return
     commitMsg.value = ''
     markSaved()
-    // Push to server if online; mark pending if offline.
+    // Push to server if online.
     if (isSynced.value) {
-      if (editId.value) {
+      const articleId = editId.value || currentDraftId.value
+      if (articleId) {
         try {
-          await articleStore.updateArticle(editId.value, {
-            title: title.value,
-            content: content.value,
-            commit_message: msg,
-            publish: false,
-          })
+          if (editId.value) {
+            // Existing article: PUT update.
+            await articleStore.updateArticle(editId.value, {
+              title: title.value,
+              content: content.value,
+              commit_message: msg,
+              publish: false,
+            })
+          } else {
+            // New article: POST create on server with client UUID.
+            await articleStore.createArticle({
+              id: currentDraftId.value,
+              title: title.value,
+              content: content.value,
+              format: format.value,
+              commit_message: msg,
+              self_review: { ...scores.value },
+            })
+          }
         } catch (e: any) {
           console.warn('Push to server failed:', e)
         }

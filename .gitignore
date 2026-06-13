@@ -48,3 +48,4 @@ backend/.vite/
 frontend/src-tauri/target/
 .reasonix/
 backend/logs/
+backend/logs/
