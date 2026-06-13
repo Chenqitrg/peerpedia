@@ -121,7 +121,7 @@ def build_article_detail(
         compiled_format=a.compiled_format,
         compiled_output=a.compiled_output,
         compiled_pages=a.compiled_pages,
-        score=a.score,
+        score=a.score if a.status != "draft" else None,
         sink_eta=sink_eta,
         days_remaining=days_remaining,
         sink_duration_days=getattr(a, "sink_duration_days", None),
@@ -235,8 +235,8 @@ def api_create_article(
     )
     rebuild_article_authors(db, a.id, set(author_list))
 
-    # L4: articles start as draft — publish is explicit via POST /articles/{id}/publish
-
+    # L4: articles start as draft. Self-review is stored but score is not
+    # surfaced in API responses until publish (see build_article_detail).
     contributions = None
     if body.contributions:
         contributions = {aid: c.model_dump() for aid, c in body.contributions.items()}

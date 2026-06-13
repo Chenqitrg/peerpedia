@@ -331,14 +331,14 @@ class TestHistoryWithScores:
 
 
 class TestScoreBackfill:
-    def test_article_without_score_gets_backfilled(self, client, seed_user, db_engine):
+    def test_article_without_score_gets_backfilled(self, client, seed_user, auth_user_id, db_engine):
         """Article with null score gets backfilled on fetch."""
         from peerpedia_core.storage.db.engine import get_session
         from peerpedia_core.storage.db.models import Article
 
         # Create article via API (now creates score automatically)
         create_body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "content": "# Backfill test",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -346,19 +346,28 @@ class TestScoreBackfill:
         }
         resp = client.post("/api/v1/articles", json=create_body)
         article_id = resp.json()["id"]
-        # Score should already be populated from creation
-        assert resp.json()["score"] is not None
+        # Draft: score is None until publish.
+        assert resp.json()["score"] is None
 
-        # Manually null out the score to simulate old article
+        # Publish → score computed.
+        pub_resp = client.put(f"/api/v1/articles/{article_id}", json={
+            "publish": True,
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4, "pedagogy": 3, "impact": 3},
+        })
+        assert pub_resp.status_code == 200
+        assert pub_resp.json()["score"] is not None  # published article has score
+
+        # Manually null out the score to simulate backfill scenario
         s = get_session(db_engine)
         a = s.get(Article, article_id)
+        assert a.status == "sedimentation"
         a.score = None
         s.commit()
         s.close()
 
-        # Fetch should backfill
+        # Fetch should backfill from commit history
         article = client.get(f"/api/v1/articles/{article_id}").json()
-        assert article["score"] is not None
+        assert article["score"] is not None, f"Backfill failed, article: {article}"
         assert "originality" in article["score"]
 
 
@@ -376,14 +385,18 @@ class TestScoreNotCleared:
         }
         resp = client.post("/api/v1/articles", json=create_body)
         article_id = resp.json()["id"]
-        original_score = resp.json()["score"]
-        assert original_score is not None
+        # Draft: score is None until publish.
+        assert resp.json()["score"] is None
 
-        # Edit WITHOUT self_review
+        # Publish → score computed.
+        client.put(f"/api/v1/articles/{article_id}", json={
+            "publish": True,
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4, "pedagogy": 3, "impact": 3},
+        })
+        # Edit WITHOUT self_review — score persists from publish commit.
         edit_body = {"content": "# V2\n\nNew content."}
         resp2 = client.put(f"/api/v1/articles/{article_id}", json=edit_body)
         assert resp2.status_code == 200
-        # Score should NOT be None — should fall back to latest commit with reviews
         assert resp2.json()["score"] is not None
 
     def test_backfill_walks_commits_for_score(self, client, seed_user, db_engine, auth_user_id):
@@ -393,7 +406,7 @@ class TestScoreNotCleared:
 
         # Create article with self-review (commit A, has score)
         create_body = {
-            "authors": [seed_user],
+            "authors": [seed_user, auth_user_id],
             "content": "# V1",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -402,6 +415,13 @@ class TestScoreNotCleared:
         resp = client.post("/api/v1/articles", json=create_body)
         article_id = resp.json()["id"]
 
+        # Publish → score computed from self_review.
+        pub_resp = client.put(f"/api/v1/articles/{article_id}", json={
+            "publish": True,
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4, "pedagogy": 3, "impact": 3},
+        })
+        assert pub_resp.status_code == 200
+        assert pub_resp.json()["score"] is not None
         # Edit without self-review (commit B, no reviews)
         edit_body = {"content": "# V2\n\nEdited."}
         client.put(f"/api/v1/articles/{article_id}", json=edit_body)
@@ -415,7 +435,7 @@ class TestScoreNotCleared:
 
         # Fetch should backfill from commit A (older commit with reviews)
         article = client.get(f"/api/v1/articles/{article_id}").json()
-        assert article["score"] is not None
+        assert article["score"] is not None, f"Backfill failed after manual null, article: {article}"
         # Should find commit A's score (originality=4), not return None
         assert article["score"]["originality"] == 4.0
 

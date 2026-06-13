@@ -297,3 +297,66 @@ class TestSpecSyncClientUuid:
         assert "id" in resp.json()
         # Server-generated UUID should be a valid UUID string.
         uuid.UUID(resp.json()["id"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SPEC-DRAFT-REGRESSION — Draft articles must not leak scores
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestSpecDraftRegression:
+    """Regression tests for bugs found during reconnect-flow testing."""
+
+    def test_draft_article_has_null_score(self, client):
+        """Draft articles must not show scores before publish. Score is only for published/pool articles."""
+        token, user = _register(client, f"draftscore_{_UNIQ}")
+        resp = client.post("/api/v1/articles", json={
+            "title": "Draft Without Score",
+            "content": "# Draft",
+            "format": "markdown",
+            "authors": [user["id"]],
+            "keywords": [],
+            "categories": [],
+            "abstract": "",
+            "commit_message": "test",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 201
+        article = resp.json()
+        # Draft: score should be null — self_review is stored but not surfaced.
+        assert article.get("score") is None, f"Draft should have null score, got {article.get('score')}"
+
+    def test_same_article_put_after_post(self, client):
+        """PUT after POST with same client UUID must return 200, not create duplicate."""
+        token, user = _register(client, f"putafter_{_UNIQ}")
+        cid = str(uuid.uuid4())
+        # Create with client UUID.
+        resp1 = client.post("/api/v1/articles", json={
+            "id": cid,
+            "title": "First Save",
+            "content": "# V1",
+            "format": "markdown",
+            "authors": [user["id"]],
+            "keywords": [],
+            "categories": [],
+            "abstract": "",
+            "commit_message": "test",
+            "self_review": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp1.status_code == 201
+        # Update with PUT — same UUID.
+        resp2 = client.put(f"/api/v1/articles/{cid}", json={
+            "title": "Second Save",
+            "content": "# V2",
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp2.status_code == 200, resp2.text
+        assert resp2.json()["id"] == cid
+        assert resp2.json()["title"] == "Second Save"
+
+    def test_put_nonexistent_article_returns_404(self, client):
+        """PUT to a non-existent article ID must return 404."""
+        token, user = _register(client, f"put404_{_UNIQ}")
+        resp = client.put(f"/api/v1/articles/{uuid.uuid4()}", json={
+            "title": "Ghost",
+            "content": "# Ghost",
+        }, headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 404
