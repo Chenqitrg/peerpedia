@@ -355,19 +355,33 @@ async function saveDraft() {
     if (!ok) return
     commitMsg.value = ''
     markSaved()
-    // Push to server if online and editing an existing article.
-    if (isSynced.value && editId.value) {
+    // Push to server if online; mark pending if offline.
+    if (isSynced.value) {
+      if (editId.value) {
+        try {
+          await articleStore.updateArticle(editId.value, {
+            title: title.value,
+            content: content.value,
+            commit_message: msg,
+            publish: false,
+          })
+        } catch (e: any) {
+          console.warn('Push to server failed:', e)
+        }
+      }
+    } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+      // Offline: mark pending push for reconnect resolution.
       try {
-        await articleStore.updateArticle(editId.value, {
+        await tauri.saveDraft({
+          id: currentDraftId.value,
+          account_id: accountId,
           title: title.value,
           content: content.value,
-          commit_message: msg,
-          publish: false,
+          format: format.value,
         })
-      } catch (e: any) {
-        console.warn('Push to server failed:', e)
-        // Don't block — local save succeeded, push will retry later
-      }
+        // pending_push is set by the Rust layer when saveDraft is called
+        // while offline — the frontend just triggers the save.
+      } catch { /* best-effort */ }
     }
     return
   }
