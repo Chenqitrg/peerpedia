@@ -48,6 +48,11 @@
     </Transition>
 
     <AuthModal />
+    <ReconnectDialog
+      v-if="showReconnect"
+      :items="pendingOps"
+      @resolve="onResolvePending"
+    />
   </div>
 </template>
 
@@ -57,8 +62,11 @@ import { useRoute, useRouter } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import AuthModal from './components/AuthModal.vue'
 import TabDrawer from './components/TabDrawer.vue'
+import ReconnectDialog from './components/ReconnectDialog.vue'
 import { useUserStore } from './stores/useUserStore'
+import { useArticleStore } from './stores/useArticleStore'
 import { useTabStore } from './stores/useTabStore'
+import { deleteArticle } from './api/articles'
 import { loadString, remove } from './composables/useLocalStorage'
 import { useNetworkStatus } from './composables/useNetworkStatus'
 import { useTauri } from './composables/useTauri'
@@ -121,19 +129,30 @@ watch(isSynced, async (online) => {
   }
 })
 
-async function resolvePending(id: string, action: 'push' | 'discard' | 'confirm_delete' | 'restore') {
+const articleStore = useArticleStore()
+
+async function onResolvePending(id: string, action: 'push' | 'discard' | 'confirm_delete' | 'restore') {
+  const draft = await tauri.getDraft({ id })
   if (action === 'push') {
-    // TODO: push commit to server
+    if (draft && !('error' in draft)) {
+      try {
+        await articleStore.createArticle({
+          id: draft.id,
+          title: draft.title,
+          content: draft.content,
+          format: (draft.format as 'markdown' | 'typst') || 'markdown',
+          commit_message: 'Offline save',
+          self_review: { originality: 3, rigor: 3, completeness: 3, pedagogy: 3, impact: 3 },
+        })
+      } catch (e: unknown) { console.warn('Push failed:', e) }
+    }
   } else if (action === 'confirm_delete') {
-    // TODO: DELETE /articles/{id}
-  } else if (action === 'restore') {
-    // Clear pending_delete, keep data
+    try { await deleteArticle(id) } catch (e: unknown) { console.warn('Delete failed:', e) }
   }
+  // discard / restore: just clear the pending marker
   await tauri.clearPending({ id })
   pendingOps.value = pendingOps.value.filter(o => o.id !== id)
-  if (pendingOps.value.length === 0) {
-    showReconnect.value = false
-  }
+  if (pendingOps.value.length === 0) showReconnect.value = false
 }
 
 // ── Close confirmation dialog (dirty tabs) ─────────────────────
