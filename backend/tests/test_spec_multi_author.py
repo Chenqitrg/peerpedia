@@ -534,3 +534,48 @@ def test_get_commit_history_empty_repo():
     assert history == []
     shutil.rmtree(tmp)
 
+
+# ── Coverage: DB migration path ──────────────────────────────────────────
+
+def test_migrate_db_adds_column_when_missing(db_engine):
+    """migrate_db: ALTER TABLE when last_author_rebuild_hash doesn't exist."""
+    import tempfile
+
+    from peerpedia_core.storage.db.engine import get_engine, migrate_db
+    from sqlalchemy import inspect, text
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_url = f"sqlite:///{tmp}/test.db"
+        eng = get_engine(db_url)
+        # Create tables WITHOUT the new column — use raw SQL
+        with eng.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE articles (
+                    id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '',
+                    abstract TEXT, keywords TEXT, categories TEXT,
+                    status TEXT NOT NULL DEFAULT 'draft', score TEXT,
+                    compiled_format TEXT, compiled_output TEXT, compiled_pages TEXT,
+                    sink_start TEXT, sink_duration_days INTEGER NOT NULL DEFAULT 7,
+                    sink_extended_count INTEGER NOT NULL DEFAULT 0,
+                    forked_from TEXT, fork_count INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+                )
+            """))
+            conn.commit()
+
+        # Verify column is missing
+        insp = inspect(eng)
+        cols = [c["name"] for c in insp.get_columns("articles")]
+        assert "last_author_rebuild_hash" not in cols
+
+        # Reconnect to get fresh inspector
+        eng2 = get_engine(db_url)
+        # Run migration
+        migrate_db(eng2)
+
+        # Verify column was added
+        insp2 = inspect(eng2)
+        cols_after = [c["name"] for c in insp2.get_columns("articles")]
+        assert "last_author_rebuild_hash" in cols_after, f"Columns after: {cols_after}"
+        eng.dispose()
+
