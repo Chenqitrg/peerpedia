@@ -408,7 +408,8 @@ pub struct GitInitParams {
     pub format: String,
     #[serde(default)]
     pub commit_message: String,
-    pub author: String,
+    pub author: String,    // display name (username)
+    pub author_id: String, // UUID identity
 }
 
 #[tauri::command]
@@ -418,8 +419,16 @@ pub async fn git_init(params: GitInitParams) -> Result<local_git::GitCommitResul
     let format = params.format;
     let commit_message = params.commit_message;
     let author = params.author;
+    let author_id = params.author_id;
     tokio::task::spawn_blocking(move || {
-        local_git::git_init(&article_id, &content, &format, &commit_message, &author)
+        local_git::git_init(
+            &article_id,
+            &content,
+            &format,
+            &commit_message,
+            &author,
+            &author_id,
+        )
     })
     .await
     .map_err(|e| AppError::IoError(format!("git_init panicked: {}", e)))?
@@ -434,7 +443,8 @@ pub struct GitCommitParams {
     pub format: String,
     #[serde(default)]
     pub commit_message: String,
-    pub author: String,
+    pub author: String,    // display name (username)
+    pub author_id: String, // UUID identity
 }
 
 #[tauri::command]
@@ -444,8 +454,16 @@ pub async fn git_commit(params: GitCommitParams) -> Result<local_git::GitCommitR
     let format = params.format;
     let commit_message = params.commit_message;
     let author = params.author;
+    let author_id = params.author_id;
     tokio::task::spawn_blocking(move || {
-        local_git::git_commit(&article_id, &content, &format, &commit_message, &author)
+        local_git::git_commit(
+            &article_id,
+            &content,
+            &format,
+            &commit_message,
+            &author,
+            &author_id,
+        )
     })
     .await
     .map_err(|e| AppError::IoError(format!("git_commit panicked: {}", e)))?
@@ -505,7 +523,8 @@ pub async fn git_diff(params: GitDiffParams) -> Result<local_git::DiffResult, Ap
 pub struct GitRollbackParams {
     pub article_id: String,
     pub commit_hash: String,
-    pub author: String,
+    pub author: String,    // display name
+    pub author_id: String, // UUID identity
 }
 
 #[tauri::command]
@@ -515,9 +534,12 @@ pub async fn git_rollback(
     let article_id = params.article_id;
     let commit_hash = params.commit_hash;
     let author = params.author;
-    tokio::task::spawn_blocking(move || local_git::git_rollback(&article_id, &commit_hash, &author))
-        .await
-        .map_err(|e| AppError::IoError(format!("git_rollback panicked: {}", e)))?
+    let author_id = params.author_id;
+    tokio::task::spawn_blocking(move || {
+        local_git::git_rollback(&article_id, &commit_hash, &author, &author_id)
+    })
+    .await
+    .map_err(|e| AppError::IoError(format!("git_rollback panicked: {}", e)))?
 }
 
 #[derive(Debug, Deserialize)]

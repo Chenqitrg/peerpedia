@@ -256,7 +256,7 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        assert_eq!(v, 8);
+        assert_eq!(v, 9);
 
         // Create account first (FK target for sessions).
         conn.execute(
@@ -480,7 +480,7 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
         // Eight version rows (v1-v8), not duplicated on re-run.
-        assert_eq!(count, 8);
+        assert_eq!(count, 9);
     }
 
     #[test]
@@ -533,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn test_migration_v6_adds_sync_columns() {
+    fn test_migration_v9_adds_pending_columns() {
         let conn = test_conn();
         run_migrations(&conn).unwrap();
         conn.execute(
@@ -541,19 +541,28 @@ mod tests {
             [],
         ).unwrap();
         conn.execute(
-            "INSERT INTO drafts (id, account_id, title, content, server_article_id, server_commit_hash)
-             VALUES ('d1', 'a1', 'Test', 'content', 'server-123', 'abc123')",
+            "INSERT INTO drafts (id, account_id, title, content)
+             VALUES ('d1', 'a1', 'Test', 'content')",
             [],
-        ).unwrap();
-        let (sid, sch): (String, String) = conn
+        )
+        .unwrap();
+        // New drafts should default to no pending flags.
+        let (push, del): (i32, i32) = conn
             .query_row(
-                "SELECT server_article_id, server_commit_hash FROM drafts WHERE id = 'd1'",
+                "SELECT pending_push, pending_delete FROM drafts WHERE id = 'd1'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
-        assert_eq!(sid, "server-123");
-        assert_eq!(sch, "abc123");
+        assert_eq!(push, 0);
+        assert_eq!(del, 0);
+        // server_article_id/server_commit_hash should not exist.
+        let result = conn.query_row(
+            "SELECT server_article_id FROM drafts WHERE id = 'd1'",
+            [],
+            |_| Ok(()),
+        );
+        assert!(result.is_err());
     }
 
     #[test]

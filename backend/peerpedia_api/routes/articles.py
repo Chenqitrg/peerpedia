@@ -216,11 +216,17 @@ def api_create_article(
         status="draft",
         **kwargs,
     )
-    rp = init_article_repo(a.id)
+    rp = repo_path(a.id)
+    is_new_repo = not (rp / ".git").is_dir()
+    if is_new_repo:
+        init_article_repo(a.id)
     ext = ".typ" if body.format == "typst" else ".md"
     (rp / f"article{ext}").write_text(body.content)
+    # Only create server commit if repo was just initialized (no existing
+    # commits from local gitInit). Author identity: name = display, email = UUID.
     commit_msg = body.commit_message or "Initial submission"
-    commit_hash = commit_article(rp, commit_msg, author_list[0],
+    author_name = current_user.name or current_user.username
+    commit_hash = commit_article(rp, commit_msg, author_name,
                                   f"{author_list[0]}@peerpedia", allow_empty=True)
 
     # Rebuild authors from git history after first commit

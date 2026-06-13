@@ -64,7 +64,8 @@ pub fn git_init(
     content: &str,
     format: &str,
     commit_message: &str,
-    author: &str,
+    author_name: &str,
+    author_id: &str,
 ) -> Result<GitCommitResult, AppError> {
     let rp = repo_path(article_id)?;
     std::fs::create_dir_all(&rp)?;
@@ -77,14 +78,14 @@ pub fn git_init(
     let file_path = rp.join(format!("article{}", ext));
     std::fs::write(&file_path, content)?;
 
-    // git add + commit
+    // git add + commit — author_id is UUID, author_name is display
     run_git(&rp, &["add", "-A"])?;
-    let author_email = format!("{}@peerpedia.local", author);
+    let author_email = format!("{}@peerpedia", author_id);
     run_git(
         &rp,
         &[
             "-c",
-            &format!("user.name={}", author),
+            &format!("user.name={}", author_name),
             "-c",
             &format!("user.email={}", author_email),
             "commit",
@@ -107,7 +108,8 @@ pub fn git_commit(
     content: &str,
     format: &str,
     commit_message: &str,
-    author: &str,
+    author_name: &str,
+    author_id: &str,
 ) -> Result<GitCommitResult, AppError> {
     let rp = repo_path(article_id)?;
 
@@ -124,14 +126,14 @@ pub fn git_commit(
     let file_path = rp.join(format!("article{}", ext));
     std::fs::write(&file_path, content)?;
 
-    // git add + commit
+    // git add + commit — author_id is UUID, author_name is display
     run_git(&rp, &["add", "-A"])?;
-    let author_email = format!("{}@peerpedia.local", author);
+    let author_email = format!("{}@peerpedia", author_id);
     run_git(
         &rp,
         &[
             "-c",
-            &format!("user.name={}", author),
+            &format!("user.name={}", author_name),
             "-c",
             &format!("user.email={}", author_email),
             "commit",
@@ -485,7 +487,8 @@ fn get_head_hash(repo_path: &PathBuf) -> Result<String, AppError> {
 pub fn git_rollback(
     article_id: &str,
     commit_hash: &str,
-    author: &str,
+    author_name: &str,
+    author_id: &str,
 ) -> Result<GitCommitResult, AppError> {
     let rp = repo_path(article_id)?;
     let (old_content, format) = git_show(article_id, commit_hash)?;
@@ -504,7 +507,14 @@ pub fn git_rollback(
         std::fs::remove_file(&stale_path).ok();
     }
 
-    git_commit(article_id, &old_content, &format, &message, author)
+    git_commit(
+        article_id,
+        &old_content,
+        &format,
+        &message,
+        author_name,
+        author_id,
+    )
 }
 
 #[cfg(test)]
@@ -539,7 +549,14 @@ mod tests {
         fs::create_dir_all(&home).unwrap();
         std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
-        let result = git_init("test-art", "# Hello", "markdown", "Initial draft", "alice");
+        let result = git_init(
+            "test-art",
+            "# Hello",
+            "markdown",
+            "Initial draft",
+            "alice",
+            "uuid-1",
+        );
         assert!(result.is_ok(), "git_init failed: {:?}", result.err());
         let commit = result.unwrap();
         assert!(!commit.hash.is_empty());
@@ -563,9 +580,9 @@ mod tests {
         fs::create_dir_all(&home).unwrap();
         std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
-        git_init("multi", "v1", "markdown", "First", "bob").unwrap();
-        git_commit("multi", "v2", "markdown", "Second", "bob").unwrap();
-        git_commit("multi", "v3", "markdown", "Third", "bob").unwrap();
+        git_init("multi", "v1", "markdown", "First", "bob", "uuid-bob").unwrap();
+        git_commit("multi", "v2", "markdown", "Second", "bob", "uuid-bob").unwrap();
+        git_commit("multi", "v3", "markdown", "Third", "bob", "uuid-bob").unwrap();
 
         let history = git_history("multi").unwrap();
         assert_eq!(history.len(), 3);
@@ -581,7 +598,14 @@ mod tests {
 
     #[test]
     fn test_commit_nonexistent_repo() {
-        let result = git_commit("no-such-repo", "content", "markdown", "msg", "bob");
+        let result = git_commit(
+            "no-such-repo",
+            "content",
+            "markdown",
+            "msg",
+            "bob",
+            "uuid-bob",
+        );
         assert!(result.is_err());
     }
 
@@ -600,9 +624,10 @@ mod tests {
         std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
         // Create an article with 3 commits
-        git_init("rb-test", "v1", "markdown", "First", "alice").unwrap();
-        git_commit("rb-test", "v2", "markdown", "Second", "alice").unwrap();
-        let third = git_commit("rb-test", "v3", "markdown", "Third", "alice").unwrap();
+        git_init("rb-test", "v1", "markdown", "First", "alice", "uuid-alice").unwrap();
+        git_commit("rb-test", "v2", "markdown", "Second", "alice", "uuid-alice").unwrap();
+        let third =
+            git_commit("rb-test", "v3", "markdown", "Third", "alice", "uuid-alice").unwrap();
 
         // Get the hash of the first commit
         let history = git_history("rb-test").unwrap();
@@ -610,7 +635,7 @@ mod tests {
         let first_hash = &history[2].hash; // oldest commit
 
         // Rollback to first commit
-        let result = git_rollback("rb-test", first_hash, "alice");
+        let result = git_rollback("rb-test", first_hash, "alice", "uuid-alice");
         assert!(result.is_ok(), "git_rollback failed: {:?}", result.err());
         let rb = result.unwrap();
         assert!(
@@ -641,8 +666,8 @@ mod tests {
         fs::create_dir_all(&home).unwrap();
         std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
-        git_init("rb-bad", "v1", "markdown", "First", "alice").unwrap();
-        let result = git_rollback("rb-bad", "deadbeef12345678", "alice");
+        git_init("rb-bad", "v1", "markdown", "First", "alice", "uuid-alice").unwrap();
+        let result = git_rollback("rb-bad", "deadbeef12345678", "alice", "uuid-alice");
         assert!(result.is_err());
 
         cleanup(&dir);
@@ -657,16 +682,17 @@ mod tests {
         std::env::set_var("PEERPEDIA_TEST_HOME", &home);
 
         // Create a Typst article with 3 commits
-        git_init("rb-typst", "= v1", "typst", "First", "alice").unwrap();
-        git_commit("rb-typst", "= v2", "typst", "Second", "alice").unwrap();
-        let third = git_commit("rb-typst", "= v3", "typst", "Third", "alice").unwrap();
+        git_init("rb-typst", "= v1", "typst", "First", "alice", "uuid-alice").unwrap();
+        git_commit("rb-typst", "= v2", "typst", "Second", "alice", "uuid-alice").unwrap();
+        let third =
+            git_commit("rb-typst", "= v3", "typst", "Third", "alice", "uuid-alice").unwrap();
 
         let history = git_history("rb-typst").unwrap();
         assert_eq!(history.len(), 3);
         let first_hash = &history[2].hash;
 
         // Rollback to first commit — auto-detects typst format, no format param
-        let result = git_rollback("rb-typst", first_hash, "alice");
+        let result = git_rollback("rb-typst", first_hash, "alice", "uuid-alice");
         assert!(result.is_ok(), "git_rollback failed: {:?}", result.err());
         let rb = result.unwrap();
 
@@ -692,20 +718,28 @@ mod tests {
     fn test_rejects_path_traversal_article_id() {
         // article_id with slashes or dots that escape the articles dir
         // These should fail at validation before any filesystem op.
-        assert!(git_init("../../etc/passwd", "x", "md", "msg", "alice").is_err());
-        assert!(git_commit("../../etc/passwd", "x", "md", "msg", "alice").is_err());
+        assert!(git_init("../../etc/passwd", "x", "md", "msg", "alice", "uuid-alice").is_err());
+        assert!(git_commit("../../etc/passwd", "x", "md", "msg", "alice", "uuid-alice").is_err());
         assert!(git_history("../../etc/passwd").is_err());
         assert!(git_show("../../etc/passwd", "abc123").is_err());
-        assert!(git_rollback("../../etc/passwd", "abc123", "alice").is_err());
+        assert!(git_rollback("../../etc/passwd", "abc123", "alice", "uuid-alice").is_err());
 
         // article_id with backslashes (Windows)
-        assert!(git_init("..\\..\\windows\\system32", "x", "md", "msg", "alice").is_err());
+        assert!(git_init(
+            "..\\..\\windows\\system32",
+            "x",
+            "md",
+            "msg",
+            "alice",
+            "uuid-alice"
+        )
+        .is_err());
 
         // article_id with null byte
-        assert!(git_init("bad\0art", "x", "md", "msg", "alice").is_err());
+        assert!(git_init("bad\0art", "x", "md", "msg", "alice", "uuid-alice").is_err());
 
         // empty article_id
-        assert!(git_init("", "x", "md", "msg", "alice").is_err());
+        assert!(git_init("", "x", "md", "msg", "alice", "uuid-alice").is_err());
 
         // normal ids still pass validation
         assert!(validate_article_id("normal-id_123").is_ok());
