@@ -28,25 +28,27 @@ Every chapter ends with an "Issues" section. Here's the full list:
 | I5 | EditorPage is ~700 lines — needs composable extraction | 03 | Medium |
 | I6 | `useAsyncResource` re-fetches on every mount — no SWR | 03 | Low |
 | I7 | Conflict resolution requires full page refresh — stale on failure | 03 | Low |
-| I8 | SQLite in production — write serialization bottleneck | 04 | High |
-| I9 | No rate limiting — /health and auth unprotected | 04 | High |
+| I8 | SQLite — tokio::sync::Mutex + WAL, correct for single-user | 04 | Low |
+| I9 | No rate limiting — localhost-only, no external exposure | 04 | Low |
 | I10 | JWT fallback secret for dev — must set env var in production | 04 | Low |
 | I11 | Git repos grow unbounded — no GC, no pruning | 04 | Low |
 | I12 | Typst compilation has no progress indicator | 05 | Low |
-| I13 | No CSP in Tauri config — XSS vector | 05 | High |
+| I13 | No CSP in Tauri config — real risk, typical for Tauri | 05 | Medium |
 | I14 | SQLite connection not pooled — writes block reads | 05 | Low |
 | I15 | Export exists (export_article) but no automated backup | 05 | Low |
 | I16 | No Markdown→PDF on desktop — server-only path | 06 | Medium |
-| I17 | Typst compilation blocks UI — no progress bar | 06 | Medium |
+| I17 | Typst no progress indicator — spawn_blocking returns final only | 06 | Low |
 | I18 | Compilation cache never expires — unbounded growth | 06 | Low |
-| I19 | Math protection is regex-based — edge case dollar signs | 06 | Medium |
-| T1 | Phone model vs auto-detect — unresolved design tension | 01 | High |
+| I19 | Math protection is regex-based — edge case dollar signs | 06 | Low |
+| T1 | Phone model: guard verified watertight, no bypass exists | 01 | Low |
 | T2 | `connecting` invisible to useOffline — no loading state | 01 | Medium |
 | T3 | `isOnline` backward compat masks design intent | 01 | Medium |
 | T4 | Two sync systems with confusing naming overlap | 01 | High |
 | G1 | No SyncButton integration test with real state machine | 07 | Medium |
 | G2 | No client.ts interceptor tests | 07 | Medium |
 | G3 | No useArticleSync + useNetworkStatus integration test | 07 | Medium |
+| N1 | `isOnline` naming → useArticleSync offline detection gap (server-down while synced) | 01 | Medium |
+| N2 | client.ts interceptor calls notifySuccess() on every response — fragile coupling | 01 | Low |
 | TD1-6 | Various technical debt items | 07 | — |
 
 ## How to Use This
