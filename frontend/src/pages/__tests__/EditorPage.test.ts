@@ -30,7 +30,7 @@ vi.mock('vue-router', () => ({
 // Mock the network composable so publish is enabled in tests.
 vi.mock('@/composables/useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
-    isOnline: { value: true },
+    isSynced: { value: true },
     isSynced: { value: true },
     connectionState: { value: 'synced' as const },
     ping: vi.fn(),

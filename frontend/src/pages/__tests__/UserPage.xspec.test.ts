@@ -26,7 +26,7 @@ const { mockServerUser, mockLocalAccounts } = vi.hoisted(() => ({
 
 // ── Module-level mutable state ───────────────────────────────────────────
 
-let mockIsOnline = true
+let mockIsSynced = true
 let mockIsBrowserLocal = false
 
 // ── Module mocks ─────────────────────────────────────────────────────────
@@ -63,9 +63,9 @@ vi.mock('../../composables/useTauri', () => ({
 
 vi.mock('../../composables/useNetworkStatus', () => ({
   useNetworkStatus: () => ({
-    isOnline: { value: mockIsOnline },
-    isSynced: { value: mockIsOnline },
-    connectionState: { value: mockIsOnline ? 'synced' as const : 'idle' as const },
+    isSynced: { value: mockIsSynced },
+    isSynced: { value: mockIsSynced },
+    connectionState: { value: mockIsSynced ? 'synced' as const : 'idle' as const },
     ping: vi.fn(),
   }),
 }))
@@ -105,7 +105,7 @@ import UserPage from '../UserPage.vue'
 describe('xspec: UserPage Profile Loading', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockIsOnline = true
+    mockIsSynced = true
     mockIsBrowserLocal = false
     mockGetUser.mockResolvedValue(mockServerUser)
     mockTauriListAccounts.mockResolvedValue(mockLocalAccounts)
@@ -127,7 +127,7 @@ describe('xspec: UserPage Profile Loading', () => {
      + 'WHEN the profile page loads '
      + 'THEN the profile is fetched via REST API', async () => {
       mockIsBrowserLocal = true
-      mockIsOnline = true
+      mockIsSynced = true
       // listAccounts returns only local accounts — no feynman
       mockTauriListAccounts.mockResolvedValue(mockLocalAccounts)
 
@@ -147,7 +147,7 @@ describe('xspec: UserPage Profile Loading', () => {
      + 'WHEN the profile page loads '
      + 'THEN the profile loads locally (no REST call)', async () => {
       mockIsBrowserLocal = true
-      mockIsOnline = false
+      mockIsSynced = false
       mockTauriListAccounts.mockResolvedValue([
         { id: 'uuid-feynman', username: 'feynman' },
       ])
@@ -183,7 +183,7 @@ describe('xspec: UserPage Profile Loading', () => {
      + 'WHEN the profile page loads '
      + 'THEN "User not found" is displayed', async () => {
       mockIsBrowserLocal = true
-      mockIsOnline = false
+      mockIsSynced = false
 
       const wrapper = await mountAndSettle()
 

@@ -371,7 +371,7 @@ async function loadReviews() {
   await reviewStore.fetchReviews(id)
 }
 
-const { isOnline } = useNetworkStatus()
+const { isSynced } = useNetworkStatus()
 
 // ── L4 Article sync ─────────────────────────────────────────────────────
 const draftSyncMeta = ref<{ server_article_id?: string | null; server_commit_hash?: string | null } | null>(null)
@@ -495,7 +495,7 @@ async function toggleBookmark() {
 
   // If server is reachable but we have no token, try to sync local creds first
   const needsSync = (userStore.isTauriMode || userStore.isBrowserLocal)
-    && isOnline.value
+    && isSynced.value
     && !userStore.token
 
   if (needsSync) {
@@ -507,7 +507,7 @@ async function toggleBookmark() {
   }
 
   try {
-    if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && !isOnline.value) {
+    if ((tauri.isTauri.value || tauri.isBrowserLocal.value) && !isSynced.value) {
       if (wasBookmarked) {
         await tauri.removeBookmark({ user_id: userStore.viewer.id, article_id: article.value.id })
       } else {

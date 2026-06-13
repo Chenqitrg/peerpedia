@@ -21,11 +21,10 @@ describe('useNetworkStatus', () => {
 
   // ── S1: Initial state ──────────────────────────────────────────────
 
-  it('S1: starts in idle state, isSynced false, isOnline false', () => {
-    const { connectionState, isSynced, isOnline } = useNetworkStatus()
+  it('S1: starts in idle state, isSynced false', () => {
+    const { connectionState, isSynced } = useNetworkStatus()
     expect(connectionState.value).toBe('idle')
     expect(isSynced.value).toBe(false)
-    expect(isOnline.value).toBe(false)
   })
 
   // ── S2: Connect success ────────────────────────────────────────────

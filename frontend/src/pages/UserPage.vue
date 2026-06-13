@@ -37,7 +37,7 @@ const id = computed(() => route.params.id as string)
 // In local mode (Tauri or browser-local), use local account data.
 const isSelf = computed(() => userStore.viewer?.id === id.value)
 const isLocal = computed(() => userStore.isTauriMode || userStore.isBrowserLocal)
-const { isOnline } = useNetworkStatus()
+const { isSynced } = useNetworkStatus()
 
 function _localUserToProfile(a: { id: string; username: string }): UserProfile {
   return {
@@ -67,7 +67,7 @@ const { data: user, loading, error, execute: loadUser } = useAsyncResource(
         if (found) return _localUserToProfile(found)
       }
       // Online — fetch from server, then cache for offline.
-      if (isOnline.value) {
+      if (isSynced.value) {
         const profile = await getUser(id.value)
         useFollowCache().setCachedUserProfile(id.value, profile).catch(() => {})
         return profile
@@ -94,7 +94,7 @@ const followLoading = ref(false)
   // Load initial follow state.
   async function loadFollowState() {
     if (!userStore.viewer) return
-    if (!isOnline.value) {
+    if (!isSynced.value) {
       // Offline — read from local cache.
       const cache = useFollowCache()
       const ids = await cache.getCachedFollowingIds(userStore.viewer.id)
@@ -148,7 +148,7 @@ async function loadArticles() {
   const merged: ArticleSummary[] = []
 
   // 1. Server articles — fetch when online (including Tauri+online)
-  if (!tauri.isTauri.value || isOnline.value) {
+  if (!tauri.isTauri.value || isSynced.value) {
     try {
       const artData = await getArticles({ author_id: id.value, page: 1, size: 50 })
       const serverArticles = Array.isArray(artData) ? artData : (artData.articles ?? [])

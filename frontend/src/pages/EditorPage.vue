@@ -101,7 +101,7 @@ const DRAFT_ID_KEY = computed(() => `editor-draft-id-${draftUid.value}-${editId.
 // Draft persistence — Tauri IPC when available, REST + localStorage fallback.
 const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
-const { isOnline } = useNetworkStatus()
+const { isSynced } = useNetworkStatus()
 
 // ── L4 Auto-upload: silently backup to server on save ──────────────────
 const _draftId = () => currentDraftId.value || editId.value || ''
@@ -111,7 +111,7 @@ const _lh = ref<string | null>(null)
 const { upload: autoUpload } = useArticleSync(_draftId, () => _sid.value, () => _sch.value, () => _lh.value)
 
 async function _tryAutoUpload() {
-  if (!isOnline.value || !(tauri.isTauri.value || tauri.isBrowserLocal.value)) return
+  if (!isSynced.value || !(tauri.isTauri.value || tauri.isBrowserLocal.value)) return
   const id = _draftId()
   if (!id) return
 

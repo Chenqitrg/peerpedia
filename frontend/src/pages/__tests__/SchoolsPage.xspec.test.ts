@@ -34,7 +34,7 @@ const { mockUsers, mockFollowing, mockViewer, viewerRef } = vi.hoisted(() => {
 // ── Module-level mutable state for mock control ──────────────────────────
 
 import { ref as vRef } from 'vue'
-const mockIsOnline = vRef(true)
+const mockIsSynced = vRef(true)
 let mockCanReadSchools = true
 let mockCanWriteFollow = true
 
@@ -92,9 +92,9 @@ vi.mock('../../composables/useOffline', () => ({
 
 vi.mock('../../composables/useNetworkStatus', () => ({
   useNetworkStatus: () => ({
-    isOnline: mockIsOnline,
-    isSynced: computed(() => mockIsOnline.value),
-    connectionState: computed(() => mockIsOnline.value ? 'synced' as const : 'idle' as const),
+    isSynced: mockIsSynced,
+    isSynced: computed(() => mockIsSynced.value),
+    connectionState: computed(() => mockIsSynced.value ? 'synced' as const : 'idle' as const),
     ping: vi.fn(),
   }),
 }))
@@ -112,7 +112,7 @@ import SchoolsPage from '../SchoolsPage.vue'
 describe('xspec: SchoolsPage Follow State', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockIsOnline.value = true
+    mockIsSynced.value = true
     mockCanReadSchools = true
     mockCanWriteFollow = true
     mockGetUsers.mockResolvedValue(mockUsers)
@@ -137,7 +137,7 @@ describe('xspec: SchoolsPage Follow State', () => {
     it('GIVEN online '
      + 'WHEN the Schools page loads '
      + 'THEN follow state is fetched via REST API', async () => {
-      mockIsOnline.value = true
+      mockIsSynced.value = true
 
       await mountAndSettle()
 
@@ -152,7 +152,7 @@ describe('xspec: SchoolsPage Follow State', () => {
     it('GIVEN offline '
      + 'WHEN the Schools page loads '
      + 'THEN follow state is read from useFollowCache', async () => {
-      mockIsOnline.value = false
+      mockIsSynced.value = false
       mockCacheGetFollowingIds.mockResolvedValue(['uuid-bohr'])
 
       await mountAndSettle()
@@ -169,7 +169,7 @@ describe('xspec: SchoolsPage Follow State', () => {
     it('GIVEN online '
      + 'WHEN the user clicks Follow '
      + 'THEN follow is persisted via REST API', async () => {
-      mockIsOnline.value = true
+      mockIsSynced.value = true
 
       const wrapper = await mountAndSettle()
       const btn = wrapper.findAll('button').find(b => b.text().trim() === 'Follow')
@@ -235,7 +235,7 @@ describe('xspec: SchoolsPage Follow State', () => {
     it('GIVEN offline '
      + 'WHEN useOffline blocks follow write '
      + 'THEN follow button is disabled', async () => {
-      mockIsOnline.value = false
+      mockIsSynced.value = false
       mockCanWriteFollow = false
 
       const wrapper = await mountAndSettle()

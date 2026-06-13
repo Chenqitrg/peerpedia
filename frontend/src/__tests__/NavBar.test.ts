@@ -44,7 +44,7 @@ vi.mock('../stores/useUserStore', () => ({
 // Mock useNetworkStatus
 vi.mock('../composables/useNetworkStatus', () => ({
   useNetworkStatus: () => ({
-    isOnline: ref(true),
+    isSynced: ref(true),
     isSynced: ref(true),
     connectionState: ref('synced'),
   }),

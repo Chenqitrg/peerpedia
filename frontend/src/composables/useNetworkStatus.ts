@@ -61,8 +61,8 @@ function notifyFailure() {
 }
 
 const isSynced: ComputedRef<boolean> = computed(() => connectionState.value === 'synced')
-// Backward compat: existing consumers that destructure isOnline.
-const isOnline: ComputedRef<boolean> = isSynced
+// Note: previously exported isOnline as backward compat alias. Removed 2026-06-13.
+// All consumers now use isSynced directly (see T4 naming fix).
 
 // Browser network events — registered once at module level
 let _listening = false
@@ -84,5 +84,5 @@ function _resetForTest() {
 
 export function useNetworkStatus() {
   _setupListeners()
-  return { connectionState, flash, isSynced, isOnline, connect, disconnect, ping, notifySuccess, notifyFailure, _resetForTest }
+  return { connectionState, flash, isSynced, connect, disconnect, ping, notifySuccess, notifyFailure, _resetForTest }
 }

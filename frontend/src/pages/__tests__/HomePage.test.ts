@@ -54,7 +54,7 @@ vi.mock('../../api/feed', () => ({
 }))
 
 vi.mock('../../composables/useNetworkStatus', () => ({
-  useNetworkStatus: () => ({ isOnline: { value: true }, isSynced: { value: true }, connectionState: { value: 'synced' as const }, ping: vi.fn(), stopPing: vi.fn() }),
+  useNetworkStatus: () => ({ isSynced: { value: true }, isSynced: { value: true }, connectionState: { value: 'synced' as const }, ping: vi.fn(), stopPing: vi.fn() }),
 }))
 
 function setLoggedIn() {
