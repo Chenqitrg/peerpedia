@@ -247,7 +247,7 @@
           "articles"
         ],
         "summary": "Api Create Article",
-        "description": "Create a new article. Articles start as draft — use POST /articles/{id}/publish to enter the sedimentation pool.",
+        "description": "Create a new article. Accepts optional client-generated UUID in the id field. Articles start as draft — use POST /articles/{id}/publish to enter the sedimentation pool.",
         "operationId": "api_create_article_api_v1_articles_post",
         "requestBody": {
           "required": true,
@@ -269,6 +269,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict — article with this client-generated UUID already exists"
           },
           "422": {
             "description": "Validation Error",
@@ -2394,6 +2397,19 @@
     "schemas": {
       "ArticleCreate": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Client-generated UUID. Server accepts as-is. Omit for auto-generation (backward compat). Invalid → 422, duplicate → 409."
+          },
           "title": {
             "type": "string",
             "title": "Title",

@@ -147,6 +147,52 @@ Post-merge, article authors are rebuilt from merged git history.
 
 ---
 
+## Design Philosophy · 设计哲学
+
+These principles emerged from the online/offline architecture audit and guide every decision in this codebase.
+
+### 1. Git is the Universal Language · Git 是通用语言
+
+Local and server each hold a complete git history. There is no single "source of truth" — like GitHub, identity is generated client-side and accepted by the server. Commit hashes are the atomic unit of synchronization.
+
+### 2. One UUID, Everywhere · 一个 ID，贯穿始终
+
+The client generates article UUIDs. The server accepts them as-is. No ID mapping table. No `server_article_id`. The same UUID identifies an article in local SQLite, the local git repo, and the server database. Mapping is the root of all sync evil.
+
+### 3. Save = Commit + Push (Online) · 保存在线即推送
+
+In online mode, Ctrl+S is `git commit && git push`. One save, one server request. The server is a live backup — not a separate system that needs reconciliation.
+
+### 4. Local First, Server as Backup · 本地优先，服务器是备份
+
+In offline mode, Save = `git commit` only. When connectivity returns, the user decides what to push and what to discard. The server is a safety net, not an obligation. Offline commits older than 7 days are rejected — this is backup, not free long-term storage.
+
+### 5. Delete is Protected by Backup · 删除受备份保护
+
+Online delete removes both local and server copies. Offline delete marks the article as "pending delete." On reconnect, the user is asked: "Delete the server backup too?" If they cancel, the backup restores the article. The server backup exists to save you from mistakes.
+
+### 6. Publish is a Gate, Not a Save · 发布是闸口，不是保存
+
+Save pushes to server (private). Publish changes visibility. Three states:
+
+```
+Private（自己可见）
+  → Pool（沉淀中 — 限制传播权，任何人不能 fork）
+  → Public（出池 — 完全公开，他人可 fork）
+```
+
+Pool is a scarce resource — each entry is a commitment. Publishing is irreversible without community governance.
+
+### 7. Explicit Over Silent · 显式优于静默
+
+No `.catch(() => {})` without at least `console.warn`. Every failure must leave a trace. Silent failures are not defensive coding — they are debugging debt.
+
+### 8. Mandatory Resolution · 强制解决
+
+When pending sync operations exist (offline saves, offline deletes), the user cannot proceed until all are resolved. A blocking dialog — no dismiss, no skip. Sync debt must be paid before new work begins.
+
+---
+
 ## Quick Start · 快速开始
 
 ### Prerequisites
