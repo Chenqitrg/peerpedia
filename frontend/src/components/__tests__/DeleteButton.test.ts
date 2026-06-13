@@ -26,7 +26,7 @@ describe('DeleteButton', () => {
     // Default: online (token present)
     const userStore = useUserStore()
     userStore.token = 'test-token'
-    userStore.viewer = { id: 'u1', username: 'test', name: 'Test', anonymous_name: 'anon' }
+    userStore.viewer = { id: 'u1', username: 'test', name: 'Test', anonymous_name: 'anon', expertise: [], reputation: 0, followers_count: 0, following_count: 0, created_at: '' } as any
   })
 
   it('shows trash icon by default, no confirm UI', () => {

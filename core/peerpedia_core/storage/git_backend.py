@@ -237,7 +237,6 @@ def merge_git_repos(target: Path, fork: Path, author_name: str) -> str:
     import git
 
     target_repo = git.Repo(target)
-    fork_repo = git.Repo(fork)
 
     remote_name = f"fork-{fork.name}"
     try:
@@ -255,10 +254,9 @@ def merge_git_repos(target: Path, fork: Path, author_name: str) -> str:
 
         if fork_ref is None:
             raise MergeConflictError(
-                f"Could not find main/master branch in fork"
+                "Could not find main/master branch in fork"
             )
 
-        author_email = f"{author_name}@peerpedia"
         target_repo.git.merge(
             fork_ref.commit.hexsha,
             message=f"Merge fork: {fork.name}",
