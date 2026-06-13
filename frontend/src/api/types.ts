@@ -85,10 +85,11 @@ export interface AuthorInfo {
 }
 
 export interface ArticleCreatePayload {
+  id?: string  // client-generated UUID
   authors?: string[]
-  self_review: FiveDimScores
+  self_review?: FiveDimScores
   contributions?: AuthorContributions
-  commit_message: string
+  commit_message?: string
   title?: string
   abstract?: string
   keywords?: string[]
