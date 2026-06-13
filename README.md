@@ -31,8 +31,8 @@ arXiv solved **distribution**. But it didn't solve **filtering** — the problem
 **Phase 1 — Tauri Desktop（冷启动）✅**
 A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. 5MB install, 30MB RAM. Useful alone — the key to cold-start users.
 
-**Phase 1.5 — Polish & Ship（打磨分发）✅ v0.2.3**
-Delete, diff view, Typst SVG + PDF, draft search, editor UX (save-as-commit, VSCode-style tab system), CodeMirror 6, git-first architecture. Follow/bookmark with server as source of truth (REST API), offline cache via article_cache. Article sync (L4): auto-backup to server, conflict resolution. Schools page with follow state. Desktop app is solid.
+**Phase 1.5 — Polish & Ship（打磨分发）✅ v0.2.3 → v0.3.0**
+Delete, diff view, Typst SVG + PDF, draft search, editor UX (save-as-commit, VSCode-style tab system), CodeMirror 6, git-first architecture. Follow/bookmark with server as source of truth (REST API), offline cache via article_cache. Article sync (L4): auto-backup to server, conflict resolution. Multi-author articles, fork/merge workflow, real git merge for proposals. Schools page with follow state. Desktop app is solid.
 
 **Phase 2 — Score arXiv（包围城市）**
 Community scoring layer on top of preprints. A quality filter that doesn't belong to any publisher.
@@ -72,6 +72,8 @@ Phase 2+（Web — 社区协作）
 | Auth | JWT (Web) / bcrypt + SQLite (Desktop) |
 | Source of Truth | Git = Source of Truth, DB = Index |
 
+**Author Identity · 作者身份:** Git commit email (`{UUID}@peerpedia`) is the author addressing key. Username is display-only. Authors are derived from git commit history, not stored as a mutable DB field. Fork copies git history → authors = original ∪ forker. Merge joins git histories → authors = target ∪ fork.
+
 ### DB Schema · 数据模型（9 entities）
 
 | Table | Purpose |
@@ -83,10 +85,12 @@ Phase 2+（Web — 社区协作）
 | `review_messages` | Threaded discussion under reviews (replaces JSON `thread` field) |
 | `follows` | User follow relationships |
 | `bookmarks` | User bookmarks |
-| `merge_proposals` | Fork → merge workflow |
+| `merge_proposals` | Fork → merge workflow. Now executes real git merge (not just status change) |
 | `citations` | Article → Article citation edges |
 
 Key architecture decision: **all relationships use proper join tables**, not JSON columns. `article_authors` and `review_messages` replace the old `authors` and `thread` JSON fields. Compile output is generated on-demand with filesystem cache — never stored in the database.
+
+Post-merge, article authors are rebuilt from merged git history.
 
 ---
 
@@ -257,6 +261,17 @@ We need designers, engineers, writers, and thinkers. Read `docs/DESIGN.en.md` fo
 ## License · 许可
 
 MIT. Content: CC BY-SA 4.0.
+
+---
+
+## Recent Changes (v0.3.0) · 近期变更
+
+| Change | Description |
+|--------|-------------|
+| Multi-author articles | `article_authors` join table replaces JSON `authors` field. Authors derived from git history, not mutable DB field. |
+| Fork & merge workflow | Fork creates a full git history copy; merge executes real git merge (not just status change). Authors rebuilt post-merge. |
+| Identity sync | Git commit email (`{UUID}@peerpedia`) as author addressing key. Username is display-only. |
+| Real git merge for proposals | `merge_proposals` now performs actual git merge + author rebuild from merged history. |
 
 ---
 

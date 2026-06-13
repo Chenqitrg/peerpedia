@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PeerPedia API",
-    "version": "0.2.1",
-    "description": "PeerPedia API — Phase 1.5 (2026-06-11). v0.2.1: L4 article sync (draft-first creation, publish is explicit), auto-backup on save, conflict resolution."
+    "version": "0.3.0",
+    "description": "PeerPedia API — Phase 2 (2026-06-13). v0.3.0: multi-author via git history, fork preserves commit history, merge executes real git merge, UUID-only internal addressing."
   },
   "paths": {
     "/api/v1/auth/register": {
@@ -860,10 +860,31 @@
         ],
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "Article forked successfully. Authors are rebuilt from git history, not from request body.",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "New fork article ID"
+                    },
+                    "forked_from": {
+                      "type": "string",
+                      "description": "Original article ID this was forked from"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Article status"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "forked_from",
+                    "status"
+                  ]
+                }
               }
             }
           },
@@ -2266,10 +2287,38 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Merge accepted (success) or merge conflict detected",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "description": "Merge successful",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "example": "merged"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "description": "Merge conflict",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": ["conflict"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Merge conflicts detected..."
+                        }
+                      },
+                      "required": ["status", "message"]
+                    }
+                  ]
+                }
               }
             }
           },
@@ -2424,7 +2473,6 @@
         },
         "type": "object",
         "required": [
-          "authors",
           "self_review"
         ],
         "title": "ArticleCreate"

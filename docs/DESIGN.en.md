@@ -1,6 +1,6 @@
 # PeerPedia (知诸网) — Design Document
 
-> 2026-06-13 · v0.3.1 · Three-state sync button (phone model), guarded notifySuccess/notifyFailure, axios cooldown removed, NetworkStatusBadge deprecated
+> 2026-06-13 · v0.3.0 · Three-state sync button (phone model), guarded notifySuccess/notifyFailure, axios cooldown removed, NetworkStatusBadge deprecated
 
 ---
 
@@ -60,6 +60,13 @@ User request → Git commit (content) → success → DB upsert (metadata index)
 - If the database is lost, it can be rebuilt from Git repositories. Git retains fork/diff/merge history.
 - Compile output is **never** stored in the database — it is generated on-demand with a filesystem cache.
 
+**Authors are derived from Git commit history (GitHub model).** The git author email encodes the user UUID: `{user_id}@peerpedia`. `get_authors_from_git()` scans commit logs, extracts UUIDs, and maps them to database users.
+
+- **Fork:** `shutil.copytree` preserves full commit history → `get_authors_from_git` extracts all contributors → fork authors = original ∪ forking user.
+- **Merge:** `merge_git_repos()` performs real git merge (add fork as remote, fetch, merge). On success, authors are rebuilt from the merged DAG. On conflict, the merge proposal stays open.
+- **Incremental scan:** `last_author_rebuild_hash` on Article tracks the last processed commit. `get_authors_from_git` uses `git rev-list since..HEAD` for DAG-safe incremental scans.
+- **UUID-only principle:** All internal addressing uses UUID. Username is a display field, never an index. Git emails use `{UUID}@peerpedia`, not `{username}@peerpedia`.
+
 ### 2.3-bis Git-First Content Loading (2026-06-10)
 
 Article content in Tauri mode is now read directly from git (`git_show`) on every page load, not from the draft cache. This ensures rollback and other git operations are immediately visible — no cache chain to go stale.
@@ -93,6 +100,23 @@ Publish → POST /articles/{id}/publish → enters sedimentation pool
 - Draft ≠ published — articles on the server stay private until explicitly published
 - Conflict resolution IS sync — no separate Push/Pull, just compare hashes
 - Follow uses server as sole source of truth (REST API). Offline: follow button is disabled (grayed + tooltip). Following list + feed article metadata cached locally via article_cache for offline browsing. Bookmark requires server connection — offline shows disabled state, not silent failure.
+
+### 2.4-bis Multi-Author via Git History
+
+**Core principle:** Git = single source of truth for authors.
+
+- **Fork flow:** `shutil.copytree` preserves the full commit DAG of the original article. When a user forks an article, `get_authors_from_git()` extracts every contributor from the commit history and inserts them into `article_authors`. The author set of a fork = all original authors + the forking user. Author identity is never guessed or prompted — it is always read from git commits.
+- **Merge flow:** When a merge proposal is accepted, `merge_git_repos()` executes a real git merge:
+  1. Add fork repository as a git remote.
+  2. Fetch fork branches.
+  3. Perform `git merge` with the target branch.
+  4. On success, rebuild authors from the merged commit DAG.
+  5. On conflict, the merge proposal stays open (status = `"open"`) until the conflict is resolved manually.
+
+**What is not done (deferred):**
+- No invitation system — adding a co-author is a git commit, not a UI action.
+- No author editing UI — authors cannot be added or removed through the interface.
+- No contribution ratios — per-author contribution analysis is a future feature.
 
 ### 2.5 Offline Architecture
 
@@ -139,6 +163,7 @@ class Article(Base):
     fork_count = Column(Integer, default=0)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
+    last_author_rebuild_hash = Column(String, nullable=True)
 ```
 
 - `authors` is **not** a column — use `article_authors` join table.
@@ -236,7 +261,7 @@ class MergeProposal(Base):
     fork_article_id = Column(String, FK("articles.id"))
     target_article_id = Column(String, FK("articles.id"))
     proposer_id = Column(String, FK("users.id"))
-    status = Column(String, default="open")  # open | accepted | rejected
+    status = Column(String, default="open")  # open | accepted | rejected | conflict (real git merge)
     created_at = Column(DateTime)
     resolved_at = Column(DateTime, nullable=True)
 
@@ -245,7 +270,7 @@ class Citation(Base):
     to_article_id = Column(String, FK("articles.id"), primary_key=True)
 ```
 
-All pure join tables. No JSON. No probability fields (removed in P0 refactor). MergeProposal thread deferred to Phase 2.
+All pure join tables. No JSON. No probability fields (removed in P0 refactor). MergeProposal now executes real git merge (add fork as remote, fetch, merge). On conflict, status = `"conflict"` — the proposal stays open until resolved. Thread deferred to Phase 2.
 
 ### 3.7 Entity Relationship Diagram
 
@@ -354,7 +379,7 @@ Compile output is **never** stored in the database. The compile endpoint generat
 | POST | `/api/v1/articles/{id}/reviews/{rid}/messages` | Post thread reply |
 | GET | `/api/v1/articles/{id}/citations` | Citation graph |
 | POST | `/api/v1/citations/click` | Record citation click |
-| POST | `/api/v1/articles/{id}/merge-proposals` | Create merge proposal (auth required; proposer_id from JWT) |
+| POST | `/api/v1/articles/{id}/merge-proposals` | Create merge proposal (auth required; proposer_id from JWT). On accept, executes real git merge. |
 | GET | `/api/v1/search` | Full-text search |
 | POST | `/api/v1/compile-preview` | Compile Markdown/Typst → HTML/SVG |
 | GET | `/api/v1/users` | List users |
