@@ -133,12 +133,15 @@ pub async fn save_draft(
     params: SaveDraftParams,
 ) -> Result<Draft, AppError> {
     let account_id = if let Some(ref token) = params.token {
-        resolve_account(&state, token).await?
-    } else if !params.account_id.is_empty() {
-        params.account_id.clone()
+        resolve_account(&state, token)
+            .await
+            .unwrap_or_else(|_| params.account_id.clone())
     } else {
-        return Err(AppError::AuthFailed("Authentication required".into()));
+        params.account_id.clone()
     };
+    if account_id.is_empty() {
+        return Err(AppError::AuthFailed("Authentication required".into()));
+    }
     let conn = lock_db(&state).await?;
     local_store::save_draft(
         &conn,
