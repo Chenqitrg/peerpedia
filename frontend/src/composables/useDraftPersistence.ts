@@ -48,9 +48,8 @@ export function useDraftPersistence() {
         format,
       })
 
-      console.log('[draftPersistence.save] tauri.saveDraft returned:', JSON.stringify(result))
-      if (!result) { console.error('[draftPersistence.save] result is null/undefined'); return { error: 'Tauri unavailable' } }
-      if ('error' in result) { console.error('[draftPersistence.save] error:', result.error); return result as PersistenceResult }
+      if (!result) return { error: 'Tauri unavailable' }
+      if ('error' in result) return result as PersistenceResult
       return result as Draft
     }
 

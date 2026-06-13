@@ -286,8 +286,7 @@ async function persistToGit(accountId: string, author: string, msg: string): Pro
     const result = await draftPersistence.save(
       accountId, title.value, content.value, format.value, undefined,
     )
-    console.log('[persistToGit] save result:', result)
-    if (!result || !result.id) { errorMsg.value = 'Failed to create draft'; console.error('[persistToGit] no result or id'); return false }
+    if (!result || !result.id) { errorMsg.value = 'Failed to create draft'; return false }
     currentDraftId.value = result.id
     saveString(DRAFT_ID_KEY.value, result.id)
 
@@ -353,11 +352,10 @@ async function saveDraft() {
   if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
     const msg = commitMsg.value.trim()
     const ok = await persistToGit(accountId, author, msg)
-    console.log('[saveDraft] persistToGit returned:', ok, 'currentDraftId:', currentDraftId.value, 'commitHash:', commitHash.value)
-    if (!ok) { console.error('[saveDraft] persistToGit failed'); return }
+    console.log('[saveDraft] persistToGit ok, draftId:', currentDraftId.value)
+    if (!ok) return
     commitMsg.value = ''
     markSaved()
-    console.log('[saveDraft] markSaved done, hasSaved:', hasSaved.value, 'isClean:', isClean.value)
     // Push to server if online.
     if (isSynced.value) {
       const articleId = editId.value || currentDraftId.value
