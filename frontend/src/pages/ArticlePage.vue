@@ -182,13 +182,12 @@ async function loadArticle(articleId: string) {
     commitHash.value = article.value.commit_hash || ''
     await loadCompiledContent()
     loadReviews()
-    // Cache explicitly opened article for offline reading.
-    if (articleSourceContent.value) {
-      useFollowCache().setCachedArticle(articleId, article.value, {
-        content: articleSourceContent.value,
-        format: articleFormat.value,
-      }).catch((e: unknown) => { console.warn('Cache article failed:', e) })
-    }
+    // Cache article metadata — always, even if source fetch failed.
+    // Fork articles have null compiled_output; source may fail independently.
+    useFollowCache().setCachedArticle(articleId, article.value, {
+      content: articleSourceContent.value || '',
+      format: articleFormat.value,
+    }).catch((e: unknown) => { console.warn('Cache article failed:', e) })
     return
   } catch (e: any) {
     // 2. In Tauri/dev-mock mode: try cached article first, then draft, then git.
@@ -602,8 +601,20 @@ async function handleFork() {
   try {
     const result = await forkArticle(id)
     isForked.value = true
-    // Navigate to article view, not editor — fork is already a draft.
-    // Decision #10: eliminates "must save or lose it" anxiety.
+    // Proactive cache: immediately cache fork with current source content
+    // so the fork is readable offline without waiting for page load.
+    if (article.value && articleSourceContent.value) {
+      useFollowCache().setCachedArticle(result.id, {
+        ...article.value,
+        id: result.id,
+        forked_from: result.forked_from,
+        status: 'draft' as const,
+        is_own_article: true,
+      }, {
+        content: articleSourceContent.value,
+        format: articleFormat.value,
+      }).catch((e: unknown) => { console.warn('Fork proactive cache failed:', e) })
+    }
     router.push(`/articles/${result.id}`)
   } catch (e) {
     console.error('Fork failed:', e)
