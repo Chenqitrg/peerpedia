@@ -28,17 +28,70 @@ arXiv solved **distribution**. But it didn't solve **filtering** — the problem
 
 ## Strategy · 策略
 
-**Phase 1 — Tauri Desktop（冷启动）✅**
-A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. 5MB install, 30MB RAM. Useful alone — the key to cold-start users.
+### Phase 1 — Tauri Desktop（冷启动）✅ v0.1.x
+A better notebook. Offline Markdown/Typst writing + Git version control + local SQLite. Multiple local accounts. Client-side compilation. **5 MB install, 30 MB RAM.** Useful alone — no server needed.
 
-**Phase 1.5 — Polish & Ship（打磨分发）✅ v0.2.3 → v0.3.0**
-Delete, diff view, Typst SVG + PDF, draft search, editor UX (save-as-commit, VSCode-style tab system), CodeMirror 6, git-first architecture. Follow/bookmark with server as source of truth (REST API), offline cache via article_cache. Article sync (L4): auto-backup to server, conflict resolution. Multi-author articles, fork/merge workflow, real git merge for proposals. Schools page with follow state. Desktop app is solid.
+> **Why this first:** Cold-start problem. Nobody will sign up for an empty platform. The desktop app is useful *before* the network exists.
 
-**Phase 2 — Score arXiv（包围城市）**
-Community scoring layer on top of preprints. A quality filter that doesn't belong to any publisher.
+### Phase 1.5 — Polish & Ship（打磨分发）✅ v0.2.x ~ v0.3.0
 
-**Phase 3 — Replace Peer Review（夺取政权）**
-When reputation + scoring infrastructure exists and people trust it, journals become obsolete. Peer review is no longer a service — it's a protocol.
+| Area | Deliverables |
+|------|-------------|
+| **Editing** | Save-as-commit, VSCode-style tab system, CodeMirror 6, Typst + Markdown |
+| **Version Control** | Diff view, commit history, rollback, fork, merge (real git merge) |
+| **Multi-Author** | Authors derived from git history (`{UUID}@peerpedia`), fork = original ∪ forker, merge = target ∪ fork |
+| **Social** | Follow/bookmark with server as source of truth, schools page with follow state |
+| **Sync (L4)** | Auto-backup to server on save, conflict resolution via hash comparison, offline cache |
+| **Desktop** | Delete, download (commit-hash embedded filenames), Typst SVG + PDF, draft search |
+
+Desktop app is solid. Ready for a second user.
+
+### Phase 2 — 2-Person Experiment → Community（包围城市）🔄 v0.4+
+
+**目标：从 1 个开发者自测 → 2 个人真实协作 → N 个人的社区。**
+
+```
+Phase 2.0 — 2-Person Experiment（当前）        约 2-4 周
+├── 台式机部署服务器（Tailscale + uvicorn）
+├── 测试者上手（dev 模式，自由探索，报 bug）
+├── 修复真实多用户场景的 bug
+└── 输出：稳定到可以打包分发的版本
+
+Phase 2.1 — Packaging & Distribution            约 2-4 周
+├── CI 自动打包 macOS/Windows/Linux
+├── 应用签名 + 自动更新
+├── 第一个非开发者的安装体验
+└── 输出：任何人可以下载安装的桌面应用
+
+Phase 2.2 — Server Infrastructure               约 2-4 周
+├── 台式机 → 云服务器迁移
+├── 域名 + HTTPS
+├── 数据库备份
+├── 多用户并发
+└── 输出：7×24 可访问的公共服务
+
+Phase 2.3 — Community Scoring                   约 4-8 周
+├── 五维评审（原创性/严谨性/完整性/教学性/影响力）
+├── 评审者信誉系统（Reputation）
+├── 沉淀池（Sedimentation Pool）自动流转
+├── 引用图
+└── 输出：一个不依赖传统期刊的质量过滤器
+
+Phase 2.4 — Discovery & Growth                  约 4-8 周
+├── 个性化信息流（Feed）
+├── 全文搜索
+├── 引用推荐
+├── 学科分类
+└── 输出：用户能找到值得读的文章
+```
+
+### Phase 3 — Replace Peer Review（夺取政权）🔮
+
+When reputation + scoring infrastructure exists and people trust it:
+- Journals become obsolete — peer review is no longer a service, it's a **protocol**
+- Decentralized editorial boards form around topics
+- University hiring/tenure recognizes community scores
+- arXiv + PeerPedia = complete open science stack
 
 ---
 
