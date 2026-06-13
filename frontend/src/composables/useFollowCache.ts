@@ -198,8 +198,9 @@ export function useFollowCache() {
         source,
         cached_at: new Date().toISOString(),
       })
-      await tauri.cacheArticle({ id: articleKey(articleId), article_json: payload })
-    } catch { /* ignore */ }
+      const r = await tauri.cacheArticle({ id: articleKey(articleId), article_json: payload })
+      if (r && typeof r === 'object' && 'error' in r) { console.warn('setCachedArticle error:', (r as { error: string }).error) }
+    } catch(e) { console.warn('setCachedArticle failed:', e) }
   }
 
   return {

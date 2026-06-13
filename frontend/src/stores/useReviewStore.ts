@@ -17,7 +17,8 @@ export const useReviewStore = defineStore('review', () => {
     error.value = ''
     try {
       reviews.value = await getReviews(articleId)
-    } catch {
+    } catch(e) {
+      console.warn('fetchReviews failed:', e)
       reviews.value = []
     } finally {
       loading.value = false
