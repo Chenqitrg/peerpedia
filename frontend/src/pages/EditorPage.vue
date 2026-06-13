@@ -505,8 +505,18 @@ async function handleSubmitToPool() {
       result = await articleStore.updateArticle(editId.value!, body)
       successMsg.value = 'Article updated and submitted to pool!'
     } else if (currentDraftId.value) {
-      // Already saved as draft — update it with publish:true instead of creating a duplicate
-      result = await articleStore.updateArticle(currentDraftId.value, body)
+      // Already saved as draft — update it with publish:true instead of creating a duplicate.
+      // In Tauri/local mode, currentDraftId is a local draft ID. Resolve the server
+      // article ID from the draft's auto-upload metadata so we don't 404.
+      let serverId: string | undefined
+      if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+        const draft = await tauri.getDraft({ id: currentDraftId.value })
+        if (draft && typeof draft === 'object' && !('error' in draft)) {
+          serverId = (draft as any).server_article_id || undefined
+        }
+      }
+      const publishId = serverId || currentDraftId.value
+      result = await articleStore.updateArticle(publishId, body)
       successMsg.value = 'Article submitted to pool!'
       remove(DRAFT_KEY.value)
       setTimeout(() => {
