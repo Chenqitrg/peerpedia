@@ -26,6 +26,24 @@
     "syncConnecting": "连接中…",
     "syncDisconnectAria": "已同步 — 点击断开"
   },
+  "sync": {
+    "conflictsTitle": "同步冲突",
+    "conflictsSubtitle": "请逐条解决后继续。",
+    "pendingUpload": "待推送",
+    "pendingDelete": "待删除",
+    "pushToServer": "推送到服务器",
+    "discard": "丢弃",
+    "confirmDelete": "确认删除",
+    "restoreFromServer": "从服务器恢复",
+    "allResolved": "全部已同步",
+    "allResolvedHint": "你的本地修改已与服务器同步。",
+    "progress": "第 {current} 项，共 {total} 项",
+    "untitled": "无标题",
+    "lessThanHour": "不到 1 小时前",
+    "hoursAgo": "{n} 小时前",
+    "daysAgo": "{n} 天前",
+    "expiryNote": "超过 7 天的修改将标记为过期。"
+  },
   "schools": {
     "subtitle": "发现研究者，关注你感兴趣的学术工作。"
   },
@@ -137,6 +155,8 @@
     "categories": "分类",
     "abstract": "摘要",
     "abstractPlaceholder2": "文章简要概述...",
+    "allFieldsRequired": "提交前请填写所有必填项",
+    "submitToPool": "提交到沉淀池",
     "cancel": "取消",
     "submitting": "提交中...",
     "publishToPool": "发布至沉淀池",
