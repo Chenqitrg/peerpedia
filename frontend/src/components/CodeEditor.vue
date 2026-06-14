@@ -164,5 +164,18 @@ defineExpose({ codemirrorView })
 }
 .cm-wrapper .cm-editor .cm-scroller {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cm-wrapper .cm-editor .cm-content {
+  border-bottom: none !important;
+}
+.cm-wrapper .cm-editor .cm-gutters {
+  font-size: 10px;
+  width: 26px;
+  min-width: 26px !important;
+  padding: 0 2px !important;
+  color: #484f58;
+  background: transparent;
 }
 </style>

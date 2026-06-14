@@ -3,7 +3,7 @@
 
 <template>
   <div id="app" class="min-h-screen bg-page flex flex-col">
-    <NavBar />
+    <NavBar v-if="!isEditorPage" />
     <!-- Server sync error banner -->
     <div
       v-if="userStore.syncError"
@@ -14,11 +14,11 @@
       {{ userStore.syncError }}
       <button class="ml-2 text-ink-muted hover:text-ink" @click="userStore.syncError = null">✕</button>
     </div>
-    <div class="flex-1 relative">
+    <div class="flex-1 relative flex flex-col min-h-0">
       <TabDrawer @close-tab="onCloseTab" />
       <main
         :class="isEditorPage
-          ? 'w-full px-2 pt-24 pb-2'
+          ? 'w-full px-2 pt-2 pb-1 flex-1 min-h-0 flex flex-col'
           : 'w-full max-w-content mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12'"
       >
         <router-view v-slot="{ Component, route }">

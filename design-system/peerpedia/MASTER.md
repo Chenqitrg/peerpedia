@@ -5,7 +5,7 @@
 > If no override exists, this Master is the source of truth.
 
 **Project:** PeerPedia (知诸网)
-**Updated:** 2026-06-10
+**Updated:** 2026-06-14
 **Base Style:** Dark Mode (GitHub-inspired academic editor)
 **Icon Set:** Lucide (lucide-vue-next)
 
@@ -21,11 +21,11 @@ All colors verified against DESIGN.en.md and main.css.
 | Card BG | `#161b22` | `bg-card` | Cards, modals, panels |
 | Hover BG | `#21262d` | — | Button/card hover states |
 | Divider | `#30363d` | `border-divider` | Borders, separators |
-| Text Primary | `#e6edf3` | `text-ink` | Body text, headings |
+| Text Primary | `#b0b8c4` | `text-ink` | Body text, headings |
 | Text Muted | `#6e7681` | `text-ink-muted` | Secondary text, placeholders |
 | Accent | `#7b8c9e` | `text-accent` / `bg-accent` | Links, active states, primary actions |
 | Accent Hover | `#8b9cae` | `hover:text-accent-hover` | Hover brightening |
-| Success | `#238636` | `text-success` / `bg-success` | Positive indicators |
+| Success | `#5c7c6e` | `text-success` / `bg-success` | Positive indicators |
 | Danger | `#d73a49` | `text-danger` / `bg-danger` | Delete, destructive actions |
 | Warning | `#d29922` | — | Warnings (rarely used) |
 
@@ -44,6 +44,7 @@ All colors verified against DESIGN.en.md and main.css.
 | Role | Font | CSS |
 |---|---|---|
 | Body | Inter | `font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif` |
+| Prose Body | Palatino | `.prose-custom` 覆写为 `'Palatino', 'Palatino Linotype', 'Book Antiqua', 'Noto Serif SC', Georgia, serif` |
 | Headings | EB Garamond | `font-family: 'EB Garamond', 'Noto Serif SC', 'STSong', Georgia, serif` |
 | Code | JetBrains Mono | `font-family: 'JetBrains Mono', 'Fira Code', monospace` |
 | Chinese Body | — | Falls back to PingFang SC, Noto Serif SC (embedded in font stacks) |
@@ -57,7 +58,7 @@ All colors verified against DESIGN.en.md and main.css.
 
 - **Headings**: EB Garamond, semibold, tight tracking. `font-heading font-semibold tracking-tight`.
 - **Body**: Inter, 16px minimum on mobile. `text-sm` (14px) for secondary text only.
-- **Code**: JetBrains Mono, `text-sm` with `leading-relaxed`.
+- **Code**: JetBrains Mono, `text-sm` (14px) default。编辑器内 `font-size: 13px; line-height: 1.5;` 更紧凑。行号 `font-size: 11px; color: #6e7681;`。
 - **Line-height**: 1.5-1.75 for body text. `leading-relaxed` class.
 - **Line-length**: Max 75 chars per line (prose). `max-w-prose` for article body.
 
@@ -71,10 +72,10 @@ Tailwind default scale. Key conventions:
 |---|---|
 | Card padding | `p-4` to `p-6` |
 | Modal padding | `p-6` |
-| Icon button | `w-7 h-7` or `w-8 h-8` |
+| Icon button | `w-7 h-7`（工具栏紧凑）或 `w-8 h-8`（常规） |
 | Button text+icon | `px-2.5 py-1` (small), `px-4 py-2.5` (normal) |
 | Section gap | `mb-6` |
-| Toolbar | `px-4 py-2` |
+| Toolbar | `px-4 py-1`（紧凑）或 `px-4 py-2`（常规） |
 | Page content | `max-w-content` (defined in tailwind.config.ts) |
 
 ---
@@ -119,11 +120,46 @@ Guard:    Two-step confirmation REQUIRED before any destructive action
 ### Editor Layout
 
 ```
-Toolbar:     flex items-center justify-between px-4 py-2 bg-card border border-divider
-Split pane:  draggable w-1 bg-divider cursor-col-resize hover:bg-accent/50
-Editor:      flex-1 bg-[#0d1117] font-mono text-sm
+Toolbar:     flex items-center justify-between px-4 py-1 bg-card border border-divider
+             按钮 28px (w-7 h-7), 图标 14px (w-3.5 h-3.5), gap-1
+             下载按钮合并为 kebab dropdown (MoreVertical 图标触发)
+Split pane:  w-1 bg-divider cursor-col-resize hover:bg-accent/50 shrink-0 relative
+             group flex items-center justify-center
+             内部 grip 竖条: w-0.5 h-8 rounded-full bg-ink-muted/40 group-hover:bg-accent
+Editor:      flex-1 bg-[#0d1117] font-mono font-size:13px line-height:1.5
+             行号 11px, color: #6e7681; 去掉 .cm-content 底部横线
 Preview:     flex-1 overflow-y-auto bg-[#0d1117] p-4
-Bottom bar:  flex items-center justify-between px-4 py-1.5 bg-card border text-xs
+Bottom bar:  flex items-center justify-between px-4 py-1 bg-card border text-xs
+```
+
+### Download Dropdown
+
+```
+Trigger:  MoreVertical 图标, w-7 h-7, 和其他工具栏按钮同样式
+Menu:     absolute top-full right-0 mt-1 z-50 bg-card border border-divider rounded-lg shadow-xl
+Item:     flex items-center gap-2 px-3 py-2 text-sm text-ink hover:bg-[#21262d] rounded
+          图标 w-4 h-4: FileCode (source) / FileDown (compiled) / Package (repo)
+Disabled: opacity-30 cursor-not-allowed, tooltip 说明原因
+Dismiss:  点击外部关闭, Esc 关闭
+```
+
+### Edit Page: No NavBar
+
+```
+NavBar:    App.vue 中 v-if="!isEditorPage"，编辑页全屏
+Main:      pt-2 pb-1（替代 pt-24 pb-2），无需避让 NavBar
+Height:    .editor-page 用 min-h-0 flex-1 自适应，不硬编码 calc()
+Back:      router.back() 加 fallback → router.push('/')
+```
+
+### Typst Auto-Compile
+
+```
+触发:     编辑 Typst 内容 → 800ms 防抖 → 自动编译（仅 Tauri/本地模式）
+并发保护:  compiling.value 为 true 时跳过防抖触发
+Dirty 重编: 编译期间内容变化 → finally 中自动重编
+手动:     Cmd+S 立即编译（不依赖防抖）
+编译按钮: 已删除（auto-compile 替代）
 ```
 
 ---

@@ -32,6 +32,7 @@ import {
   EyeOff,
   GitCommitHorizontal,
   History,
+  MoreVertical,
   Play,
   Save,
   Send,
@@ -78,6 +79,7 @@ const submitting = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 const savedMsg = ref(false)
+const showDownloadMenu = ref(false)
 const showPreview = ref(true)
 const commitHash = ref('')
 // Track saved state to detect unsaved edits
@@ -195,18 +197,34 @@ watch(() => route.query.new, (val) => {
   }
 }, { immediate: true })
 
-// Debounced auto-preview for markdown — WYSIWYG: no manual compile needed
+// Debounced auto-preview/compile — WYSIWYG for both markdown and typst
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+const needsRecompile = ref(false)
+
 watch(content, (val) => {
-  if (format.value !== 'markdown') return
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    try {
-      previewHtml.value = val.trim() ? parseMarkdown(val) : ''
-    } catch {
-      // silent — auto-preview shouldn't surface errors to the user
+  if (format.value === 'markdown') {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      try {
+        previewHtml.value = val.trim() ? parseMarkdown(val) : ''
+      } catch {
+        // silent — auto-preview shouldn't surface errors to the user
+      }
+    }, 300)
+  } else if (
+    format.value === 'typst' &&
+    (tauri.isTauri.value || tauri.isBrowserLocal.value) &&
+    showPreview.value
+  ) {
+    if (compiling.value) {
+      needsRecompile.value = true
+      return
     }
-  }, 300)
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      handleCompile()
+    }, 800)
+  }
 })
 
 async function loadExistingArticle() {
@@ -439,7 +457,9 @@ async function saveDraft() {
 
 async function handleCompile() {
   if (!content.value.trim()) return
+  if (compiling.value) return  // guard: skip if already compiling
   compiling.value = true
+  needsRecompile.value = false
   previewHtml.value = ''
   compileResult.value = null
   errorMsg.value = ''
@@ -468,6 +488,10 @@ async function handleCompile() {
     errorMsg.value = e.message || 'Compile failed'
   } finally {
     compiling.value = false
+    if (needsRecompile.value) {
+      needsRecompile.value = false
+      handleCompile()
+    }
   }
 }
 
@@ -563,17 +587,17 @@ defineExpose({ handlePublish, showSelfReview })
 </script>
 
 <template>
-  <div class="editor-page flex flex-col h-[calc(100vh-6rem)] animate-fade-in">
+  <div class="editor-page flex flex-col min-h-0 flex-1 animate-fade-in">
     <!-- Top toolbar -->
-    <div class="flex items-center justify-between px-4 py-2 bg-card border border-divider rounded-t-lg mb-0">
+    <div class="flex items-center justify-between px-4 py-1 bg-card border border-divider rounded-t-lg mb-0">
       <button
-        class="flex items-center justify-center w-9 h-9 rounded-lg
+        class="flex items-center justify-center w-7 h-7 rounded-lg
                text-ink-muted hover:text-ink hover:bg-[#21262d]
                transition-colors duration-200 shrink-0"
         :aria-label="t('editor.back')"
         @click="router.back()"
       >
-        <ArrowLeft class="w-4 h-4" stroke-width="2" />
+        <ArrowLeft class="w-3.5 h-3.5" stroke-width="2" />
       </button>
       <div class="flex items-center gap-3 flex-1 min-w-0">
         <!-- Title input (editable only on create) -->
@@ -582,22 +606,22 @@ defineExpose({ handlePublish, showSelfReview })
           v-model="title"
           type="text"
           :placeholder="t('editor.titlePlaceholder')"
-          class="flex-1 min-w-0 bg-transparent border-none text-base font-heading font-semibold text-ink
+          class="flex-1 min-w-0 bg-transparent border-none text-sm font-heading font-semibold text-ink
                  placeholder:text-ink-muted/50 focus:outline-none"
         />
         <span
           v-else
-          class="text-base font-heading font-semibold text-ink truncate"
+          class="text-sm font-heading font-semibold text-ink truncate"
         >
           {{ title || 'Untitled' }}
         </span>
       </div>
 
-      <div class="flex items-center gap-1.5 shrink-0">
+      <div class="flex items-center gap-1 shrink-0">
         <!-- Draft save -->
         <div class="relative">
           <button
-            class="flex items-center justify-center w-9 h-9 rounded-lg
+            class="flex items-center justify-center w-7 h-7 rounded-lg
                    text-ink-muted hover:text-ink hover:bg-[#21262d]
                    transition-colors duration-200
                    disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-ink-muted"
@@ -606,7 +630,7 @@ defineExpose({ handlePublish, showSelfReview })
             :disabled="submitting || isClean"
             @click="handleSaveDraft"
           >
-            <Save class="w-4 h-4" stroke-width="2" />
+            <Save class="w-3.5 h-3.5" stroke-width="2" />
           </button>
           <!-- Commit message popup -->
           <Transition name="slide-up">
@@ -647,80 +671,87 @@ defineExpose({ handlePublish, showSelfReview })
 
         <!-- Toggle preview -->
         <button
-          class="flex items-center justify-center w-9 h-9 rounded-lg
+          class="flex items-center justify-center w-7 h-7 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="showPreview ? t('editor.hidePreview') : t('editor.showPreview')"
           :data-tooltip="showPreview ? t('editor.hidePreview') : t('editor.showPreview')"
           @click="showPreview = !showPreview"
         >
-          <Eye v-if="showPreview" class="w-4 h-4" stroke-width="2" />
-          <EyeOff v-else class="w-4 h-4" stroke-width="2" />
+          <Eye v-if="showPreview" class="w-3.5 h-3.5" stroke-width="2" />
+          <EyeOff v-else class="w-3.5 h-3.5" stroke-width="2" />
         </button>
 
-        <!-- Compile (Typst only — Markdown preview is auto) -->
-        <button
-          v-if="format === 'typst'"
-          class="flex items-center justify-center w-9 h-9 rounded-lg
-                 text-ink-muted hover:text-accent hover:bg-accent/10
-                 transition-colors duration-200"
-          :aria-label="t('editor.compile')"
-          :data-tooltip="t('editor.compile') + ' (⌘S)'"
-          :disabled="compiling || !content.trim()"
-          @click="handleCompile"
-        >
-          <Play class="w-4 h-4" stroke-width="2" />
-        </button>
-
-        <!-- Download source -->
-        <DownloadButton
-          format="source"
-          :content="content"
-          :content-format="format"
-          :filename="title"
-          :disabled="!hasSaved || !isClean || !content.trim()"
-          :commit-hash="commitHash"
-          :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
-        />
-        <!-- Download compiled HTML -->
-        <DownloadButton
-          format="compiled"
-          :content="content"
-          :content-format="format"
-          :filename="title"
-          :disabled="!hasSaved || !isClean || !content.trim()"
-          :commit-hash="commitHash"
-          :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
-        />
-        <!-- Download repo bundle -->
-        <DownloadButton
-          format="repo"
-          :content="content"
-          :article-id="editId || currentDraftId"
-          :filename="title"
-          :disabled="!hasSaved || !isClean || !content.trim()"
-          :commit-hash="commitHash"
-          :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
-        />
+        <!-- Download kebab dropdown -->
+        <div class="relative">
+          <button
+            class="flex items-center justify-center w-7 h-7 rounded-lg
+                   text-ink-muted hover:text-ink hover:bg-[#21262d]
+                   transition-colors duration-200"
+            :aria-label="t('download.repo')"
+            :data-tooltip="t('download.repo')"
+            @click="showDownloadMenu = !showDownloadMenu"
+          >
+            <MoreVertical class="w-3.5 h-3.5" stroke-width="2" />
+          </button>
+          <!-- Dropdown backdrop (click outside to close) -->
+          <div v-if="showDownloadMenu" class="fixed inset-0 z-40" @click="showDownloadMenu = false" />
+          <!-- Dropdown menu -->
+          <div
+            v-if="showDownloadMenu"
+            class="absolute top-full right-0 mt-1 z-50 bg-card border border-divider rounded-lg shadow-xl py-1 min-w-[160px] animate-fade-in"
+          >
+            <DownloadButton
+              format="source"
+              :content="content"
+              :content-format="format"
+              :filename="title"
+              :show-label="true"
+              :disabled="!hasSaved || !isClean || !content.trim()"
+              :commit-hash="commitHash"
+              :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+            />
+            <DownloadButton
+              format="compiled"
+              :content="content"
+              :content-format="format"
+              :filename="title"
+              :show-label="true"
+              :disabled="!hasSaved || !isClean || !content.trim()"
+              :commit-hash="commitHash"
+              :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+            />
+            <DownloadButton
+              format="repo"
+              :content="content"
+              :article-id="editId || currentDraftId"
+              :filename="title"
+              :show-label="true"
+              :disabled="!hasSaved || !isClean || !content.trim()"
+              :commit-hash="commitHash"
+              :disabled-reason="!hasSaved ? 'Save to enable download' : !isClean ? 'Unsaved changes — save to download' : undefined"
+            />
+          </div>
+        </div>
 
         <!-- History — show after first save even for new articles -->
         <router-link
           v-if="isEdit || currentDraftId"
           :to="`/articles/${editId || currentDraftId}/history`"
-          class="flex items-center justify-center w-9 h-9 rounded-lg
+          class="flex items-center justify-center w-7 h-7 rounded-lg
                  text-ink-muted hover:text-ink hover:bg-[#21262d]
                  transition-colors duration-200"
           :aria-label="t('article.history')"
           :data-tooltip="t('article.history')"
         >
-          <History class="w-4 h-4" stroke-width="2" />
+          <History class="w-3.5 h-3.5" stroke-width="2" />
         </router-link>
 
         <div class="w-px h-5 bg-divider mx-1" />
 
         <!-- Publish to pool -->
         <button
-          class="flex items-center justify-center w-9 h-9 rounded-lg
+          class="flex items-center justify-center w-7 h-7 rounded-lg
                  transition-colors duration-200"
           :class="publishDisabled
             ? 'text-ink-muted/30 cursor-not-allowed'
@@ -730,7 +761,7 @@ defineExpose({ handlePublish, showSelfReview })
           :data-tooltip="publishDisabledReason || t('editor.publish')"
           @click="handlePublish"
         >
-          <Send class="w-4 h-4" stroke-width="2" />
+          <Send class="w-3.5 h-3.5" stroke-width="2" />
         </button>
 
       </div>
@@ -805,10 +836,12 @@ defineExpose({ handlePublish, showSelfReview })
       <div
         v-if="showPreview"
         ref="splitterEl"
-        class="w-1 bg-divider cursor-col-resize hover:bg-accent/50 transition-colors shrink-0 relative"
+        class="w-1 bg-divider cursor-col-resize hover:bg-accent/50 transition-colors shrink-0 relative flex items-center justify-center group"
         :class="{ 'bg-accent': isDragging }"
         @mousedown="onSplitterMouseDown"
-      />
+      >
+        <div class="w-0.5 h-8 rounded-full bg-ink-muted/40 group-hover:bg-accent transition-colors" />
+      </div>
 
       <!-- Preview area (right) -->
       <div
@@ -843,7 +876,7 @@ defineExpose({ handlePublish, showSelfReview })
     </div>
 
     <!-- Bottom bar -->
-    <div class="flex items-center justify-between px-4 py-1.5 bg-card border border-divider rounded-b-lg text-xs text-ink-muted">
+    <div class="flex items-center justify-between px-4 py-1 bg-card border border-divider rounded-b-lg text-xs text-ink-muted">
       <div class="flex items-center gap-3">
         <span>{{ format.toUpperCase() }}</span>
         <span v-if="commitHash" class="flex items-center gap-1 font-mono">

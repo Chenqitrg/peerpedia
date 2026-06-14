@@ -935,8 +935,9 @@ describe('EditorPage', () => {
     vi.useRealTimers()
   })
 
-  it('T3: no auto-preview for typst mode', async () => {
+  it('T3: typst auto-compile in Tauri mode', async () => {
     vi.useFakeTimers()
+    _isTauri = true
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
@@ -945,18 +946,49 @@ describe('EditorPage', () => {
     const vm = wrapper.vm as any
 
     vm.format = 'typst'
+    vm.showPreview = true
     vm.content = '= Some typst content'
+    await flushPromises() // flush watcher callback → creates setTimeout
+
+    // 300ms should NOT trigger (uses 800ms for typst)
     vi.advanceTimersByTime(300)
     await flushPromises()
+    expect(vm.compileResult).toBeNull()
 
-    // Auto-preview watcher should skip typst — no compileResult, no previewHtml
-    expect(vm.previewHtml).toBe('')
+    // 800ms should trigger auto-compile
+    vi.advanceTimersByTime(500)
+    await flushPromises()
+    // compileResult should be populated after handleCompile completes
+    expect(vm.compileResult).not.toBeNull()
+
+    vi.useRealTimers()
+    _isTauri = false
+  })
+
+  it('T3b: no typst auto-compile in web mode', async () => {
+    vi.useFakeTimers()
+    _isTauri = false
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.format = 'typst'
+    vm.showPreview = true
+    vm.content = '= Some typst content'
+    await flushPromises() // flush watcher callback
+    vi.advanceTimersByTime(800)
+    await flushPromises()
+
+    // Auto-compile should NOT fire in web mode
     expect(vm.compileResult).toBeNull()
 
     vi.useRealTimers()
   })
 
-  it('T4: compile button hidden in markdown mode (default)', async () => {
+  it('T4: compile button removed (auto-compile replaces it)', async () => {
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
@@ -965,12 +997,12 @@ describe('EditorPage', () => {
     const vm = wrapper.vm as any
     expect(vm.format).toBe('markdown')
 
-    // Compile button (Play icon) should not exist in markdown mode
+    // Compile button should not exist in any mode (removed, auto-compile replaces it)
     const compileBtn = wrapper.find('[aria-label="Compile"]')
     expect(compileBtn.exists()).toBe(false)
   })
 
-  it('T5: compile button visible in typst mode', async () => {
+  it('T5: compile button absent in typst mode (auto-compile replaces it)', async () => {
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
@@ -982,11 +1014,9 @@ describe('EditorPage', () => {
     vm.content = '= Hello'
     await flushPromises()
 
-    // Compile button should exist in typst mode
+    // Compile button should NOT exist — auto-compile replaces manual button
     const compileBtn = wrapper.find('[aria-label="Compile"]')
-    expect(compileBtn.exists()).toBe(true)
-    // Should be enabled when content is non-empty
-    expect((compileBtn.element as HTMLButtonElement).disabled).toBe(false)
+    expect(compileBtn.exists()).toBe(false)
   })
 
   // T6: Markdown auto-preview works without manual compile
