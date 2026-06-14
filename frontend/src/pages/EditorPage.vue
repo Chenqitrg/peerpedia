@@ -126,7 +126,8 @@ const autoSync = useAutoSync()
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
-const _pushedToServer = ref(false)
+/** @deprecated Phase B: replaced by bundle pushRepo — track whether first server POST succeeded */
+const _firstServerPushDone = ref(false)
 
 function onSaveAndClose(e: Event) {
   const detail = (e as CustomEvent).detail
@@ -145,7 +146,7 @@ onMounted(() => {
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
     currentDraftId.value = undefined
-    _pushedToServer.value = false
+    _firstServerPushDone.value = false
   }
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('tab-save-and-close', onSaveAndClose)
@@ -418,7 +419,7 @@ async function saveDraft() {
               commit_message: msg,
               publish: false,
             })
-          } else if (!_pushedToServer.value) {
+          } else if (!_firstServerPushDone.value) {
             // New article, first push: POST create with client UUID.
             await articleStore.createArticle({
               id: currentDraftId.value,
@@ -427,7 +428,7 @@ async function saveDraft() {
               format: format.value,
               commit_message: msg,
             })
-            _pushedToServer.value = true
+            _firstServerPushDone.value = true
           } else {
             // Already created on server — use PUT update.
             await articleStore.updateArticle(currentDraftId.value!, {
