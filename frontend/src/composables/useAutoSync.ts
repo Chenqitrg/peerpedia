@@ -122,8 +122,6 @@ export function useAutoSync() {
     authorId: string,
     msg: string,
   ): Promise<{ pushed: boolean; head: string | null }> {
-    const tauri = useTauri()
-
     // 1. Get local HEAD
     let history: any
     try {
@@ -151,10 +149,23 @@ export function useAutoSync() {
       // Server might not have the article yet (first push) — that's fine
     }
 
+    // Helper: full tar.gz fallback (first push or incremental failure)
+    async function fullExportPush(): Promise<{ pushed: boolean; head: string | null }> {
+      const base64 = await tauri.exportArticle({ article_id: articleId })
+      await createArticle({
+        id: articleId,
+        title: '',
+        content: '',
+        format: 'markdown',
+        commit_message: msg,
+        repo_bundle: base64,
+      })
+      return { pushed: true, head: localHead }
+    }
+
     // 3. Create incremental bundle
     let bundleBytes: number[]
     try {
-      // Try incremental first
       const serverHeadRes = await getArticleHead(articleId).catch(() => ({ hash: '' }))
       if (serverHeadRes.hash) {
         bundleBytes = await tauri.gitBundleCreate({
@@ -162,32 +173,10 @@ export function useAutoSync() {
           since_hash: serverHeadRes.hash,
         })
       } else {
-        // No server commits — send full tar.gz
-        const base64 = await tauri.exportArticle({ article_id: articleId })
-        const payload = {
-          id: articleId,
-          title: '',
-          content: '',
-          format: 'markdown' as const,
-          commit_message: msg,
-          repo_bundle: base64,
-        }
-        await createArticle(payload)
-        return { pushed: true, head: localHead }
+        return fullExportPush()
       }
     } catch {
-      // Fall back to full export
-      const base64 = await tauri.exportArticle({ article_id: articleId })
-      const payload = {
-        id: articleId,
-        title: '',
-        content: '',
-        format: 'markdown' as const,
-        commit_message: msg,
-        repo_bundle: base64,
-      }
-      await createArticle(payload)
-      return { pushed: true, head: localHead }
+      return fullExportPush()
     }
 
     // 4. POST bundle to /sync
