@@ -179,7 +179,7 @@ describe('EditorPage', () => {
     expect(saveBtn.exists()).toBe(true)
   })
 
-  it('has a compile button', async () => {
+  it('has toolbar buttons', async () => {
     const EditorPage = (await import('../EditorPage.vue')).default
     const wrapper = mount(EditorPage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
@@ -896,5 +896,192 @@ describe('EditorPage', () => {
     expect(wrapper.text()).toMatch(/Self Assessment/i)
     // Commit message label should NOT be present in self-review panel
     expect(wrapper.text()).not.toMatch(/Commit Message/i)
+  })
+
+  // ── Markdown WYSIWYG: auto-preview tests ─────────────────────────
+
+  // T1+T2 combined: auto-preview update and clear
+  it('T1: auto-preview updates on markdown content change', async () => {
+    vi.useFakeTimers()
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.format = 'markdown'
+    vm.content = '# Hello World'
+    await flushPromises() // flush watcher callback → creates setTimeout
+
+    // Debounce hasn't fired yet
+    expect(vm.previewHtml).toBe('')
+
+    // Advance past 300ms debounce
+    vi.advanceTimersByTime(310)
+    await flushPromises()
+
+    // Now preview should be populated
+    expect(vm.previewHtml).toBeTruthy()
+    expect(vm.previewHtml).toContain('Hello World')
+
+    // Clear content — watcher fires, schedules new timer
+    vm.content = ''
+    await flushPromises() // flush watcher callback → creates new setTimeout
+    vi.advanceTimersByTime(310)
+    await flushPromises()
+    expect(vm.previewHtml).toBe('')
+
+    vi.useRealTimers()
+  })
+
+  it('T3: no auto-preview for typst mode', async () => {
+    vi.useFakeTimers()
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.format = 'typst'
+    vm.content = '= Some typst content'
+    vi.advanceTimersByTime(300)
+    await flushPromises()
+
+    // Auto-preview watcher should skip typst — no compileResult, no previewHtml
+    expect(vm.previewHtml).toBe('')
+    expect(vm.compileResult).toBeNull()
+
+    vi.useRealTimers()
+  })
+
+  it('T4: compile button hidden in markdown mode (default)', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    expect(vm.format).toBe('markdown')
+
+    // Compile button (Play icon) should not exist in markdown mode
+    const compileBtn = wrapper.find('[aria-label="Compile"]')
+    expect(compileBtn.exists()).toBe(false)
+  })
+
+  it('T5: compile button visible in typst mode', async () => {
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.format = 'typst'
+    vm.content = '= Hello'
+    await flushPromises()
+
+    // Compile button should exist in typst mode
+    const compileBtn = wrapper.find('[aria-label="Compile"]')
+    expect(compileBtn.exists()).toBe(true)
+    // Should be enabled when content is non-empty
+    expect((compileBtn.element as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  // T6: Markdown auto-preview works without manual compile
+  it('T6: markdown auto-preview populates without compile button', async () => {
+    vi.useFakeTimers()
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.format = 'markdown'
+    vm.content = '# Auto preview test'
+    await flushPromises() // flush watcher callback → creates setTimeout
+
+    // Advance past debounce
+    vi.advanceTimersByTime(310)
+    await flushPromises()
+
+    // Preview should be populated via auto-watcher (no manual compile needed)
+    expect(vm.previewHtml).toBeTruthy()
+    expect(vm.previewHtml).toContain('Auto preview test')
+
+    // Compile button should not exist in markdown mode
+    const compileBtn = wrapper.find('[aria-label="Compile"]')
+    expect(compileBtn.exists()).toBe(false)
+
+    vi.useRealTimers()
+  })
+
+  it('T7: Cmd+S still compiles for typst', async () => {
+    _isTauri = true
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.format = 'typst'
+    vm.content = '= Test Cmd+S typst'
+
+    // Call handleCompile directly (simulating Cmd+S in typst mode)
+    await vm.handleCompile()
+    await flushPromises()
+
+    // Typst compilation should have been triggered
+    expect(mockCompileTypst).toHaveBeenCalledWith({
+      content: '= Test Cmd+S typst',
+      format: 'typst',
+    })
+  })
+
+  it('T8: rapid typing cancels previous debounce', async () => {
+    vi.useFakeTimers()
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.format = 'markdown'
+
+    // First keystroke
+    vm.content = '# A'
+    await flushPromises()
+    vi.advanceTimersByTime(200) // Only 200ms — not enough for 300ms debounce
+
+    // Second keystroke cancels first timer
+    vm.content = '# AB'
+    await flushPromises()
+    vi.advanceTimersByTime(200) // Another 200ms — still only 200ms since second keystroke
+
+    // Third keystroke
+    vm.content = '# ABC'
+    await flushPromises()
+    vi.advanceTimersByTime(310) // 310ms from last keystroke — now it fires
+
+    await flushPromises()
+
+    // Only the final content should appear in preview
+    expect(vm.previewHtml).toContain('ABC')
+    // Intermediate content should NOT appear
+    expect(vm.previewHtml).not.toContain('# A</h1>')
+    expect(vm.previewHtml).not.toContain('# AB</h1>')
+
+    vi.useRealTimers()
   })
 })

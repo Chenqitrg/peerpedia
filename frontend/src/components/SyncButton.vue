@@ -6,15 +6,20 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Wifi, WifiOff } from 'lucide-vue-next'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
+import { useAutoSync } from '../composables/useAutoSync'
 
 const { t } = useI18n()
 const { connectionState, flash, connect, disconnect } = useNetworkStatus()
+const { pendingCount } = useAutoSync()
 
 const tooltip = computed(() => {
   switch (connectionState.value) {
     case 'connecting': return t('nav.syncConnecting')
     case 'synced': return t('nav.syncDisconnectAria')
-    default: return t('nav.syncConnectAria')
+    default:
+      return pendingCount.value > 0
+        ? `${pendingCount.value} pending sync(s)`
+        : t('nav.syncConnectAria')
   }
 })
 
@@ -38,8 +43,25 @@ function handleClick() {
     :aria-label="tooltip"
     @click="handleClick"
   >
-    <Wifi v-if="connectionState === 'connecting' || connectionState === 'synced'" class="sync-icon" :class="{ 'sync-icon--connecting': connectionState === 'connecting', 'sync-icon--synced': connectionState === 'synced' }" stroke-width="2" />
-    <WifiOff v-else class="sync-icon" :class="{ 'sync-icon--flash': flash }" stroke-width="2" />
+    <Wifi
+      v-if="connectionState === 'connecting' || connectionState === 'synced'"
+      class="sync-icon"
+      :class="{
+        'sync-icon--connecting': connectionState === 'connecting',
+        'sync-icon--synced': connectionState === 'synced',
+      }"
+      stroke-width="2"
+    />
+    <WifiOff
+      v-else
+      class="sync-icon"
+      :class="{ 'sync-icon--flash': flash }"
+      stroke-width="2"
+    />
+    <span
+      v-if="connectionState === 'idle' && pendingCount > 0"
+      class="sync-badge"
+    >{{ pendingCount }}</span>
     <span
       class="sync-dot"
       :class="{
@@ -103,6 +125,26 @@ function handleClick() {
 }
 .sync-icon--flash {
   color: #d73a49;
+}
+
+/* Pending count badge — red number below WiFi icon */
+.sync-badge {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: #d73a49;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 3px;
+  box-shadow: 0 0 0 1.5px #161b22;
 }
 
 /* Corner dot — 7px, positioned bottom-right */

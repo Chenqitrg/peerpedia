@@ -22,13 +22,13 @@ import {
   Landmark,
   Waves,
   X,
-  GitCompare,
 } from 'lucide-vue-next'
-import { pendingConflictCount } from '../router'
+import { useAutoSync } from '../composables/useAutoSync'
 
 const router = useRouter()
 const userStore = useUserStore()
 const tauri = useTauri()
+const { pendingCount } = useAutoSync()
 const { canRead, isLocalOnly } = useOffline()
 const { t, locale } = useI18n()
 const searchQuery = ref('')
@@ -154,17 +154,6 @@ function handleLogout() {
 <!-- Actions — logged in -->
       <div v-if="isLoggedIn" class="flex items-center gap-1">
         <SyncButton />
-        <router-link
-          to="/sync/conflicts"
-          class="relative flex items-center justify-center w-8 h-8 rounded-lg text-ink-muted hover:text-ink hover:bg-[#21262d] transition-colors duration-200"
-          :aria-label="`${pendingConflictCount} conflict(s)`"
-        >
-          <GitCompare class="w-4 h-4" stroke-width="2" />
-          <span
-            v-if="pendingConflictCount > 0"
-            class="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-danger text-white text-[10px] font-bold px-1"
-          >{{ pendingConflictCount }}</span>
-        </router-link>
         <!-- Language toggle -->
         <button
           class="flex items-center justify-center w-8 h-8 rounded-lg

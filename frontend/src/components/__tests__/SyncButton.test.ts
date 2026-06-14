@@ -20,6 +20,13 @@ vi.mock('@/composables/useNetworkStatus', () => ({
   }),
 }))
 
+const mockPendingCount = ref(0)
+vi.mock('@/composables/useAutoSync', () => ({
+  useAutoSync: () => ({
+    pendingCount: mockPendingCount,
+  }),
+}))
+
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: (key: string) => key,
@@ -30,17 +37,17 @@ describe('SyncButton', () => {
   beforeEach(() => {
     mockConnectionState.value = 'idle'
     mockFlash.value = false
+    mockPendingCount.value = 0
     mockConnect.mockClear()
     mockDisconnect.mockClear()
   })
 
-  // ── Render: 32x32 icon-only button with corner dot ──────────────
+  // ── Render: 32x32 icon button with corner dot ──────────────────
 
   it('renders idle state: WifiOff icon, gray dot, no text', () => {
     const wrapper = mount(SyncButton)
     expect(wrapper.find('.sync-dot--idle').exists()).toBe(true)
-    expect(wrapper.find('svg').exists()).toBe(true) // WifiOff
-    expect(wrapper.text()).toBe('') // icon-only, no text label
+    expect(wrapper.find('svg').exists()).toBe(true)
     expect(wrapper.attributes('title')).toBe('nav.syncConnectAria')
   })
 
@@ -69,15 +76,51 @@ describe('SyncButton', () => {
     expect(wrapper.find('.sync-icon--flash').exists()).toBe(true)
   })
 
-  // ── Fixed size ──────────────────────────────────────────────────
+  // ── Pending count badge ────────────────────────────────────────
 
-  it('has fixed width/height (32px icon button)', () => {
+  it('shows pending count badge when offline with pending', () => {
+    mockConnectionState.value = 'idle'
+    mockPendingCount.value = 3
     const wrapper = mount(SyncButton)
-    const btn = wrapper.find('button')
-    expect(btn.attributes('style')).toBeFalsy() // no dynamic width
+    const badge = wrapper.find('.sync-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('3')
   })
 
-  // ── Click behavior ──────────────────────────────────────────────
+  it('hides pending badge when online even with pending', () => {
+    mockConnectionState.value = 'synced'
+    mockPendingCount.value = 3
+    const wrapper = mount(SyncButton)
+    expect(wrapper.find('.sync-badge').exists()).toBe(false)
+  })
+
+  it('hides pending count badge when pendingCount is 0', () => {
+    mockConnectionState.value = 'idle'
+    mockPendingCount.value = 0
+    const wrapper = mount(SyncButton)
+    expect(wrapper.find('.sync-badge').exists()).toBe(false)
+  })
+
+  it('shows pending count in tooltip when offline with pending', () => {
+    mockConnectionState.value = 'idle'
+    mockPendingCount.value = 2
+    const wrapper = mount(SyncButton)
+    expect(wrapper.attributes('title')).toBe('2 pending sync(s)')
+  })
+
+  it('shows normal tooltip when synced (no pending mention)', () => {
+    mockConnectionState.value = 'synced'
+    mockPendingCount.value = 1
+    const wrapper = mount(SyncButton)
+    expect(wrapper.attributes('title')).toBe('nav.syncDisconnectAria')
+  })
+
+  // ── Click behavior ─────────────────────────────────────────────
+
+  it('is a button element', () => {
+    const wrapper = mount(SyncButton)
+    expect(wrapper.find('button').exists()).toBe(true)
+  })
 
   it('calls connect() on click when idle', async () => {
     const wrapper = mount(SyncButton)

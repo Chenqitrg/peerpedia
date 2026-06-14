@@ -15,6 +15,7 @@ import { useCommitFlow } from '../composables/useCommitFlow'
 import { useSplitPane } from '../composables/useSplitPane'
 import { useTauri } from '../composables/useTauri'
 import { useNetworkStatus } from '@/composables/useNetworkStatus'
+import { useAutoSync } from '@/composables/useAutoSync'
 import { useEditorTab } from '../composables/useTabIntegration'
 import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
@@ -118,6 +119,7 @@ const DRAFT_ID_KEY = computed(() => `editor-draft-id-${draftUid.value}-${editId.
 const draftPersistence = useDraftPersistence()
 const tauri = useTauri()
 const { isSynced } = useNetworkStatus()
+const autoSync = useAutoSync()
 
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
@@ -152,14 +154,18 @@ onUnmounted(() => {
   window.removeEventListener('tab-save-and-close', onSaveAndClose)
 })
 
-// Cmd+S / Ctrl+S → compile preview (only when editor area is focused)
+// Cmd+S / Ctrl+S → compile preview for Typst (only when editor area is focused)
+// Markdown: no-op — preview is auto-updated via debounced watcher
 function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
     // Ignore if focus is outside the editor (e.g., in a modal or other input)
     const active = document.activeElement
     if (active && !active.closest('.editor-page')) return
     e.preventDefault()
-    handleCompile()
+    if (format.value === 'typst') {
+      handleCompile()
+    }
+    // markdown: no-op — preview is auto
   }
 }
 
@@ -189,6 +195,20 @@ watch(() => route.query.new, (val) => {
   }
 }, { immediate: true })
 
+// Debounced auto-preview for markdown — WYSIWYG: no manual compile needed
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(content, (val) => {
+  if (format.value !== 'markdown') return
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    try {
+      previewHtml.value = val.trim() ? parseMarkdown(val) : ''
+    } catch {
+      // silent — auto-preview shouldn't surface errors to the user
+    }
+  }, 300)
+})
+
 async function loadExistingArticle() {
   loadingArticle.value = true
   // 1. Try REST API first.
@@ -200,8 +220,8 @@ async function loadExistingArticle() {
       commitHash.value = a.commit_hash || ''
     }
     const src = await getArticleSource(editId.value!)
-    content.value = src.content
     format.value = src.format as 'markdown' | 'typst'
+    content.value = src.content
     savedContent.value = src.content
     savedTitle.value = title.value
     return
@@ -408,7 +428,7 @@ async function saveDraft() {
       // Offline: mark pending push for reconnect resolution.
       const draftId = currentDraftId.value
       if (draftId) {
-        try { await tauri.setPendingPush({ id: draftId }) } catch { /* best-effort */ }
+        try { await tauri.setPendingPush({ id: draftId }); await autoSync.refresh() } catch { /* best-effort */ }
       }
     }
     return
@@ -639,8 +659,9 @@ defineExpose({ handlePublish, showSelfReview })
           <EyeOff v-else class="w-4 h-4" stroke-width="2" />
         </button>
 
-        <!-- Compile -->
+        <!-- Compile (Typst only — Markdown preview is auto) -->
         <button
+          v-if="format === 'typst'"
           class="flex items-center justify-center w-9 h-9 rounded-lg
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"

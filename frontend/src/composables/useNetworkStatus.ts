@@ -41,12 +41,11 @@ function disconnect() {
 }
 
 function notifySuccess() {
-  // Only promote to synced if user initiated connection (via connect() → ping()).
-  // Prevents: (a) stale ping() promises after disconnect, (b) axios interceptor
-  // auto-connecting the user without a tap.
+  // Only promote to synced when actively connecting (user click or browser online event).
+  // Prevents axios interceptor from auto-connecting on every successful API response.
   if (connectionState.value !== 'connecting') return
-  connectionState.value = 'synced'
   if (connectTimer !== null) { clearTimeout(connectTimer); connectTimer = null }
+  connectionState.value = 'synced'
 }
 
 function notifyFailure() {
@@ -74,7 +73,15 @@ function _setupListeners() {
   if (_listening || typeof window === 'undefined') return
   _listening = true
   window.addEventListener('offline', () => disconnect())
-  // 'online' event intentionally does nothing — user controls connection
+  window.addEventListener('online', () => {
+    // Auto-detect restored connectivity — ping to confirm server is reachable.
+    // If already synced, re-verify (server may have restarted).
+    connectionState.value = 'connecting'
+    ping()
+    if (connectionState.value === 'connecting') {
+      connectTimer = setTimeout(() => { notifyFailure() }, CONNECT_TIMEOUT_MS)
+    }
+  })
 }
 
 // Exposed for tests.

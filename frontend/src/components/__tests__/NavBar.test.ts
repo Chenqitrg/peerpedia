@@ -13,10 +13,16 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ path: '/' }),
 }))
 
-// Mock router module — NavBar imports pendingConflictCount from it
+// Mock router module — NavBar no longer imports pendingConflictCount.
 vi.mock('../../router', () => ({
-  pendingConflictCount: { value: 0 },
   default: [],
+}))
+
+// Mock useAutoSync — NavBar reads pendingCount from it.
+vi.mock('@/composables/useAutoSync', () => ({
+  useAutoSync: () => ({
+    pendingCount: { value: 0 },
+  }),
 }))
 
 // Mock useNetworkStatus — vi.mock is hoisted, so the factory must use vi.hoisted.
@@ -25,8 +31,6 @@ const { mockUseNetworkStatus } = vi.hoisted(() => ({
     isSynced: { value: true },
     connectionState: ref('synced'),
     flash: ref(false),
-    connect: vi.fn(),
-    disconnect: vi.fn(),
     ping: vi.fn(),
   })),
 }))
@@ -171,8 +175,6 @@ describe('NavBar — WiFi connectivity icon', () => {
       isSynced: { value: true },
       connectionState: ref('synced'),
       flash: ref(false),
-      connect: vi.fn(),
-      disconnect: vi.fn(),
       ping: vi.fn(),
     })
     const user = { id: 'u1', username: 'test', name: 'Test' }
@@ -183,7 +185,7 @@ describe('NavBar — WiFi connectivity icon', () => {
     const wrapper = mount(NavBar, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
     })
-    // SyncButton in synced state shows green dot
+    // SyncButton in synced state shows blue tint
     const syncBtn = wrapper.find('.sync-btn--synced')
     expect(syncBtn.exists()).toBe(true)
   })
@@ -193,8 +195,6 @@ describe('NavBar — WiFi connectivity icon', () => {
       isSynced: { value: false },
       connectionState: ref('idle'),
       flash: ref(false),
-      connect: vi.fn(),
-      disconnect: vi.fn(),
       ping: vi.fn(),
     })
     // Simulate Tauri environment

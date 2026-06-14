@@ -6,18 +6,24 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 
-const mockPendingConflictCount = ref(0)
-
 vi.mock('vue-router', () => ({
   useRouter: () => ({ afterEach: vi.fn(), beforeEach: vi.fn() }),
   useRoute: () => ({ path: '/' }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
-// Mock router module — App.vue + NavBar.vue import pendingConflictCount from it
+// Mock router module — App.vue no longer imports pendingConflictCount.
 vi.mock('../router', () => ({
-  pendingConflictCount: mockPendingConflictCount,
   default: [],
+}))
+
+// Mock useAutoSync
+vi.mock('@/composables/useAutoSync', () => ({
+  useAutoSync: () => ({
+    flush: vi.fn().mockResolvedValue({ synced: 0, failed: 0 }),
+    pendingCount: { value: 0 },
+    refresh: vi.fn(),
+  }),
 }))
 
 // Mock useTabStore

@@ -8,6 +8,7 @@ import { Trash2 } from 'lucide-vue-next'
 import { useTauri } from '../composables/useTauri'
 import { useUserStore } from '../stores/useUserStore'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
+import { useAutoSync } from '../composables/useAutoSync'
 import { deleteArticle } from '../api/articles'
 
 const { t } = useI18n()
@@ -28,6 +29,7 @@ const errorMessage = ref('')
 const tauri = useTauri()
 const userStore = useUserStore()
 const { isSynced } = useNetworkStatus()
+const autoSync = useAutoSync()
 
 async function handleDelete() {
   if (deleting.value) return
@@ -53,7 +55,7 @@ async function handleDelete() {
     } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
       // Offline: mark pending delete (data preserved for reconnect confirmation).
       try {
-        await tauri.setPendingDelete({ id: props.articleId })
+        await tauri.setPendingDelete({ id: props.articleId }); await autoSync.refresh()
       } catch (e: unknown) {
         console.warn('setPendingDelete failed:', e)
       }

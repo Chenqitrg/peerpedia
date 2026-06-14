@@ -126,11 +126,11 @@ describe('useNetworkStatus', () => {
     disconnect()
     expect(connectionState.value).toBe('idle')
 
-    // Advance past the fetch resolution — should NOT promote to synced
+    // Advance past the fetch resolution — should NOT promote to synced (guard restored).
     await vi.advanceTimersByTimeAsync(5000)
     expect(connectionState.value).toBe('idle')
 
-    // Advance past the 10s timeout — should NOT fire (timer was cleared)
+    // Advance past the 10s timeout — should NOT fire (timer was cleared on disconnect).
     await vi.advanceTimersByTimeAsync(10000)
     expect(connectionState.value).toBe('idle')
   })
@@ -157,6 +157,37 @@ describe('useNetworkStatus', () => {
     notifyFailure()
     expect(connectionState.value).toBe('idle')
     expect(flash.value).toBe(false) // no flash — was already synced, not an active attempt
+  })
+
+  // ── S7: Auto-detect on browser online event ───────────────────────
+
+  it('S7: browser online event triggers auto-ping and promotes to synced', async () => {
+    const { connectionState, isSynced } = useNetworkStatus()
+    expect(connectionState.value).toBe('idle')
+
+    window.dispatchEvent(new Event('online'))
+    expect(connectionState.value).toBe('connecting')
+
+    // Resolve the fetch promise (microtask) without firing the 10s timer.
+    await vi.advanceTimersByTimeAsync(1)
+    expect(connectionState.value).toBe('synced')
+    expect(isSynced.value).toBe(true)
+  })
+
+  it('S7: browser online event with unreachable server → timeout → idle + flash', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
+    const { connectionState, flash } = useNetworkStatus()
+
+    window.dispatchEvent(new Event('online'))
+    expect(connectionState.value).toBe('connecting')
+
+    // Advance past the 10s timeout to trigger notifyFailure.
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(connectionState.value).toBe('idle')
+    expect(flash.value).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(500)
+    expect(flash.value).toBe(false)
   })
 
   // ── Guards ─────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@
       <button class="ml-2 text-ink-muted hover:text-ink" @click="userStore.syncError = null">✕</button>
     </div>
     <div class="flex-1 relative">
-      <TabDrawer v-if="pendingConflictCount === 0" @close-tab="onCloseTab" />
+      <TabDrawer @close-tab="onCloseTab" />
       <main
         :class="isEditorPage
           ? 'w-full px-2 pt-24 pb-2'
@@ -62,8 +62,7 @@ import { useUserStore } from './stores/useUserStore'
 import { useTabStore } from './stores/useTabStore'
 import { loadString, remove } from './composables/useLocalStorage'
 import { useNetworkStatus } from './composables/useNetworkStatus'
-import { useTauri } from './composables/useTauri'
-import { pendingConflictCount } from './router'
+import { useAutoSync } from './composables/useAutoSync'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,16 +108,14 @@ watch(
   { immediate: true },
 )
 
-// ── Reconnect: check pending ops when network comes back ─────────
-const tauri = useTauri()
-
-
+// ── Reconnect: auto-flush pending ops when network comes back ─────────
+const autoSync = useAutoSync()
 
 watch(isSynced, async (online) => {
-  if (!online || !tauri.isTauri.value) return
-  const ops = await tauri.getPendingOps({ account_id: userStore.viewer?.id || 'local' })
-  if (ops && Array.isArray(ops) && !('error' in ops) && ops.length > 0) {
-    pendingConflictCount.value = ops.length
+  if (!online) return
+  const { synced, failed } = await autoSync.flush()
+  if (synced > 0) {
+    console.log(`[App] Auto-synced ${synced} pending ops` + (failed > 0 ? `, ${failed} failed` : ''))
   }
 })
 
@@ -180,6 +177,7 @@ async function saveAndClose() {
 
 onMounted(async () => {
   ping()
+  autoSync.refresh()
   await userStore.restoreSession()
   tabStore.restoreTabs()
   if (loadString('showAuthModal') === 'true') {
