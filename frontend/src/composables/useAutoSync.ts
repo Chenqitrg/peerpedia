@@ -244,14 +244,24 @@ export function useAutoSync() {
 
       for (const op of ops) {
         try {
-          let result: { pushed: boolean; discard: boolean }
           if (op.op_type === 'delete') {
-            result = await deleteOne(op)
+            const r = await deleteOne(op)
+            if (r.pushed) synced++
           } else {
-            result = await pushOne(op)
+            // Phase C: try bundle pushRepo first (preserves commit hashes)
+            let pushed = false
+            try {
+              const res = await pushRepo(op.id, 'PeerPedia', 'local', 'Auto-sync')
+              pushed = res.pushed
+            } catch {
+              // Fall back to legacy REST push
+            }
+            if (!pushed) {
+              const r = await pushOne(op)
+              pushed = r.pushed
+            }
+            if (pushed) synced++
           }
-
-          if (result.pushed) synced++
           try { await tauri.clearPending({ id: op.id }) } catch { /* best-effort */ }
         } catch {
           failed++
