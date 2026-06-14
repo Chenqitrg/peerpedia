@@ -242,8 +242,10 @@ describe('EditorPage', () => {
     expect(vm.showSelfReview).toBe(true)
   })
 
-  // Regression: saveDraft must trigger git init in Tauri/local mode
-  it('saveDraft triggers git init in Tauri mode', async () => {
+  // Regression: first offline save defers local git init to avoid duplicate
+  // "first commit" with the server. The local git is initialized on the second
+  // offline save if the repo doesn't exist yet.
+  it('first offline save does NOT trigger gitInit (avoids duplicate initial commit)', async () => {
     _isTauri = true
     _isSynced = false
     const { useUserStore } = await import('../../stores/useUserStore')
@@ -263,13 +265,39 @@ describe('EditorPage', () => {
     vm.commitMsg = 'Initial draft'
     await vm.saveDraft()
 
-    // Verify gitInit was called
+    // First offline save: gitInit NOT called (deferred to avoid duplicate with server).
+    expect(mockGitInit).not.toHaveBeenCalled()
+    // But the draft was saved (persisted to local DB).
+    expect(mockSaveDraft).toHaveBeenCalled()
+  })
+
+  // Second offline save: gitInit is called because the repo doesn't exist yet.
+  it('second offline save triggers gitInit when repo missing', async () => {
+    _isTauri = true
+    _isSynced = false
+    mockGitHistory.mockResolvedValue([]) // no repo yet
+
+    const { useUserStore } = await import('../../stores/useUserStore')
+    setActivePinia(createPinia())
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u1', name: 'Alice Chen', username: 'alice' } as any
+
+    const EditorPage = (await import('../EditorPage.vue')).default
+    const wrapper = mount(EditorPage, {
+      global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as any
+
+    vm.currentDraftId = 'draft-99'  // simulate existing draft from first save
+    vm.title = 'Updated Article'
+    vm.content = '# Updated'
+    vm.commitMsg = 'Second draft'
+    await vm.saveDraft()
+
+    // Second offline save: gitInit called because no repo exists yet.
     expect(mockGitInit).toHaveBeenCalled()
-    const callArgs = mockGitInit.mock.calls[0][0]
-    expect(callArgs.article_id).toBe('draft-99')
-    expect(callArgs.content).toBe('# Hello World')
-    expect(callArgs.commit_message).toBe('Initial draft')
-    expect(callArgs.author).toBe('Alice Chen')
+    expect(mockGitCommit).not.toHaveBeenCalled()
   })
 
   // Regression: second and subsequent saves must trigger gitCommit, not gitInit

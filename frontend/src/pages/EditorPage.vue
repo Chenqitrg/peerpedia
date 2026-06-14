@@ -329,15 +329,9 @@ async function persistToGit(accountId: string, authorName: string, authorId: str
     saveString(DRAFT_ID_KEY.value, result.id)
 
     // Online: server handles git repo + first commit via POST.
-    // Offline: init local git now so work can continue.
-    if (!isSynced.value) {
-      try {
-        const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
-        if (r && 'hash' in r) commitHash.value = r.hash
-      } catch (e: unknown) {
-        errorMsg.value = e instanceof Error ? e.message : 'Git init failed'
-      }
-    }
+    // Offline: defer local git init to avoid a duplicate "first commit."
+    // The server creates the canonical initial commit on sync; local git
+    // is initialized lazily on the second offline save if needed.
     return true
   }
 
