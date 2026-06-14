@@ -824,7 +824,7 @@ mod tests {
         // Create a Typst article with 3 commits
         git_init("rb-typst", "= v1", "typst", "First", "alice", "uuid-alice").unwrap();
         git_commit("rb-typst", "= v2", "typst", "Second", "alice", "uuid-alice").unwrap();
-        let third =
+        let _third =
             git_commit("rb-typst", "= v3", "typst", "Third", "alice", "uuid-alice").unwrap();
 
         let history = git_history("rb-typst").unwrap();
@@ -850,6 +850,113 @@ mod tests {
             !rp.join("article.md").exists(),
             "rollback should not create article.md in a typst repo"
         );
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_bundle_create_and_apply_preserves_hash() {
+        let _lock = git_test_lock().lock().unwrap();
+        let dir = setup_dir();
+        let home = dir.join("home");
+        fs::create_dir_all(&home).unwrap();
+        std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+        // Create article with 2 commits
+        git_init(
+            "bundle-src",
+            "v1",
+            "markdown",
+            "First",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let c2 = git_commit(
+            "bundle-src",
+            "v2",
+            "markdown",
+            "Second",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let history = git_history("bundle-src").unwrap();
+        assert_eq!(history.len(), 2);
+
+        // Create FULL bundle (HEAD only, no incremental range) — simulates initial sync
+        let src_path = home.join(".peerpedia").join("articles").join("bundle-src");
+        let bundle_path = std::env::temp_dir().join("test-full.bundle");
+        Command::new("git")
+            .args([
+                "-C",
+                src_path.to_str().unwrap(),
+                "bundle",
+                "create",
+                bundle_path.to_str().unwrap(),
+                "HEAD",
+            ])
+            .output()
+            .unwrap();
+        let bundle = fs::read(&bundle_path).unwrap();
+        let _ = fs::remove_file(&bundle_path);
+
+        // Apply to fresh empty repo — simulates server initial sync
+        let tgt = home.join(".peerpedia").join("articles").join("bundle-tgt");
+        fs::create_dir_all(&tgt).unwrap();
+        Command::new("git")
+            .args(["-C", tgt.to_str().unwrap(), "init"])
+            .output()
+            .unwrap();
+
+        let new_head = git_bundle_apply("bundle-tgt", &bundle).unwrap();
+        assert_eq!(new_head, c2.hash, "HEAD hash must match after apply");
+        assert_eq!(git_history("bundle-tgt").unwrap().len(), 2);
+
+        let (content, _fmt) = git_show("bundle-tgt", &new_head).unwrap();
+        assert_eq!(content, "v2");
+
+        // Now test INCREMENTAL bundle: add a commit to source, create incremental bundle
+        git_commit(
+            "bundle-src",
+            "v3",
+            "markdown",
+            "Third",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let c3_hash = &git_history("bundle-src").unwrap()[0].hash;
+        let incr_bundle = git_bundle_create("bundle-src", &c2.hash).unwrap();
+        assert!(!incr_bundle.is_empty());
+
+        // Apply incremental bundle to target
+        let new_head2 = git_bundle_apply("bundle-tgt", &incr_bundle).unwrap();
+        assert_eq!(new_head2, *c3_hash, "incremental hash must match");
+        assert_eq!(git_history("bundle-tgt").unwrap().len(), 3);
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_bundle_create_bad_since() {
+        let _lock = git_test_lock().lock().unwrap();
+        let dir = setup_dir();
+        let home = dir.join("home");
+        fs::create_dir_all(&home).unwrap();
+        std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+        git_init(
+            "bundle-bad",
+            "v1",
+            "markdown",
+            "First",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let result = git_bundle_create("bundle-bad", &"0".repeat(40));
+        assert!(result.is_err());
 
         cleanup(&dir);
     }
