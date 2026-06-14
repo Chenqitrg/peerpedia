@@ -353,8 +353,14 @@ def api_update_article(
     if body.categories is not None:
         a.categories = body.categories
 
-    # @deprecated Phase B: content updates via bundle /sync, not server-side commit.
-    commit_hash = commit_article(rp, commit_msg, author, f"{author}@peerpedia")
+    # Phase C: content updates arrive via bundle /sync. Server-side commit
+    # only for web mode or metadata changes that modify repo files.
+    content_changed = body.content is not None
+    if content_changed:
+        commit_hash = commit_article(rp, commit_msg, author, f"{author}@peerpedia")
+    else:
+        import git as gitmod
+        commit_hash = gitmod.Repo(rp).head.commit.hexsha if gitmod.Repo(rp).head.is_valid() else None
 
     # Rebuild authors from git history (incremental scan when marker exists)
     from peerpedia_core.storage.db.crud_article import (
