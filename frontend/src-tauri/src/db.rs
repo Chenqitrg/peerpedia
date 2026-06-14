@@ -144,29 +144,38 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
                     tokenize='porter unicode61',
                     content='drafts',
                     content_rowid='rowid'
-                );
-
-                -- Triggers to keep FTS index in sync with drafts table
-                CREATE TRIGGER IF NOT EXISTS drafts_ai AFTER INSERT ON drafts BEGIN
+                );",
+            )?;
+            // Triggers must use individual execute() — execute_batch
+            // splits on ';' which breaks trigger bodies.
+            tx.execute(
+                "CREATE TRIGGER IF NOT EXISTS drafts_ai AFTER INSERT ON drafts BEGIN
                     INSERT INTO drafts_fts(rowid, title, content)
                     VALUES (new.rowid, new.title, new.content);
-                END;
-
-                CREATE TRIGGER IF NOT EXISTS drafts_ad AFTER DELETE ON drafts BEGIN
+                END",
+                [],
+            )?;
+            tx.execute(
+                "CREATE TRIGGER IF NOT EXISTS drafts_ad AFTER DELETE ON drafts BEGIN
                     INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
                     VALUES ('delete', old.rowid, old.title, old.content);
-                END;
-
-                CREATE TRIGGER IF NOT EXISTS drafts_au AFTER UPDATE ON drafts BEGIN
+                END",
+                [],
+            )?;
+            tx.execute(
+                "CREATE TRIGGER IF NOT EXISTS drafts_au AFTER UPDATE ON drafts BEGIN
                     INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
                     VALUES ('delete', old.rowid, old.title, old.content);
                     INSERT INTO drafts_fts(rowid, title, content)
                     VALUES (new.rowid, new.title, new.content);
-                END;
-
-                -- Backfill existing drafts into FTS index so they're searchable.
-                INSERT INTO drafts_fts(rowid, title, content)
-                SELECT rowid, title, content FROM drafts;",
+                END",
+                [],
+            )?;
+            // Backfill existing drafts into FTS index.
+            tx.execute(
+                "INSERT INTO drafts_fts(rowid, title, content)
+                 SELECT rowid, title, content FROM drafts",
+                [],
             )?;
         }
         5 => {
@@ -221,27 +230,32 @@ fn apply_migration(conn: &Connection, version: i32) -> Result<(), AppError> {
         10 => {
             // v9 dropped/recreated the drafts table, which DESTROYED the
             // FTS triggers. Re-create them so INSERT/UPDATE/DELETE sync the
-            // FTS index again.
-            tx.execute_batch(
+            // FTS index again. Use individual execute() calls because
+            // execute_batch splits on ';' which breaks trigger bodies.
+            tx.execute(
                 "CREATE TRIGGER IF NOT EXISTS drafts_ai AFTER INSERT ON drafts BEGIN
                     INSERT INTO drafts_fts(rowid, title, content)
                     VALUES(new.rowid, new.title, new.content);
-                END;
-
-                CREATE TRIGGER IF NOT EXISTS drafts_ad AFTER DELETE ON drafts BEGIN
+                END",
+                [],
+            )?;
+            tx.execute(
+                "CREATE TRIGGER IF NOT EXISTS drafts_ad AFTER DELETE ON drafts BEGIN
                     INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
                     VALUES('delete', old.rowid, old.title, old.content);
-                END;
-
-                CREATE TRIGGER IF NOT EXISTS drafts_au AFTER UPDATE ON drafts BEGIN
+                END",
+                [],
+            )?;
+            tx.execute(
+                "CREATE TRIGGER IF NOT EXISTS drafts_au AFTER UPDATE ON drafts BEGIN
                     INSERT INTO drafts_fts(drafts_fts, rowid, title, content)
                     VALUES('delete', old.rowid, old.title, old.content);
                     INSERT INTO drafts_fts(rowid, title, content)
                     VALUES(new.rowid, new.title, new.content);
-                END;
-
-                INSERT INTO drafts_fts(drafts_fts) VALUES('rebuild');",
+                END",
+                [],
             )?;
+            tx.execute("INSERT INTO drafts_fts(drafts_fts) VALUES('rebuild')", [])?;
         }
         _ => {
             // Unknown migration — rollback and report.
