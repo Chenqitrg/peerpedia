@@ -11,8 +11,14 @@ This is the immutable storage format — the git object format IS the protocol.
 
 from pathlib import Path
 from typing import Optional
+import tempfile
+import threading
+from weakref import WeakValueDictionary
 
 DEFAULT_ARTICLES_DIR = Path.home() / ".peerpedia" / "articles"
+
+# Per-article git operation locks (file-level, not per-process; single-worker deployment).
+_article_locks: WeakValueDictionary = WeakValueDictionary()
 
 
 def init_article_repo(
@@ -280,3 +286,95 @@ def merge_git_repos(target: Path, fork: Path, author_name: str) -> str:
             pass
 
     return merge_hash
+
+
+# ── Bundle Sync ─────────────────────────────────────────────────────────────
+
+
+def apply_bundle(repo_path: Path, bundle_bytes: bytes) -> str:
+    """Fetch objects from a git bundle and fast-forward merge.
+
+    Writes bundle to a temp file, fetches into the target repo, and merges
+    with --ff-only. Returns the new HEAD commit hash.
+
+    Raises:
+        FileNotFoundError: if repo_path/.git doesn't exist.
+        ValueError: if the bundle is empty or malformed.
+        MergeConflictError: if --ff-only fails (history diverged).
+    """
+    import git
+
+    if not (repo_path / ".git").is_dir():
+        raise FileNotFoundError(f"Git repo not found: {repo_path}")
+
+    repo = git.Repo(repo_path)
+
+    with tempfile.NamedTemporaryFile(suffix=".bundle", delete=True) as f:
+        f.write(bundle_bytes)
+        f.flush()
+
+        # Verify bundle validity
+        try:
+            repo.git.bundle("verify", f.name)
+        except git.GitCommandError as e:
+            raise ValueError(f"Invalid bundle: {e}") from e
+
+        # Fetch objects from bundle
+        repo.git.fetch(f.name, "HEAD")
+
+    # Fast-forward merge to FETCH_HEAD
+    try:
+        repo.git.merge("FETCH_HEAD", "--ff-only")
+    except git.GitCommandError as e:
+        # Abort merge if in progress
+        try:
+            repo.git.merge("--abort")
+        except git.GitCommandError:
+            pass
+        raise MergeConflictError(f"Fast-forward merge failed: {e}") from e
+
+    return repo.head.commit.hexsha
+
+
+def create_bundle(repo_path: Path, since_hash: str) -> bytes:
+    """Create an incremental git bundle from since_hash to HEAD.
+
+    Returns the bundle file bytes. The caller can stream this directly
+    as an HTTP response.
+
+    Raises:
+        FileNotFoundError: if repo_path/.git doesn't exist.
+        ValueError: if since_hash is not an ancestor of HEAD.
+    """
+    import git
+
+    if not (repo_path / ".git").is_dir():
+        raise FileNotFoundError(f"Git repo not found: {repo_path}")
+
+    repo = git.Repo(repo_path)
+
+    # Verify since_hash is an ancestor
+    try:
+        repo.git.merge_base("--is-ancestor", since_hash, "HEAD")
+    except git.GitCommandError:
+        raise ValueError(
+            f"since_hash {since_hash[:8]} is not an ancestor of HEAD"
+        )
+
+    with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
+        bundle_path = f.name
+
+    try:
+        repo.git.bundle("create", bundle_path, f"{since_hash}..HEAD")
+        return Path(bundle_path).read_bytes()
+    finally:
+        Path(bundle_path).unlink(missing_ok=True)
+
+
+def get_article_lock(article_id: str) -> threading.Lock:
+    """Get or create a per-article threading.Lock for git operation serialization."""
+    lock = _article_locks.get(article_id)
+    if lock is None:
+        lock = threading.Lock()
+        _article_locks[article_id] = lock
+    return lock
