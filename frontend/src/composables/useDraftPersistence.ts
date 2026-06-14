@@ -23,6 +23,7 @@ interface PersistenceResult {
   title?: string
   content?: string
   format?: string
+  commit_hash?: string
   updated_at?: string
   error?: string
   ok?: boolean
@@ -67,7 +68,7 @@ export function useDraftPersistence() {
         localStorage.setItem(storageKey, JSON.stringify({
           id: data.id, title: data.title, content, format,
         }))
-        return { id: data.id, title: data.title, content, format }
+        return { id: data.id, title: data.title, content, format, commit_hash: data.commit_hash || '' }
       }
 
       // New draft: generate client UUID, create via POST.
@@ -79,7 +80,6 @@ export function useDraftPersistence() {
         format,
         commit_message: 'Save draft',
         publish: false,
-        self_review: { originality: 0, rigor: 0, completeness: 0, pedagogy: 0, impact: 0 },
       }
       const { data } = await apiClient.post('/articles', payload)
       // Persist to localStorage as offline backup.
@@ -94,6 +94,7 @@ export function useDraftPersistence() {
         title: data.title,
         content,
         format,
+        commit_hash: (data as any).commit_hash || '',
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e)

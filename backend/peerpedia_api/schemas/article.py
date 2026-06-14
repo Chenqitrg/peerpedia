@@ -123,7 +123,7 @@ class ArticleCreate(BaseModel):
     content: str = ""               # article body (markdown or typst)
     format: str = "markdown"        # "markdown" | "typst"
     commit_message: str = ""        # git commit message (required for submit)
-    self_review: FiveDimScoresIn
+    self_review: Optional[FiveDimScoresIn] = None
     contributions: Optional[dict[str, FiveDimScoresIn]] = None
     forked_from: Optional[str] = None
 

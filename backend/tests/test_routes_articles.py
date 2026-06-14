@@ -123,8 +123,17 @@ class TestCreateArticle:
         assert data["authors"][0]["id"] == seed_user
 
     def test_create_missing_self_review(self, client, seed_user):
-        resp = client.post("/api/v1/articles", json={"authors": [seed_user]})
-        assert resp.status_code == 422
+        """self_review is optional for draft creation; only required at publish time."""
+        resp = client.post("/api/v1/articles", json={
+            "authors": [seed_user],
+            "title": "Draft without self-review",
+            "content": "# Test",
+            "format": "markdown",
+        })
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["status"] == "draft"
+        assert data["score"] is None
 
     def test_create_with_all_metadata(self, client, seed_user):
         """Create article with categories, keywords, abstract, contributions."""
