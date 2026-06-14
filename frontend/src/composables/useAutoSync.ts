@@ -53,6 +53,10 @@ export function useAutoSync() {
    * Returns { pushed: true } on success, { pushed: false, discard: true } on 4xx,
    * throws on network error.
    */
+  /**
+   * Push a pending offline edit to server via REST content upload.
+   * @deprecated Phase B: replaced by bundle pushRepo — sends git objects, preserves hash.
+   */
   async function pushOne(op: PendingOp): Promise<{ pushed: boolean; discard: boolean }> {
     const draft = await tauri.getDraft({ id: op.id })
     if (!draft || isTauriError(draft)) {

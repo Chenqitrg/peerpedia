@@ -53,7 +53,10 @@ export function useArticleSync(
     return 'synced'
   })
 
-  /** Push local changes to server. */
+  /**
+   * Push local changes to server via REST content upload.
+   * @deprecated Phase B: replaced by bundle pushRepo — git bundle preserves commit hash.
+   */
   async function pushUpdate(): Promise<boolean> {
     const sid = serverArticleId()
     if (!sid || !userStore.token) {
