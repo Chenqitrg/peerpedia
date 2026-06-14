@@ -303,7 +303,7 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        assert_eq!(v, 10);
+        assert_eq!(v, 11);
 
         // Create account first (FK target for sessions).
         conn.execute(
@@ -526,8 +526,8 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))
             .unwrap();
-        // Eight version rows (v1-v8), not duplicated on re-run.
-        assert_eq!(count, 10);
+        // Eleven version rows (v1-v11), not duplicated on re-run.
+        assert_eq!(count, 11);
     }
 
     #[test]

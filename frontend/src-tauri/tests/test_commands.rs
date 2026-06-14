@@ -81,6 +81,7 @@ fn test_token_list_drafts_flow() {
         "My Draft",
         "# Hello",
         "markdown",
+        "",
     )
     .unwrap();
     assert_eq!(draft.account_id, account.id);
@@ -115,6 +116,7 @@ fn test_get_draft_backward_compat_no_token() {
         "ArticlePage Draft",
         "# Hello from local draft",
         "markdown",
+        "",
     )
     .unwrap();
 
@@ -142,6 +144,7 @@ fn test_list_drafts_backward_compat_account_id() {
         "Backward Compat Draft",
         "# Test",
         "markdown",
+        "",
     )
     .unwrap();
 
@@ -174,6 +177,7 @@ fn test_save_draft_backward_compat_account_id() {
         "Newly Created Draft",
         "# Fresh content",
         "markdown",
+        "",
     )
     .unwrap();
     assert!(
@@ -205,6 +209,7 @@ fn test_full_draft_flow() {
         "My Draft",
         "# Hello",
         "markdown",
+        "",
     )
     .unwrap();
     assert_eq!(draft.title, "My Draft");
@@ -218,6 +223,7 @@ fn test_full_draft_flow() {
         "Updated",
         "new",
         "markdown",
+        "",
     )
     .unwrap();
     assert_eq!(updated.title, "Updated");
@@ -254,6 +260,7 @@ fn test_delete_article_removes_db_row_and_git_repo() {
         "To Delete",
         "# Gone",
         "markdown",
+        "",
     )
     .unwrap();
     peerpedia::local_git::git_init(
@@ -425,6 +432,7 @@ fn test_search_drafts_fts() {
         "Quantum Mechanics",
         "# Quantum",
         "markdown",
+        "",
     )
     .unwrap();
     peerpedia::local_store::save_draft(
@@ -434,6 +442,7 @@ fn test_search_drafts_fts() {
         "Classical Physics",
         "# Classical",
         "markdown",
+        "",
     )
     .unwrap();
     peerpedia::local_store::save_draft(
@@ -443,6 +452,7 @@ fn test_search_drafts_fts() {
         "Cooking Recipes",
         "# Pasta",
         "markdown",
+        "",
     )
     .unwrap();
 
@@ -462,9 +472,9 @@ fn test_search_drafts_empty_query_returns_all() {
         peerpedia::local_auth::create_account(&conn, "searcher2", "password", "", "Searcher2")
             .unwrap();
 
-    peerpedia::local_store::save_draft(&conn, None, &account.id, "Draft A", "# A", "markdown")
+    peerpedia::local_store::save_draft(&conn, None, &account.id, "Draft A", "# A", "markdown", "")
         .unwrap();
-    peerpedia::local_store::save_draft(&conn, None, &account.id, "Draft B", "# B", "markdown")
+    peerpedia::local_store::save_draft(&conn, None, &account.id, "Draft B", "# B", "markdown", "")
         .unwrap();
 
     let results = peerpedia::local_store::search_drafts(&conn, "", &account.id).unwrap();
@@ -485,6 +495,7 @@ fn test_search_drafts_fts_content() {
         "Title One",
         "This draft discusses gravity waves",
         "markdown",
+        "",
     )
     .unwrap();
     peerpedia::local_store::save_draft(
@@ -494,6 +505,7 @@ fn test_search_drafts_fts_content() {
         "Title Two",
         "This draft discusses electromagnetism",
         "markdown",
+        "",
     )
     .unwrap();
 
@@ -520,10 +532,19 @@ fn test_search_drafts_account_isolation() {
         "Alice Draft",
         "# Alice",
         "markdown",
+        "",
     )
     .unwrap();
-    peerpedia::local_store::save_draft(&conn, None, &account2.id, "Bob Draft", "# Bob", "markdown")
-        .unwrap();
+    peerpedia::local_store::save_draft(
+        &conn,
+        None,
+        &account2.id,
+        "Bob Draft",
+        "# Bob",
+        "markdown",
+        "",
+    )
+    .unwrap();
 
     // Alice should only see her own draft
     let results = peerpedia::local_store::search_drafts(&conn, "draft", &account1.id).unwrap();

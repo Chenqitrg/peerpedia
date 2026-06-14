@@ -126,8 +126,6 @@ const autoSync = useAutoSync()
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
-const _pushedToServer = ref(false)
-
 function onSaveAndClose(e: Event) {
   const detail = (e as CustomEvent).detail
   if (detail?.tabId !== tabId) return  // not for this instance
@@ -145,7 +143,6 @@ onMounted(() => {
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
     currentDraftId.value = undefined
-    _pushedToServer.value = false
   }
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('tab-save-and-close', onSaveAndClose)
@@ -412,30 +409,37 @@ async function saveDraft() {
       if (articleId) {
         try {
           if (editId.value) {
+            // Existing article — always use PUT.
             await articleStore.updateArticle(editId.value, {
               title: title.value,
               content: content.value,
               commit_message: msg,
               publish: false,
             })
-          } else if (!_pushedToServer.value) {
-            // New article, first push: POST create with client UUID.
-            await articleStore.createArticle({
-              id: currentDraftId.value,
-              title: title.value,
-              content: content.value,
-              format: format.value,
-              commit_message: msg,
-            })
-            _pushedToServer.value = true
           } else {
-            // Already created on server — use PUT update.
-            await articleStore.updateArticle(currentDraftId.value!, {
-              title: title.value,
-              content: content.value,
-              commit_message: msg,
-              publish: false,
-            })
+            // New article: try POST first, fall back to PUT on 409.
+            // This mirrors the auto-sync pushOne strategy and is robust against
+            // the case where auto-sync already created the article on reconnect.
+            try {
+              await articleStore.createArticle({
+                id: currentDraftId.value,
+                title: title.value,
+                content: content.value,
+                format: format.value,
+                commit_message: msg,
+              })
+            } catch (e: any) {
+              if (e?.response?.status === 409 || e?.response?.status === 422) {
+                await articleStore.updateArticle(currentDraftId.value!, {
+                  title: title.value,
+                  content: content.value,
+                  commit_message: msg,
+                  publish: false,
+                })
+              } else {
+                throw e
+              }
+            }
           }
         } catch (e: any) {
           console.warn('Push to server failed:', e)
