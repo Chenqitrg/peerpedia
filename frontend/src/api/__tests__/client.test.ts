@@ -6,6 +6,8 @@ import { describe, it, expect } from 'vitest'
 describe('API client', () => {
   it('has correct base URL', async () => {
     const { apiClient } = await import('../client')
-    expect(apiClient.defaults.baseURL).toBe('http://localhost:8080/api/v1')
+    // base URL reads VITE_API_BASE_URL env var, defaulting to localhost:8080
+    const expected = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+    expect(apiClient.defaults.baseURL).toBe(`${expected}/api/v1`)
   })
 })

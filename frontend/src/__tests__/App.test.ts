@@ -5,10 +5,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+// Use vi.hoisted so the ref is available when vi.mock callbacks execute (hoisted).
+const { mockPendingConflictCount } = vi.hoisted(() => {
+  const { ref } = require('vue') as typeof import('vue')
+  return { mockPendingConflictCount: ref(0) }
+})
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ afterEach: vi.fn(), beforeEach: vi.fn() }),
   useRoute: () => ({ path: '/' }),
   RouterLink: { template: '<a><slot /></a>' },
+}))
+
+// Mock router module — App.vue + NavBar.vue import pendingConflictCount from it
+vi.mock('../router', () => ({
+  pendingConflictCount: mockPendingConflictCount,
+  default: [],
 }))
 
 // Mock useTabStore

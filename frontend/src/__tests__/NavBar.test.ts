@@ -14,6 +14,16 @@ vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
+// Mock router module — NavBar imports pendingConflictCount from it
+const { mockPendingConflictCount } = vi.hoisted(() => {
+  const { ref } = require('vue') as typeof import('vue')
+  return { mockPendingConflictCount: ref(0) }
+})
+vi.mock('../router', () => ({
+  pendingConflictCount: mockPendingConflictCount,
+  default: [],
+}))
+
 // Mock useOffline
 const mockIsLocalOnlyValue = ref(false)
 const mockIsLocalOnly = vi.fn(() => mockIsLocalOnlyValue.value)

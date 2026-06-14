@@ -26,24 +26,6 @@
     "syncConnecting": "Connecting…",
     "syncDisconnectAria": "Synced — tap to disconnect"
   },
-  "sync": {
-    "conflictsTitle": "Sync Conflicts",
-    "conflictsSubtitle": "Resolve each item before continuing.",
-    "pendingUpload": "Pending upload",
-    "pendingDelete": "Pending delete",
-    "pushToServer": "Push to Server",
-    "discard": "Discard",
-    "confirmDelete": "Confirm Delete",
-    "restoreFromServer": "Restore from Server",
-    "allResolved": "All Synced",
-    "allResolvedHint": "Your local changes are now in sync with the server.",
-    "progress": "Item {current} of {total}",
-    "untitled": "Untitled",
-    "lessThanHour": "Less than 1 hour ago",
-    "hoursAgo": "{n} hour(s) ago",
-    "daysAgo": "{n} day(s) ago",
-    "expiryNote": "Changes older than 7 days will be marked expired."
-  },
   "schools": {
     "subtitle": "Discover researchers. Follow people whose work you find interesting."
   },
@@ -99,6 +81,22 @@
     "follow": "Follow"
   },
   "sync": {
+    "conflictsTitle": "Sync Conflicts",
+    "conflictsSubtitle": "Resolve each item before continuing.",
+    "pendingUpload": "Pending upload",
+    "pendingDelete": "Pending delete",
+    "pushToServer": "Push to Server",
+    "discard": "Discard",
+    "confirmDelete": "Confirm Delete",
+    "restoreFromServer": "Restore from Server",
+    "allResolved": "All Synced",
+    "allResolvedHint": "Your local changes are now in sync with the server.",
+    "progress": "Item {current} of {total}",
+    "untitled": "Untitled",
+    "lessThanHour": "Less than 1 hour ago",
+    "hoursAgo": "{n} hour(s) ago",
+    "daysAgo": "{n} day(s) ago",
+    "expiryNote": "Changes older than 7 days will be marked expired.",
     "loginRequired": "Please log in to the server",
     "noArticle": "No article to upload",
     "cannotReadDraft": "Cannot read local draft",

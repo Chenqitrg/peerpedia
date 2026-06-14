@@ -58,6 +58,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, CloudUpload, Trash2, CheckCircle } from 'lucide-vue-next'
+import { pendingConflictCount } from '../router'
 import { useTauri } from '../composables/useTauri'
 import { useUserStore } from '../stores/useUserStore'
 import { useArticleStore } from '../stores/useArticleStore'
@@ -119,6 +120,7 @@ async function resolve(action: 'push' | 'discard' | 'confirm_delete' | 'restore'
 
   await tauri.clearPending({ id })
   currentIndex.value++
+  pendingConflictCount.value = Math.max(0, items.value.length - currentIndex.value)
   if (currentIndex.value >= items.value.length) allResolved.value = true
   resolving.value = false
 }

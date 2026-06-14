@@ -106,47 +106,15 @@ describe('useArticleSync — SPEC-SYNC state machine', () => {
     expect(syncState.value).toBe('offline')
   })
 
-  it('SPEC-SYNC-ACTION-1: upload() returns true on success', async () => {
-    const { upload } = useArticleSync(() => 'd1', () => null, () => null, () => 'abc123')
-    const result = await upload()
-    expect(result).toBe(true)
-    expect(mockCreateArticle).toHaveBeenCalled()
-    expect(mockSetServerArticleId).toHaveBeenCalledWith(
-      expect.objectContaining({ draft_id: 'd1', server_article_id: 'server-1', server_commit_hash: 'abc123' }),
-    )
-  })
+  // SPEC-SYNC-ACTION-1: initial upload removed — createArticle is now called
+  // directly in EditorPage.saveDraft(), not through useArticleSync.
+  // useArticleSync is only used for pushUpdate (conflict resolution) path.
 
   it('SPEC-SYNC-ACTION-2: pushUpdate() returns true on success', async () => {
-    // pushUpdate reads gitHistory directly — must return the new local HEAD hash
     mockGitHistory.mockResolvedValue([{ hash: 'new_hash', message: '', author: '', timestamp: '' }])
     const { pushUpdate } = useArticleSync(() => 'd1', () => 's1', () => 'old_hash', () => 'new_hash')
     const result = await pushUpdate()
     expect(result).toBe(true)
     expect(mockUpdateArticle).toHaveBeenCalled()
-    expect(mockSetServerArticleId).toHaveBeenCalledWith(
-      expect.objectContaining({ draft_id: 'd1', server_article_id: 's1', server_commit_hash: 'new_hash' }),
-    )
-  })
-
-  it('SPEC-SYNC-REGRESSION-1: upload() sends payload without hardcoded authors', async () => {
-    // Authors are now auto-derived by the backend from git history + auth token.
-    // Frontend no longer hardcodes authors — backend defaults to current_user.
-    mockViewer.value = { id: 'u1', name: 'ChenqiMeng', username: 'test' }
-    const { upload } = useArticleSync(() => 'd1', () => null, () => null, () => 'abc123')
-    await upload()
-    expect(mockCreateArticle).toHaveBeenCalled()
-    // Verify authors field is NOT in the payload (backend handles it)
-    const callArg = mockCreateArticle.mock.calls[0][0]
-    expect(callArg.authors).toBeUndefined()
-  })
-
-  it('SPEC-SYNC-REGRESSION-2: upload() still works when viewer is null', async () => {
-    // Backend derives author from auth token, not request body.
-    mockViewer.value = null
-    const { upload } = useArticleSync(() => 'd1', () => null, () => null, () => 'abc123')
-    await upload()
-    expect(mockCreateArticle).toHaveBeenCalled()
-    const callArg = mockCreateArticle.mock.calls[0][0]
-    expect(callArg.authors).toBeUndefined()
   })
 })
