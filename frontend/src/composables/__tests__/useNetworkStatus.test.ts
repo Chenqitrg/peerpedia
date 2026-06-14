@@ -204,10 +204,10 @@ describe('useNetworkStatus', () => {
 
   // ── Legacy: ping() still works for direct probing ──────────────────
 
-  it('ping sends request to http://localhost:8080/health', async () => {
+  it('ping sends request to /health', async () => {
     const { ping } = useNetworkStatus()
     await ping()
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/health')
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/health$/))
   })
 
   it('ping from idle does not change state', async () => {

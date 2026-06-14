@@ -34,6 +34,14 @@ const mockCreateMergeProposal = vi.fn().mockResolvedValue({
 
 const mockGetMergeProposals = vi.fn().mockResolvedValue({ proposals: [] })
 
+vi.mock('../../composables/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({
+    isSynced: { value: true },
+    connectionState: { value: 'synced' },
+    ping: vi.fn(),
+  })),
+}))
+
 vi.mock('../../composables/useTauri', () => ({
   useTauri: () => ({
     isTauri: { value: false },
@@ -89,6 +97,7 @@ vi.mock('../../api/articles', () => ({
   getMergeProposals: mockGetMergeProposals,
   acceptMergeProposal: vi.fn().mockResolvedValue({}),
   rejectMergeProposal: vi.fn().mockResolvedValue({}),
+  deleteArticle: vi.fn().mockResolvedValue({ ok: true }),
 }))
 
 const mockCreateReview = vi.fn().mockResolvedValue({
@@ -519,6 +528,7 @@ describe('ArticlePage — delete', () => {
     const { useUserStore } = await import('../../stores/useUserStore')
     const userStore = useUserStore()
     userStore.viewer = { id: 'u1', name: 'Alice Chen' } as any
+    userStore.token = 'test-token'
 
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
@@ -545,11 +555,9 @@ describe('ArticlePage — delete', () => {
     await deleteConfirm!.trigger('click')
     await new Promise(r => setTimeout(r, 50))
 
-    // Verify deleteArticle was called
-    expect(mockDeleteArticle).toHaveBeenCalledWith({
-      id: 'test-article-1',
-      account_id: 'u1',
-    })
+    // Verify deleteArticle was called — now uses REST API directly
+    const { deleteArticle } = await import('../../api/articles')
+    expect(deleteArticle).toHaveBeenCalledWith('test-article-1')
 
     // Verify navigation to user profile
     expect(mockPush).toHaveBeenCalledWith('/user/u1')

@@ -13,6 +13,12 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ path: '/' }),
 }))
 
+// Mock router module — NavBar imports pendingConflictCount from it
+vi.mock('../../router', () => ({
+  pendingConflictCount: { value: 0 },
+  default: [],
+}))
+
 // Mock useNetworkStatus — vi.mock is hoisted, so the factory must use vi.hoisted.
 const { mockUseNetworkStatus } = vi.hoisted(() => ({
   mockUseNetworkStatus: vi.fn(() => ({

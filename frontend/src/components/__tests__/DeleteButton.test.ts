@@ -10,6 +10,13 @@ import { useUserStore } from '../../stores/useUserStore'
 import { deleteArticle } from '../../api/articles'
 
 // Mock dependencies
+vi.mock('../../composables/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({
+    isSynced: { value: true },
+    connectionState: { value: 'synced' },
+  })),
+}))
+
 vi.mock('../../composables/useTauri', () => ({
   useTauri: vi.fn(() => ({
     isTauri: { value: false },

@@ -339,6 +339,7 @@ async function persistToWeb(accountId: string) {
   )
   if (result && result.id) {
     currentDraftId.value = result.id
+    if (result.commit_hash) commitHash.value = result.commit_hash
     saveString(DRAFT_ID_KEY.value, result.id)
   }
   saveJSON(DRAFT_KEY.value, {

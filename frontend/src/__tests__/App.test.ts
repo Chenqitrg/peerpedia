@@ -4,11 +4,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { ref } from 'vue'
+
+const mockPendingConflictCount = ref(0)
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ afterEach: vi.fn(), beforeEach: vi.fn() }),
   useRoute: () => ({ path: '/' }),
   RouterLink: { template: '<a><slot /></a>' },
+}))
+
+// Mock router module — App.vue + NavBar.vue import pendingConflictCount from it
+vi.mock('../router', () => ({
+  pendingConflictCount: mockPendingConflictCount,
+  default: [],
 }))
 
 // Mock useTabStore

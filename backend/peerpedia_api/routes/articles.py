@@ -235,23 +235,30 @@ def api_create_article(
     )
     rebuild_article_authors(db, a.id, set(author_list))
 
-    # L4: articles start as draft. Self-review is stored but score is not
-    # surfaced in API responses until publish (see build_article_detail).
-    contributions = None
-    if body.contributions:
-        contributions = {aid: c.model_dump() for aid, c in body.contributions.items()}
-    create_review(
-        db,
-        article_id=a.id,
-        commit_hash=commit_hash,
-        reviewer_id=author_list[0],
-        scope="pool",
-        scores=body.self_review.model_dump(),
-        contributions=contributions,
-    )
-    score = compute_article_score_for_commit(db, a.id, commit_hash)
-    if score is not None:
-        a.score = score
+    # Self-review and scoring: only created when the author explicitly
+    # provides scores (i.e., at publish time, not draft save).
+    if body.self_review is not None:
+        contributions = None
+        if body.contributions:
+            contributions = {aid: c.model_dump() for aid, c in body.contributions.items()}
+        create_review(
+            db,
+            article_id=a.id,
+            commit_hash=commit_hash,
+            reviewer_id=author_list[0],
+            scope="pool",
+            scores=body.self_review.model_dump(),
+            contributions=contributions,
+        )
+        score = compute_article_score_for_commit(db, a.id, commit_hash)
+        if score is not None:
+            a.score = score
+
+    # Publish to pool if requested
+    if body.publish:
+        sink_days = params.sink.new_article_default_days
+        a = set_sink_start(db, a.id, sink_days)
+
     db.commit()
     return build_article_detail(db, a.id)
 

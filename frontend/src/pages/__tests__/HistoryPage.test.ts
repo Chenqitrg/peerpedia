@@ -242,6 +242,7 @@ describe('HistoryPage', () => {
         article_id: 'art-1',
         commit_hash: 'ghi9012',
         author: 'User',
+        author_id: 'local',
       })
     })
 

@@ -33,11 +33,21 @@ vi.mock('vue-router', () => ({
 // After the isOnline default change (false → pings determine truth), the
 // EditorPage publish button is gated on canWrite('editor.publish_pool').
 // Mock the network composable so publish is enabled in tests.
+// Tests that need offline mode can set _isSynced = false.
+let _isSynced = true
 vi.mock('@/composables/useNetworkStatus', () => ({
   useNetworkStatus: vi.fn(() => ({
-    isSynced: { value: true },
+    get isSynced() { return { value: _isSynced } },
     connectionState: { value: 'synced' as const },
     ping: vi.fn(),
+  })),
+}))
+
+vi.mock('@/composables/useOffline', () => ({
+  useOffline: vi.fn(() => ({
+    canWrite: vi.fn(() => true),
+    getFallback: vi.fn((key: string) => key),
+    isLocalOnly: { value: false },
   })),
 }))
 
@@ -92,6 +102,7 @@ describe('EditorPage', () => {
     setActivePinia(createPinia())
     localStorage.clear()
     _isTauri = false
+    _isSynced = true
     vi.clearAllMocks()
     mockRoute.params = { id: undefined } as any
     mockRoute.query = {}
@@ -234,6 +245,7 @@ describe('EditorPage', () => {
   // Regression: saveDraft must trigger git init in Tauri/local mode
   it('saveDraft triggers git init in Tauri mode', async () => {
     _isTauri = true
+    _isSynced = false
     const { useUserStore } = await import('../../stores/useUserStore')
     setActivePinia(createPinia())
     const userStore = useUserStore()
@@ -263,6 +275,7 @@ describe('EditorPage', () => {
   // Regression: second and subsequent saves must trigger gitCommit, not gitInit
   it('saveDraft triggers gitCommit (not gitInit) when repo already exists', async () => {
     _isTauri = true
+    _isSynced = false
     // Simulate existing repo by returning a history entry
     mockGitHistory.mockResolvedValue([{ hash: 'abc1234', message: 'Initial', author: 'alice', timestamp: '2026-01-01' }])
 
@@ -878,10 +891,10 @@ describe('EditorPage', () => {
     vm.showSelfReview = true
     await flushPromises()
 
-    // The SelfReviewPanel modal should be visible
-    const modal = wrapper.find('.fixed.inset-0.z-50')
-    expect(modal.exists()).toBe(true)
-    // Commit message label should NOT be present
-    expect(modal.text()).not.toMatch(/Commit Message/i)
+    // SelfReviewPanel is now an inline section, not a modal popup
+    // The inline panel appears below the toolbar when showSelfReview is true
+    expect(wrapper.text()).toMatch(/Self Assessment/i)
+    // Commit message label should NOT be present in self-review panel
+    expect(wrapper.text()).not.toMatch(/Commit Message/i)
   })
 })

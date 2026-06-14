@@ -113,12 +113,14 @@ class TestReviewSubmit:
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
                             "pedagogy": 3, "impact": 3},
+            "publish": True,
         }
         resp = client.post("/api/v1/articles", json=create_body, headers=auth_header(uid))
         assert resp.status_code == 201
         article_id = resp.json()["id"]
-        # The article should already have a score from the self-review
+        # Article published to pool — score should be computed from self-review
         article = client.get(f"/api/v1/articles/{article_id}").json()
+        assert article["status"] == "sedimentation"
         assert article["score"] is not None
         assert "originality" in article["score"]
 
@@ -217,12 +219,13 @@ class TestReviewSubmit:
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
                             "pedagogy": 3, "impact": 3},
+            "publish": True,
         }
         resp = client.post("/api/v1/articles", json=create_body, headers=auth_header(uid))
         article_id = resp.json()["id"]
 
         # Edit WITHOUT self-review (commit B, no reviews for latest commit)
-        client.put(f"/api/v1/articles/{article_id}", json={"content": "# V2"}, headers=auth_header(uid))
+        client.put(f"/api/v1/articles/{article_id}", json={"content": "# V2", "publish": True}, headers=auth_header(uid))
 
         # Get commit B hash (latest, no reviews)
         history = client.get(f"/api/v1/articles/{article_id}/history").json()
@@ -242,6 +245,7 @@ class TestReviewSubmit:
 
         # Article score should now be computed, not None
         article = client.get(f"/api/v1/articles/{article_id}").json()
+        assert article["status"] == "sedimentation"
         assert article["score"] is not None
         # Latest commit now has reviews, so should have a valid score
         assert article["score"]["originality"] > 0

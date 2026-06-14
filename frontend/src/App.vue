@@ -48,11 +48,6 @@
     </Transition>
 
     <AuthModal />
-    
-      v-if="showReconnect"
-      :items="pendingOps"
-      @resolve="onResolvePending"
-    />
   </div>
 </template>
 
