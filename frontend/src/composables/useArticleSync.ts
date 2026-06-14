@@ -45,11 +45,11 @@ export function useArticleSync(
     if (!isSynced.value) return 'offline'
     if (pushing.value) return 'loading'
     const sid = serverArticleId()
-    const sch = serverCommitHash()
-    const lh = localHeadHash()
+    const srvHead = serverCommitHash()
+    const locHead = localHeadHash()
     if (!sid) return 'upload'
-    if (!lh || !sch) return 'synced'
-    if (lh !== sch) return 'conflict'
+    if (!locHead || !srvHead) return 'synced'
+    if (locHead !== srvHead) return 'conflict'
     return 'synced'
   })
 
