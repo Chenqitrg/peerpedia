@@ -227,17 +227,52 @@ def api_create_article(
 
     rp = repo_path(a.id)
     is_new_repo = not (rp / ".git").is_dir()
-    if is_new_repo:
-        init_article_repo(a.id)
-    ext = ".typ" if body.format == "typst" else ".md"
-    (rp / f"article{ext}").write_text(body.content)
-    # @deprecated Phase B: server-side commit replaced by bundle apply.
-    # Only create server commit if repo was just initialized (no existing
-    # commits from local gitInit). Author identity: name = display, email = UUID.
-    commit_msg = body.commit_message or "Initial submission"
-    author_name = current_user.name or current_user.username
-    commit_hash = commit_article(rp, commit_msg, author_name,
-                                  f"{author_list[0]}@peerpedia", allow_empty=True)
+
+    if body.repo_bundle:
+        # Phase B: bundle-based create — client sends full git repo as tar.gz.
+        # Extract the bundle instead of init+commit. Commits are preserved as-is.
+        import base64
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            tar_bytes = base64.b64decode(body.repo_bundle)
+        except Exception:
+            raise HTTPException(status_code=422, detail="Invalid repo_bundle: base64 decode failed")
+
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tf:
+            tf.write(tar_bytes)
+            tar_path = Path(tf.name)
+
+        try:
+            with tarfile.open(tar_path, "r:gz") as tar:
+                tar.extractall(path=rp.parent)
+            # Verify extraction produced a git repo
+            if not (rp / ".git").is_dir():
+                raise HTTPException(
+                    status_code=422,
+                    detail="repo_bundle does not contain a valid git repository",
+                )
+            # Parse article.json from extracted repo for metadata sync
+            try:
+                _refresh_db_from_git(a.id, rp)
+            except Exception:
+                logger.warning("Bundle extraction ok but DB refresh failed for %s", a.id)
+        except tarfile.ReadError as e:
+            raise HTTPException(status_code=422, detail=f"Invalid tar.gz: {e}")
+        finally:
+            tar_path.unlink(missing_ok=True)
+    else:
+        # Legacy path: server-side init + commit (web mode, backward compat)
+        if is_new_repo:
+            init_article_repo(a.id)
+        ext = ".typ" if body.format == "typst" else ".md"
+        (rp / f"article{ext}").write_text(body.content)
+        # @deprecated Phase B: server-side commit replaced by bundle apply.
+        commit_msg = body.commit_message or "Initial submission"
+        author_name = current_user.name or current_user.username
+        commit_article(rp, commit_msg, author_name,
+                       f"{author_list[0]}@peerpedia", allow_empty=True)
 
     # Rebuild authors from git history after first commit
     from peerpedia_core.storage.db.crud_article import (
