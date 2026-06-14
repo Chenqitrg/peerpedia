@@ -126,8 +126,6 @@ const autoSync = useAutoSync()
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
-const _pushedToServer = ref(false)
-
 function onSaveAndClose(e: Event) {
   const detail = (e as CustomEvent).detail
   if (detail?.tabId !== tabId) return  // not for this instance
@@ -145,7 +143,6 @@ onMounted(() => {
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
     currentDraftId.value = undefined
-    _pushedToServer.value = false
   }
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('tab-save-and-close', onSaveAndClose)
@@ -331,38 +328,32 @@ async function persistToGit(accountId: string, authorName: string, authorId: str
     currentDraftId.value = result.id
     saveString(DRAFT_ID_KEY.value, result.id)
 
-    // Online: server handles git repo + first commit via POST.
-    // Offline: init local git now so work can continue.
-    if (!isSynced.value) {
-      try {
-        const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
-        if (r && 'hash' in r) commitHash.value = r.hash
-      } catch (e: unknown) {
-        errorMsg.value = e instanceof Error ? e.message : 'Git init failed'
-      }
+    // Phase C: always commit locally — bundle will carry the exact hash to server.
+    try {
+      const r = await tauri.gitInit({ article_id: result.id, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
+      if (r && 'hash' in r) commitHash.value = r.hash
+    } catch (e: unknown) {
+      errorMsg.value = e instanceof Error ? e.message : 'Git init failed'
     }
     return true
   }
 
-  // Existing draft.
-  // Online: server handles commit via PUT. Offline: commit locally.
-  if (!isSynced.value) {
-    try {
-      const history = await tauri.gitHistory({ article_id: existingId })
-      const hasRepo = history && !('error' in history) && Array.isArray(history) && history.length > 0
-      if (hasRepo) {
-        const r = await tauri.gitCommit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
-        if (r && 'hash' in r) { commitHash.value = r.hash }
-        else { errorMsg.value = 'Git commit failed'; return false }
-      } else {
-        const r = await tauri.gitInit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
-        if (r && 'hash' in r) { commitHash.value = r.hash }
-        else { errorMsg.value = 'Git init failed'; return false }
-      }
-    } catch (e: unknown) {
-      errorMsg.value = e instanceof Error ? e.message : 'Git operation failed'
-      return false
+  // Existing draft — always commit locally (Phase C: bundle carries hash to server).
+  try {
+    const history = await tauri.gitHistory({ article_id: existingId })
+    const hasRepo = history && !('error' in history) && Array.isArray(history) && history.length > 0
+    if (hasRepo) {
+      const r = await tauri.gitCommit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
+      if (r && 'hash' in r) { commitHash.value = r.hash }
+      else { errorMsg.value = 'Git commit failed'; return false }
+    } else {
+      const r = await tauri.gitInit({ article_id: existingId, content: content.value, format: format.value, commit_message: msg, author: authorName, author_id: authorId })
+      if (r && 'hash' in r) { commitHash.value = r.hash }
+      else { errorMsg.value = 'Git init failed'; return false }
     }
+  } catch (e: unknown) {
+    errorMsg.value = e instanceof Error ? e.message : 'Git operation failed'
+    return false
   }
 
   // Update the DB index.
@@ -406,39 +397,15 @@ async function saveDraft() {
     if (!ok) return
     commitMsg.value = ''
     markSaved()
-    // Push to server if online.
+    // Phase C: push to server via bundle (preserves commit hash).
     if (isSynced.value) {
       const articleId = editId.value || currentDraftId.value
       if (articleId) {
         try {
-          if (editId.value) {
-            await articleStore.updateArticle(editId.value, {
-              title: title.value,
-              content: content.value,
-              commit_message: msg,
-              publish: false,
-            })
-          } else if (!_pushedToServer.value) {
-            // New article, first push: POST create with client UUID.
-            await articleStore.createArticle({
-              id: currentDraftId.value,
-              title: title.value,
-              content: content.value,
-              format: format.value,
-              commit_message: msg,
-            })
-            _pushedToServer.value = true
-          } else {
-            // Already created on server — use PUT update.
-            await articleStore.updateArticle(currentDraftId.value!, {
-              title: title.value,
-              content: content.value,
-              commit_message: msg,
-              publish: false,
-            })
-          }
+          const result = await autoSync.pushRepo(articleId, authorName, authorId, msg)
+          if (result.head) commitHash.value = result.head
         } catch (e: any) {
-          console.warn('Push to server failed:', e)
+          console.warn('Bundle push failed:', e)
         }
       }
     } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
@@ -535,24 +502,49 @@ async function handleSubmitToPool() {
   errorMsg.value = ''
   successMsg.value = ''
 
+  // Guard: server JWT required to publish.
+  if (!userStore.token) {
+    errorMsg.value = 'Your account needs to sync with the server before publishing.'
+    submitting.value = false
+    return
+  }
+
+  const accountId = userStore.viewer?.id || 'local'
+  const authorName = userStore.viewer?.name || userStore.viewer?.username || 'local'
+  const aid = editId.value || currentDraftId.value
+
+  // S5: Tauri mode — update article.json status → commit → bundle push.
+  if (aid && (tauri.isTauri.value || tauri.isBrowserLocal.value)) {
+    const meta = JSON.stringify({
+      status: 'pool',
+      self_review: { ...scores.value },
+    })
+    try {
+      await tauri.gitUpdateMeta({
+        article_id: aid,
+        json_str: meta,
+        commit_message: '[publish]',
+        author: authorName,
+        author_id: accountId,
+      })
+      const pushRes = await autoSync.pushRepo(aid, authorName, accountId, '[publish]')
+      if (pushRes.head) commitHash.value = pushRes.head
+    } catch (e: any) {
+      console.warn('Publish bundle push failed:', e)
+    }
+  }
+
   try {
     const body = {
       title: title.value,
       abstract: abstract.value || title.value,
       content: content.value,
       format: format.value,
-      commit_message: '',
+      commit_message: '[publish]',
       self_review: { ...scores.value },
       publish: true,
       keywords: keywords.value ? keywords.value.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
       categories: categories.value ? categories.value.split(',').map((c: string) => c.trim()).filter(Boolean) : [],
-    }
-
-    // Guard: server JWT required to publish. Local-only accounts must sync first.
-    if (!userStore.token) {
-      errorMsg.value = 'Your account needs to sync with the server before publishing. Please try again in a moment.'
-      submitting.value = false
-      return
     }
 
     let result: { id: string }
@@ -560,7 +552,6 @@ async function handleSubmitToPool() {
       result = await articleStore.updateArticle(editId.value!, body)
       successMsg.value = 'Article updated and submitted to pool!'
     } else if (currentDraftId.value) {
-      // UUID unification: currentDraftId IS the server UUID — no fallback needed.
       result = await articleStore.updateArticle(currentDraftId.value, body)
       successMsg.value = 'Article submitted to pool!'
       remove(DRAFT_KEY.value)

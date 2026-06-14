@@ -127,6 +127,9 @@ class ArticleCreate(BaseModel):
     contributions: Optional[dict[str, FiveDimScoresIn]] = None
     forked_from: Optional[str] = None
     publish: bool = False  # True = publish to pool, False = save as draft
+    # Phase B: bundle-based create. Client sends base64-encoded tar.gz of
+    # the full git repo. Server extracts it instead of init+commit.
+    repo_bundle: Optional[str] = None
 
 
 class ArticleUpdate(BaseModel):

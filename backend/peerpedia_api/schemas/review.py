@@ -35,6 +35,8 @@ class ReviewCreate(BaseModel):
     scope: ReviewScope
     scores: dict  # FiveDimScores as dict, validated below
     contributions: Optional[dict[str, dict[str, float]]] = None  # author_id → 5-dim ratios
+    # Phase B: review body as Markdown (written to reviews/{uuid}/{timestamp}.md)
+    content: str = ""
 
     @model_validator(mode="after")
     def validate_five_dims(self):

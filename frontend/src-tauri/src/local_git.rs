@@ -58,7 +58,7 @@ pub struct GitCommitResult {
 }
 
 /// Initialize a git repo for a new article. Creates the directory, writes
-/// the initial content file, and makes the first commit.
+/// the initial content file + article.json, and makes the first commit.
 pub fn git_init(
     article_id: &str,
     content: &str,
@@ -77,6 +77,21 @@ pub fn git_init(
     let ext = if format == "typst" { ".typ" } else { ".md" };
     let file_path = rp.join(format!("article{}", ext));
     std::fs::write(&file_path, content)?;
+
+    // Write initial article.json (Phase C)
+    let meta = serde_json::json!({
+        "title": "",
+        "abstract": "",
+        "keywords": [],
+        "categories": [],
+        "format": format,
+        "status": "draft",
+        "self_review": null
+    });
+    std::fs::write(
+        rp.join("article.json"),
+        serde_json::to_string_pretty(&meta).unwrap_or_default(),
+    )?;
 
     // git add + commit — author_id is UUID, author_name is display
     run_git(&rp, &["add", "-A"])?;
@@ -532,6 +547,206 @@ pub fn git_rollback(
     )
 }
 
+// ── Bundle Sync ──────────────────────────────────────────────────────────
+
+/// Create an incremental git bundle from `since_hash` to HEAD.
+/// Returns the bundle file bytes (for uploading to server).
+pub fn git_bundle_create(article_id: &str, since_hash: &str) -> Result<Vec<u8>, AppError> {
+    let rp = repo_path(article_id)?;
+    if !rp.join(".git").is_dir() {
+        return Err(AppError::NotFound(format!(
+            "Git repo not found for article '{}'",
+            article_id
+        )));
+    }
+
+    // Verify since_hash is an ancestor of HEAD
+    let ancestor_check = Command::new("git")
+        .args([
+            "-C",
+            rp.to_str().unwrap_or("."),
+            "merge-base",
+            "--is-ancestor",
+            since_hash,
+            "HEAD",
+        ])
+        .output()
+        .map_err(|e| AppError::IoError(format!("git merge-base failed: {}", e)))?;
+
+    if !ancestor_check.status.success() {
+        return Err(AppError::IoError(format!(
+            "since_hash {} is not an ancestor of HEAD",
+            &since_hash[..8.min(since_hash.len())]
+        )));
+    }
+
+    let tmp_path = std::env::temp_dir().join(format!("peerpedia-bundle-{}.bundle", article_id));
+
+    let output = Command::new("git")
+        .args([
+            "-C",
+            rp.to_str().unwrap_or("."),
+            "bundle",
+            "create",
+            tmp_path.to_str().unwrap_or("/tmp/bundle"),
+            &format!("{}..HEAD", since_hash),
+        ])
+        .output()
+        .map_err(|e| AppError::IoError(format!("git bundle create failed: {}", e)))?;
+
+    if !output.status.success() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(AppError::IoError(format!(
+            "git bundle create failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )));
+    }
+
+    let buf = std::fs::read(&tmp_path)
+        .map_err(|e| AppError::IoError(format!("Failed to read bundle: {}", e)))?;
+    let _ = std::fs::remove_file(&tmp_path);
+    Ok(buf)
+}
+
+/// Apply a git bundle to the local repo (pull server-side commits).
+/// Fetches objects from the bundle and fast-forward merges.
+/// Returns the new HEAD commit hash.
+pub fn git_bundle_apply(article_id: &str, bundle_bytes: &[u8]) -> Result<String, AppError> {
+    let rp = repo_path(article_id)?;
+    if !rp.join(".git").is_dir() {
+        return Err(AppError::NotFound(format!(
+            "Git repo not found for article '{}'",
+            article_id
+        )));
+    }
+
+    let tmp_path = std::env::temp_dir().join(format!("peerpedia-apply-{}.bundle", article_id));
+    std::fs::write(&tmp_path, bundle_bytes)
+        .map_err(|e| AppError::IoError(format!("Failed to write bundle: {}", e)))?;
+
+    // Fetch objects from bundle
+    let fetch = Command::new("git")
+        .args([
+            "-C",
+            rp.to_str().unwrap_or("."),
+            "fetch",
+            tmp_path.to_str().unwrap_or("/tmp/bundle"),
+            "HEAD",
+        ])
+        .output()
+        .map_err(|e| AppError::IoError(format!("git fetch bundle failed: {}", e)))?;
+
+    if !fetch.status.success() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(AppError::IoError(format!(
+            "git fetch bundle failed: {}",
+            String::from_utf8_lossy(&fetch.stderr)
+        )));
+    }
+
+    // Fast-forward merge to FETCH_HEAD
+    let merge = Command::new("git")
+        .args([
+            "-C",
+            rp.to_str().unwrap_or("."),
+            "merge",
+            "FETCH_HEAD",
+            "--ff-only",
+        ])
+        .output()
+        .map_err(|e| AppError::IoError(format!("git merge failed: {}", e)))?;
+
+    let _ = std::fs::remove_file(&tmp_path);
+
+    if !merge.status.success() {
+        // Abort merge if in progress
+        let _ = Command::new("git")
+            .args(["-C", rp.to_str().unwrap_or("."), "merge", "--abort"])
+            .output();
+        return Err(AppError::IoError(format!(
+            "Fast-forward merge failed — history may have diverged: {}",
+            String::from_utf8_lossy(&merge.stderr)
+        )));
+    }
+
+    get_head_hash(&rp)
+}
+
+// ── Metadata ─────────────────────────────────────────────────────────────
+
+/// Update article.json metadata fields and commit.
+/// `json_str` is a JSON string with fields to merge into the existing article.json.
+/// If article.json doesn't exist, creates it with defaults first.
+pub fn git_update_meta(
+    article_id: &str,
+    json_str: &str,
+    commit_message: &str,
+    author_name: &str,
+    author_id: &str,
+) -> Result<GitCommitResult, AppError> {
+    let rp = repo_path(article_id)?;
+    if !rp.join(".git").is_dir() {
+        return Err(AppError::NotFound(format!(
+            "Git repo not found for article '{}'",
+            article_id
+        )));
+    }
+
+    let meta_path = rp.join("article.json");
+
+    // Read existing or create default
+    let mut meta: serde_json::Value = if meta_path.exists() {
+        let existing = std::fs::read_to_string(&meta_path)?;
+        serde_json::from_str(&existing).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({
+            "title": "",
+            "abstract": "",
+            "keywords": [],
+            "categories": [],
+            "format": "markdown",
+            "status": "draft",
+            "self_review": null
+        })
+    };
+
+    // Merge new fields
+    if let Ok(update) = serde_json::from_str::<serde_json::Value>(json_str) {
+        if let Some(obj) = update.as_object() {
+            for (k, v) in obj {
+                meta[k] = v.clone();
+            }
+        }
+    }
+
+    std::fs::write(
+        &meta_path,
+        serde_json::to_string_pretty(&meta).unwrap_or_default(),
+    )?;
+
+    // git add + commit
+    run_git(&rp, &["add", "-A"])?;
+    let author_email = format!("{}@peerpedia", author_id);
+    run_git(
+        &rp,
+        &[
+            "-c",
+            &format!("user.name={}", author_name),
+            "-c",
+            &format!("user.email={}", author_email),
+            "commit",
+            "-m",
+            commit_message,
+        ],
+    )?;
+
+    let hash = get_head_hash(&rp)?;
+    Ok(GitCommitResult {
+        hash,
+        message: commit_message.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -699,7 +914,7 @@ mod tests {
         // Create a Typst article with 3 commits
         git_init("rb-typst", "= v1", "typst", "First", "alice", "uuid-alice").unwrap();
         git_commit("rb-typst", "= v2", "typst", "Second", "alice", "uuid-alice").unwrap();
-        let third =
+        let _third =
             git_commit("rb-typst", "= v3", "typst", "Third", "alice", "uuid-alice").unwrap();
 
         let history = git_history("rb-typst").unwrap();
@@ -725,6 +940,113 @@ mod tests {
             !rp.join("article.md").exists(),
             "rollback should not create article.md in a typst repo"
         );
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_bundle_create_and_apply_preserves_hash() {
+        let _lock = git_test_lock().lock().unwrap();
+        let dir = setup_dir();
+        let home = dir.join("home");
+        fs::create_dir_all(&home).unwrap();
+        std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+        // Create article with 2 commits
+        git_init(
+            "bundle-src",
+            "v1",
+            "markdown",
+            "First",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let c2 = git_commit(
+            "bundle-src",
+            "v2",
+            "markdown",
+            "Second",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let history = git_history("bundle-src").unwrap();
+        assert_eq!(history.len(), 2);
+
+        // Create FULL bundle (HEAD only, no incremental range) — simulates initial sync
+        let src_path = home.join(".peerpedia").join("articles").join("bundle-src");
+        let bundle_path = std::env::temp_dir().join("test-full.bundle");
+        Command::new("git")
+            .args([
+                "-C",
+                src_path.to_str().unwrap(),
+                "bundle",
+                "create",
+                bundle_path.to_str().unwrap(),
+                "HEAD",
+            ])
+            .output()
+            .unwrap();
+        let bundle = fs::read(&bundle_path).unwrap();
+        let _ = fs::remove_file(&bundle_path);
+
+        // Apply to fresh empty repo — simulates server initial sync
+        let tgt = home.join(".peerpedia").join("articles").join("bundle-tgt");
+        fs::create_dir_all(&tgt).unwrap();
+        Command::new("git")
+            .args(["-C", tgt.to_str().unwrap(), "init"])
+            .output()
+            .unwrap();
+
+        let new_head = git_bundle_apply("bundle-tgt", &bundle).unwrap();
+        assert_eq!(new_head, c2.hash, "HEAD hash must match after apply");
+        assert_eq!(git_history("bundle-tgt").unwrap().len(), 2);
+
+        let (content, _fmt) = git_show("bundle-tgt", &new_head).unwrap();
+        assert_eq!(content, "v2");
+
+        // Now test INCREMENTAL bundle: add a commit to source, create incremental bundle
+        git_commit(
+            "bundle-src",
+            "v3",
+            "markdown",
+            "Third",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let c3_hash = &git_history("bundle-src").unwrap()[0].hash;
+        let incr_bundle = git_bundle_create("bundle-src", &c2.hash).unwrap();
+        assert!(!incr_bundle.is_empty());
+
+        // Apply incremental bundle to target
+        let new_head2 = git_bundle_apply("bundle-tgt", &incr_bundle).unwrap();
+        assert_eq!(new_head2, *c3_hash, "incremental hash must match");
+        assert_eq!(git_history("bundle-tgt").unwrap().len(), 3);
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_bundle_create_bad_since() {
+        let _lock = git_test_lock().lock().unwrap();
+        let dir = setup_dir();
+        let home = dir.join("home");
+        fs::create_dir_all(&home).unwrap();
+        std::env::set_var("PEERPEDIA_TEST_HOME", &home);
+
+        git_init(
+            "bundle-bad",
+            "v1",
+            "markdown",
+            "First",
+            "alice",
+            "uuid-alice",
+        )
+        .unwrap();
+        let result = git_bundle_create("bundle-bad", &"0".repeat(40));
+        assert!(result.is_err());
 
         cleanup(&dir);
     }

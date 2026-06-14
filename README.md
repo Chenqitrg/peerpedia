@@ -99,17 +99,18 @@ When reputation + scoring infrastructure exists and people trust it:
 
 ```
 Phase 1 + 1.5（Tauri Desktop — 离线写作 + 打磨）
-┌─────────────────────────────────────────────────────────┐
-│  Vue 3 → IPC → Rust → SQLite + Git（本地）                │
-│  离线写作 · 客户端编译 · 版本控制 · 浏览即缓存               │
-│  git-first 写入 · 关注走服务器 API · 文章自动备份           │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Vue 3 → IPC → Rust → SQLite + Git（本地）                            │
+│  离线写作 · 客户端编译 · 版本控制 · 浏览即缓存                          │
+│  git commit → bundle push → 服务器 fetch + merge（hash 不变）         │
+└──────────────────────────────────────────────────────────────────────┘
 
 Phase 2+（Web — 社区协作）
-┌─────────────────────────────────────────────────────────┐
-│  Vue 3 SPA → REST → FastAPI → SQLite + Git（服务器）       │
-│  沉淀池 · 社区评审 · 信誉系统 · 引用图 · 关注/信息流         │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Vue 3 SPA → REST / Bundle → FastAPI → SQLite + Git（服务器）         │
+│  沉淀池 · 社区评审 · 信誉系统 · 引用图 · 关注/信息流                   │
+│  评审写入 git 仓库 · DB 缓存文章数据 · 社交数据存 DB                    │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Stack · 技术栈
@@ -120,12 +121,28 @@ Phase 2+（Web — 社区协作）
 | Frontend | Vue 3, TypeScript, Vite, Tailwind CSS, Pinia, vue-i18n |
 | Backend (Web) | Python 3.12+, FastAPI, SQLAlchemy, SQLite |
 | Backend (Desktop) | Rust, rusqlite, bcrypt, libgit2 |
-| Storage | SQLite + Git repositories |
+| Storage | Git repositories (文章完整档案) + SQLite (DB 缓存 + 社交数据) |
 | Compilation | Markdown: client-side (marked + KaTeX). Typst: Tauri sidecar CLI |
 | Auth | JWT (Web) / bcrypt + SQLite (Desktop) |
-| Source of Truth | Git = Source of Truth, DB = Index |
+| Source of Truth | Git = Source of Truth, DB = Index / 社交数据原生 |
+| Sync | Git bundle over HTTP（hash 不变）；增量双向同步 |
 
 **Author Identity · 作者身份:** Git commit email (`{UUID}@peerpedia`) is the author addressing key. Username is display-only. Authors are derived from git commit history, not stored as a mutable DB field. Fork copies git history → authors = original ∪ forker. Merge joins git histories → authors = target ∪ fork.
+
+**Article Repository · 文章仓库结构:**
+
+```
+article repo/
+├── article.md              # 正文（Markdown / Typst）
+├── article.json            # 作者元数据（title, status, self_review）
+├── references.bib          # 引用（BibTeX）
+└── reviews/
+    └── {reviewer_uuid}/
+        ├── scores.json     # {O, R, C, P, I}
+        └── {timestamp}.md  # 评审/讨论（第1行=UUID, Markdown 正文）
+```
+
+**Bundle Sync · 同步模型:** 客户端 `git commit` → `git bundle create` 打包 → HTTP 上传 → 服务器 `git fetch` + `--ff-only merge`。同一批 git objects，commit hash 不变——作为 arXiv 式不可篡改时间戳。双向：推送前先拉取服务器端 commit（审稿人/platform），合并后再推。
 
 ### DB Schema · 数据模型（9 entities）
 

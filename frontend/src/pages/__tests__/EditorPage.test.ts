@@ -835,7 +835,7 @@ describe('EditorPage', () => {
 
     expect(mockUpdateArticle).toHaveBeenCalledWith('draft-99', expect.objectContaining({
       publish: true,
-      commit_message: '',
+      commit_message: '[publish]',
     }))
     expect(mockCreateArticle).not.toHaveBeenCalled()
   })
@@ -869,7 +869,7 @@ describe('EditorPage', () => {
 
     expect(mockCreateArticle).toHaveBeenCalledWith(expect.objectContaining({
       publish: true,
-      commit_message: '',
+      commit_message: '[publish]',
     }))
     expect(mockUpdateArticle).not.toHaveBeenCalled()
   })

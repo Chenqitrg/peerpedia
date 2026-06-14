@@ -97,6 +97,9 @@ export interface ArticleCreatePayload {
   content?: string
   format?: 'markdown' | 'typst'
   forked_from?: string
+  publish?: boolean
+  // Phase C: bundle-based create — base64-encoded tar.gz of full git repo
+  repo_bundle?: string
 }
 
 export interface ArticleUpdatePayload {

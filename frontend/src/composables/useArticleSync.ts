@@ -45,15 +45,18 @@ export function useArticleSync(
     if (!isSynced.value) return 'offline'
     if (pushing.value) return 'loading'
     const sid = serverArticleId()
-    const sch = serverCommitHash()
-    const lh = localHeadHash()
+    const srvHead = serverCommitHash()
+    const locHead = localHeadHash()
     if (!sid) return 'upload'
-    if (!lh || !sch) return 'synced'
-    if (lh !== sch) return 'conflict'
+    if (!locHead || !srvHead) return 'synced'
+    if (locHead !== srvHead) return 'conflict'
     return 'synced'
   })
 
-  /** Push local changes to server. */
+  /**
+   * Push local changes to server via REST content upload.
+   * @deprecated Phase B: replaced by bundle pushRepo — git bundle preserves commit hash.
+   */
   async function pushUpdate(): Promise<boolean> {
     const sid = serverArticleId()
     if (!sid || !userStore.token) {

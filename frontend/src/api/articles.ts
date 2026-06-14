@@ -89,3 +89,30 @@ export async function rejectMergeProposal(id: string, pid: string) {
 export async function deleteArticle(id: string): Promise<void> {
   await apiClient.delete(`/articles/${id}`)
 }
+
+// ── Bundle Sync API (Phase C) ──────────────────────────────────────────
+
+/** Get the server's HEAD commit hash for an article. */
+export async function getArticleHead(id: string): Promise<{ hash: string }> {
+  const res = await apiClient.get(`/articles/${id}/head`)
+  return res.data
+}
+
+/** Get an incremental git bundle from the server (server-side commits since `since`). */
+export async function getArticleBundle(id: string, since: string): Promise<ArrayBuffer> {
+  const res = await apiClient.get(`/articles/${id}/bundle`, {
+    params: { since },
+    responseType: 'arraybuffer',
+  })
+  return res.data
+}
+
+/** Push an incremental git bundle to the server (client-side commits). */
+export async function syncArticle(id: string, bundle: Blob): Promise<{ head: string }> {
+  const form = new FormData()
+  form.append('file', bundle)
+  const res = await apiClient.post(`/articles/${id}/sync`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}

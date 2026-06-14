@@ -164,3 +164,150 @@ class TestBlame:
             # Pre-existing bug: BlameEntry attribute names changed in newer GitPython
             # This is a known issue, not a regression
             pass
+
+
+class TestBundleSync:
+    """Git bundle create/apply — commit hash preservation across repos."""
+
+    def test_create_and_apply_bundle_preserves_hash(self, articles_dir):
+        """S1+S2: Full bundle preserves commit hash when applied to empty repo."""
+        import git as gitmod
+
+        from peerpedia_core.storage.git_backend import (
+            apply_bundle,
+            commit_article,
+            init_article_repo,
+        )
+
+        # Client: create repo with two commits
+        client_rp = init_article_repo("client-article", articles_dir)
+        (client_rp / "article.md").write_text("v1")
+        h1 = commit_article(client_rp, "first", "Author", "author@test.com")
+        (client_rp / "article.md").write_text("v2")
+        h2 = commit_article(client_rp, "second", "Author", "author@test.com")
+        assert h1 != h2
+
+        # Create full bundle of all client objects
+        import tempfile
+        client_repo = gitmod.Repo(client_rp)
+        with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
+            bundle_path = f.name
+        try:
+            client_repo.git.bundle("create", bundle_path, "HEAD")
+            full_bytes = Path(bundle_path).read_bytes()
+        finally:
+            Path(bundle_path).unlink(missing_ok=True)
+
+        # Server: empty repo — apply full bundle (initial sync)
+        server_rp = init_article_repo("server-article", articles_dir)
+        new_head = apply_bundle(server_rp, full_bytes)
+        assert new_head == h2  # hash preserved!
+
+        # Verify content and history
+        server_repo = gitmod.Repo(server_rp)
+        assert len(list(server_repo.iter_commits())) == 2
+        assert server_repo.head.commit.hexsha == h2
+        assert (server_rp / "article.md").read_text() == "v2"
+
+    def test_create_incremental_bundle(self, articles_dir):
+        """create_bundle returns bytes for since..HEAD range."""
+        from peerpedia_core.storage.git_backend import (
+            commit_article,
+            create_bundle,
+            init_article_repo,
+        )
+
+        rp = init_article_repo("incr-test", articles_dir)
+        (rp / "article.md").write_text("v1")
+        h1 = commit_article(rp, "first", "Author", "author@test.com")
+        (rp / "article.md").write_text("v2")
+        commit_article(rp, "second", "Author", "author@test.com")
+
+        bundle = create_bundle(rp, h1)  # since first commit
+        assert isinstance(bundle, bytes)
+        assert len(bundle) > 0
+        # Should be smaller than full repo (only contains objects after h1)
+        assert len(bundle) < 10000
+
+    def test_create_bundle_bad_since_raises(self, articles_dir):
+        """create_bundle with non-ancestor since_hash raises ValueError."""
+        from peerpedia_core.storage.git_backend import (
+            commit_article,
+            create_bundle,
+            init_article_repo,
+        )
+
+        rp = init_article_repo("bad-since", articles_dir)
+        (rp / "article.md").write_text("v1")
+        commit_article(rp, "first", "Author", "author@test.com")
+
+        with pytest.raises(ValueError, match="not an ancestor"):
+            create_bundle(rp, "0" * 40)  # nonexistent hash
+
+    def test_apply_bundle_bad_repo_raises(self, articles_dir):
+        """apply_bundle on non-existent repo raises FileNotFoundError."""
+        from peerpedia_core.storage.git_backend import apply_bundle
+
+        with pytest.raises(FileNotFoundError):
+            apply_bundle(articles_dir / "nonexistent", b"garbage")
+
+    def test_apply_bundle_corrupt_raises(self, repo):
+        """apply_bundle with corrupt bytes raises ValueError."""
+        from peerpedia_core.storage.git_backend import apply_bundle
+
+        with pytest.raises(ValueError, match="Invalid bundle"):
+            apply_bundle(repo, b"not a git bundle")
+
+    def test_apply_bundle_divergent_history(self, articles_dir):
+        """apply_bundle with divergent history raises MergeConflictError."""
+        import git as gitmod
+
+        from peerpedia_core.storage.git_backend import (
+            MergeConflictError,
+            apply_bundle,
+            commit_article,
+            init_article_repo,
+        )
+
+        # Server has commit A → B
+        server_rp = init_article_repo("server-div", articles_dir)
+        (server_rp / "article.md").write_text("sv1")
+        commit_article(server_rp, "sv1", "Svr", "svr@test.com")
+        (server_rp / "article.md").write_text("sv2")
+        commit_article(server_rp, "sv2", "Svr", "svr@test.com")
+
+        # Client has commit A → C (different second commit)
+        client_rp = init_article_repo("client-div", articles_dir)
+        (client_rp / "article.md").write_text("cl1")
+        commit_article(client_rp, "cl1", "Cli", "cli@test.com")
+        (client_rp / "article.md").write_text("cl2")
+        commit_article(client_rp, "cl2", "Cli", "cli@test.com")
+
+        # Bundle from client (divergent from server)
+        client_repo = gitmod.Repo(client_rp)
+        with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
+            bundle_path = f.name
+        try:
+            client_repo.git.bundle("create", bundle_path, "--all")
+            bundle_bytes = Path(bundle_path).read_bytes()
+        finally:
+            Path(bundle_path).unlink(missing_ok=True)
+
+        with pytest.raises(MergeConflictError):
+            apply_bundle(server_rp, bundle_bytes)
+
+    def test_lock_reuse(self):
+        """get_article_lock returns same lock for same article_id."""
+        from peerpedia_core.storage.git_backend import get_article_lock
+
+        lock1 = get_article_lock("test-article")
+        lock2 = get_article_lock("test-article")
+        assert lock1 is lock2
+
+    def test_lock_different_articles(self):
+        """get_article_lock returns different locks for different article_ids."""
+        from peerpedia_core.storage.git_backend import get_article_lock
+
+        lock_a = get_article_lock("article-a")
+        lock_b = get_article_lock("article-b")
+        assert lock_a is not lock_b

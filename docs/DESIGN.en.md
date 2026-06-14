@@ -18,17 +18,19 @@ PeerPedia is the GitHub of academic publishing. Articles are Git repositories. R
 
 ```
 Phase 1 + 1.5 (Tauri Desktop — MVP + Polish)
-┌─────────────────────────────────────────────────────────┐
-│  Vue 3 → IPC → Rust → SQLite + Git (local)               │
-│  Offline writing · client compilation · version control   │
-│  Browse = cache · Bookmark = full cache                   │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Vue 3 → IPC → Rust → SQLite + Git (local)                            │
+│  Offline writing · client compilation · version control               │
+│  Browse = cache · Bookmark = full cache                               │
+│  git commit → bundle push → server fetch + merge (hash preserved)     │
+└──────────────────────────────────────────────────────────────────────┘
 
 Phase 2+ (Web — community)
-┌─────────────────────────────────────────────────────────┐
-│  Vue 3 SPA → REST → FastAPI → SQLite + Git (server)       │
-│  Sedimentation pool · community review · reputation       │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Vue 3 SPA → REST / Bundle → FastAPI → SQLite + Git (server)         │
+│  Sedimentation pool · community review · reputation                  │
+│  Reviews written to git · DB caches article data · social data in DB │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 Tech Stack
@@ -45,9 +47,45 @@ Phase 2+ (Web — community)
 
 ### 2.3 Source of Truth
 
-**Git is the source of truth. Database is an index.**
+**Git is the source of truth. Database is an index / social data store.**
 
-Local and server each hold a complete git history. There is no single "source of truth" — like GitHub, identity is generated client-side. Commit hashes are the atomic unit of synchronization.
+Local and server each hold a complete git history. Article content, metadata, reviews, and discussions all live in git. The database caches article metadata for fast queries and natively stores social data (users, follows, bookmarks, merge proposals).
+
+Commit hashes are preserved end-to-end via git bundle sync — the same git objects exist on both client and server. This makes commit hash an arXiv-style immutable timestamp protecting research priority.
+
+### 2.3-bis Article Repository Structure
+
+```
+article repo/
+├── article.md              # Body (Markdown / Typst)
+├── article.json            # Author metadata (title, status, self_review)
+├── references.bib          # Citations (BibTeX)
+└── reviews/
+    └── {reviewer_uuid}/
+        ├── scores.json     # {O, R, C, P, I}
+        └── {timestamp}.md  # Review / discussion (line 1 = sender UUID)
+```
+
+### 2.3-ter Bundle Sync Model
+
+The client creates git commits locally and transfers them via git bundle over HTTP:
+
+```
+Client (Tauri/Rust)                    Server (FastAPI/Python)
+  git bundle create <server>..HEAD
+  ─────────────────────────────────→    git fetch + --ff-only merge
+  POST /articles/{id}/sync              parse article.json → update DB
+
+  ← GET /articles/{id}/bundle?since=    server-side commits (reviews)
+  ← GET /articles/{id}/head             current HEAD
+```
+
+**Key properties:**
+- Same commit hash on client and server (no re-commit)
+- Bidirectional: pull server commits before push (reviews, platform updates)
+- Fast-forward only: different writers touch different files (no merge conflicts)
+- Bundle files are P2P-native: any transport layer (HTTP, IPFS, BitTorrent) works
+- Per-article `threading.Lock` serializes git operations on the server
 
 ```
 User request → Git commit (content) → success → DB upsert (metadata index)
@@ -132,11 +170,11 @@ Every component has exactly one role. The boundary: **local is the productivity 
     LOCAL (Tauri Desktop)                  SERVER (Python Backend)
     ┌─────────────────────┐               ┌──────────────────────┐
     │ UUID generation      │               │ UUID acceptance       │
-    │ git commit + history │─── push ───▶  │ git history backup    │
+    │ git commit + bundle  │─── bundle ──▶ │ git fetch + merge     │
     │ Article cache        │               │ Fork source           │
     │ Offline pending queue│               │ Visibility (publish)  │
     │ Local auth           │               │ JWT auth              │
-    │ Pending resolution   │◀── restore ── │ Backup rescue         │
+    │ Pull reviews/platform│◀── bundle ── │ Review/platform commits│
     └─────────────────────┘               └──────────────────────┘
 ```
 
@@ -144,7 +182,8 @@ Every component has exactly one role. The boundary: **local is the productivity 
 |---------------|-------|--------|
 | UUID generation | ✅ Generates (client-side) | Accepts and stores |
 | Content git repo | ✅ Full history (works offline) | ✅ Full history (fork source, rollback) |
-| Save | git commit + push trigger | Accept push, store commit |
+| Save | git commit + bundle push | git fetch + ff-only merge |
+| Sync direction | pushRepo (pull server → merge → bundle → push) | Accept bundle, return server bundle for pull |
 | Delete | Clear local git + cache + mark pending | DELETE article + git repo |
 | Publish | Trigger only | Changes visibility (draft → pool → public) |
 | Fork | Trigger (own articles, not pool) | Copy git repo, create article |
@@ -155,24 +194,28 @@ Every component has exactly one role. The boundary: **local is the productivity 
 
 **Rule of thumb:** if it touches a git repo, both sides do it. If it touches visibility, only the server. If it touches offline state, only the local side.
 
-### 2.4 Article Sync (L4)
+### 2.4 Article Sync (L4) — Git Bundle Model
 
-Every save in Tauri mode auto-uploads the article to the server as a private draft (like a GitHub private repo). Publish is a separate, explicit action.
+Every save in Tauri mode creates a local git commit. The commit is synced to the server via git bundle transfer — same git objects, same commit hash. Publish is a separate, explicit action.
 
 ```
-Save → auto POST/PUT /articles (status=draft)
-     → server_article_id + server_commit_hash stored locally
+Save → local git commit → pushRepo()
+     → GET /articles/{id}/head        (check server HEAD)
+     → GET /articles/{id}/bundle?since= (pull server commits: reviews, platform)
+     → git fetch bundle → merge locally
+     → git bundle create <server>..HEAD
+     → POST /articles/{id}/sync       (push client commits)
+     → 409 conflict → re-pull → re-bundle → retry
 
-Next save → local HEAD ≠ server_commit_hash → GitCompare icon
-     → "Keep Local" = PUT local changes to server
-     → "Use Remote" = git rollback to server version
-     → Both resolve the conflict and update server_commit_hash
-
-Publish → POST /articles/{id}/publish → enters sedimentation pool
+Publish → status change in article.json → commit → bundle push → server triggers sink
 ```
 
 **Design principles:**
 - No manual Upload button — backup is automatic and silent
+- Commit hash is preserved end-to-end (no server re-commit)
+- Bidirectional: pull server commits before push (reviews, platform updates)
+- Fast-forward only: different writers touch different files (no conflicts)
+- Bundle over REST: no git daemon needed, P2P-native format
 - Draft ≠ published — articles on the server stay private until explicitly published
 - Draft saves do not include `self_review` (five-dimension scores). Only publishing to the sedimentation pool requires `self_review` with all five dimensions (originality, rigor, completeness, pedagogy, impact). Server returns 400 if `publish: true` is set without `self_review`.
 - Conflict resolution IS sync — no separate Push/Pull, just compare hashes
