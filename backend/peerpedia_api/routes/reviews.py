@@ -127,6 +127,48 @@ def _batch_load_reviewers(db: Session, reviews) -> dict[str, User]:
     return {u.id: u for u in users}
 
 
+def _write_thread_reply_to_git(
+    article_id: str,
+    review_owner_uuid: str,
+    sender: User,
+    content: str,
+    article,
+) -> None:
+    """Write a thread reply .md to the review's git directory and commit."""
+    import logging
+    from datetime import datetime, timezone
+
+    logger = logging.getLogger(__name__)
+    rp = DEFAULT_ARTICLES_DIR / article_id
+    if not (rp / ".git").is_dir():
+        return
+
+    review_dir = rp / "reviews" / review_owner_uuid
+    review_dir.mkdir(parents=True, exist_ok=True)
+
+    is_self = sender.id in (getattr(article, 'author_ids', None) or [])
+    if article.status == "sedimentation":
+        display_name = "Anonymous Contributor"
+        author_email = "anonymous@peerpedia"
+    else:
+        display_name = sender.name or sender.username
+        author_email = f"{sender.id}@peerpedia"
+
+    try:
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+        md_content = f"{sender.id}\n\n{content}"
+        (review_dir / f"{ts}.md").write_text(md_content)
+
+        lock = get_article_lock(article_id)
+        if lock.acquire(timeout=10):
+            try:
+                commit_article(rp, f"Reply by {display_name}", display_name, author_email)
+            finally:
+                lock.release()
+    except Exception:
+        logger.exception("Failed to write thread reply for article %s", article_id)
+
+
 @router.get("", response_model=list[ReviewOut])
 def list_reviews(article_id: str, db: Session = Depends(deps.get_db)):
     article = get_article(db, article_id)
@@ -213,4 +255,11 @@ def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCrea
     msg = ThreadMessage(author_id=current_user.id, content=body.content,
                         author_name=current_user.name)
     add_thread_message(db, review_id, msg.to_dict())
+
+    # Phase C: write reply .md to git repo
+    _write_thread_reply_to_git(
+        article_id, r.reviewer_id, current_user, body.content,
+        article,
+    )
+
     return {"status": "ok", "message": msg.to_dict()}
