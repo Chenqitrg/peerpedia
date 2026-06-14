@@ -126,9 +126,6 @@ const autoSync = useAutoSync()
 const currentDraftId = ref<string | undefined>(
   isEdit.value ? (editId.value as string | undefined) : undefined
 )
-/** @deprecated Phase B: replaced by bundle pushRepo — track whether first server POST succeeded */
-const _firstServerPushDone = ref(false)
-
 function onSaveAndClose(e: Event) {
   const detail = (e as CustomEvent).detail
   if (detail?.tabId !== tabId) return  // not for this instance
@@ -146,7 +143,6 @@ onMounted(() => {
     remove(DRAFT_ID_KEY.value)
     remove(DRAFT_KEY.value)
     currentDraftId.value = undefined
-    _firstServerPushDone.value = false
   }
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('tab-save-and-close', onSaveAndClose)
