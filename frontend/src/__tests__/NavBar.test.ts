@@ -15,10 +15,7 @@ vi.mock('vue-router', () => ({
 }))
 
 // Mock router module — NavBar imports pendingConflictCount from it
-const { mockPendingConflictCount } = vi.hoisted(() => {
-  const { ref } = require('vue') as typeof import('vue')
-  return { mockPendingConflictCount: ref(0) }
-})
+const mockPendingConflictCount = ref(0)
 vi.mock('../router', () => ({
   pendingConflictCount: mockPendingConflictCount,
   default: [],
