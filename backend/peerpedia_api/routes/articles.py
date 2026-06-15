@@ -821,7 +821,24 @@ async def api_sync_article(
     # Auth: only article authors can push bundles.
     a = get_article(db, article_id)
     if a is None:
-        raise HTTPException(status_code=404, detail="Article not found")
+        # Git repo exists but no DB record — first-time bundle push.
+        # Auto-create the article record from git history.
+        rp = repo_path(article_id)
+        if not (rp / ".git").is_dir():
+            raise HTTPException(status_code=404, detail="Article not found")
+        from peerpedia_core.storage.db.crud_article import create_article as _create_article
+        a = _create_article(db, id=article_id, status="draft")
+        db.commit()
+        # Rebuild authors from git commit history
+        from peerpedia_core.storage.db.crud_article import (
+            get_authors_from_git,
+            rebuild_article_authors,
+        )
+        git_authors = get_authors_from_git(rp, db)
+        rebuild_article_authors(db, article_id, git_authors)
+        # Refresh metadata from article.json
+        _refresh_db_from_git(article_id, rp, db)
+
     if current_user.id not in get_author_ids(db, article_id):
         raise HTTPException(status_code=403, detail="Only authors can sync article content")
 
