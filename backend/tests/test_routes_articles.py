@@ -1608,6 +1608,9 @@ class TestBundleSyncEndpoints:
         # Create empty root commit first (since_hash anchor)
         import git as gitmod
         repo = gitmod.Repo(rp)
+        with repo.config_writer() as cw:
+            cw.set_value("user", "name", "CI")
+            cw.set_value("user", "email", "ci@peerpedia")
         repo.git.commit("--allow-empty", "-m", "root")
         empty_hash = repo.head.commit.hexsha
 
