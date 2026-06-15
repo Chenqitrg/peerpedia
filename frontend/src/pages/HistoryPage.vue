@@ -57,7 +57,13 @@ const { data: history, loading, error, execute: loadHistory } = useAsyncResource
 
 const commits = computed(() => history.value?.commits ?? [])
 
-const sortedCommits = computed(() => [...commits.value].reverse())
+// Review/reply commits are shown on the article page — hide them from history.
+const isReviewCommit = (msg: string) =>
+  msg.startsWith('Review by ') || msg.startsWith('Reply by ')
+
+const sortedCommits = computed(() =>
+  [...commits.value].filter(c => !isReviewCommit(c.message)).reverse(),
+)
 
 // ── Range selection (Ctrip-style) ──────────────────────────────────
 // When both hashes are selected, highlight all commits between them.
@@ -105,27 +111,33 @@ async function loadDiff() {
   if (!selectedHash1.value || !selectedHash2.value) return
   diffLoading.value = true
   try {
+    let raw: DiffResult | null = null
     if (isLocal.value) {
-      // In local mode, use Tauri's structured git_diff
       const data = await tauri.gitDiff({
         article_id: id,
         hash1: selectedHash1.value,
         hash2: selectedHash2.value,
       })
       if (data && !('error' in data)) {
-        diffResult.value = data as unknown as DiffResult
-      } else {
-        diffResult.value = null
+        raw = data as unknown as DiffResult
       }
     } else {
-      // Web mode: fetch REST diff, parse into DiffResult format
       const { getDiff } = await import('../api/articles')
       const data = await getDiff(id, selectedHash1.value!, selectedHash2.value!)
       if (data?.diff_text) {
-        diffResult.value = parseUnifiedDiff(data.diff_text, data.files || [])
-      } else {
-        diffResult.value = null
+        raw = parseUnifiedDiff(data.diff_text, data.files || [])
       }
+    }
+    // Only show article content files — reviews/article.json are noise here
+    if (raw) {
+      diffResult.value = {
+        ...raw,
+        files: raw.files.filter(
+          f => f === 'article.md' || f === 'article.typ',
+        ),
+      }
+    } else {
+      diffResult.value = null
     }
   } catch (e) {
     console.error('Failed to load diff:', e)
