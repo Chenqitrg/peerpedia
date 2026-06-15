@@ -13,12 +13,13 @@ import tempfile
 import threading
 from pathlib import Path
 from typing import Optional
-from weakref import WeakValueDictionary
 
 DEFAULT_ARTICLES_DIR = Path.home() / ".peerpedia" / "articles"
 
-# Per-article git operation locks (file-level, not per-process; single-worker deployment).
-_article_locks: WeakValueDictionary = WeakValueDictionary()
+# Per-article git operation locks. Plain dict (not WeakValueDictionary — locks
+# must survive GC). Guarded by a module-level lock for thread-safe get/create.
+_locks_dict: dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
 
 
 def init_article_repo(
@@ -372,9 +373,14 @@ def create_bundle(repo_path: Path, since_hash: str) -> bytes:
 
 
 def get_article_lock(article_id: str) -> threading.Lock:
-    """Get or create a per-article threading.Lock for git operation serialization."""
-    lock = _article_locks.get(article_id)
-    if lock is None:
-        lock = threading.Lock()
-        _article_locks[article_id] = lock
+    """Get or create a per-article threading.Lock for git operation serialization.
+
+    Guards the dict with _locks_guard to prevent races during lock creation.
+    The lock persists indefinitely (no GC risk like WeakValueDictionary).
+    """
+    with _locks_guard:
+        lock = _locks_dict.get(article_id)
+        if lock is None:
+            lock = threading.Lock()
+            _locks_dict[article_id] = lock
     return lock

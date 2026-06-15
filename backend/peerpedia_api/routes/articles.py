@@ -771,7 +771,11 @@ def api_get_head(article_id: str):
 
 
 @router.get("/{article_id}/bundle")
-def api_get_bundle(article_id: str, since: str):
+def api_get_bundle(
+    article_id: str,
+    since: str,
+    current_user: User = Depends(deps.require_user),
+):
     """Return an incremental git bundle from `since` to HEAD.
 
     The client pulls this to get server-side commits (reviews, platform
@@ -804,6 +808,8 @@ def api_get_bundle(article_id: str, since: str):
 async def api_sync_article(
     article_id: str,
     file: UploadFile = File(...),
+    current_user: User = Depends(deps.require_user),
+    db: Session = Depends(deps.get_db),
 ):
     """Receive an incremental git bundle and fast-forward merge.
 
@@ -811,6 +817,11 @@ async def api_sync_article(
     ff-only merges, and updates DB cache from article.json/reviews.
     Returns 409 if history diverged.
     """
+    # Auth: only article authors can push bundles.
+    a = get_article(db, article_id)
+    if a is not None and current_user.id not in get_author_ids(db, article_id):
+        raise HTTPException(status_code=403, detail="Only authors can sync article content")
+
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=404, detail="Article repo not found")
@@ -846,9 +857,9 @@ async def api_sync_article(
             )
 
         # Try to update DB cache — best-effort, git is truth
-        # DB session not available in sync endpoint — DB will catch up on next read
+        # Sync article.json → DB cache (db now available from Depends)
         try:
-            _refresh_db_from_git(article_id, rp, None)
+            _refresh_db_from_git(article_id, rp, db)
         except Exception:
             logger.warning("DB cache refresh failed for article %s", article_id)
 
