@@ -6,6 +6,11 @@ from sqlalchemy.orm import Session
 
 from peerpedia_core.storage.db.models import Article, ArticleAuthor
 
+# Canonical status for articles entering the sedimentation pool.
+# Client article.json and server _refresh_db_from_git must use the same value
+# to correctly trigger set_sink_start.  Matches ArticleStatus.sedimentation.
+POOL_STATUS = "sedimentation"
+
 # ── Author helpers (join table) ───────────────────────────────────────────
 
 def add_article_authors(session: Session, article_id: str, author_ids: list[str]) -> None:
@@ -313,6 +318,55 @@ def rebuild_article_authors(
                 article.last_author_rebuild_hash = repo.head.commit.hexsha
 
     session.commit()
+
+
+def repair_orphan_article_authors(session: Session) -> int:
+    """Rebuild article_authors for articles that have none.
+
+    Scans all articles, finds those with zero rows in article_authors,
+    and attempts to rebuild from git commit history.  Returns the number
+    of articles repaired.
+
+    This is a startup repair for databases where article_authors was
+    never populated (e.g., Tauri local DB, migration gaps).
+    """
+    import logging
+    from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
+
+    logger = logging.getLogger(__name__)
+
+    # Find articles with no author links
+    orphan_ids = [
+        row[0] for row in
+        session.query(Article.id)
+        .filter(~Article.id.in_(
+            session.query(ArticleAuthor.article_id)
+        ))
+        .all()
+    ]
+
+    if not orphan_ids:
+        return 0
+
+    logger.info("Found %d articles without author links — repairing", len(orphan_ids))
+
+    repaired = 0
+    for aid in orphan_ids:
+        rp = DEFAULT_ARTICLES_DIR / aid
+        if not (rp / ".git").is_dir():
+            continue
+        try:
+            git_authors = get_authors_from_git(rp, session)
+            if git_authors:
+                rebuild_article_authors(session, aid, git_authors)
+                repaired += 1
+        except Exception:
+            logger.warning("Failed to repair authors for article %s", aid)
+
+    if repaired:
+        session.commit()
+        logger.info("Repaired %d articles with authors from git history", repaired)
+    return repaired
 
 
 def get_article_by_fork_and_author(

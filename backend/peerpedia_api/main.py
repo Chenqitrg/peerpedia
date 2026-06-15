@@ -78,6 +78,18 @@ async def lifespan(app: FastAPI):
     init_db(engine)
     migrate_db(engine)
 
+    # Repair: rebuild article_authors for articles that have none
+    try:
+        from peerpedia_core.storage.db.crud_article import repair_orphan_article_authors
+        from peerpedia_core.storage.db.engine import get_session
+        s = get_session(engine)
+        repaired = repair_orphan_article_authors(s)
+        if repaired:
+            logger.info("Startup repair: rebuilt authors for %d articles", repaired)
+        s.close()
+    except Exception:
+        logger.exception("Startup repair failed — continuing")
+
     task = asyncio.create_task(_auto_publish_loop())
     logger.info("Auto-publish background task started")
     yield

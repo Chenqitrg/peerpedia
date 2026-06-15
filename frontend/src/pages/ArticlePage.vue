@@ -190,6 +190,7 @@ async function loadArticle(articleId: string) {
   // 1. Try REST API first.
   try {
     article.value = await getArticle(articleId)
+    console.log('[loadArticle] REST OK:', articleId, 'status:', article.value?.status, 'authors:', article.value?.authors?.length)
     commitHash.value = article.value.commit_hash || ''
     await loadCompiledContent()
     loadReviews()
@@ -201,6 +202,7 @@ async function loadArticle(articleId: string) {
     }).catch((e: unknown) => { console.warn('Cache article failed:', e) })
     return
   } catch (e: any) {
+    console.log('[loadArticle] REST failed:', articleId, 'status:', e?.response?.status, 'offline:', tauri.isTauri.value || tauri.isBrowserLocal.value)
     // 2. In Tauri/dev-mock mode: try cached article first, then draft, then git.
     //    Git is the source of truth — no cache chain to get stale.
     const isOffline = tauri.isTauri.value || tauri.isBrowserLocal.value

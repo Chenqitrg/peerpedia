@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from peerpedia_core.config.params import params
 from peerpedia_core.storage.db.crud_article import (
+    POOL_STATUS,
     count_articles,
     create_article,
     delete_article,
@@ -733,7 +734,7 @@ def _refresh_db_from_git(article_id: str, rp: Path, db: "Session | None" = None)
         if new_status is not None and new_status != a.status:
             a.status = new_status
             updated = True
-            if new_status == "pool":
+            if new_status == POOL_STATUS:
                 sink_days = params.sink.new_article_default_days
                 set_sink_start(db, article_id, sink_days)
 
@@ -827,7 +828,7 @@ async def api_sync_article(
         if not (rp / ".git").is_dir():
             raise HTTPException(status_code=404, detail="Article not found")
         from peerpedia_core.storage.db.crud_article import create_article as _create_article
-        a = _create_article(db, id=article_id, status="draft")
+        a = _create_article(db, authors=[], id=article_id, status="draft")
         db.commit()
         # Rebuild authors from git commit history
         from peerpedia_core.storage.db.crud_article import (
@@ -895,6 +896,14 @@ async def api_sync_article(
     # Update DB cache — best-effort, git is truth
     try:
         _refresh_db_from_git(article_id, rp, db)
+        # Rebuild authors from git history — sync may include new co-author commits
+        from peerpedia_core.storage.db.crud_article import (
+            get_authors_from_git,
+            rebuild_article_authors,
+        )
+        git_authors = get_authors_from_git(rp, db)
+        if git_authors:
+            rebuild_article_authors(db, article_id, git_authors)
     except Exception:
         logger.warning("DB cache refresh failed for article %s", article_id)
 

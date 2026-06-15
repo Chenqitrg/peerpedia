@@ -2494,9 +2494,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "self_review"
-        ],
+        "required": [],
         "title": "ArticleCreate"
       },
       "ArticleDetail": {

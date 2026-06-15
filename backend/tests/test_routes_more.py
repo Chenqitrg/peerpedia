@@ -107,6 +107,45 @@ class TestFeed:
         assert len(data["articles"]) == 1
         assert data["articles"][0]["id"] == a.id
 
+    def test_feed_shows_followed_author_article(self, client, db_engine, auth_header):
+        """REGRESSION: Bug 3 — authenticated follower sees followed author's articles.
+
+        If the viewer follows an author who has articles, the feed must include
+        those articles.  Verifies the list_articles(follower_id=...) join works
+        correctly through Follow + ArticleAuthor.
+        """
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor, Follow, User
+        from peerpedia_core.storage.db.engine import get_session
+
+        s = get_session(db_engine)
+        # Author who writes
+        author = User(username="feed_regr_auth", password_hash="", name="AuthorX", anonymous_name="ax")
+        # Viewer who follows
+        viewer = User(username="feed_regr_view", password_hash="", name="ViewerX", anonymous_name="vx")
+        s.add_all([author, viewer])
+        s.commit()
+
+        # Viewer follows author
+        s.add(Follow(follower_id=viewer.id, followed_id=author.id))
+
+        # Author has an article (with ArticleAuthor row)
+        a = Article(title="Feed Article", status="published")
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=author.id, position=0))
+        s.commit()
+        article_id = a.id
+        s.close()
+
+        # Authenticate as viewer and fetch feed
+        resp = client.get("/api/v1/feed", headers=auth_header(viewer.id))
+        assert resp.status_code == 200
+        data = resp.json()
+        feed_ids = [art["id"] for art in data["articles"]]
+        assert article_id in feed_ids, (
+            f"Feed should include article {article_id} from followed author {author.id}"
+        )
+
 
 class TestSearch:
     def test_search_by_keyword(self, client, db_engine):

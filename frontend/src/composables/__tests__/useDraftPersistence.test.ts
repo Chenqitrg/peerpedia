@@ -106,6 +106,17 @@ describe('useDraftPersistence', () => {
       expect(result).toHaveProperty('id', 'web-draft-1')
     })
 
+    it('throws on REST failure instead of returning fake ID', async () => {
+      mockPost.mockRejectedValue(new Error('Network error'))
+
+      const { save } = useDraftPersistence()
+      await expect(save('a1', 'Web Draft', '# Web', 'markdown')).rejects.toThrow('Network error')
+
+      // Verify no localStorage entry with fake ID was created
+      const stored = localStorage.getItem('peerpedia_draft_a1')
+      expect(stored).toBeNull()
+    })
+
     it('fallback persists to localStorage in Web mode', async () => {
       mockPost.mockResolvedValue({
         data: { id: 'web-1', title: 'Draft', status: 'draft' },

@@ -97,17 +97,9 @@ export function useDraftPersistence() {
         commit_hash: (data as any).commit_hash || '',
       }
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e)
-      // Fallback: save to localStorage only.
-      const localDraft = {
-        id: draftId || `local-${Date.now()}`,
-        title,
-        content,
-        format,
-        updated_at: new Date().toISOString(),
-      }
-      localStorage.setItem(storageKey, JSON.stringify(localDraft))
-      return { ...localDraft, error: message }
+      // Propagate the error to the caller — do NOT silently create a fake
+      // local ID.  A fake ID causes downstream updateArticle calls to 404.
+      throw e
     }
   }
 

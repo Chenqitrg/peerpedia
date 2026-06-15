@@ -363,19 +363,24 @@ async function persistToGit(accountId: string, authorName: string, authorId: str
 
 /** Persist via REST API + localStorage fallback (web mode). */
 async function persistToWeb(accountId: string) {
-  const result = await draftPersistence.save(
-    accountId, title.value, content.value, format.value, currentDraftId.value,
-  )
-  if (result && result.id) {
-    currentDraftId.value = result.id
-    if (result.commit_hash) commitHash.value = result.commit_hash
-    saveString(DRAFT_ID_KEY.value, result.id)
+  try {
+    const result = await draftPersistence.save(
+      accountId, title.value, content.value, format.value, currentDraftId.value,
+    )
+    if (result && result.id) {
+      currentDraftId.value = result.id
+      if (result.commit_hash) commitHash.value = result.commit_hash
+      saveString(DRAFT_ID_KEY.value, result.id)
+    }
+    saveJSON(DRAFT_KEY.value, {
+      title: title.value, content: content.value, format: format.value,
+      scores: scores.value, keywords: keywords.value,
+      categories: categories.value, abstract: abstract.value,
+    })
+  } catch (e: any) {
+    errorMsg.value = e?.response?.data?.detail || e?.message || 'Save failed — server unreachable'
+    // Keep currentDraftId unchanged — do NOT overwrite with a fake ID
   }
-  saveJSON(DRAFT_KEY.value, {
-    title: title.value, content: content.value, format: format.value,
-    scores: scores.value, keywords: keywords.value,
-    categories: categories.value, abstract: abstract.value,
-  })
 }
 
 function markSaved() {
@@ -521,9 +526,13 @@ async function handleSubmitToPool() {
   const aid = editId.value || currentDraftId.value
 
   // S5: Tauri mode — update article.json status → commit → bundle push.
+  // Bundle carries full git state including status change; server /sync endpoint
+  // auto-creates DB records and syncs metadata.  Skip the redundant REST call
+  // on success to avoid dual-write races that reset sink_start.
+  let bundlePushed = false
   if (aid && (tauri.isTauri.value || tauri.isBrowserLocal.value)) {
     const meta = JSON.stringify({
-      status: 'pool',
+      status: 'sedimentation',
       self_review: { ...scores.value },
     })
     try {
@@ -535,10 +544,20 @@ async function handleSubmitToPool() {
         author_id: accountId,
       })
       const pushRes = await autoSync.pushRepo(aid, authorName, accountId, '[publish]')
-      if (pushRes.head) commitHash.value = pushRes.head
+      if (pushRes.head) {
+        commitHash.value = pushRes.head
+        bundlePushed = true
+      }
     } catch (e: any) {
       console.warn('Publish bundle push failed:', e)
+      // Fall through to REST path below
     }
+  }
+  if (bundlePushed) {
+    successMsg.value = 'Article published!'
+    showSelfReview.value = false
+    submitting.value = false
+    return
   }
 
   try {

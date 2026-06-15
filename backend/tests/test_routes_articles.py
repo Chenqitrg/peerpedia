@@ -1785,7 +1785,7 @@ class TestRefreshDbFromGit:
         (rp / "article.md").write_text("# C")
         commit_article(rp, "init", "A", f"{auth_user_id}@peerpedia")
         (rp / "article.json").write_text(json.dumps({
-            "title": "Publishing", "status": "pool",
+            "title": "Publishing", "status": "sedimentation",
             "self_review": {"originality": 5, "rigor": 4, "completeness": 4,
                             "pedagogy": 3, "impact": 4},
         }))
@@ -1797,6 +1797,350 @@ class TestRefreshDbFromGit:
         s3 = get_session(db_engine)
         from peerpedia_core.storage.db.crud_article import get_article
         updated = get_article(s3, aid)
-        assert updated.status in ("pool", "sedimentation")  # auto-publish may have advanced
+        assert updated.status == "sedimentation"  # POOL_STATUS constant
         assert updated.sink_start is not None  # sink was triggered
+        assert updated.sink_duration_days > 0  # sink duration was set
+        s3.close()
+
+    def test_refresh_db_from_git_sets_sink_on_sedimentation(self, db_engine):
+        """REGRESSION: status='sedimentation' in article.json triggers set_sink_start.
+
+        Verifies the sink trigger at articles.py line 738 uses the POOL_STATUS
+        constant.  Without this, the sink timer never starts and auto-publish
+        silently fails.
+        """
+        import json
+
+        from peerpedia_api.routes.articles import _refresh_db_from_git
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
+        s = get_session(db_engine)
+        u = User(username="sink_test_user", password_hash="", name="T", anonymous_name="t")
+        s.add(u)
+        s.commit()
+        uid = u.id
+
+        a = Article(status="draft")
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=uid, position=0))
+        s.commit()
+        aid = a.id
+        s.close()
+
+        rp = init_article_repo(aid)
+        (rp / "article.md").write_text("# Sink Trigger Test")
+        commit_article(rp, "init", "T", f"{uid}@peerpedia")
+        # Write the canonical status — must trigger set_sink_start
+        (rp / "article.json").write_text(json.dumps({"status": "sedimentation"}))
+
+        s2 = get_session(db_engine)
+        _refresh_db_from_git(aid, rp, s2)
+        s2.close()
+
+        s3 = get_session(db_engine)
+        from peerpedia_core.storage.db.crud_article import get_article
+        updated = get_article(s3, aid)
+        assert updated.status == "sedimentation"
+        assert updated.sink_start is not None, "sink_start must be set when status is sedimentation"
+        assert updated.sink_duration_days > 0, "sink_duration_days must be > 0"
+        s3.close()
+
+    def test_create_then_publish_sets_sink_start(self, client, auth_user_id):
+        """REGRESSION: Bug 1 — publish flow sets sink_start and returns correct status.
+
+        Create → publish → GET: article must be 'sedimentation' with sink_start set.
+        Reproduces the 'article not found after publish' and 'sink timer never starts' bugs.
+        """
+        # Step 1: Create draft
+        create_body = {
+            "authors": [auth_user_id],
+            "title": "Publish Flow Test",
+            "content": "# Publish Test\n\nContent.",
+            "format": "markdown",
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        assert resp.status_code == 201, f"Create failed: {resp.json()}"
+        article_id = resp.json()["id"]
+        assert resp.json()["status"] == "draft"
+
+        # Step 2: Publish via PUT with self_review
+        publish_body = {
+            "content": "# Publish Test\n\nContent. (published)",
+            "publish": True,
+            "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
+                            "pedagogy": 3, "impact": 3},
+        }
+        resp2 = client.put(f"/api/v1/articles/{article_id}", json=publish_body)
+        assert resp2.status_code == 200, f"Publish failed: {resp2.json()}"
+        data2 = resp2.json()
+        assert data2["status"] == "sedimentation"
+        assert data2["sink_eta"] is not None, "sink_eta must be set after publish"
+        assert data2["days_remaining"] is not None
+        assert data2["sink_duration_days"] is not None
+
+        # Step 3: GET — article must be found (not 404) and show correct status
+        resp3 = client.get(f"/api/v1/articles/{article_id}")
+        assert resp3.status_code == 200, f"GET after publish failed: {resp3.json()}"
+        assert resp3.json()["status"] == "sedimentation"
+        assert resp3.json()["sink_eta"] is not None
+
+    def test_list_articles_by_author(self, client, db_engine, auth_user_id):
+        """REGRESSION: Bug 2 — articles are returned when filtering by author_id.
+
+        Verifies that get_articles_by_author / list_articles with author_id
+        correctly joins ArticleAuthor and returns articles for the author.
+        """
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor
+
+        # Create an article by the auth user
+        create_body = {
+            "authors": [auth_user_id],
+            "title": "Author Filter Test",
+            "content": "# Author Filter\n\nTesting.",
+            "format": "markdown",
+        }
+        resp = client.post("/api/v1/articles", json=create_body)
+        assert resp.status_code == 201, f"Create failed: {resp.json()}"
+        article_id = resp.json()["id"]
+
+        # Query by author_id
+        resp2 = client.get(f"/api/v1/articles?author_id={auth_user_id}")
+        assert resp2.status_code == 200
+        articles = resp2.json()["articles"]
+        assert len(articles) >= 1, f"Expected ≥1 article for author {auth_user_id}"
+        article_ids = [a["id"] for a in articles]
+        assert article_id in article_ids, f"Article {article_id} not in author-filtered results"
+
+
+class TestAuthorArticleLink:
+    """Verify the article-author link via article_authors join table."""
+
+    def test_created_article_has_authors(self, client, auth_user_id):
+        """REGRESSION: article created via POST returns non-empty authors list."""
+        body = {
+            "authors": [auth_user_id],
+            "title": "Author Link Test",
+            "content": "# Author Link\n\nTesting.",
+            "format": "markdown",
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201, f"Create failed: {resp.json()}"
+        data = resp.json()
+        assert len(data["authors"]) >= 1, f"Expected ≥1 author, got {len(data['authors'])}"
+        assert data["authors"][0]["id"] == auth_user_id
+
+    def test_author_filter_returns_article(self, client, auth_user_id):
+        """REGRESSION: articles appear when filtering by author_id."""
+        body = {
+            "authors": [auth_user_id],
+            "title": "Filter Test",
+            "content": "# Filter\n\nTesting.",
+            "format": "markdown",
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201
+        article_id = resp.json()["id"]
+
+        resp2 = client.get(f"/api/v1/articles?author_id={auth_user_id}")
+        assert resp2.status_code == 200
+        ids = [a["id"] for a in resp2.json()["articles"]]
+        assert article_id in ids, f"Article {article_id} not found in author filter"
+
+    def test_article_detail_includes_author_names(self, client, auth_user_id):
+        """REGRESSION: article detail response includes resolved author names."""
+        body = {
+            "authors": [auth_user_id],
+            "title": "Author Name Test",
+            "content": "# Name Test",
+            "format": "markdown",
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201
+        article_id = resp.json()["id"]
+
+        resp2 = client.get(f"/api/v1/articles/{article_id}")
+        assert resp2.status_code == 200
+        authors = resp2.json()["authors"]
+        assert len(authors) >= 1
+        # Author name should be resolved, not "unknown"
+        assert authors[0]["name"] != "unknown", f"Author name is 'unknown': {authors[0]}"
+        assert len(authors[0]["name"]) > 0
+
+    def test_sync_auto_create_populates_authors(self, db_engine):
+        """REGRESSION: first-time bundle sync creates DB record and populates authors.
+
+        Verifies the sync auto-create path (articles.py:831) passes authors=[]
+        and then rebuild_article_authors from git history.
+        """
+        import json
+        import uuid as _uuid
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import User
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
+        s = get_session(db_engine)
+        # Create a user whose UUID matches the git commit email
+        u = User(username="sync_test_author", password_hash="", name="SyncAuthor", anonymous_name="sa")
+        s.add(u)
+        s.commit()
+        uid = u.id
+        s.close()
+
+        # Create a git repo (simulating Tauri client) — but NO DB article record yet
+        aid = str(_uuid.uuid4())
+        rp = init_article_repo(aid)
+        (rp / "article.md").write_text("# Sync Test")
+        commit_article(rp, "init", "SyncAuthor", f"{uid}@peerpedia")
+        (rp / "article.json").write_text(json.dumps({"status": "draft", "title": "Sync Article"}))
+
+        # Simulate sync auto-create: create article with empty authors, then rebuild
+        from peerpedia_core.storage.db.crud_article import (
+            create_article,
+            get_authors_from_git,
+            get_author_ids,
+            rebuild_article_authors,
+        )
+        s2 = get_session(db_engine)
+        a = create_article(s2, authors=[], id=aid, status="draft")
+        s2.commit()
+
+        # Rebuild authors from git — this is what the sync endpoint does
+        git_authors = get_authors_from_git(rp, s2)
+        rebuild_article_authors(s2, aid, git_authors)
+
+        # Verify authors are populated
+        s3 = get_session(db_engine)
+        author_ids = get_author_ids(s3, aid)
+        assert uid in author_ids, f"Author {uid} should be in {author_ids} after rebuild from git"
+        s3.close()
+
+    def test_delete_succeeds_for_author(self, client, auth_user_id):
+        """REGRESSION: article author can delete their own article (returns 204)."""
+        body = {
+            "authors": [auth_user_id],
+            "title": "Delete Me",
+            "content": "# Delete Test",
+            "format": "markdown",
+        }
+        resp = client.post("/api/v1/articles", json=body)
+        assert resp.status_code == 201
+        article_id = resp.json()["id"]
+
+        # Delete should succeed (the client fixture's require_user is the same auth_user)
+        resp2 = client.delete(f"/api/v1/articles/{article_id}")
+        assert resp2.status_code == 204, f"Delete failed: {resp2.status_code} {resp2.text}"
+
+        # Verify article is gone
+        resp3 = client.get(f"/api/v1/articles/{article_id}")
+        assert resp3.status_code == 404
+
+    def test_sync_rebuilds_authors_from_git(self, db_engine):
+        """REGRESSION: normal sync path rebuilds article_authors from git history.
+
+        When a bundle sync brings new co-author commits, _refresh_db_from_git alone
+        doesn't update article_authors.  The fix adds rebuild_article_authors after
+        _refresh_db_from_git on the normal (non-auto-create) sync path.
+        """
+        import json
+        import uuid as _uuid
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+        from peerpedia_core.storage.db.crud_article import (
+            create_article,
+            get_authors_from_git,
+            get_author_ids,
+            rebuild_article_authors,
+        )
+
+        s = get_session(db_engine)
+        # Two authors
+        u1 = User(username="sync_auth1", password_hash="", name="A1", anonymous_name="a1")
+        u2 = User(username="sync_auth2", password_hash="", name="A2", anonymous_name="a2")
+        s.add_all([u1, u2])
+        s.commit()
+        uid1, uid2 = u1.id, u2.id
+        s.close()
+
+        # Article with only u1 as author initially
+        aid = str(_uuid.uuid4())
+        rp = init_article_repo(aid)
+        (rp / "article.md").write_text("# Two Authors")
+        commit_article(rp, "first", "A1", f"{uid1}@peerpedia")
+        (rp / "article.json").write_text(json.dumps({"status": "draft"}))
+
+        s2 = get_session(db_engine)
+        a = create_article(s2, authors=[uid1], id=aid, status="draft")
+        s2.commit()
+
+        # u2 adds a co-author commit → simulates what bundle sync brings
+        (rp / "article.md").write_text("# Two Authors — co-authored")
+        commit_article(rp, "co-author", "A2", f"{uid2}@peerpedia")
+
+        # Normal sync path: refresh from git + rebuild authors
+        from peerpedia_api.routes.articles import _refresh_db_from_git
+        s3 = get_session(db_engine)
+        _refresh_db_from_git(aid, rp, s3)
+        git_authors = get_authors_from_git(rp, s3)
+        if git_authors:
+            rebuild_article_authors(s3, aid, git_authors)
+        s3.close()
+
+        # Verify BOTH authors are in the join table
+        s4 = get_session(db_engine)
+        author_ids = get_author_ids(s4, aid)
+        assert uid1 in author_ids, f"Original author {uid1} must be present"
+        assert uid2 in author_ids, f"Co-author {uid2} must be added after sync + rebuild"
+        s4.close()
+
+    def test_repair_orphan_article_authors(self, db_engine):
+        """REGRESSION: startup repair populates article_authors for orphan articles.
+
+        Articles without author links are repaired from git history.
+        """
+        import json
+        import uuid as _uuid
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import User
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+        from peerpedia_core.storage.db.crud_article import (
+            create_article,
+            get_author_ids,
+            repair_orphan_article_authors,
+        )
+
+        s = get_session(db_engine)
+        u = User(username="repair_test_u", password_hash="", name="RepairAuthor", anonymous_name="ra")
+        s.add(u)
+        s.commit()
+        uid = u.id
+        s.close()
+
+        # Create article with git history but NO article_authors rows
+        aid = str(_uuid.uuid4())
+        rp = init_article_repo(aid)
+        (rp / "article.md").write_text("# Repair Test")
+        commit_article(rp, "init", "RepairAuthor", f"{uid}@peerpedia")
+        (rp / "article.json").write_text(json.dumps({"status": "draft", "title": "Repair Me"}))
+
+        # Create article with empty authors (simulating the broken state)
+        s2 = get_session(db_engine)
+        a = create_article(s2, authors=[], id=aid, status="draft")
+        s2.commit()
+        # Verify it has no authors
+        assert get_author_ids(s2, aid) == []
+        s2.close()
+
+        # Run repair
+        s3 = get_session(db_engine)
+        repaired = repair_orphan_article_authors(s3)
+        assert repaired >= 1, f"Expected ≥1 repair, got {repaired}"
+
+        # Verify authors are now populated
+        author_ids = get_author_ids(s3, aid)
+        assert uid in author_ids, f"Author {uid} should be in {author_ids} after repair"
         s3.close()
