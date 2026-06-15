@@ -625,3 +625,43 @@ class TestReviewGitWrite:
         md_content = md_files[0].read_text()
         assert reviewer_id in md_content
         assert "Excellent work." in md_content
+
+    def test_thread_reply_writes_to_git(self, db_engine):
+        """_write_thread_reply_to_git writes reply .md to git repo."""
+        from peerpedia_api.routes.reviews import _write_thread_reply_to_git
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
+        s = get_session(db_engine)
+        author = User(username="t_reply_a", password_hash="", name="ReplyAuthor",
+                      anonymous_name="anon_ra", affiliation="U")
+        s.add(author)
+        s.flush()
+        a = Article(status="draft")
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=author.id, position=0))
+        s.commit()
+        aid = a.id
+        author_id = author.id
+        author_obj = s.get(User, author_id)
+
+        rp = init_article_repo(aid)
+        (rp / "article.md").write_text("# Reply Test")
+        commit_article(rp, "init", "Author", f"{author_id}@peerpedia")
+
+        _write_thread_reply_to_git(
+            article_id=aid,
+            review_owner_uuid=author_id,
+            sender=author_obj,
+            content="Test reply content.",
+            article=a,
+        )
+
+        review_dir = rp / "reviews" / author_id
+        assert review_dir.is_dir()
+        md_files = sorted(review_dir.glob("*.md"))
+        assert len(md_files) >= 1
+        assert "Test reply content." in md_files[-1].read_text()
+        s.close()

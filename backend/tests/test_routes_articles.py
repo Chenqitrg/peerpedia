@@ -1459,6 +1459,69 @@ class TestBundleSyncEndpoints:
             if old is not None:
                 app.dependency_overrides[deps.require_user] = old
 
+    def test_get_bundle_no_repo(self, client, auth_user_id, db_engine):
+        """GET /bundle for article without git repo returns 404."""
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor
+
+        s = get_session(db_engine)
+        a = Article(status="draft")
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=auth_user_id, position=0))
+        s.commit()
+        aid = a.id
+        s.close()
+
+        resp = client.get(f"/api/v1/articles/{aid}/bundle?since={'0' * 40}")
+        assert resp.status_code == 404
+
+    def test_sync_divergent_history_returns_409(self, client, article_with_repo):
+        """POST /sync with divergent history returns 409 with server_head."""
+        import git as gitmod
+        from peerpedia_core.storage.git_backend import (
+            DEFAULT_ARTICLES_DIR,
+            commit_article,
+            init_article_repo,
+        )
+
+        article_id, _ = article_with_repo
+        rp = DEFAULT_ARTICLES_DIR / article_id
+
+        # Create a divergent commit directly on the server repo
+        # (simulates a review commit from another user)
+        (rp / "reviews").mkdir(exist_ok=True)
+        (rp / "reviews/review.md").write_text("server-side change")
+        commit_article(rp, "server commit", "Server", "server@peerpedia.com")
+        server_head = gitmod.Repo(rp).head.commit.hexsha
+
+        # Create a bundle from a completely different repo with divergent history
+        import tempfile
+        from pathlib import Path
+
+        tmp = tempfile.mkdtemp()
+        try:
+            other_rp = init_article_repo("other", base_dir=Path(tmp))
+            (other_rp / "article.md").write_text("divergent content")
+            commit_article(other_rp, "other commit", "Other", "other@test.com")
+            other_repo = gitmod.Repo(other_rp)
+            with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
+                other_repo.git.bundle("create", f.name, "--all")
+                bundle_bytes = Path(f.name).read_bytes()
+            Path(f.name).unlink(missing_ok=True)
+
+            resp = client.post(
+                f"/api/v1/articles/{article_id}/sync",
+                files={"file": ("bundle", bundle_bytes, "application/octet-stream")},
+            )
+            assert resp.status_code == 409
+            detail = resp.json()["detail"]
+            assert detail["server_head"] == server_head
+            assert "Fast-forward merge failed" in detail["error"]
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # _refresh_db_from_git — DB cache sync from article.json

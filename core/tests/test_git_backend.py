@@ -244,6 +244,13 @@ class TestBundleSync:
         with pytest.raises(ValueError, match="not an ancestor"):
             create_bundle(rp, "0" * 40)  # nonexistent hash
 
+    def test_create_bundle_bad_repo_raises(self, articles_dir):
+        """create_bundle on non-existent repo raises FileNotFoundError."""
+        from peerpedia_core.storage.git_backend import create_bundle
+
+        with pytest.raises(FileNotFoundError):
+            create_bundle(articles_dir / "nonexistent", "0" * 40)
+
     def test_apply_bundle_bad_repo_raises(self, articles_dir):
         """apply_bundle on non-existent repo raises FileNotFoundError."""
         from peerpedia_core.storage.git_backend import apply_bundle
