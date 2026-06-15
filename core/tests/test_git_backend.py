@@ -318,3 +318,153 @@ class TestBundleSync:
         lock_a = get_article_lock("article-a")
         lock_b = get_article_lock("article-b")
         assert lock_a is not lock_b
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Closed-Loop Tests — full client ↔ server sync lifecycle
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestClosedLoopSync:
+    """Simulate a complete client-server sync cycle using only git operations.
+
+    These tests verify the XSPEC specifications S1-S4 end-to-end:
+    - S1: First push preserves commit hash
+    - S2: Incremental push works after first sync
+    - S3: Bidirectional pull-before-push
+    - S4: Divergent history → 409 conflict
+    """
+
+    def _make_client_repo(self, base_dir: Path, article_id: str, content: str,
+                          author_name: str, author_email: str) -> tuple[Path, str]:
+        """Create a repo simulating a Tauri client with one commit. Returns (rp, head)."""
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
+        rp = init_article_repo(article_id, base_dir=base_dir)
+        (rp / "article.md").write_text(content)
+        h = commit_article(rp, "initial", author_name, author_email)
+        return rp, h
+
+    def test_full_lifecycle_s1_s2_s3(self, articles_dir):
+        """S1+S2+S3: Create → push → verify hash → server change → pull → push again."""
+        import git as gitmod
+
+        from peerpedia_core.storage.git_backend import (
+            apply_bundle,
+            commit_article,
+            create_bundle,
+            init_article_repo,
+        )
+
+        base = articles_dir
+
+        # ── S1: Client creates article, pushes to server ──────────────────
+        client_rp, h1 = self._make_client_repo(
+            base, "lifecycle-s1", "# v1", "Alice", "alice@peerpedia.com")
+        # Add second commit
+        (client_rp / "article.md").write_text("# v2")
+        h2 = commit_article(client_rp, "second", "Alice", "alice@peerpedia.com")
+        assert h1 != h2
+
+        # Server starts with empty repo (init only, no commits)
+        server_rp = init_article_repo("lifecycle-s1-server", base_dir=base)
+        # iter_commits raises on repos with no commits — verify instead
+        assert not gitmod.Repo(server_rp).head.is_valid()
+
+        # Create full bundle of all client commits
+        client_repo = gitmod.Repo(client_rp)
+        with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
+            client_repo.git.bundle("create", f.name, "HEAD")
+            full_bundle = Path(f.name).read_bytes()
+        Path(f.name).unlink(missing_ok=True)
+
+        # Server applies full bundle
+        server_head = apply_bundle(server_rp, full_bundle)
+        assert server_head == h2  # S1: hash preserved end-to-end!
+        assert (server_rp / "article.md").read_text() == "# v2"
+
+        # ── S3: Server adds a review commit; client pulls it ──────────────
+        (server_rp / "reviews").mkdir(exist_ok=True)
+        (server_rp / "reviews" / "review.md").write_text("review: Good.")
+        server_h_review = commit_article(server_rp, "review commit", "Reviewer",
+                                         "reviewer@peerpedia.com")
+        assert server_h_review != h2
+
+        # Client pulls server commits via incremental bundle
+        incr_bundle = create_bundle(server_rp, h2)  # since client's last known HEAD
+        assert len(incr_bundle) > 0
+
+        # Client applies server's bundle
+        client_new_head = apply_bundle(client_rp, incr_bundle)
+        assert client_new_head == server_h_review  # same hash
+
+        # Client now has the review commit
+        client_repo2 = gitmod.Repo(client_rp)
+        commits_after_pull = list(client_repo2.iter_commits())
+        assert len(commits_after_pull) == 3  # v1, v2, review
+
+        # ── S2: Client edits and pushes incrementally ─────────────────────
+        (client_rp / "article.md").write_text("# v3 after review")
+        client_h3 = commit_article(client_rp, "v3 edit", "Alice",
+                                   "alice@peerpedia.com")
+
+        # Incremental bundle: server's HEAD → client's HEAD
+        incr_bundle2 = create_bundle(client_rp, server_h_review)
+        assert len(incr_bundle2) > 0
+
+        # Server applies incremental bundle
+        server_head2 = apply_bundle(server_rp, incr_bundle2)
+        assert server_head2 == client_h3  # S2: incremental hash preserved!
+        assert (server_rp / "article.md").read_text() == "# v3 after review"
+
+        # Full cycle complete: client and server repos have identical history
+        client_hashes = {c.hexsha for c in client_repo2.iter_commits()}
+        server_commits = gitmod.Repo(server_rp)
+        server_hashes = {c.hexsha for c in server_commits.iter_commits()}
+        assert client_hashes == server_hashes  # identical git history
+
+    def test_divergent_history_s4(self, articles_dir):
+        """S4: Divergent commits on both sides → 409 conflict."""
+        import git as gitmod
+
+        from peerpedia_core.storage.git_backend import (
+            MergeConflictError,
+            apply_bundle,
+            commit_article,
+            create_bundle,
+            init_article_repo,
+        )
+
+        base = articles_dir
+
+        # Common ancestor
+        client_rp, h1 = self._make_client_repo(
+            base, "div-s4-client", "# shared v1", "Alice", "alice@test.com")
+        (client_rp / "article.md").write_text("# shared v2")
+        h2 = commit_article(client_rp, "shared commit", "Alice", "alice@test.com")
+
+        # Server starts from same ancestor
+        server_rp = init_article_repo("div-s4-server", base_dir=base)
+        server_repo = gitmod.Repo(server_rp)
+        with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
+            gitmod.Repo(client_rp).git.bundle("create", f.name, "HEAD")
+            full = Path(f.name).read_bytes()
+        Path(f.name).unlink(missing_ok=True)
+        apply_bundle(server_rp, full)
+        assert server_repo.head.commit.hexsha == h2
+
+        # Client makes commit C
+        (client_rp / "article.md").write_text("# client change")
+        h_client = commit_article(client_rp, "client edit", "Alice", "alice@test.com")
+
+        # Server makes commit R (divergent)
+        (server_rp / "article.md").write_text("# server change")
+        h_server = commit_article(server_rp, "server edit", "Bob", "bob@test.com")
+        assert h_client != h_server
+
+        # Client tries to push → 409 conflict
+        client_bundle = create_bundle(client_rp, h2)
+        assert len(client_bundle) > 0
+
+        with pytest.raises(MergeConflictError, match="Fast-forward merge failed"):
+            apply_bundle(server_rp, client_bundle)
