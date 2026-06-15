@@ -260,6 +260,15 @@ def api_create_article(
             except Exception:
                 logger.warning("Bundle extraction ok but DB refresh failed for %s", a.id)
 
+            # Rebuild authors from the imported git history
+            from peerpedia_core.storage.db.crud_article import (
+                get_authors_from_git,
+                rebuild_article_authors,
+            )
+            git_authors = get_authors_from_git(rp, db)
+            if git_authors:
+                rebuild_article_authors(db, a.id, git_authors | {current_user.id})
+
             repo = git.Repo(rp)
             commit_hash = repo.head.commit.hexsha if repo.head.is_valid() else None
         except tarfile.ReadError as e:
@@ -821,27 +830,45 @@ async def api_sync_article(
     """
     # Auth: only article authors can push bundles.
     a = get_article(db, article_id)
-    if a is None:
-        # Git repo exists but no DB record — first-time bundle push.
-        # Auto-create the article record from git history.
-        rp = repo_path(article_id)
-        if not (rp / ".git").is_dir():
-            raise HTTPException(status_code=404, detail="Article not found")
-        from peerpedia_core.storage.db.crud_article import create_article as _create_article
-        a = _create_article(db, authors=[], id=article_id, status="draft")
-        db.commit()
-        # Rebuild authors from git commit history
-        from peerpedia_core.storage.db.crud_article import (
-            get_authors_from_git,
-            rebuild_article_authors,
-        )
-        git_authors = get_authors_from_git(rp, db)
-        rebuild_article_authors(db, article_id, git_authors)
-        # Refresh metadata from article.json
-        _refresh_db_from_git(article_id, rp, db)
+    created_record = False
+    try:
+        if a is None:
+            # Git repo exists but no DB record — first-time bundle push.
+            # Auto-create the article record from git history.
+            rp = repo_path(article_id)
+            if not (rp / ".git").is_dir():
+                raise HTTPException(status_code=404, detail="Article not found")
+            from peerpedia_core.storage.db.crud_article import create_article as _create_article
+            a = _create_article(db, authors=[], id=article_id, status="draft")
+            created_record = True
+            # Rebuild authors from git commit history
+            from peerpedia_core.storage.db.crud_article import (
+                get_authors_from_git,
+                rebuild_article_authors,
+            )
+            git_authors = get_authors_from_git(rp, db)
+            if git_authors:
+                rebuild_article_authors(db, article_id, git_authors)
+            else:
+                # No recognizable authors in git — don't leave an authorless record
+                raise HTTPException(
+                    status_code=422,
+                    detail="Cannot derive authors from git history — "
+                           "ensure commit emails use UUID@peerpedia format",
+                )
+            # Refresh metadata from article.json
+            _refresh_db_from_git(article_id, rp, db)
 
-    if current_user.id not in get_author_ids(db, article_id):
-        raise HTTPException(status_code=403, detail="Only authors can sync article content")
+        if current_user.id not in get_author_ids(db, article_id):
+            raise HTTPException(status_code=403, detail="Only authors can sync article content")
+
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
 
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():

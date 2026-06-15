@@ -764,6 +764,17 @@ $$
             commit_article(rp, "Initial submission", author.name,
                           f"{author.id}@peerpedia",
                           allow_empty=True)
+            # Write co-author attribution commits so git-derived authors
+            # can recover the full author list on repair/rebuild.
+            for co_author_id in co_author_ids:
+                co = session.get(User, co_author_id)
+                commit_article(
+                    rp,
+                    f"Co-author: {co.name}",
+                    co.name,
+                    f"{co.id}@peerpedia",
+                    allow_empty=True,
+                )
         except Exception as e:
             print(f"  Warning: git repo for {ad['title'][:40]} failed: {e}")
 
