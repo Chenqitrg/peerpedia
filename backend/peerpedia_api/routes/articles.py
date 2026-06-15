@@ -266,12 +266,12 @@ def api_create_article(
         finally:
             tar_path.unlink(missing_ok=True)
     else:
-        # Legacy path: server-side init + commit (web mode, backward compat)
+        # Web mode: server writes content + commits to git.  Tauri clients
+        # send a repo_bundle instead — same git repo, different transport.
         if is_new_repo:
             init_article_repo(a.id)
         ext = ".typ" if body.format == "typst" else ".md"
         (rp / f"article{ext}").write_text(body.content)
-        # @deprecated Phase B: server-side commit replaced by bundle apply.
         commit_msg = body.commit_message or "Initial submission"
         author_name = current_user.name or current_user.username
         commit_hash = commit_article(rp, commit_msg, author_name,
@@ -356,8 +356,7 @@ def api_update_article(
     if body.categories is not None:
         a.categories = body.categories
 
-    # Phase C: content updates arrive via bundle /sync. Server-side commit
-    # only for web mode or metadata changes that modify repo files.
+    # Web mode: write content to git.  Tauri clients push bundles via /sync.
     content_changed = body.content is not None
     if content_changed:
         commit_hash = commit_article(rp, commit_msg, author, f"{author}@peerpedia")
