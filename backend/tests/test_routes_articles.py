@@ -1287,6 +1287,25 @@ class TestBundleSyncEndpoints:
         resp = client.get(f"/api/v1/articles/{aid}/head")
         assert resp.status_code == 404
 
+    def test_get_head_empty_repo(self, client, auth_user_id, db_engine):
+        """GET /head for article with empty git repo (no commits) returns 404."""
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import Article, ArticleAuthor
+        from peerpedia_core.storage.git_backend import init_article_repo
+
+        s = get_session(db_engine)
+        a = Article(status="draft")
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id=a.id, author_id=auth_user_id, position=0))
+        s.commit()
+        aid = a.id
+        s.close()
+
+        init_article_repo(aid)  # git init only, no commits
+        resp = client.get(f"/api/v1/articles/{aid}/head")
+        assert resp.status_code == 404
+
     # ── GET /{id}/bundle?since= ─────────────────────────────────────────
 
     def test_get_bundle_returns_octet_stream(self, client, article_with_repo):

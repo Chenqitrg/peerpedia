@@ -38,7 +38,8 @@ def _write_review_to_git_blocking(
     scores: dict,
     content: str,
     reviewer_user: User,
-    article,
+    author_ids: list[str],
+    article_status: str,
 ) -> None:
     """Write review scores.json and .md to git repo, then commit.
 
@@ -59,11 +60,11 @@ def _write_review_to_git_blocking(
     review_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine reviewer display identity
-    is_self = reviewer_id in (getattr(article, 'authors', None) or [])
+    is_self = reviewer_id in author_ids
     if is_self:
         display_name = reviewer_user.name
         author_email = f"{reviewer_id}@peerpedia"
-    elif article.status == "sedimentation":
+    elif article_status == "sedimentation":
         display_name = "Anonymous Contributor"
         author_email = "anonymous@peerpedia"
     else:
@@ -201,12 +202,15 @@ def submit_review(article_id: str, body: ReviewCreate,
     existing = get_review_by_user_scope(db, article_id, current_user.id,
                                         body.scope.value, commit_hash=body.commit_hash)
 
+    # Compute author list before git write (needed for identity resolution).
+    article_author_ids = get_author_ids(db, article_id)
+
     # Git-first: write review files to git BEFORE any DB mutation.
     # If git fails (lock timeout, I/O error), the request aborts with an error
     # and the DB stays clean — no orphaned review records. Git is source of truth.
     _write_review_to_git_blocking(
         article_id, current_user.id, body.scores, body.content,
-        current_user, article,
+        current_user, article_author_ids, article.status,
     )
 
     if existing:
@@ -228,7 +232,6 @@ def submit_review(article_id: str, body: ReviewCreate,
                 db.commit()
     # Update reputation for all authors of the reviewed article
     from peerpedia_core.workflow.reputation import compute_author_reputation
-    article_author_ids = get_author_ids(db, article_id)
     for author_id in article_author_ids:
         compute_author_reputation(db, author_id)
 
