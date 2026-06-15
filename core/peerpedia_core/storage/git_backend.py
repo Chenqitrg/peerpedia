@@ -199,16 +199,19 @@ def get_diff_between(
 
     unified_diff = "\n".join(diff_parts)
 
-    # Compute stats from the diff index
+    # Compute stats from the diff text (unified diff format).
     total_insertions = 0
     total_deletions = 0
     diff_files = {}
     for d in diff_index:
         fname = d.a_path or d.b_path or ""
         if fname:
-            insertions = d.diff.decode("utf-8", errors="replace").count("\n") if d.diff else 0
-            diff_files[fname] = {"insertions": insertions, "deletions": 0}
-            total_insertions += insertions
+            diff_text = d.diff.decode("utf-8", errors="replace") if d.diff else ""
+            ins = sum(1 for line in diff_text.split("\n") if line.startswith("+") and not line.startswith("+++"))
+            dels = sum(1 for line in diff_text.split("\n") if line.startswith("-") and not line.startswith("---"))
+            diff_files[fname] = {"insertions": ins, "deletions": dels}
+            total_insertions += ins
+            total_deletions += dels
 
     return {
         "commit_hash": c2.hexsha,
@@ -321,7 +324,10 @@ def apply_bundle(repo_path: Path, bundle_bytes: bytes) -> str:
             raise ValueError(f"Invalid bundle: {e}") from e
 
         # Fetch objects from bundle
-        repo.git.fetch(f.name, "HEAD")
+        try:
+            repo.git.fetch(f.name, "HEAD")
+        except git.GitCommandError as e:
+            raise ValueError(f"Bundle fetch failed: {e}") from e
 
     # Fast-forward merge to FETCH_HEAD
     try:

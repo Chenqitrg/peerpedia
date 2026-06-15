@@ -70,20 +70,21 @@ def _write_review_to_git_blocking(
         display_name = reviewer_user.name
         author_email = f"{reviewer_id}@peerpedia"
 
-    # Write scores.json
-    (review_dir / "scores.json").write_text(json.dumps(scores, indent=2))
-
-    # Write review .md with timestamp
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    md_content = f"{reviewer_id}\n\n{content or '(scores only)'}"
-    (review_dir / f"{ts}.md").write_text(md_content)
-
-    # Commit — blocking, raises on failure
+    # Commit — blocking, raises on failure. File writes AND git commit
+    # are inside the lock for atomicity — no other writer can interleave.
     lock = get_article_lock(article_id)
     acquired = lock.acquire(timeout=10)
     if not acquired:
         raise HTTPException(status_code=503, detail="Article busy — retry later")
     try:
+        # Write scores.json
+        (review_dir / "scores.json").write_text(json.dumps(scores, indent=2))
+
+        # Write review .md with timestamp
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+        md_content = f"{reviewer_id}\n\n{content or '(scores only)'}"
+        (review_dir / f"{ts}.md").write_text(md_content)
+
         commit_article(
             rp,
             f"Review by {display_name}",
@@ -130,20 +131,23 @@ def _write_thread_reply_to_git(
     content: str,
     article,
 ) -> None:
-    """Write a thread reply .md to the review's git directory and commit."""
+    """Write a thread reply .md to the review's git directory and commit.
+
+    Blocking: raises HTTPException on failure so DB stays consistent.
+    Call this BEFORE DB commit.
+    """
     import logging
     from datetime import datetime, timezone
 
     logger = logging.getLogger(__name__)
     rp = DEFAULT_ARTICLES_DIR / article_id
     if not (rp / ".git").is_dir():
+        logger.warning("No git repo for article %s — skipping thread reply write", article_id)
         return
 
     review_dir = rp / "reviews" / review_owner_uuid
     review_dir.mkdir(parents=True, exist_ok=True)
 
-    is_self = sender.id in (getattr(article, 'author_ids', None) or [])
-    _ = is_self  # used for future display logic
     if article.status == "sedimentation":
         display_name = "Anonymous Contributor"
         author_email = "anonymous@peerpedia"
@@ -151,19 +155,19 @@ def _write_thread_reply_to_git(
         display_name = sender.name or sender.username
         author_email = f"{sender.id}@peerpedia"
 
+    # Write .md reply and commit — all inside the lock for atomicity.
+    lock = get_article_lock(article_id)
+    acquired = lock.acquire(timeout=10)
+    if not acquired:
+        raise HTTPException(status_code=503, detail="Article busy — retry later")
     try:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
         md_content = f"{sender.id}\n\n{content}"
         (review_dir / f"{ts}.md").write_text(md_content)
 
-        lock = get_article_lock(article_id)
-        if lock.acquire(timeout=10):
-            try:
-                commit_article(rp, f"Reply by {display_name}", display_name, author_email)
-            finally:
-                lock.release()
-    except Exception:
-        logger.exception("Failed to write thread reply for article %s", article_id)
+        commit_article(rp, f"Reply by {display_name}", display_name, author_email)
+    finally:
+        lock.release()
 
 
 @router.get("", response_model=list[ReviewOut])
@@ -196,19 +200,21 @@ def submit_review(article_id: str, body: ReviewCreate,
             )
     existing = get_review_by_user_scope(db, article_id, current_user.id,
                                         body.scope.value, commit_hash=body.commit_hash)
+
+    # Git-first: write review files to git BEFORE any DB mutation.
+    # If git fails (lock timeout, I/O error), the request aborts with an error
+    # and the DB stays clean — no orphaned review records. Git is source of truth.
+    _write_review_to_git_blocking(
+        article_id, current_user.id, body.scores, body.content,
+        current_user, article,
+    )
+
     if existing:
         r = update_review_scores(db, existing.id, body.scores)
     else:
         r = create_review(db, article_id=article_id, commit_hash=body.commit_hash,
                            reviewer_id=current_user.id, scope=body.scope.value,
                            scores=body.scores)
-
-    # I4 fix: write to git BEFORE DB commit. If git fails, return error
-    # so DB stays consistent with "git is source of truth."
-    _write_review_to_git_blocking(
-        article_id, r.reviewer_id, body.scores, body.content,
-        current_user, article,
-    )
 
     # Compute per-commit score and cache latest commit's score on the article
     rp = DEFAULT_ARTICLES_DIR / article_id
@@ -242,7 +248,9 @@ def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCrea
 
     # Permission: only article authors + the review's reviewer can reply
     article = get_article(db, article_id)
-    is_author = article is not None and current_user.id in get_author_ids(db, article_id)
+    if article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    is_author = current_user.id in get_author_ids(db, article_id)
     is_reviewer = r.reviewer_id == current_user.id
     if not (is_author or is_reviewer):
         raise HTTPException(
@@ -250,15 +258,15 @@ def post_thread_message(article_id: str, review_id: str, body: ThreadMessageCrea
             detail="Only the article author and reviewer can participate in this thread",
         )
 
-    from peerpedia_core.types.messages import ThreadMessage
-    msg = ThreadMessage(author_id=current_user.id, content=body.content,
-                        author_name=current_user.name)
-    add_thread_message(db, review_id, msg.to_dict())
-
-    # Phase C: write reply .md to git repo
+    # Git-first: write reply to git BEFORE DB. If git fails, the DB stays clean.
     _write_thread_reply_to_git(
         article_id, r.reviewer_id, current_user, body.content,
         article,
     )
+
+    from peerpedia_core.types.messages import ThreadMessage
+    msg = ThreadMessage(author_id=current_user.id, content=body.content,
+                        author_name=current_user.name)
+    add_thread_message(db, review_id, msg.to_dict())
 
     return {"status": "ok", "message": msg.to_dict()}

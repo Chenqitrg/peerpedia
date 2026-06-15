@@ -274,8 +274,8 @@ def api_create_article(
         # @deprecated Phase B: server-side commit replaced by bundle apply.
         commit_msg = body.commit_message or "Initial submission"
         author_name = current_user.name or current_user.username
-        commit_article(rp, commit_msg, author_name,
-                       f"{author_list[0]}@peerpedia", allow_empty=True)
+        commit_hash = commit_article(rp, commit_msg, author_name,
+                                     f"{author_list[0]}@peerpedia", allow_empty=True)
 
     # Rebuild authors from git history after first commit
     from peerpedia_core.storage.db.crud_article import (
@@ -330,7 +330,7 @@ def api_update_article(
         raise HTTPException(status_code=400, detail="Article repo not found")
 
     # Validate publish-time requirements before any disk operations.
-    if body.publish and not body.self_review:
+    if body.publish and body.self_review is None:
         raise HTTPException(status_code=400, detail="self_review is required when publishing")
 
     author_ids = get_author_ids(db, article_id)
@@ -381,7 +381,7 @@ def api_update_article(
         )
         a = set_sink_start(db, article_id, sink_days)
 
-        if body.self_review:
+        if body.self_review is not None:
             contributions = None
             if body.contributions:
                 contributions = {aid: c.model_dump() for aid, c in body.contributions.items()}
@@ -698,7 +698,7 @@ def _refresh_db_from_git(article_id: str, rp: Path, db: "Session | None" = None)
 
     try:
         data = json.loads(article_json.read_text())
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         logger.warning("Failed to parse article.json for %s", article_id)
         return
 
@@ -719,8 +719,8 @@ def _refresh_db_from_git(article_id: str, rp: Path, db: "Session | None" = None)
 
         updated = False
 
-        # Sync title
-        if data.get("title") and a.title != data["title"]:
+        # Sync title — use presence check so empty string can clear the field
+        if "title" in data and a.title != data["title"]:
             a.title = data["title"]
             updated = True
 
@@ -731,20 +731,20 @@ def _refresh_db_from_git(article_id: str, rp: Path, db: "Session | None" = None)
 
         # Sync status — trigger sink on pool transition
         new_status = data.get("status")
-        if new_status and new_status != a.status:
+        if new_status is not None and new_status != a.status:
             a.status = new_status
             updated = True
             if new_status == "pool":
                 sink_days = params.sink.new_article_default_days
                 set_sink_start(db, article_id, sink_days)
 
-        # Sync keywords
-        if data.get("keywords") and a.keywords != data["keywords"]:
+        # Sync keywords — use presence check so [] can clear the field
+        if "keywords" in data and a.keywords != data["keywords"]:
             a.keywords = data["keywords"]
             updated = True
 
-        # Sync categories
-        if data.get("categories") and a.categories != data["categories"]:
+        # Sync categories — use presence check so [] can clear the field
+        if "categories" in data and a.categories != data["categories"]:
             a.categories = data["categories"]
             updated = True
 
@@ -792,6 +792,8 @@ def api_get_bundle(
 
     try:
         bundle_bytes = create_bundle(rp, since)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Article repo not found")
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -819,7 +821,9 @@ async def api_sync_article(
     """
     # Auth: only article authors can push bundles.
     a = get_article(db, article_id)
-    if a is not None and current_user.id not in get_author_ids(db, article_id):
+    if a is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if current_user.id not in get_author_ids(db, article_id):
         raise HTTPException(status_code=403, detail="Only authors can sync article content")
 
     rp = repo_path(article_id)
@@ -834,45 +838,51 @@ async def api_sync_article(
     if file.size is not None and file.size > MAX_BUNDLE_BYTES:
         raise HTTPException(status_code=413, detail="Bundle too large — max 50MB")
 
-    lock = get_article_lock(article_id)
-    acquired = lock.acquire(timeout=30)
-    if not acquired:
-        raise HTTPException(status_code=503, detail="Article busy — retry later")
+    # Read the bundle fully before acquiring the lock — keep the lock
+    # scope as short as possible (only git operations, not network I/O).
+    bundle_bytes = await file.read()
+    if len(bundle_bytes) > MAX_BUNDLE_BYTES:
+        raise HTTPException(status_code=413, detail="Bundle too large — max 50MB")
 
+    # Offload blocking git operations to a thread pool — threading.Lock
+    # and libgit2 calls must not block the asyncio event loop.
+    import asyncio
+
+    def _apply_sync() -> str:
+        lock = get_article_lock(article_id)
+        acquired = lock.acquire(timeout=30)
+        if not acquired:
+            raise HTTPException(status_code=503, detail="Article busy — retry later")
+        try:
+            try:
+                return apply_bundle(rp, bundle_bytes)
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="Article repo not found")
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            except MergeConflictError:
+                import git as gitmod
+                repo = gitmod.Repo(rp)
+                current_head = repo.head.commit.hexsha if repo.head.is_valid() else None
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "Fast-forward merge failed — history diverged",
+                        "server_head": current_head,
+                    },
+                )
+        finally:
+            lock.release()
+
+    _new_head = await asyncio.to_thread(_apply_sync)
+
+    # Update DB cache — best-effort, git is truth
     try:
-        bundle_bytes = await file.read()
-        if len(bundle_bytes) > MAX_BUNDLE_BYTES:
-            raise HTTPException(status_code=413, detail="Bundle too large — max 50MB")
+        _refresh_db_from_git(article_id, rp, db)
+    except Exception:
+        logger.warning("DB cache refresh failed for article %s", article_id)
 
-        try:
-            _new_head = apply_bundle(rp, bundle_bytes)
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="Article repo not found")
-        except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
-        except MergeConflictError:
-            # Return current HEAD so client can re-pull and retry
-            import git as gitmod
-            repo = gitmod.Repo(rp)
-            current_head = repo.head.commit.hexsha if repo.head.is_valid() else None
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "error": "Fast-forward merge failed — history diverged",
-                    "server_head": current_head,
-                },
-            )
-
-        # Try to update DB cache — best-effort, git is truth
-        # Sync article.json → DB cache (db now available from Depends)
-        try:
-            _refresh_db_from_git(article_id, rp, db)
-        except Exception:
-            logger.warning("DB cache refresh failed for article %s", article_id)
-
-        import git as gitmod
-        repo = gitmod.Repo(rp)
-        head_hash = repo.head.commit.hexsha if repo.head.is_valid() else None
-        return {"head": head_hash}
-    finally:
-        lock.release()
+    import git as gitmod
+    repo = gitmod.Repo(rp)
+    head_hash = repo.head.commit.hexsha if repo.head.is_valid() else None
+    return {"head": head_hash}

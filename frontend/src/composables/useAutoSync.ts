@@ -19,8 +19,10 @@ function isTauriError(v: unknown): v is { error: string } {
   return typeof v === 'object' && v !== null && 'error' in v
 }
 
-/** HTTP status codes that indicate the op should be discarded (won't succeed on retry). */
+/** HTTP status codes that indicate the op should be discarded (won't succeed on retry).
+ *  Excludes 401 (token expired — re-auth may fix) and 429 (rate limit — backoff and retry). */
 function isDiscardable(status: number): boolean {
+  if (status === 401 || status === 429) return false
   return status >= 400 && status < 500
 }
 

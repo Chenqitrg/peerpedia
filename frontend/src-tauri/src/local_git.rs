@@ -11,6 +11,8 @@
 
 use crate::error::AppError;
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -580,7 +582,11 @@ pub fn git_bundle_create(article_id: &str, since_hash: &str) -> Result<Vec<u8>, 
         )));
     }
 
-    let tmp_path = std::env::temp_dir().join(format!("peerpedia-bundle-{}.bundle", article_id));
+    // Hash the article_id so it can't be used for path traversal.
+    let mut hasher = DefaultHasher::new();
+    article_id.hash(&mut hasher);
+    let safe_name = format!("peerpedia-bundle-{:x}.bundle", hasher.finish());
+    let tmp_path = std::env::temp_dir().join(safe_name);
 
     let output = Command::new("git")
         .args([
@@ -620,7 +626,10 @@ pub fn git_bundle_apply(article_id: &str, bundle_bytes: &[u8]) -> Result<String,
         )));
     }
 
-    let tmp_path = std::env::temp_dir().join(format!("peerpedia-apply-{}.bundle", article_id));
+    let mut hasher = DefaultHasher::new();
+    article_id.hash(&mut hasher);
+    let safe_name = format!("peerpedia-apply-{:x}.bundle", hasher.finish());
+    let tmp_path = std::env::temp_dir().join(safe_name);
     std::fs::write(&tmp_path, bundle_bytes)
         .map_err(|e| AppError::IoError(format!("Failed to write bundle: {}", e)))?;
 
@@ -694,10 +703,12 @@ pub fn git_update_meta(
 
     let meta_path = rp.join("article.json");
 
-    // Read existing or create default
+    // Read existing or create default.  Propagate parse errors — a
+    // corrupted article.json must not be silently overwritten.
     let mut meta: serde_json::Value = if meta_path.exists() {
         let existing = std::fs::read_to_string(&meta_path)?;
-        serde_json::from_str(&existing).unwrap_or(serde_json::json!({}))
+        serde_json::from_str(&existing)
+            .map_err(|e| AppError::IoError(format!("Failed to parse article.json: {}", e)))?
     } else {
         serde_json::json!({
             "title": "",
@@ -719,10 +730,9 @@ pub fn git_update_meta(
         }
     }
 
-    std::fs::write(
-        &meta_path,
-        serde_json::to_string_pretty(&meta).unwrap_or_default(),
-    )?;
+    let json_str = serde_json::to_string_pretty(&meta)
+        .map_err(|e| AppError::IoError(format!("Failed to serialize article.json: {}", e)))?;
+    std::fs::write(&meta_path, json_str)?;
 
     // git add + commit
     run_git(&rp, &["add", "-A"])?;

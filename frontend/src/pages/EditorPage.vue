@@ -405,7 +405,14 @@ async function saveDraft() {
           const result = await autoSync.pushRepo(articleId, authorName, authorId, msg)
           if (result.head) commitHash.value = result.head
         } catch (e: any) {
-          console.warn('Bundle push failed:', e)
+          console.warn('Bundle push failed — marking pending for retry:', e)
+          // Fall through to offline pending path so the edit is retried later.
+          if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
+            const draftId = currentDraftId.value
+            if (draftId) {
+              try { await tauri.setPendingPush({ id: draftId }); await autoSync.refresh() } catch { /* best-effort */ }
+            }
+          }
         }
       }
     } else if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
