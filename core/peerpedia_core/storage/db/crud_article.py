@@ -151,6 +151,54 @@ def count_articles(session: Session, status: str | None = None,
     return q.count()
 
 
+def list_articles_multi_status(
+    session: Session, statuses: set[str],
+    author_id: str | None = None,
+    follower_id: str | None = None,
+    limit: int | None = None, offset: int = 0,
+) -> list[Article]:
+    """List articles matching any of *statuses* (SQL-level IN filter).
+
+    Used by the policy layer so visibility filtering happens before
+    pagination, avoiding wrong totals / short pages.
+    """
+    from peerpedia_core.storage.db.models import Follow
+
+    q = session.query(Article)
+    if statuses:
+        q = q.filter(Article.status.in_(list(statuses)))
+    if author_id:
+        q = q.join(ArticleAuthor, Article.id == ArticleAuthor.article_id).filter(
+            ArticleAuthor.author_id == author_id
+        )
+    if follower_id:
+        q = (
+            q.join(ArticleAuthor, Article.id == ArticleAuthor.article_id)
+            .join(Follow, ArticleAuthor.author_id == Follow.followed_id)
+            .filter(Follow.follower_id == follower_id)
+            .distinct()
+        )
+    q = q.order_by(Article.created_at.desc())
+    if limit is not None:
+        q = q.limit(limit).offset(offset)
+    return q.all()
+
+
+def count_articles_multi_status(
+    session: Session, statuses: set[str],
+    author_id: str | None = None,
+) -> int:
+    """Count articles matching any of *statuses*."""
+    q = session.query(Article)
+    if statuses:
+        q = q.filter(Article.status.in_(list(statuses)))
+    if author_id:
+        q = q.join(ArticleAuthor, Article.id == ArticleAuthor.article_id).filter(
+            ArticleAuthor.author_id == author_id
+        )
+    return q.count()
+
+
 def update_article_compiled(
     session: Session,
     article_id: str,
