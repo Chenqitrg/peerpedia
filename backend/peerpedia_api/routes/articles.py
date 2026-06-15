@@ -827,9 +827,8 @@ async def api_sync_article(
         if not (rp / ".git").is_dir():
             raise HTTPException(status_code=404, detail="Article not found")
         from peerpedia_core.storage.db.crud_article import create_article as _create_article
-        a = _create_article(db, id=article_id, status="draft")
-        db.commit()
-        # Rebuild authors from git commit history
+        a = _create_article(db, authors=[], id=article_id, status="draft")
+        # Rebuild authors from git commit history (single source of truth)
         from peerpedia_core.storage.db.crud_article import (
             get_authors_from_git,
             rebuild_article_authors,
