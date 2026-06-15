@@ -314,11 +314,12 @@ def test_spec_regression_uuid_email_matched(db_engine):
 
 
 def test_spec_regression_username_email_rejected(db_engine):
-    """git emails with {username}@peerpedia → NOT matched (username is not UUID)."""
+    """git emails with {username}@peerpedia → NOW matched (Phase 0c: legacy compat)."""
     from peerpedia_core.storage.db.crud_article import get_authors_from_git
 
     s = get_session(db_engine)
-    _create_user(s, "bob", "Bob")
+    u = _create_user(s, "bob", "Bob")
+    uid = u.id
     s.close()
 
     import tempfile
@@ -328,7 +329,7 @@ def test_spec_regression_username_email_rejected(db_engine):
     rp = Path(tmp)
     repo = git.Repo.init(rp)
     (rp / "f.md").write_text("# T\n")
-    # Deliberately use username in email — should NOT match
+    # Deliberately use username in email — NOW matched via username lookup
     repo.index.add(["f.md"])
     repo.index.commit("init", author=git.Actor("Bob", "bob@peerpedia"),
                       committer=git.Actor("Bob", "bob@peerpedia"))
@@ -338,8 +339,8 @@ def test_spec_regression_username_email_rejected(db_engine):
     s.close()
     shutil.rmtree(tmp)
 
-    assert result == set(), (
-        f"Username-based email should NOT match (UUID only), got {result}"
+    assert result == {uid}, (
+        f"Username-based email SHOULD match (Phase 0c legacy compat), got {result}"
     )
 
 
