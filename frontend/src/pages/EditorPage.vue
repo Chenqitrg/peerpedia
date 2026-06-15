@@ -21,6 +21,7 @@ import { useTabStore } from '../stores/useTabStore'
 import { loadString, saveString, saveJSON, remove } from '../composables/useLocalStorage'
 import { parseMarkdown } from '../utils/markdown'
 import { sanitizeTypstSvg } from '../utils/typst'
+import { sanitizeHtml } from '../utils/sanitize'
 import DownloadButton from '../components/DownloadButton.vue'
 import StarRating from '../components/StarRating.vue'
 import { SCORE_DIMS } from '../api/constants'
@@ -64,6 +65,8 @@ const previewHtml = ref('')
 const previewLoading = ref(false)
 const compiling = ref(false)
 const compileResult = ref<{ type: 'svg' | 'error'; content: string } | null>(null)
+const safeCompileSvg = computed(() => compileResult.value ? sanitizeHtml(compileResult.value.content) : '')
+const safePreviewHtml = computed(() => sanitizeHtml(previewHtml.value))
 const loadingArticle = ref(false)
 
 // Side panel
@@ -872,7 +875,7 @@ defineExpose({ handlePublish, showSelfReview })
             Compiling...
           </div>
           <!-- Typst compile result (SVG or error) -->
-          <div v-else-if="compileResult?.type === 'svg'" class="typst-preview" v-html="compileResult.content" />
+          <div v-else-if="compileResult?.type === 'svg'" class="typst-preview" v-html="safeCompileSvg" />
           <div v-else-if="compileResult?.type === 'error'" class="typst-preview-error text-[#d73a49] p-4 font-mono text-sm">
             {{ compileResult.content }}
           </div>
@@ -880,7 +883,7 @@ defineExpose({ handlePublish, showSelfReview })
           <div
             v-else-if="previewHtml"
             class="prose-custom max-w-none"
-            v-html="previewHtml"
+            v-html="safePreviewHtml"
           />
           <div
             v-else

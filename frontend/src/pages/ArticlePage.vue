@@ -11,6 +11,7 @@ import { compilePreview } from '../api/compile'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
 import { useUserStore } from '../stores/useUserStore'
 import { useTauri } from '../composables/useTauri'
+import { sanitizeHtml } from '../utils/sanitize'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
 import { useArticleTab } from '../composables/useTabIntegration'
 import { useTabStore } from '../stores/useTabStore'
@@ -55,6 +56,7 @@ const { canRead, canWrite, getFallback } = useOffline()
 
 const article = ref<ArticleDetail | null>(null)
 const compiledHtml = ref('')
+const safeCompiledHtml = computed(() => sanitizeHtml(compiledHtml.value))
 const loading = ref(true)
 const errorMessage = ref('')
 const activeTab = ref<'body' | 'comments'>('body')
@@ -888,7 +890,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
           ref="articleBodyRef"
           v-if="compiledHtml"
           class="prose-custom max-w-none"
-          v-html="compiledHtml"
+          v-html="safeCompiledHtml"
         />
         <p v-else class="text-ink-muted text-sm">
           No compiled content available.

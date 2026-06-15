@@ -3,6 +3,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { sanitizeHtml } from '../utils/sanitize'
 
 export interface DiffLine {
   line_type: 'add' | 'del' | 'ctx'
@@ -271,7 +272,7 @@ const processedHunksList = computed(() => {
             'text-danger': line.line_type === 'del',
             'text-ink-muted': line.line_type === 'ctx',
           }"
-          v-html="line.displayContent"
+          v-html="sanitizeHtml(line.displayContent)"
         />
       </div>
     </div>
