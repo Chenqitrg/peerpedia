@@ -14,10 +14,8 @@ vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
-// Mock router module — NavBar imports pendingConflictCount from it
-const mockPendingConflictCount = ref(0)
+// Mock router module
 vi.mock('../router', () => ({
-  pendingConflictCount: mockPendingConflictCount,
   default: [],
 }))
 
@@ -48,6 +46,13 @@ vi.mock('../stores/useUserStore', () => ({
     viewer: { id: 'test-user', username: 'test', name: 'Test User' },
     showAuthModal: false,
     logout: vi.fn(),
+  }),
+}))
+
+// Mock useAutoSync — NavBar reads pendingCount from it
+vi.mock('../composables/useAutoSync', () => ({
+  useAutoSync: () => ({
+    pendingCount: ref(0),
   }),
 }))
 

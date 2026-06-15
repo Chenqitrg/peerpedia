@@ -707,11 +707,11 @@ def _refresh_db_from_git(article_id: str, rp: Path, db: "Session | None" = None)
         return
 
     try:
+        from peerpedia_core.config.params import params
         from peerpedia_core.storage.db.crud_article import (
             get_article,
             set_sink_start,
         )
-        from peerpedia_core.config.params import params
 
         a = get_article(db, article_id)
         if a is None:
@@ -834,14 +834,14 @@ async def api_sync_article(
     logger = logging.getLogger(__name__)
 
     # Size guard: academic articles with git history rarely exceed 50MB
-    MAX_BUNDLE_BYTES = 50 * 1024 * 1024
-    if file.size is not None and file.size > MAX_BUNDLE_BYTES:
+    max_bundle_bytes = 50 * 1024 * 1024
+    if file.size is not None and file.size > max_bundle_bytes:
         raise HTTPException(status_code=413, detail="Bundle too large — max 50MB")
 
     # Read the bundle fully before acquiring the lock — keep the lock
     # scope as short as possible (only git operations, not network I/O).
     bundle_bytes = await file.read()
-    if len(bundle_bytes) > MAX_BUNDLE_BYTES:
+    if len(bundle_bytes) > max_bundle_bytes:
         raise HTTPException(status_code=413, detail="Bundle too large — max 50MB")
 
     # Offload blocking git operations to a thread pool — threading.Lock

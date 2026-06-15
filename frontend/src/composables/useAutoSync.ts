@@ -158,7 +158,8 @@ export function useAutoSync() {
 
     // Helper: full tar.gz fallback (first push or incremental failure)
     async function fullExportPush(): Promise<{ pushed: boolean; head: string | null }> {
-      const base64 = await tauri.exportArticle({ article_id: articleId })
+      const raw = await tauri.exportArticle({ article_id: articleId })
+      const base64 = (raw && !isTauriError(raw)) ? String(raw) : ''
       await createArticle({
         id: articleId,
         title: '',
@@ -175,10 +176,14 @@ export function useAutoSync() {
     try {
       const serverHeadRes = await getArticleHead(articleId).catch(() => ({ hash: '' }))
       if (serverHeadRes.hash) {
-        bundleBytes = await tauri.gitBundleCreate({
+        const raw = await tauri.gitBundleCreate({
           article_id: articleId,
           since_hash: serverHeadRes.hash,
         })
+        if (!raw || isTauriError(raw) || !Array.isArray(raw)) {
+          return fullExportPush()
+        }
+        bundleBytes = raw
       } else {
         return fullExportPush()
       }
@@ -202,7 +207,11 @@ export function useAutoSync() {
             await tauri.gitBundleApply({ article_id: articleId, bundle_bytes: bytes })
           }
           // Recreate bundle and retry
-          bundleBytes = await tauri.gitBundleCreate({ article_id: articleId, since_hash: hash })
+          const retryRaw = await tauri.gitBundleCreate({ article_id: articleId, since_hash: hash })
+          if (!retryRaw || isTauriError(retryRaw) || !Array.isArray(retryRaw)) {
+            return { pushed: false, head: null }
+          }
+          bundleBytes = retryRaw
           const blob = new Blob([new Uint8Array(bundleBytes)], { type: 'application/octet-stream' })
           const retry = await syncArticle(articleId, blob)
           return { pushed: true, head: retry.head }
