@@ -105,7 +105,25 @@ core/peerpedia_core/
 - **DB 是索引/缓存**——用于快速查询、排序、过滤。articles/reviews/article_authors 都可以从 Git 重建
 - **只有 users/follows/bookmarks/citations/merge_proposals 是纯 DB 数据**——没有 Git 对应物
 
-```
+## 澄清："实体"有两层含义
+
+`models.py` 里定义的 SQLAlchemy class（`Article`、`User` 等）**不是领域实体，是 DB 访问对象（ORM）**。真正的实体存在 Git 或 DB 里：
+
+| models.py 里的 class | 真正的实体在哪 | 关系 |
+|---------------------|---------------|------|
+| `Article` | Git repo（`article.md` + `article.json`） | ORM class 只是缓存入口 |
+| `Review` | Git repo（`scores.json` + `thread.md`） | ORM class 只是缓存入口 |
+| `ArticleAuthor` | Git（commit author）+ DB join table | 两条路径，rebuild 同步 |
+| `User` | SQLite users 表 | ORM class = 唯一访问入口 |
+| `Follow` | SQLite follows 表 | ORM class = 唯一访问入口 |
+| `Bookmark` | SQLite bookmarks 表 | ORM class = 唯一访问入口 |
+| `Citation` | SQLite citations 表 | ORM class = 唯一访问入口 |
+| `MergeProposal` | SQLite merge_proposals 表 | ORM class = 唯一访问入口 |
+
+所以：
+- **`models.py` = DB 缓存层的访问接口**——定义的是怎么读写 SQLite
+- **Git repo 里的 json/md 文件 = 领域实体的权威版本**——但没有对应的 Python class 定义，靠读写代码隐式约定结构
+- **User/Follow/Bookmark 等 = DB 访问对象就是实体本身**——因为没有 Git 对应物
 
 ### Article（文章）
 - **内容存在 Git 里**（`~/.peerpedia/articles/{id}/`），数据库只存元数据
