@@ -20,22 +20,37 @@
 
 ---
 
-## ADR-007: 文章内容存 Git，元数据存 SQLite
+## ADR-007: Git 是事实来源，DB 是索引/缓存
 
-**日期**: 2026-05 | **状态**: 已实施
+**日期**: 2026-05（2026-06 修订：评审和分数也移入 Git） | **状态**: 已实施
 
-**背景**: 需要支持 fork、merge、diff、历史追溯。传统 CMS 用数据库存所有内容，做不到这些。
+**背景**: 需要支持 fork、merge、diff、历史追溯。传统 CMS 用数据库存所有内容，做不到这些。后来进一步把评审和分数也移入 Git，DB 降级为缓存。
 
-**决策**: 每篇文章一个独立 Git repo（`~/.peerpedia/articles/{id}/`）。DB 只存元数据（标题、状态、评分、关系）。
+**决策**: 每篇文章一个独立 Git repo（`~/.peerpedia/articles/{id}/`）。
 
-**放弃的方案**: 所有文章共用一个 Git monorepo（fork 操作太重）；纯数据库存储（没有版本历史）。
+Git 存储（权威）：
+- 文章内容（article.md / article.typ）
+- 评审数据（reviews/{id}/scores.json + thread.md）
+- 文章分数（从评审聚合）
+- 完整历史（git log）
+- 作者（git commit author）
+
+DB 存储（索引/缓存）：
+- users、follows、bookmarks —— 纯关系数据
+- articles 表 —— 元数据 + score 缓存
+- reviews 表 —— 评审缓存（可从 Git 重建）
+- article_authors —— 作者关联缓存（可从 Git 重建）
+
+**Git-first 写入原则**: 评审写入时先写 Git，成功后才写 DB。Git 失败则 DB 不写。
+
+**放弃的方案**: 所有内容存 DB（没有版本历史）；评审只存 DB（没有审计 trail）。
 
 **后果**:
 - ✅ fork = clone repo，merge = git merge
 - ✅ diff/history/blame 免费获得
-- ✅ bundle sync 是 Git 原语
+- ✅ 评审有不可变审计 trail
 - ❌ 大量文章时文件系统压力大（每篇一个 .git 目录）
-- ❌ DB 和 Git 之间没有事务保证——article_authors join table 和 Git history 可能不一致
+- ❌ DB 和 Git 之间没有事务保证——缓存可能和 Git 不一致，需要重建
 
 ---
 

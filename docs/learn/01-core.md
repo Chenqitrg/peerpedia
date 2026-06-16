@@ -71,17 +71,39 @@ core/peerpedia_core/
 - **storage 内部互不依赖**：db、git_backend、compiler 各自独立
 - **config/types 在最底层**：被所有层依赖，自身无外部依赖
 
-## 7 个实体 + 1 个 join table
+## 7 个实体 + 1 个 join table：各自存在哪
 
 ```
-Article ──< ArticleAuthor >── User
-   │              │              │
-   │              │         Follow (follower → followed)
-   │              │
-   ├── Review (article_id, reviewer_id, scope, commit_hash)
-   ├── Bookmark (user_id, article_id)
-   ├── Citation (from_article → to_article)
-   └── MergeProposal (fork → target, proposer)
+┌─────────────────────────────────────────────────────────┐
+│                    Git Repos                            │
+│  ~/.peerpedia/articles/{id}/                            │
+│                                                         │
+│  ★ 文章内容（article.md / article.typ）                  │
+│  ★ 评审数据（reviews/{id}/scores.json + thread.md）       │
+│  ★ 文章分数（从 reviews 聚合得出，存在 scores.json）      │
+│  ★ 完整历史（git log）                                   │
+│  ★ 作者信息（git commit author）                         │
+└─────────────────────────────────────────────────────────┘
+                        ↕ DB 是缓存/索引
+┌─────────────────────────────────────────────────────────┐
+│                    SQLite DB                            │
+│                                                         │
+│  users —— 用户账号、信誉分            ← 只在 DB          │
+│  articles —— 文章元数据、score 缓存    ← 内容在 Git       │
+│  article_authors —— 作者关联          ← 从 Git 重建      │
+│  reviews —— 评审缓存                  ← 源文件在 Git     │
+│  follows —— 关注关系                  ← 只在 DB          │
+│  bookmarks —— 书签                    ← 只在 DB          │
+│  citations —— 引用关系                ← 只在 DB          │
+│  merge_proposals —— 合并提议          ← 只在 DB          │
+└─────────────────────────────────────────────────────────┘
+```
+
+核心规则：
+- **Git 是事实来源（Source of Truth）**——文章内容、评审、分数、历史的权威版本在 Git
+- **DB 是索引/缓存**——用于快速查询、排序、过滤，可以从 Git 重建
+- **users/follows/bookmarks 是纯 DB 数据**——没有 Git 对应物
+
 ```
 
 ### Article（文章）
@@ -121,20 +143,35 @@ Article ──< ArticleAuthor >── User
 - 文章之间的引用关系
 - `forward_prob` / `backward_prob` 表示引用方向和概率
 
-## 双层存储：DB + Git
+## 双层存储：Git 是事实来源，DB 是索引
 
-这是 PeerPedia 最核心的架构决策：
+这是 PeerPedia 最核心的架构决策（ADR-007）。
 
-| 存什么 | 在哪 | 为什么 |
-|--------|------|--------|
-| 文章内容、历史、作者 | Git repo | 不可变、可追溯、可 fork |
-| 元数据、评分、关系 | SQLite | 可查询、可索引 |
+| 存什么 | 权威来源 | 索引/缓存 | 为什么 |
+|--------|----------|-----------|--------|
+| 文章内容 | Git repo | — | 不可变、可追溯、可 fork |
+| 评审 + 分数 | Git repo（`scores.json`） | DB（reviews 表、articles.score） | 不可变审计 trail、可从 Git 重建 DB |
+| 作者关联 | Git commit author | DB（article_authors 表） | Git 是权威、DB 方便查询 |
+| 用户/关注/书签 | DB | — | 纯关系数据，不需要版本历史 |
 
-- **Git 是事实来源**（source of truth），DB 是索引/缓存
+### Git → DB 的数据流
+
+```
+用户提交评审
+  → _write_review_to_git_blocking()
+    → 写 scores.json + thread.md 到 Git repo
+    → git commit（不可变记录）
+  → 成功后才写 DB
+    → crud_review.upsert_review()（缓存）
+    → compute_article_score() → 更新 Article.score（缓存）
+    → compute_author_reputation() → 更新 User.reputation（DB only）
+```
+
+**Git-first 原则**：如果 Git 写入失败，DB 不写。DB 数据可以从 Git 重建。
+
 - 每篇文章一个独立 repo，存在 `~/.peerpedia/articles/{id}/`
 - bundle sync：用 `git bundle` 做增量同步（create → HTTP 传输 → apply）
 - merge 走 `git merge --ff-only`，冲突抛 `MergeConflictError`
-- 每个文章有独立的 `threading.Lock` 防止并发写冲突
 
 ## 三大 workflow
 

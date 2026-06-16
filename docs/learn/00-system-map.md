@@ -17,9 +17,10 @@
 ## 架构原则
 
 - **Git 是事实来源，DB 是索引**
-- 文章内容永远在 Git 里，DB 不存正文
+- 文章内容、评审数据（scores.json）、分数的权威版本永远在 Git 里
+- DB 里的 articles.score、reviews 表是缓存——可以从 Git 重建
+- 用户、关注、书签等纯关系数据只在 DB
 - 每篇文章一个独立 Git repo——可以 fork、可以 merge、可以 bundle sync
-- 离线优先：Tauri 桌面端用本地 SQLite + 本地 Git，网络恢复后 bundle sync
 
 ## 核心数据流
 
