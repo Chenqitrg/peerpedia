@@ -70,10 +70,9 @@ async def _auto_publish_loop():
 async def lifespan(app: FastAPI):
     """Start background tasks on startup, cancel on shutdown."""
     # Run DB init + migrations before serving requests
-    import os
-
+    from peerpedia_api.settings import get_database_url
     from peerpedia_core.storage.db.engine import get_engine, init_db, migrate_db
-    db_url = os.environ.get("PEERPEDIA_DB", "sqlite:///peerpedia.db")
+    db_url = get_database_url()
     engine = get_engine(db_url)
     init_db(engine)
     migrate_db(engine)

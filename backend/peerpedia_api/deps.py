@@ -13,10 +13,16 @@ from peerpedia_core.storage.db.engine import get_engine, get_session
 from peerpedia_core.storage.db.models import User
 from sqlalchemy.orm import Session
 
+_ENV = os.environ.get("PEERPEDIA_ENV", "development").lower()
 _JWT_SECRET = os.environ.get("JWT_SECRET")
 _JWT_EXPIRY = 86400  # 24 hours
 
 if not _JWT_SECRET:
+    if _ENV in {"production", "prod"}:
+        raise RuntimeError(
+            "JWT_SECRET must be set in production. "
+            "Run: export JWT_SECRET=$(openssl rand -hex 32)"
+        )
     import warnings
     warnings.warn("JWT_SECRET not set — using insecure default for development only")
     _JWT_SECRET = "peerpedia-dev-secret"
@@ -24,7 +30,8 @@ if not _JWT_SECRET:
 
 def get_db():
     """Yield a database session. SQLAlchemy's internal registry handles engine reuse."""
-    db_path = os.environ.get("PEERPEDIA_DB", "sqlite:///peerpedia.db")
+    from peerpedia_api.settings import get_database_url
+    db_path = get_database_url()
     session = get_session(get_engine(db_path))
     try:
         yield session
