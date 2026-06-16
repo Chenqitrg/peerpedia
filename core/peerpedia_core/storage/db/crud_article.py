@@ -95,16 +95,31 @@ def get_articles_by_author(session: Session, author_id: str) -> list[Article]:
 
 # ── CRUD ──────────────────────────────────────────────────────────────────
 
+def insert_article(
+    session: Session,
+    status: str = "draft",
+    **kwargs,
+) -> Article:
+    """Create article row WITHOUT committing. Caller must commit/rollback.
+
+    Use this in API/service layers that need to wrap disk operations
+    and DB writes in a single transaction.
+    """
+    a = Article(status=status, **kwargs)
+    session.add(a)
+    session.flush()  # populate a.id
+    return a
+
+
 def create_article(
     session: Session,
     authors: list[str],
     status: str = "draft",
     **kwargs,
 ) -> Article:
-    """Create a new article record with author rows in the join table."""
-    a = Article(status=status, **kwargs)
-    session.add(a)
-    session.flush()  # ensure a.id is available
+    """Create article + authors + commit. Legacy wrapper for callers that
+    don't need transactional control (e.g., seed.py, tests)."""
+    a = insert_article(session, status=status, **kwargs)
     add_article_authors(session, a.id, authors)
     session.commit()
     return a

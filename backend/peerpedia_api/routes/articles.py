@@ -71,6 +71,11 @@ from peerpedia_api.policies.articles import (
     require_self_review_for_publish,
     visible_statuses_for_user,
 )
+from peerpedia_api.policies.repo import (
+    ensure_inside,
+    reject_symlinks,
+    safe_extract_tar,
+)
 from peerpedia_api.schemas.article import (
     ArticleCreate,
     ArticleDetail,
@@ -213,10 +218,8 @@ def api_create_article(
     current_user: User = Depends(deps.require_user),
     db: Session = Depends(deps.get_db),
 ):
-    # Default to current user when no authors specified
+    # ── 1. Validate BEFORE touching DB ──────────────────────────────────
     author_list = body.authors or [current_user.id]
-    # Validate all authors exist in server DB — prevents FOREIGN KEY violation
-    # when a local-only account (not synced to server) is passed as author_id.
     for author_id in author_list:
         if get_user(db, author_id) is None:
             raise HTTPException(
@@ -224,9 +227,7 @@ def api_create_article(
                 detail=f"Author '{author_id}' is not synced to the server. "
                        "Please log out and log in again while the server is running.",
             )
-    # Client-generated UUID: validate and check for duplicates.
-    # Authors are always derived from current_user — client UUID is trusted
-    # only for article identity, never for authorship.
+
     client_id = body.id
     if client_id is not None:
         try:
@@ -235,6 +236,11 @@ def api_create_article(
             raise HTTPException(status_code=422, detail=f"Invalid article ID: {client_id}")
         if get_article(db, client_id) is not None:
             raise HTTPException(status_code=409, detail=f"Article '{client_id}' already exists")
+
+    if body.publish and body.self_review is None:
+        raise HTTPException(status_code=400, detail="self_review is required when publishing")
+
+    # ── 2. Create article WITHOUT commit ────────────────────────────────
     kwargs = {
         "title": body.title,
         "abstract": body.abstract,
@@ -244,110 +250,104 @@ def api_create_article(
     }
     if client_id is not None:
         kwargs["id"] = client_id
-    a = create_article(
-        db,
-        authors=author_list,
-        status="draft",
-        **kwargs,
-    )
-
-    # Validate publish-time requirements before any disk operations.
-    if body.publish and body.self_review is None:
-        raise HTTPException(status_code=400, detail="self_review is required when publishing")
-
-    rp = repo_path(a.id)
-    is_new_repo = not (rp / ".git").is_dir()
-
-    if body.repo_bundle:
-        # Phase B: bundle-based create — client sends full git repo as tar.gz.
-        # Extract the bundle instead of init+commit. Commits are preserved as-is.
-        import base64
-        import logging
-        logger = logging.getLogger(__name__)
-
-        try:
-            tar_bytes = base64.b64decode(body.repo_bundle)
-        except Exception:
-            raise HTTPException(status_code=422, detail="Invalid repo_bundle: base64 decode failed")
-
-        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tf:
-            tf.write(tar_bytes)
-            tar_path = Path(tf.name)
-
-        try:
-            with tarfile.open(tar_path, "r:gz") as tar:
-                tar.extractall(path=rp.parent)
-            # Verify extraction produced a git repo
-            if not (rp / ".git").is_dir():
-                raise HTTPException(
-                    status_code=422,
-                    detail="repo_bundle does not contain a valid git repository",
-                )
-            # Parse article.json from extracted repo for metadata sync
-            try:
-                _refresh_db_from_git(a.id, rp, db)
-            except Exception:
-                logger.warning("Bundle extraction ok but DB refresh failed for %s", a.id)
-
-            # Rebuild authors from the imported git history
-            from peerpedia_core.storage.db.crud_article import (
-                get_authors_from_git,
-                rebuild_article_authors,
-            )
-            git_authors = get_authors_from_git(rp, db)
-            if git_authors:
-                rebuild_article_authors(db, a.id, git_authors | {current_user.id})
-
-            repo = git.Repo(rp)
-            commit_hash = repo.head.commit.hexsha if repo.head.is_valid() else None
-        except tarfile.ReadError as e:
-            raise HTTPException(status_code=422, detail=f"Invalid tar.gz: {e}")
-        finally:
-            tar_path.unlink(missing_ok=True)
-    else:
-        # Web mode: server writes content + commits to git.  Tauri clients
-        # send a repo_bundle instead — same git repo, different transport.
-        if is_new_repo:
-            init_article_repo(a.id)
-        ext = ".typ" if body.format == "typst" else ".md"
-        (rp / f"article{ext}").write_text(body.content)
-        commit_msg = body.commit_message or "Initial submission"
-        author_name = current_user.name or current_user.username
-        commit_hash = commit_article(rp, commit_msg, author_name,
-                                     f"{author_list[0]}@peerpedia", allow_empty=True)
-
-    # Rebuild authors from git history after first commit
     from peerpedia_core.storage.db.crud_article import (
+        add_article_authors,
+        insert_article,
         rebuild_article_authors,
+        replace_article_authors,
     )
-    rebuild_article_authors(db, a.id, set(author_list))
+    a = insert_article(db, status="draft", **kwargs)
+    add_article_authors(db, a.id, author_list)
+    rp = repo_path(a.id)
 
-    # Self-review and scoring: only created when the author explicitly
-    # provides scores (i.e., at publish time, not draft save).
-    if body.self_review is not None:
-        contributions = None
-        if body.contributions:
-            contributions = {aid: c.model_dump() for aid, c in body.contributions.items()}
-        create_review(
-            db,
-            article_id=a.id,
-            commit_hash=commit_hash,
-            reviewer_id=author_list[0],
-            scope="pool",
-            scores=body.self_review.model_dump(),
-            contributions=contributions,
-        )
-        score = compute_article_score_for_commit(db, a.id, commit_hash)
-        if score is not None:
-            a.score = score
+    commit_hash = None
+    try:
+        # ── 3. Disk operations ──────────────────────────────────────────
+        is_new_repo = not (rp / ".git").is_dir()
 
-    # Publish to pool if requested
-    if body.publish:
-        sink_days = params.sink.new_article_default_days
-        a = set_sink_start(db, a.id, sink_days)
+        if body.repo_bundle:
+            import base64
+            import logging
+            logger = logging.getLogger(__name__)
 
-    db.commit()
-    return build_article_detail(db, a.id)
+            try:
+                tar_bytes = base64.b64decode(body.repo_bundle)
+            except Exception:
+                raise HTTPException(status_code=422, detail="Invalid repo_bundle: base64 decode failed")
+
+            with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tf:
+                tf.write(tar_bytes)
+                tar_path = Path(tf.name)
+
+            try:
+                with tarfile.open(tar_path, "r:gz") as tar:
+                    safe_extract_tar(tar, rp.parent)
+                if not (rp / ".git").is_dir():
+                    raise HTTPException(
+                        status_code=422,
+                        detail="repo_bundle does not contain a valid git repository",
+                    )
+                try:
+                    _refresh_db_from_git(a.id, rp, db)
+                except Exception:
+                    logger.warning("Bundle extraction ok but DB refresh failed for %s", a.id)
+
+                # Phase 2c: only grant uploading user permission
+                replace_article_authors(db, a.id, {current_user.id})
+
+                repo = git.Repo(rp)
+                commit_hash = repo.head.commit.hexsha if repo.head.is_valid() else None
+            except tarfile.ReadError as e:
+                raise HTTPException(status_code=422, detail=f"Invalid tar.gz: {e}")
+            finally:
+                tar_path.unlink(missing_ok=True)
+        else:
+            if is_new_repo:
+                init_article_repo(a.id)
+            ext = ".typ" if body.format == "typst" else ".md"
+            (rp / f"article{ext}").write_text(body.content)
+            commit_msg = body.commit_message or "Initial submission"
+            author_name = current_user.name or current_user.username
+            commit_hash = commit_article(rp, commit_msg, author_name,
+                                         f"{author_list[0]}@peerpedia", allow_empty=True)
+
+        # Rebuild authors from git history
+        rebuild_article_authors(db, a.id, set(author_list))
+
+        # Self-review and scoring
+        if body.self_review is not None:
+            contributions = None
+            if body.contributions:
+                contributions = {aid: c.model_dump() for aid, c in body.contributions.items()}
+            create_review(
+                db, article_id=a.id, commit_hash=commit_hash,
+                reviewer_id=author_list[0], scope="pool",
+                scores=body.self_review.model_dump(),
+                contributions=contributions,
+            )
+            score = compute_article_score_for_commit(db, a.id, commit_hash)
+            if score is not None:
+                a.score = score
+
+        # Publish to pool if requested
+        if body.publish:
+            sink_days = params.sink.new_article_default_days
+            a = set_sink_start(db, a.id, sink_days)
+
+        # ── 4. Commit everything ────────────────────────────────────────
+        db.commit()
+        return build_article_detail(db, a.id)
+
+    except HTTPException:
+        db.rollback()
+        import shutil
+        shutil.rmtree(str(rp), ignore_errors=True)
+        raise
+    except Exception:
+        db.rollback()
+        import shutil
+        shutil.rmtree(str(rp), ignore_errors=True)
+        raise HTTPException(status_code=500, detail="Internal error creating article")
 
 
 @router.put("/{article_id}", response_model=ArticleDetail)
@@ -506,7 +506,9 @@ def api_fork_article(
     dst = repo_path(fork_id)
 
     if (src / ".git").is_dir():
-        shutil.copytree(src, dst, symlinks=True)
+        reject_symlinks(src)
+        shutil.copytree(src, dst, symlinks=False)
+        reject_symlinks(dst)
     else:
         init_article_repo(fork_id)
 
@@ -630,9 +632,11 @@ def api_get_source(
 ):
     assert_can_read_article(db, article_id, current_user)
     rp = repo_path(article_id)
+    reject_symlinks(rp)
     for ext in [".md", ".typ"]:
         f = rp / f"article{ext}"
         if f.exists():
+            ensure_inside(rp, f)
             fmt = "markdown" if ext == ".md" else "typst"
             return ArticleSourceResponse(content=f.read_text(), format=fmt)
     raise HTTPException(status_code=404, detail="Source file not found")
@@ -646,6 +650,7 @@ def api_download_source(
 ):
     assert_can_read_article(db, article_id, current_user)
     rp = repo_path(article_id)
+    reject_symlinks(rp)
     for ext in [".md", ".typ"]:
         f = rp / f"article{ext}"
         if f.exists():
@@ -666,6 +671,7 @@ def api_download_pdf(
     """Compile article to PDF and return as downloadable file."""
     assert_can_read_article(db, article_id, current_user)
     rp = repo_path(article_id)
+    reject_symlinks(rp)
     for ext in [".typ", ".md"]:
         f = rp / f"article{ext}"
         if f.exists():
@@ -719,6 +725,7 @@ def api_download_repo(
     """
     assert_can_download_repo(db, article_id, current_user)
     rp = repo_path(article_id)
+    reject_symlinks(rp)
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=404, detail="Git repo not found")
 
@@ -898,14 +905,15 @@ async def api_sync_article(
             rp = repo_path(article_id)
             if not (rp / ".git").is_dir():
                 raise HTTPException(status_code=404, detail="Article not found")
-            from peerpedia_core.storage.db.crud_article import create_article as _create_article
-            a = _create_article(db, authors=[], id=article_id, status="draft")
-            created_record = True
-            # Rebuild authors from git commit history
             from peerpedia_core.storage.db.crud_article import (
+                add_article_authors,
                 get_authors_from_git,
+                insert_article,
                 rebuild_article_authors,
             )
+            a = insert_article(db, id=article_id, status="draft")
+            add_article_authors(db, article_id, [])
+            created_record = True
             git_authors = get_authors_from_git(rp, db)
             if git_authors:
                 rebuild_article_authors(db, article_id, git_authors)
