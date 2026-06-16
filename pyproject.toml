@@ -34,14 +34,8 @@ dev = [
     "pre-commit>=3.0",
 ]
 
-[project.scripts]
-peerpedia = "peerpedia.cli.main:cli"
-
-[tool.setuptools]
-packages = ["peerpedia_core", "peerpedia_core.protocol", "peerpedia_core.reputation", "peerpedia_core.governance", "peerpedia_core.storage", "peerpedia", "peerpedia.cli", "peerpedia.web", "peerpedia.web.routes", "peerpedia.config"]
-
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["core/tests", "backend/tests"]
 python_files = ["test_*.py"]
 
 [tool.black]

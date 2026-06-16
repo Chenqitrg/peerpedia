@@ -26,6 +26,7 @@ import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_engine, get_session
 
+pytestmark = pytest.mark.seed
 # Connect to seed DB (CI runs seed.py before pytest)
 SEED_DB = os.environ.get("PEERPEDIA_DB", "peerpedia.db")
 

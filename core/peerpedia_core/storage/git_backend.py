@@ -87,10 +87,14 @@ def get_commit_history(
         return []
     commits = []
     for c in repo.iter_commits(max_count=max_count):
+        msg = c.message.strip()
+        # Skip attribution-only commits (co-author markers, review threads)
+        if msg.startswith("Co-author:") or msg.startswith("Review:") or msg.startswith("Reply:"):
+            continue
         commits.append({
             "hash": c.hexsha,
             "parents": [p.hexsha for p in c.parents],
-            "message": c.message.strip(),
+            "message": msg,
             "author": str(c.author),
             "timestamp": c.committed_datetime.isoformat(),
             "stats": {

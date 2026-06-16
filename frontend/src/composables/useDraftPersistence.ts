@@ -148,7 +148,9 @@ export function useDraftPersistence() {
       const { data } = await apiClient.get('/articles', {
         params: { status: 'draft', author_id: accountId },
       })
-      const list = Array.isArray(data) ? data : (data.items || [])
+      const list = Array.isArray(data)
+        ? data
+        : (data.articles || data.items || [])
       return list.map((item: Record<string, unknown>) => ({
         id: item.id as string,
         title: item.title as string,

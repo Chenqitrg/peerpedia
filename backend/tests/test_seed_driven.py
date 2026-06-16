@@ -20,6 +20,8 @@ from peerpedia_core.storage.db.models import (
     User,
 )
 
+pytestmark = pytest.mark.seed
+
 DB_URL = "sqlite:////Users/chenqimeng/Projects/peerpedia/peerpedia.db"
 
 

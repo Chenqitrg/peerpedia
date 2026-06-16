@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
         logger.info("Auto-publish background task stopped")
 
 
-app = FastAPI(title="PeerPedia API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="PeerPedia API", version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

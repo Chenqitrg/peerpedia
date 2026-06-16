@@ -22,6 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_engine, get_session
 
+pytestmark = pytest.mark.seed
 # ── S1 fixtures (empty test DB — health doesn't need data) ──────────────
 
 

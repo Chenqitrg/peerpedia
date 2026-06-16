@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/open-tauri/main/.schemas/desktop-schema.json",
   "productName": "PeerPedia",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "org.peerpedia.desktop",
   "build": {
     "frontendDist": "../dist",

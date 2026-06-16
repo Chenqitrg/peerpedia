@@ -41,6 +41,15 @@ frontend/dist/
 *.db
 *.db-shm
 *.db-wal
+*.db.bak
+
+# Logs
+logs/
+*.log
+
+# Root Node (frontend is the real Node project)
+node_modules/
+/package-lock.json
 
 # Build caches
 .vite/
