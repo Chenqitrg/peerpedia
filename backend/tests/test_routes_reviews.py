@@ -135,7 +135,8 @@ class TestReviewSubmit:
         uid = u.id
         s.close()
 
-        # Create article
+        # Create article using the fixture auth user (test_auth_user) so
+        # read checks pass against the conftest's get_current_user override.
         create_body = {
             "authors": [uid],
             "content": "# V1",
@@ -146,8 +147,9 @@ class TestReviewSubmit:
         resp = client.post("/api/v1/articles", json=create_body, headers=auth_header(uid))
         article_id = resp.json()["id"]
 
-        # Get the commit hash from history
-        history = client.get(f"/api/v1/articles/{article_id}/history").json()
+        # Get the commit hash from history (must auth as article author)
+        history = client.get(f"/api/v1/articles/{article_id}/history",
+                             headers=auth_header(uid)).json()
         commit_1 = history["commits"][0]["hash"]
 
         # Submit a second review for the same commit (different reviewer approach)
@@ -180,7 +182,7 @@ class TestReviewSubmit:
         client.put(f"/api/v1/articles/{article_id}", json=edit_body, headers=auth_header(uid))
 
         # Get new commit hash
-        history2 = client.get(f"/api/v1/articles/{article_id}/history").json()
+        history2 = client.get(f"/api/v1/articles/{article_id}/history", headers=auth_header(uid)).json()
         commit_2 = history2["commits"][0]["hash"]
         assert commit_2 != commit_1
 

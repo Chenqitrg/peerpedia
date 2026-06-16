@@ -60,7 +60,7 @@ def _make_client_fixture(app, db_engine, db_override_only=False):
     app.dependency_overrides[deps.get_db] = override_db
 
     if not db_override_only:
-        # Create a default user and override require_user for convenience.
+        # Create a default user and override require_user + get_current_user.
         s = get_session(db_engine)
         _u = User(username="test_auth_user", password_hash="",
                    name="AuthUser", anonymous_name="anon", affiliation="TestU")
@@ -72,7 +72,10 @@ def _make_client_fixture(app, db_engine, db_override_only=False):
 
         def override_require_user():
             return _user_obj
+        def override_get_current_user():
+            return _user_obj
         app.dependency_overrides[deps.require_user] = override_require_user
+        app.dependency_overrides[deps.get_current_user] = override_get_current_user
 
     from fastapi.testclient import TestClient
     return TestClient(app)

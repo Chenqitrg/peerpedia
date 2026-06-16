@@ -114,7 +114,7 @@ class TestSpecSyncUpload:
         """SPEC-SYNC-UPLOAD-2: After upload, article appears in GET /articles."""
         token, user = _register(client, f"list_{_UNIQ}")
         _create_article(client, token, user["id"], "Listable Article")
-        resp = client.get("/api/v1/articles", params={"author_id": user["id"]})
+        resp = client.get("/api/v1/articles", params={"author_id": user["id"]}, headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 200
         data = resp.json()
         articles = data.get("articles", data)
@@ -196,7 +196,7 @@ class TestSpecSyncSource:
         article = _create_article(client, token, user["id"], "Source Test", "# Remote Content", fmt="markdown")
         aid = article["id"]
 
-        resp = client.get(f"/api/v1/articles/{aid}/source")
+        resp = client.get(f"/api/v1/articles/{aid}/source", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["content"] == "# Remote Content"

@@ -22,9 +22,12 @@ def client(db_engine):
         finally:
             session.close()
 
+    # Use the same user as seed_user fixture (user21) so auth user ==
+    # default article author.  Policy checks require the authenticated
+    # user to be an author for draft access.
     s = get_session(db_engine)
-    _u = User(username="test_articles_auth", password_hash="",
-               name="TestAuthor", anonymous_name="anon", affiliation="U")
+    _u = User(username="user21", password_hash="",
+               name="测试用户", anonymous_name="anon_test", affiliation="测试大学")
     s.add(_u)
     s.commit()
     _uid = _u.id
@@ -34,8 +37,12 @@ def client(db_engine):
     def override_require_user():
         return _user_obj
 
+    def override_get_current_user():
+        return _user_obj
+
     app.dependency_overrides[deps.get_db] = override_db
     app.dependency_overrides[deps.require_user] = override_require_user
+    app.dependency_overrides[deps.get_current_user] = override_get_current_user
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -44,9 +51,11 @@ def client(db_engine):
 @pytest.fixture
 def seed_user(db_engine):
     s = get_session(db_engine)
-    u = User(username="user21", password_hash="", name="测试用户", anonymous_name="anon_test", affiliation="测试大学")
-    s.add(u)
-    s.commit()
+    u = s.query(User).filter(User.username == "user21").first()
+    if u is None:
+        u = User(username="user21", password_hash="", name="测试用户", anonymous_name="anon_test", affiliation="测试大学")
+        s.add(u)
+        s.commit()
     uid = u.id
     s.close()
     return uid
@@ -54,9 +63,24 @@ def seed_user(db_engine):
 
 @pytest.fixture
 def auth_user_id(db_engine):
-    """Return the ID of the client's implicit auth user (test_articles_auth)."""
+    """Return the ID of the client's implicit auth user (user21)."""
     s = get_session(db_engine)
-    u = s.query(User).filter(User.username == "test_articles_auth").first()
+    u = s.query(User).filter(User.username == "user21").first()
+    uid = u.id
+    s.close()
+    return uid
+
+
+@pytest.fixture
+def second_user(db_engine):
+    """Create a second user distinct from the auth user (for multi-author tests)."""
+    s = get_session(db_engine)
+    u = s.query(User).filter(User.username == "user22").first()
+    if u is None:
+        u = User(username="user22", password_hash="", name="SecondUser",
+                 anonymous_name="anon2", affiliation="U2")
+        s.add(u)
+        s.commit()
     uid = u.id
     s.close()
     return uid
@@ -311,10 +335,10 @@ class TestCreateArticle:
 
 
 class TestUpdateArticle:
-    def test_update_content_flow(self, client, seed_user, auth_user_id):
+    def test_update_content_flow(self, client, seed_user, second_user, auth_user_id):
         """Full flow: create article, then edit it."""
         create_body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "content": "# Original\n\nHello world.",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -336,10 +360,10 @@ class TestUpdateArticle:
         assert data["id"] == article_id
         assert data["status"] == "draft"
 
-    def test_update_no_content_change(self, client, seed_user, auth_user_id):
+    def test_update_no_content_change(self, client, seed_user, second_user, auth_user_id):
         """Edit without content change: commits, stays draft unless publish=true."""
         create_body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "content": "# Test",
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
@@ -362,7 +386,7 @@ class TestUpdateArticle:
         resp = client.put("/api/v1/articles/nonexistent", json={"content": "x"})
         assert resp.status_code == 404
 
-    def test_update_no_repo(self, client, seed_user, db_engine, auth_user_id):
+    def test_update_no_repo(self, client, seed_user, second_user, db_engine, auth_user_id):
         """Update article that has no git repo (edge case)."""
         from peerpedia_core.storage.db.engine import get_session
         from peerpedia_core.storage.db.models import Article, ArticleAuthor
@@ -379,7 +403,7 @@ class TestUpdateArticle:
         resp = client.put(f"/api/v1/articles/{aid}", json={"content": "x"})
         assert resp.status_code == 400
 
-    def test_update_non_author_forbidden(self, client, seed_user, db_engine, auth_user_id):
+    def test_update_non_author_forbidden(self, client, seed_user, second_user, db_engine, auth_user_id):
         """Non-authors cannot edit; others get 403."""
         # Create article owned by seed_user + auth_user
         create_body = {
@@ -444,10 +468,10 @@ class TestHistoryWithScores:
             if commit == data["commits"][0]:
                 assert commit["score"] is not None
 
-    def test_history_multiple_commits_independent_scores(self, client, seed_user, auth_user_id):
+    def test_history_multiple_commits_independent_scores(self, client, seed_user, second_user, auth_user_id):
         """After editing, each commit gets its own score."""
         create_body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "content": "# V1",
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
@@ -481,14 +505,14 @@ class TestHistoryWithScores:
 
 
 class TestScoreBackfill:
-    def test_article_without_score_gets_backfilled(self, client, seed_user, auth_user_id, db_engine):
+    def test_article_without_score_gets_backfilled(self, client, seed_user, second_user, auth_user_id, db_engine):
         """Article with null score gets backfilled on fetch."""
         from peerpedia_core.storage.db.engine import get_session
         from peerpedia_core.storage.db.models import Article
 
         # Create article via API (now creates score automatically)
         create_body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "content": "# Backfill test",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -524,10 +548,10 @@ class TestScoreBackfill:
 class TestScoreNotCleared:
     """Regression tests: article.score must not be cleared when latest commit has no reviews."""
 
-    def test_edit_without_self_review_preserves_score(self, client, seed_user, auth_user_id):
+    def test_edit_without_self_review_preserves_score(self, client, seed_user, second_user, auth_user_id):
         """Editing content without self_review should not set score to None."""
         create_body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "content": "# V1",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -549,14 +573,14 @@ class TestScoreNotCleared:
         assert resp2.status_code == 200
         assert resp2.json()["score"] is not None
 
-    def test_backfill_walks_commits_for_score(self, client, seed_user, db_engine, auth_user_id):
+    def test_backfill_walks_commits_for_score(self, client, seed_user, second_user, db_engine, auth_user_id):
         """Backfill should find a score from older commit if latest has none."""
         from peerpedia_core.storage.db.engine import get_session
         from peerpedia_core.storage.db.models import Article
 
         # Create article with self-review (commit A, has score)
         create_body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "content": "# V1",
             "format": "markdown",
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
@@ -626,15 +650,15 @@ class TestDownloadEndpoints:
     """Tests for download endpoints (source and PDF)."""
 
     def _create_article_with_content(self, client, seed_user, content, fmt="markdown"):
-        create_body = {
-            "authors": [seed_user],
+        """Create article. authors defaults to current auth user (omit seed_user)."""
+        create_body: dict = {
             "content": content,
             "format": fmt,
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
                             "pedagogy": 3, "impact": 3},
         }
         resp = client.post("/api/v1/articles", json=create_body)
-        assert resp.status_code == 201
+        assert resp.status_code == 201, resp.text
         return resp.json()["id"]
 
     def test_download_source_markdown(self, client, seed_user):
@@ -701,12 +725,12 @@ class TestDeleteArticle:
 
     @pytest.fixture
     def owned_article(self, db_engine):
-        """Create an article owned by the client's auth user (test_articles_auth)."""
+        """Create an article owned by the client's auth user (user21)."""
         from peerpedia_core.storage.db.engine import get_session
         from peerpedia_core.storage.db.models import Article, User
 
         s = get_session(db_engine)
-        auth_user = s.query(User).filter(User.username == "test_articles_auth").first()
+        auth_user = s.query(User).filter(User.username == "user21").first()
         a = Article(status="draft")
         s.add(a)
         s.flush()
@@ -744,7 +768,7 @@ class TestDeleteArticle:
 
         # Get the auth user's ID so the article is owned by the authenticated user
         s = get_session(db_engine)
-        auth_user = s.query(User).filter(User.username == "test_articles_auth").first()
+        auth_user = s.query(User).filter(User.username == "user21").first()
         auth_id = auth_user.id
         s.close()
 
@@ -777,14 +801,18 @@ class TestDeleteArticle:
         """DELETE /articles/{id} returns 401 without authentication."""
         from peerpedia_api import deps
         app = client.app
-        old = app.dependency_overrides.get(deps.require_user)
+        old_req = app.dependency_overrides.get(deps.require_user)
+        old_cur = app.dependency_overrides.get(deps.get_current_user)
         try:
             app.dependency_overrides.pop(deps.require_user, None)
+            app.dependency_overrides.pop(deps.get_current_user, None)
             resp = client.delete(f"/api/v1/articles/{owned_article}")
             assert resp.status_code == 401
         finally:
-            if old is not None:
-                app.dependency_overrides[deps.require_user] = old
+            if old_req is not None:
+                app.dependency_overrides[deps.require_user] = old_req
+            if old_cur is not None:
+                app.dependency_overrides[deps.get_current_user] = old_cur
 
     def test_delete_nonexistent_article(self, client):
         """DELETE /articles/nonexistent returns 404."""
@@ -847,10 +875,10 @@ class TestArticleLifecycle:
         assert resp.status_code == 201
         assert resp.json()["status"] == "draft"
 
-    def test_edit_re_enters_pool(self, client, seed_user, auth_user_id):
+    def test_edit_re_enters_pool(self, client, seed_user, second_user, auth_user_id):
         """Editing an article should update sink_start and re-enter sedimentation."""
         create_body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "content": "# V1\n\nFirst.",
             "format": "markdown",
             "self_review": {"originality": 3, "rigor": 3, "completeness": 3,
@@ -963,23 +991,27 @@ class TestArticleErrorPaths:
         # Without auth override, require_user dependency returns 401
         from peerpedia_api import deps
         app = client.app
-        old = app.dependency_overrides.get(deps.require_user)
+        old_req = app.dependency_overrides.get(deps.require_user)
+        old_cur = app.dependency_overrides.get(deps.get_current_user)
         try:
             app.dependency_overrides.pop(deps.require_user, None)
+            app.dependency_overrides.pop(deps.get_current_user, None)
             resp2 = client.get(f"/api/v1/articles/{article_id}/has-forked")
             assert resp2.status_code == 401
         finally:
-            if old is not None:
-                app.dependency_overrides[deps.require_user] = old
+            if old_req is not None:
+                app.dependency_overrides[deps.require_user] = old_req
+            if old_cur is not None:
+                app.dependency_overrides[deps.get_current_user] = old_cur
 
     def test_rollback_nonexistent_article_returns_404(self, client):
         resp = client.post("/api/v1/articles/nonexistent/rollback/abc123")
         assert resp.status_code == 404
 
-    def test_rollback_creates_revert_commit(self, client, seed_user, auth_user_id):
+    def test_rollback_creates_revert_commit(self, client, seed_user, second_user, auth_user_id):
         """Happy path: create article with 2 commits, rollback to first, verify content restored."""
         body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "self_review": {"originality": 4, "rigor": 3, "completeness": 4,
                             "pedagogy": 3, "impact": 3},
             "title": "Rollback Test",
@@ -1049,10 +1081,10 @@ class TestArticleCreateEdgeCases:
 class TestArticleUpdateEdgeCases:
     """Edge cases for article updates."""
 
-    def test_update_body_fields(self, client, seed_user, auth_user_id):
+    def test_update_body_fields(self, client, seed_user, second_user, auth_user_id):
         """Update title, abstract, keywords, and categories."""
         body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "title": "Original Title",
             "content": "Content",
             "format": "markdown",
@@ -1094,8 +1126,8 @@ class TestHasForked:
         assert check.status_code == 200
         assert check.json()["has_forked"] is False
 
-    def test_has_forked_returns_true(self, client, seed_user):
-        """Returns true after user forks an article."""
+    def test_has_forked_returns_true(self, client, seed_user, db_engine):
+        """Returns true after user forks a published article."""
         body = {
             "authors": [seed_user],
             "title": "WillBeForked",
@@ -1106,6 +1138,13 @@ class TestHasForked:
         }
         resp = client.post("/api/v1/articles", json=body)
         article_id = resp.json()["id"]
+
+        # Must be published to be forkable
+        s = get_session(db_engine)
+        a = s.get(Article, article_id)
+        a.status = "published"
+        s.commit()
+        s.close()
 
         # Fork it
         fork_resp = client.post(f"/api/v1/articles/{article_id}/fork")
@@ -1185,10 +1224,10 @@ class TestArticleSource:
 class TestUpdatePublishWithContributions:
     """Update + publish article with contributions to cover all branches."""
 
-    def test_update_publish_with_contributions(self, client, seed_user, auth_user_id):
+    def test_update_publish_with_contributions(self, client, seed_user, second_user, auth_user_id):
         """Updating and publishing with self_review + contributions."""
         body = {
-            "authors": [seed_user, auth_user_id],
+            "authors": [seed_user, second_user],
             "title": "Contrib Test",
             "content": "Initial content.",
             "format": "markdown",
@@ -1393,14 +1432,18 @@ class TestBundleSyncEndpoints:
 
         article_id, _ = article_with_repo
         app = client.app
-        old = app.dependency_overrides.get(deps.require_user)
+        old_req = app.dependency_overrides.get(deps.require_user)
+        old_cur = app.dependency_overrides.get(deps.get_current_user)
         try:
             app.dependency_overrides.pop(deps.require_user, None)
+            app.dependency_overrides.pop(deps.get_current_user, None)
             resp = client.get(f"/api/v1/articles/{article_id}/bundle?since={'0' * 40}")
             assert resp.status_code == 401
         finally:
-            if old is not None:
-                app.dependency_overrides[deps.require_user] = old
+            if old_req is not None:
+                app.dependency_overrides[deps.require_user] = old_req
+            if old_cur is not None:
+                app.dependency_overrides[deps.get_current_user] = old_cur
 
     # ── POST /{id}/sync ─────────────────────────────────────────────────
 
@@ -1485,17 +1528,21 @@ class TestBundleSyncEndpoints:
 
         article_id, _ = article_with_repo
         app = client.app
-        old = app.dependency_overrides.get(deps.require_user)
+        old_req = app.dependency_overrides.get(deps.require_user)
+        old_cur = app.dependency_overrides.get(deps.get_current_user)
         try:
             app.dependency_overrides.pop(deps.require_user, None)
+            app.dependency_overrides.pop(deps.get_current_user, None)
             resp = client.post(
                 f"/api/v1/articles/{article_id}/sync",
                 files={"file": ("bundle", b"x", "application/octet-stream")},
             )
             assert resp.status_code == 401
         finally:
-            if old is not None:
-                app.dependency_overrides[deps.require_user] = old
+            if old_req is not None:
+                app.dependency_overrides[deps.require_user] = old_req
+            if old_cur is not None:
+                app.dependency_overrides[deps.get_current_user] = old_cur
 
     def test_sync_non_author_forbidden(self, client, article_with_repo, db_engine):
         """POST /sync from non-author returns 403."""

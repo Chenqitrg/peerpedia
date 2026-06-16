@@ -181,15 +181,23 @@ class TestJourneyForkEditMerge:
         assert resp.status_code == 201
         original_id = resp.json()["id"]
 
-        # Publish the article (transitions draft → sedimentation pool)
+        # Publish and set status to published so it can be forked
         pub_resp = client.post(
             f"/api/v1/articles/{original_id}/publish",
             headers=orig_headers,
         )
         assert pub_resp.status_code == 200
-        assert pub_resp.json()["status"] == "sedimentation"
 
-        # 3. Forker forks the article (now in the pool)
+        # Transition to published (pool articles are not forkable per spec)
+        from peerpedia_api import deps
+        s = next(client.app.dependency_overrides[deps.get_db]())
+        from peerpedia_core.storage.db.models import Article
+        a = s.get(Article, original_id)
+        a.status = "published"
+        s.commit()
+        s.close()
+
+        # 3. Forker forks the published article
         fork_resp = client.post(
             f"/api/v1/articles/{original_id}/fork",
             headers=forker_headers,
@@ -396,7 +404,7 @@ class TestJourneyDeleteArticle:
         article_id = resp.json()["id"]
 
         # 3. Verify article exists
-        get_resp = client.get(f"/api/v1/articles/{article_id}")
+        get_resp = client.get(f"/api/v1/articles/{article_id}", headers=headers)
         assert get_resp.status_code == 200
         assert get_resp.json()["title"] == "韩非子"
 
@@ -438,6 +446,6 @@ class TestJourneyDeleteArticle:
         assert del_resp.status_code == 403, \
             f"Non-author should get 403, got {del_resp.status_code}"
 
-        # 4. Verify article still exists
-        get_resp = client.get(f"/api/v1/articles/{article_id}")
+        # 4. Verify article still exists (must authenticate as author for draft)
+        get_resp = client.get(f"/api/v1/articles/{article_id}", headers=author_headers)
         assert get_resp.status_code == 200

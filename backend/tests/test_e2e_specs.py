@@ -60,6 +60,10 @@ class TestSpec3ForkUserValidation:
         aid, uid = _create_article_with_user(db_engine, "fork_user_1")
         s = get_session(db_engine)
         user = s.query(User).filter(User.id == uid).first()
+        # Must be published to be forkable
+        a = s.get(Article, aid)
+        a.status = "published"
+        s.commit()
         s.close()
 
         from peerpedia_api import deps as api_deps
