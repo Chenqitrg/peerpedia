@@ -22,7 +22,8 @@
     ],
     "withGlobalTauri": true,
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8080; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; media-src 'self'"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8080; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; media-src 'self'",
+      "_csp_production": "Remove 'unsafe-eval' from script-src for production builds. Vite HMR requires it in dev."
     }
   },
   "bundle": {

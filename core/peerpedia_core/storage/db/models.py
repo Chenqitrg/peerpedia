@@ -36,6 +36,9 @@ class Article(Base):
     categories = Column(JSONList, nullable=True)
     status = Column(String, nullable=False, default="draft")  # draft|sedimentation|published
     score = Column(JSONDict, nullable=True)                    # FiveDimScores as dict
+    # TODO(Phase-7b): compiled_* columns should be removed per README architecture
+    # (compile output is generated on-demand with filesystem cache, never stored in DB).
+    # Migration plan: drop compiled_format/output/pages, keep only status/error tracking.
     compiled_format = Column(String, nullable=True)            # "html" | "svg"
     compiled_output = Column(String, nullable=True)            # single-page result
     compiled_pages = Column(JSONList, nullable=True)           # list[str] for multi-page SVG
