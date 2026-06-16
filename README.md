@@ -265,6 +265,9 @@ uvicorn peerpedia_api.main:app --port 8080 --reload
 cd frontend && npm install && npm run dev   # → http://localhost:5173
 ```
 
+> **端口说明**: 前端 Vite proxy 指向 `localhost:8080`（后端默认端口）。
+> 如果后端用其他端口，修改 `frontend/.env` 中的 `VITE_API_BASE_URL`（参考 `frontend/.env.example`）。
+
 ### Tauri Desktop
 
 ```bash
