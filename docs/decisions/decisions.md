@@ -2,6 +2,40 @@
 
 > 重大架构决策及其原因。按时间倒序，每条记录：背景、决策、后果。
 
+## ADR-011: 权限策略集中到 Core，语义异常解耦 HTTP
+
+**日期**: 2026-06 | **状态**: 已实施（PR #71）
+
+**背景**: PR #71 在 `backend/peerpedia_api/policies/articles.py` 中引入集中化权限策略，但依赖 `fastapi.HTTPException`（`raise HTTPException(status_code=403)`）。这与 ADR-002（backend = HTTP 翻译，core = 业务逻辑）冲突——HTTP 状态码泄露到了业务层。同时 `crud_article.py` 用 `ValueError`、路由层用内联 `HTTPException`，三处三种异常，同一类错误表达方式不统一。
+
+**原则依据**: [Fail Fast](https://martinfowler.com/ieeeSoftware/failFast.pdf)（Jim Shore, 2004）——错误在最早时刻暴露。Core 不知道 HTTP，异常名字描述**什么错了**，不描述**HTTP 返回什么**。
+
+**决策**:
+
+1. **定义语义异常在 Core**。`core/peerpedia_core/exceptions.py`：`PeerpediaError` → `NotFoundError` / `NotAuthorizedError` / `ConflictError` / `BadRequestError`。零 HTTP 概念——没有 `status_code`，没有 `headers`。
+
+2. **权限函数搬到 Core**。`backend/peerpedia_api/policies/articles.py` → `core/peerpedia_core/policies/articles.py`。所有 `raise HTTPException(403)` 替换为 `raise NotAuthorizedError("...")`。
+
+3. **一个 Handler 做翻译**。`main.py` 注册 `@app.exception_handler(PeerpediaError)`，一个字典映射语义异常 → HTTP 状态码。只有这一个地方知道映射关系。
+
+4. **`validate_article_has_authors` 保留 `ValueError`**。零作者是数据完整性 bug（服务器内部错误），不是权限拒绝。语义对，不改。
+
+**放弃的方案**:
+
+- 异常带 `status_code` 属性（换名字不换耦合——`ForbiddenError(status_code=403)` 和 `HTTPException(403)` 本质相同）
+- 独立的"翻译层"文件（过度设计——一个 handler 函数就够）
+- 一次性替换所有路由的内联检查（风险 > 收益，后续 PR 逐步做）
+
+**后果**:
+
+- ✅ Core 零 FastAPI 依赖——`grep fastapi core/` 返回空
+- ✅ 报错语义统一：`NotFoundError` / `NotAuthorizedError` / `ConflictError` / `BadRequestError`
+- ✅ 路由接入成本低：调 `assert_can_*`，异常自动转 HTTP
+- ❌ 路由层仍有内联 `get_author_ids` 检查未替换——后续 PR 逐步接入
+- ❌ `visible_statuses_for_user` 同时被 core 和 backend 引用——未来可能要进一步统一
+
+---
+
 ## ADR-010: 作者解析失败必须报错，禁止静默修复
 
 **日期**: 2026-06 | **状态**: 已实施（PR #68 评审修订）
