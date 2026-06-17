@@ -840,6 +840,8 @@ async def api_sync_article(
             raise HTTPException(status_code=404, detail="Article not found")
         from peerpedia_core.storage.db.crud_article import (
             create_article as _create_article,
+        )
+        from peerpedia_core.storage.db.crud_article import (
             get_authors_from_git,
         )
 

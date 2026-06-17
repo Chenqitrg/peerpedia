@@ -2147,7 +2147,6 @@ class TestAuthorArticleLink:
     def test_validate_article_has_authors_raises_on_empty(self, db_engine):
         """validate_article_has_authors raises ValueError when article has no authors."""
         import pytest
-
         from peerpedia_core.storage.db.crud_article import (
             create_article,
             validate_article_has_authors,
@@ -2166,6 +2165,7 @@ class TestAuthorArticleLink:
 
         # Direct insert article with no authors — validate should raise
         from peerpedia_core.storage.db.models import Article
+
         aid2 = "test-no-authors-1"
         s.add(Article(id=aid2, title="Orphan", status="draft"))
         s.commit()
