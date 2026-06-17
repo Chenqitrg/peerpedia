@@ -13,6 +13,7 @@ Philosophy per docs/test_requirement.md:
 - Large-scale closed-loop, connecting frontend↔backend concepts
 - Almost uniquely determines current functionality
 """
+
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
@@ -39,10 +40,13 @@ def client(db_engine):
 
 def _login(client, username: str, password: str) -> dict:
     """Login helper — returns (token, user_dict)."""
-    resp = client.post("/api/v1/auth/login", json={
-        "username": username,
-        "password": password,
-    })
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": username,
+            "password": password,
+        },
+    )
     assert resp.status_code == 200, f"Login failed: {resp.json()}"
     data = resp.json()
     return {"token": data["token"], "user": data["user"]}
@@ -50,12 +54,15 @@ def _login(client, username: str, password: str) -> dict:
 
 def _register(client, username: str, password: str, email: str, name: str) -> dict:
     """Register helper — returns (token, user_dict)."""
-    resp = client.post("/api/v1/auth/register", json={
-        "username": username,
-        "password": password,
-        "email": email,
-        "name": name,
-    })
+    resp = client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": username,
+            "password": password,
+            "email": email,
+            "name": name,
+        },
+    )
     assert resp.status_code == 201, f"Register failed: {resp.json()}"
     data = resp.json()
     return {"token": data["token"], "user": data["user"]}
@@ -64,6 +71,7 @@ def _register(client, username: str, password: str, email: str, name: str) -> di
 # ═══════════════════════════════════════════════════════════════════════════════
 # Journey 1: Register → Write → Review → Pool → Publish
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestJourneyWriteReviewPublish:
     """A complete user journey: two users register, one writes an article,
@@ -83,8 +91,11 @@ class TestJourneyWriteReviewPublish:
             "format": "markdown",
             "title": "西游记新解",
             "self_review": {
-                "originality": 5, "rigor": 4, "completeness": 4,
-                "pedagogy": 5, "impact": 4,
+                "originality": 5,
+                "rigor": 4,
+                "completeness": 4,
+                "pedagogy": 5,
+                "impact": 4,
             },
         }
         resp = client.post("/api/v1/articles", json=create_body, headers=author_headers)
@@ -103,8 +114,7 @@ class TestJourneyWriteReviewPublish:
         pool_resp = client.get("/api/v1/pool", headers=author_headers)
         assert pool_resp.status_code == 200
         pool_articles = pool_resp.json()["articles"]
-        assert any(a["id"] == article_id for a in pool_articles), \
-            "New article should appear in pool"
+        assert any(a["id"] == article_id for a in pool_articles), "New article should appear in pool"
 
         # 4. Reviewer submits a pool review
         # First get the commit hash from history
@@ -119,8 +129,11 @@ class TestJourneyWriteReviewPublish:
             "commit_hash": commit_hash,
             "scope": "pool",
             "scores": {
-                "originality": 5, "rigor": 4, "completeness": 3,
-                "pedagogy": 5, "impact": 5,
+                "originality": 5,
+                "rigor": 4,
+                "completeness": 3,
+                "pedagogy": 5,
+                "impact": 5,
             },
         }
         rev_resp = client.post(
@@ -141,8 +154,7 @@ class TestJourneyWriteReviewPublish:
         assert len(community_reviews) >= 1
         # Pool reviews should show anonymous name, not real name
         community_review = community_reviews[0]
-        assert community_review["reviewer_name"] != "唐僧", \
-            "Pool review should use anonymous name, not real name"
+        assert community_review["reviewer_name"] != "唐僧", "Pool review should use anonymous name, not real name"
 
         # 6. Article score is updated after review
         article_resp = client.get(f"/api/v1/articles/{article_id}")
@@ -155,6 +167,7 @@ class TestJourneyWriteReviewPublish:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Journey 2: Fork → Edit → Propose Merge → Accept
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestJourneyForkEditMerge:
     """A user forks an article, edits it, and proposes a merge back."""
@@ -173,8 +186,11 @@ class TestJourneyForkEditMerge:
             "format": "markdown",
             "title": "道德经",
             "self_review": {
-                "originality": 5, "rigor": 4, "completeness": 5,
-                "pedagogy": 4, "impact": 5,
+                "originality": 5,
+                "rigor": 4,
+                "completeness": 5,
+                "pedagogy": 4,
+                "impact": 5,
             },
         }
         resp = client.post("/api/v1/articles", json=create_body, headers=orig_headers)
@@ -205,8 +221,11 @@ class TestJourneyForkEditMerge:
             "format": "markdown",
             "commit_message": "Add Zhuangzi commentary",
             "self_review": {
-                "originality": 4, "rigor": 3, "completeness": 4,
-                "pedagogy": 4, "impact": 3,
+                "originality": 4,
+                "rigor": 3,
+                "completeness": 4,
+                "pedagogy": 4,
+                "impact": 3,
             },
         }
         edit_resp = client.put(
@@ -249,6 +268,7 @@ class TestJourneyForkEditMerge:
 # Journey 3: Bookmark → List → Unbookmark
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestJourneyBookmarkLifecycle:
     """A user bookmarks articles, views their collection, and removes bookmarks."""
 
@@ -268,8 +288,11 @@ class TestJourneyBookmarkLifecycle:
                 "format": "markdown",
                 "title": title,
                 "self_review": {
-                    "originality": 4, "rigor": 3, "completeness": 4,
-                    "pedagogy": 3, "impact": 4,
+                    "originality": 4,
+                    "rigor": 3,
+                    "completeness": 4,
+                    "pedagogy": 3,
+                    "impact": 4,
                 },
             }
             resp = client.post("/api/v1/articles", json=body, headers=author_headers)
@@ -312,6 +335,7 @@ class TestJourneyBookmarkLifecycle:
 # Journey 4: Multi-author collaboration
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestJourneyMultiAuthor:
     """Two users co-author an article and both can see it."""
 
@@ -329,17 +353,26 @@ class TestJourneyMultiAuthor:
             "format": "markdown",
             "title": "天文历法",
             "self_review": {
-                "originality": 5, "rigor": 5, "completeness": 4,
-                "pedagogy": 3, "impact": 4,
+                "originality": 5,
+                "rigor": 5,
+                "completeness": 4,
+                "pedagogy": 3,
+                "impact": 4,
             },
             "contributions": {
                 co1["user"]["id"]: {
-                    "originality": 5, "rigor": 5, "completeness": 3,
-                    "pedagogy": 2, "impact": 3,
+                    "originality": 5,
+                    "rigor": 5,
+                    "completeness": 3,
+                    "pedagogy": 2,
+                    "impact": 3,
                 },
                 co2["user"]["id"]: {
-                    "originality": 3, "rigor": 4, "completeness": 4,
-                    "pedagogy": 4, "impact": 4,
+                    "originality": 3,
+                    "rigor": 4,
+                    "completeness": 4,
+                    "pedagogy": 4,
+                    "impact": 4,
                 },
             },
         }
@@ -372,6 +405,7 @@ class TestJourneyMultiAuthor:
 # Journey 5: Create → Delete → Verify Gone
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestJourneyDeleteArticle:
     """A user creates an article, then deletes it — verify complete removal."""
 
@@ -387,8 +421,11 @@ class TestJourneyDeleteArticle:
             "format": "markdown",
             "title": "韩非子",
             "self_review": {
-                "originality": 5, "rigor": 4, "completeness": 5,
-                "pedagogy": 4, "impact": 5,
+                "originality": 5,
+                "rigor": 4,
+                "completeness": 5,
+                "pedagogy": 4,
+                "impact": 5,
             },
         }
         resp = client.post("/api/v1/articles", json=body, headers=headers)
@@ -402,13 +439,11 @@ class TestJourneyDeleteArticle:
 
         # 4. Delete the article (only the author can delete)
         del_resp = client.delete(f"/api/v1/articles/{article_id}", headers=headers)
-        assert del_resp.status_code == 204, \
-            f"Delete should return 204, got {del_resp.status_code}: {del_resp.text}"
+        assert del_resp.status_code == 204, f"Delete should return 204, got {del_resp.status_code}: {del_resp.text}"
 
         # 5. Verify article is gone — GET returns 404
         get_resp2 = client.get(f"/api/v1/articles/{article_id}")
-        assert get_resp2.status_code == 404, \
-            "Article should return 404 after deletion"
+        assert get_resp2.status_code == 404, "Article should return 404 after deletion"
 
     def test_delete_non_author_rejected(self, client):
         """Only the article author can delete — others get 403."""
@@ -425,8 +460,11 @@ class TestJourneyDeleteArticle:
             "format": "markdown",
             "title": "商君书",
             "self_review": {
-                "originality": 4, "rigor": 4, "completeness": 4,
-                "pedagogy": 3, "impact": 4,
+                "originality": 4,
+                "rigor": 4,
+                "completeness": 4,
+                "pedagogy": 3,
+                "impact": 4,
             },
         }
         resp = client.post("/api/v1/articles", json=body, headers=author_headers)
@@ -435,8 +473,7 @@ class TestJourneyDeleteArticle:
 
         # 3. Other user tries to delete → 403
         del_resp = client.delete(f"/api/v1/articles/{article_id}", headers=other_headers)
-        assert del_resp.status_code == 403, \
-            f"Non-author should get 403, got {del_resp.status_code}"
+        assert del_resp.status_code == 403, f"Non-author should get 403, got {del_resp.status_code}"
 
         # 4. Verify article still exists
         get_resp = client.get(f"/api/v1/articles/{article_id}")

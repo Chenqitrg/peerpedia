@@ -7,6 +7,7 @@ These tests validate that the seed data is correct AND that all the features
 that the seed data represents work properly. If a seed scenario breaks, the
 corresponding test catches it.
 """
+
 import pytest
 from peerpedia_core.storage.db.crud_article import get_author_ids
 from peerpedia_core.storage.db.engine import get_engine, get_session
@@ -40,6 +41,7 @@ def client():
 
     app.dependency_overrides[deps.get_db] = override_db
     from fastapi.testclient import TestClient
+
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -48,6 +50,7 @@ def client():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. Seed smoke test — verify counts
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSeedSmoke:
     """Verify the seeded database has expected data."""
@@ -146,9 +149,7 @@ class TestSeedSmoke:
         engine = get_engine(DB_URL)
         s = get_session(engine)
         articles = s.query(Article).all()
-        chinese_titles = [a for a in articles if any(
-            '一' <= c <= '鿿' for c in (a.title or "")
-        )]
+        chinese_titles = [a for a in articles if any("一" <= c <= "鿿" for c in (a.title or ""))]
         s.close()
         engine.dispose()
         assert len(chinese_titles) >= 2, f"Expected >= 2 Chinese articles, got {len(chinese_titles)}"
@@ -158,23 +159,45 @@ class TestSeedSmoke:
 # 2. Auth — all seed users can login
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestSeedAuth:
     """Verify that all seed users can login with the default password."""
 
     SEED_USERS = [
-        "einstein", "feynman", "chandra", "bohr", "heisenberg",
-        "schrodinger", "dirac", "born", "noether", "lovelace",
-        "vonneumann", "turing", "shannon", "hopper", "curie",
-        "franklin", "hodgkin", "crick", "cajal", "goldmanrakic",
-        "popper", "kuhn", "putnam",
+        "einstein",
+        "feynman",
+        "chandra",
+        "bohr",
+        "heisenberg",
+        "schrodinger",
+        "dirac",
+        "born",
+        "noether",
+        "lovelace",
+        "vonneumann",
+        "turing",
+        "shannon",
+        "hopper",
+        "curie",
+        "franklin",
+        "hodgkin",
+        "crick",
+        "cajal",
+        "goldmanrakic",
+        "popper",
+        "kuhn",
+        "putnam",
     ]
 
     @pytest.mark.parametrize("username", SEED_USERS)
     def test_seed_user_can_login(self, client, username):
-        resp = client.post("/api/v1/auth/login", json={
-            "username": username,
-            "password": "666666",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": username,
+                "password": "666666",
+            },
+        )
         assert resp.status_code == 200, f"{username} login failed: {resp.json()}"
         data = resp.json()
         assert data["token"] != ""
@@ -184,6 +207,7 @@ class TestSeedAuth:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 3. Fork → Merge full flow
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestForkMergeFlow:
     """End-to-end: fork an article, edit the fork, propose merge, accept it."""
@@ -198,28 +222,36 @@ class TestForkMergeFlow:
 
         # Use first published article as parent, use feynman as forker
         parent = articles[0]
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "feynman", "password": "666666",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "feynman",
+                "password": "666666",
+            },
+        )
         token = resp.json()["token"]
         feynman_id = resp.json()["user"]["id"]
         headers = {"Authorization": f"Bearer {token}"}
 
         # Fork
         fork_resp = client.post(
-            f"/api/v1/articles/{parent.id}/fork", headers=headers,
+            f"/api/v1/articles/{parent.id}/fork",
+            headers=headers,
         )
         assert fork_resp.status_code in (200, 201)
         fork_id = fork_resp.json()["id"]
 
         # Edit the fork
-        client.post(f"/api/v1/articles/{fork_id}", json={
-            "authors": [feynman_id],
-            "content": "# Forked Content\n\nNew analysis.",
-            "commit_message": "Fork improvements",
-            "self_review": {"originality": 4, "rigor": 4, "completeness": 3,
-                           "pedagogy": 3, "impact": 3},
-        }, headers=headers)
+        client.post(
+            f"/api/v1/articles/{fork_id}",
+            json={
+                "authors": [feynman_id],
+                "content": "# Forked Content\n\nNew analysis.",
+                "commit_message": "Fork improvements",
+                "self_review": {"originality": 4, "rigor": 4, "completeness": 3, "pedagogy": 3, "impact": 3},
+            },
+            headers=headers,
+        )
 
         # Propose merge (authenticated as feynman)
         merge_resp = client.post(
@@ -241,6 +273,7 @@ class TestForkMergeFlow:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. Chinese content search
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestChineseSearch:
     """Search with Chinese query should find Chinese content articles."""
@@ -268,13 +301,14 @@ class TestChineseSearch:
         resp = client.get("/api/v1/articles?size=300")
         assert resp.status_code == 200
         titles = [a["title"] for a in resp.json()["articles"]]
-        chinese = [t for t in titles if any('一' <= c <= '鿿' for c in t)]
+        chinese = [t for t in titles if any("一" <= c <= "鿿" for c in t)]
         assert len(chinese) >= 2
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 5. Citation graph
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestCitationGraph:
     """Verify citation edges exist between related articles."""
@@ -283,9 +317,12 @@ class TestCitationGraph:
         engine = get_engine(DB_URL)
         s = get_session(engine)
         b = s.query(User).filter(User.username == "bohr").first()
-        a = s.query(Article).join(
-            ArticleAuthor, Article.id == ArticleAuthor.article_id
-        ).filter(ArticleAuthor.author_id == b.id).first()
+        a = (
+            s.query(Article)
+            .join(ArticleAuthor, Article.id == ArticleAuthor.article_id)
+            .filter(ArticleAuthor.author_id == b.id)
+            .first()
+        )
         s.close()
         engine.dispose()
         assert a is not None
@@ -301,16 +338,20 @@ class TestCitationGraph:
         engine.dispose()
         assert cit is not None
 
-        resp = client.post("/api/v1/citations/click", json={
-            "from_article_id": cit.from_article_id,
-            "to_article_id": cit.to_article_id,
-        })
+        resp = client.post(
+            "/api/v1/citations/click",
+            json={
+                "from_article_id": cit.from_article_id,
+                "to_article_id": cit.to_article_id,
+            },
+        )
         assert resp.status_code in (200, 201)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 6. Reputation computation
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestReputation:
     """Verify reputation is calculated from community reviews."""
@@ -331,6 +372,7 @@ class TestReputation:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 7. Pool / Sedimentation
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestPoolSedimentation:
     """Verify sedimentation articles have correct sink settings."""
@@ -354,6 +396,7 @@ class TestPoolSedimentation:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 8. Schools / User directory
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSchools:
     """Verify the schools/user directory shows seed users."""
@@ -383,15 +426,20 @@ class TestSchools:
 # 9. Seed-driven scenario tests — exercise real user actions with seeded data
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestSeedScenarios:
     """Exercise real scenarios against the seeded database."""
 
     def test_login_as_einstein_then_list_own_articles(self, client):
         """Login as einstein → list articles filtered by author_id = self."""
         # Login
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "einstein", "password": "666666",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "666666",
+            },
+        )
         assert resp.status_code == 200
         token = resp.json()["token"]
         einstein_id = resp.json()["user"]["id"]
@@ -410,9 +458,13 @@ class TestSeedScenarios:
 
     def test_login_as_feynman_then_check_following(self, client):
         """Login as feynman → check who they follow."""
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "feynman", "password": "666666",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "feynman",
+                "password": "666666",
+            },
+        )
         assert resp.status_code == 200
         feynman_id = resp.json()["user"]["id"]
 
@@ -441,8 +493,7 @@ class TestSeedScenarios:
             resp = client.get(f"/api/v1/articles/{article.id}")
             assert resp.status_code == 200
             data = resp.json()
-            assert data["score"] is not None, \
-                f"Published article {article.title} has null score"
+            assert data["score"] is not None, f"Published article {article.title} has null score"
 
     def test_sedimentation_article_has_future_sink_eta(self, client):
         """Sedimentation articles should have sink_eta in the future or pool metrics."""
@@ -484,9 +535,13 @@ class TestSeedScenarios:
         s = get_session(engine)
         article = s.query(Article).filter(Article.status == "published").first()
         # Login as a random seed user
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "turing", "password": "666666",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "turing",
+                "password": "666666",
+            },
+        )
         token = resp.json()["token"]
         s.close()
         engine.dispose()

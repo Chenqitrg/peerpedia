@@ -6,6 +6,7 @@
 Computes author reputation from article scores and uses reputation
 to weight reviewer contributions.
 """
+
 from sqlalchemy.orm import Session
 
 from peerpedia_core.config.params import params
@@ -92,23 +93,19 @@ def compute_author_reputation(session: Session, user_id: str) -> ReputationScore
     weight = params.reputation.article_to_author_weight  # 0.3
     blended = ReputationScores(
         professionalism=round(
-            (1 - weight) * existing_rep.get("professionalism", 0.0)
-            + weight * rep.professionalism,
+            (1 - weight) * existing_rep.get("professionalism", 0.0) + weight * rep.professionalism,
             2,
         ),
         objectivity=round(
-            (1 - weight) * existing_rep.get("objectivity", 0.0)
-            + weight * rep.objectivity,
+            (1 - weight) * existing_rep.get("objectivity", 0.0) + weight * rep.objectivity,
             2,
         ),
         collaboration=round(
-            (1 - weight) * existing_rep.get("collaboration", 0.0)
-            + weight * rep.collaboration,
+            (1 - weight) * existing_rep.get("collaboration", 0.0) + weight * rep.collaboration,
             2,
         ),
         pedagogy=round(
-            (1 - weight) * existing_rep.get("pedagogy", 0.0)
-            + weight * rep.pedagogy,
+            (1 - weight) * existing_rep.get("pedagogy", 0.0) + weight * rep.pedagogy,
             2,
         ),
     )

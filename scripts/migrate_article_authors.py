@@ -11,6 +11,7 @@ Usage:
 After running this script, the Article.authors JSON column can be removed
 from the model. The data is now in the article_authors join table.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,6 +37,7 @@ def migrate(db_url: str) -> dict:
     print("✓ article_authors table ready")
 
     from peerpedia_core.storage.db.engine import get_session
+
     session = get_session(engine)
 
     stats = {"articles_scanned": 0, "authors_migrated": 0, "skipped": 0}
@@ -44,6 +46,7 @@ def migrate(db_url: str) -> dict:
     try:
         # Read old JSON column via raw SQL (column removed from ORM model)
         from sqlalchemy import text
+
         result = session.execute(text("SELECT id, authors FROM articles"))
         rows = list(result.fetchall())
         stats["articles_scanned"] = len(rows)
@@ -79,17 +82,21 @@ def migrate(db_url: str) -> dict:
                     print(f"  WARNING: skipping unknown author_id {author_id} for article {article_id}")
                     continue
 
-                session.add(ArticleAuthor(
-                    article_id=article_id,
-                    author_id=author_id,
-                    position=pos,
-                ))
+                session.add(
+                    ArticleAuthor(
+                        article_id=article_id,
+                        author_id=author_id,
+                        position=pos,
+                    )
+                )
                 stats["authors_migrated"] += 1
 
         session.commit()
-        print(f"✓ Migrated {stats['authors_migrated']} author relations "
-              f"from {stats['articles_scanned']} articles "
-              f"({stats['skipped']} articles had no authors)")
+        print(
+            f"✓ Migrated {stats['authors_migrated']} author relations "
+            f"from {stats['articles_scanned']} articles "
+            f"({stats['skipped']} articles had no authors)"
+        )
 
         # Verify
         aa_count = session.query(ArticleAuthor).count()
@@ -108,8 +115,7 @@ def migrate(db_url: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Migrate Article.authors JSON → article_authors join table")
-    parser.add_argument("--db", default="sqlite:///peerpedia.db",
-                        help="Database URL (default: sqlite:///peerpedia.db)")
+    parser.add_argument("--db", default="sqlite:///peerpedia.db", help="Database URL (default: sqlite:///peerpedia.db)")
     args = parser.parse_args()
 
     print(f"Migrating: {args.db}")

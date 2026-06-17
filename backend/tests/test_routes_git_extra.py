@@ -7,6 +7,7 @@ These tests strengthen the git-backed article sub-routes (history, diff,
 fork, source, download) by verifying the actual response payload, not
 just accepting 200/404. Added alongside existing test_routes_git.py.
 """
+
 import shutil
 
 import pytest
@@ -43,8 +44,7 @@ def client(db_engine):
 def article_with_history(db_engine):
     """Create a user + article with a git repo containing 2 commits."""
     s = get_session(db_engine)
-    u = User(username="git_extra_user", password_hash="",
-             name="玄奘", anonymous_name="anon_xz", affiliation="大雁塔")
+    u = User(username="git_extra_user", password_hash="", name="玄奘", anonymous_name="anon_xz", affiliation="大雁塔")
     s.add(u)
     s.commit()
     a = Article(status="published")
@@ -77,6 +77,7 @@ def article_with_history(db_engine):
 # ═══════════════════════════════════════════════════════════════════════════════
 # History endpoint — real content verification
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestHistoryContent:
     """GET /articles/{id}/history returns real commit data."""
@@ -124,6 +125,7 @@ class TestHistoryContent:
 # Diff endpoint — real content verification
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestDiffContent:
     """GET /articles/{id}/diff/{h1}/{h2} returns real diff data."""
 
@@ -145,8 +147,7 @@ class TestDiffContent:
         resp = client.get(f"/api/v1/articles/{aid}/diff/{h1}/{h2}")
         diff_text = resp.json()["diff_text"]
         # h2 added "西行五万里。"
-        assert "西行五万里" in diff_text, \
-            f"Diff should contain the added content, got: {diff_text}"
+        assert "西行五万里" in diff_text, f"Diff should contain the added content, got: {diff_text}"
 
     def test_diff_stats_not_empty(self, client, article_with_history):
         """Diff between different commits should have non-empty stats."""
@@ -175,6 +176,7 @@ class TestDiffContent:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Source and download endpoints — real content verification
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSourceAndDownload:
     """GET source and download endpoints return actual file content."""
@@ -220,9 +222,8 @@ class TestSourceAndDownload:
         # Verify it's a valid tar.gz
         import io
         import tarfile
+
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
             names = tar.getnames()
-            assert any("article.md" in n for n in names), \
-                f"Repo archive should contain article.md, got: {names}"
-            assert any(".git" in n for n in names), \
-                f"Repo archive should contain .git, got: {names}"
+            assert any("article.md" in n for n in names), f"Repo archive should contain article.md, got: {names}"
+            assert any(".git" in n for n in names), f"Repo archive should contain .git, got: {names}"

@@ -11,6 +11,7 @@ It must reliably:
   - Compile Markdown to HTML with KaTeX math support
   - Handle missing CLI, timeouts, and read errors gracefully
 """
+
 import tempfile
 from pathlib import Path
 
@@ -354,6 +355,7 @@ class TestMarkdownFallback:
             builtins.__import__ = mock_import
             # Force reload so the module-level import check runs again
             from peerpedia_core.storage import compiler
+
             importlib.reload(compiler)
 
             with tempfile.TemporaryDirectory() as tmp:
@@ -383,8 +385,7 @@ class TestCompileResult:
         assert r.warnings == []
 
     def test_failure_result(self):
-        r = CompileResult(success=False, format="typst", error="syntax error",
-                         warnings=["warning: unused"])
+        r = CompileResult(success=False, format="typst", error="syntax error", warnings=["warning: unused"])
         assert r.success is False
         assert r.error == "syntax error"
         assert len(r.warnings) == 1

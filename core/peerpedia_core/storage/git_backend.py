@@ -87,19 +87,23 @@ def get_commit_history(
         return []
     commits = []
     for c in repo.iter_commits(max_count=max_count):
-        commits.append({
-            "hash": c.hexsha,
-            "parents": [p.hexsha for p in c.parents],
-            "message": c.message.strip(),
-            "author": str(c.author),
-            "timestamp": c.committed_datetime.isoformat(),
-            "stats": {
-                "total": c.stats.total,
-                "files": list(c.stats.files.keys()),
-                "insertions": c.stats.total.get("insertions", 0) if isinstance(c.stats.total, dict) else 0,
-                "deletions": c.stats.total.get("deletions", 0) if isinstance(c.stats.total, dict) else 0,
-            } if c.stats.total else {},
-        })
+        commits.append(
+            {
+                "hash": c.hexsha,
+                "parents": [p.hexsha for p in c.parents],
+                "message": c.message.strip(),
+                "author": str(c.author),
+                "timestamp": c.committed_datetime.isoformat(),
+                "stats": {
+                    "total": c.stats.total,
+                    "files": list(c.stats.files.keys()),
+                    "insertions": c.stats.total.get("insertions", 0) if isinstance(c.stats.total, dict) else 0,
+                    "deletions": c.stats.total.get("deletions", 0) if isinstance(c.stats.total, dict) else 0,
+                }
+                if c.stats.total
+                else {},
+            }
+        )
     return commits
 
 
@@ -110,11 +114,13 @@ def get_blame(repo_path: Path, file_path: str) -> list[dict]:
     repo = git.Repo(repo_path)
     blames: list[dict] = []
     for entry in repo.blame_incremental("HEAD", file_path):  # type: ignore[attr-defined]
-        blames.append({
-            "commit": entry.commit.hexsha[:8],  # type: ignore[attr-defined]
-            "author": str(entry.commit.author),  # type: ignore[attr-defined]
-            "lines": list(range(entry.linenos_start, entry.linenos_start + entry.linenos_count)),  # type: ignore[attr-defined]
-        })
+        blames.append(
+            {
+                "commit": entry.commit.hexsha[:8],  # type: ignore[attr-defined]
+                "author": str(entry.commit.author),  # type: ignore[attr-defined]
+                "lines": list(range(entry.linenos_start, entry.linenos_start + entry.linenos_count)),  # type: ignore[attr-defined]
+            }
+        )
     return blames
 
 
@@ -167,13 +173,13 @@ def get_diff(repo_path: Path, commit_hash: str) -> dict:
         "stats": {
             "total": commit.stats.total.get("lines", 0) if commit.stats.total else 0,
             "files": list(commit.stats.files.keys()) if commit.stats.total else [],
-        } if commit.stats.total else {},
+        }
+        if commit.stats.total
+        else {},
     }
 
 
-def get_diff_between(
-    repo_path: Path, hash1: str, hash2: str
-) -> dict:
+def get_diff_between(repo_path: Path, hash1: str, hash2: str) -> dict:
     """Get the diff between two arbitrary commits.
 
     hash1 is the "old" commit, hash2 is the "new" commit.
@@ -237,6 +243,7 @@ def get_diff_between(
 
 class MergeConflictError(Exception):
     """Raised when a git merge encounters conflicts that can't auto-resolve."""
+
     pass
 
 
@@ -266,9 +273,7 @@ def merge_git_repos(target: Path, fork: Path, author_name: str) -> str:
                 continue
 
         if fork_ref is None:
-            raise MergeConflictError(
-                "Could not find main/master branch in fork"
-            )
+            raise MergeConflictError("Could not find main/master branch in fork")
 
         target_repo.git.merge(
             fork_ref.commit.hexsha,
@@ -364,9 +369,7 @@ def create_bundle(repo_path: Path, since_hash: str) -> bytes:
     try:
         repo.git.merge_base("--is-ancestor", since_hash, "HEAD")
     except git.GitCommandError:
-        raise ValueError(
-            f"since_hash {since_hash[:8]} is not an ancestor of HEAD"
-        )
+        raise ValueError(f"since_hash {since_hash[:8]} is not an ancestor of HEAD")
 
     with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
         bundle_path = f.name

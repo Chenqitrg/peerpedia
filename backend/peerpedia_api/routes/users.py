@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """User API routes."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from peerpedia_core.storage.db.crud_article import get_articles_by_author
 from peerpedia_core.storage.db.crud_user import (
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 def _batch_article_counts(db: Session, user_ids: list[str]) -> dict[str, int]:
     """Return {user_id: article_count} for a batch of users."""
     from peerpedia_core.storage.db.models import Article, ArticleAuthor
+
     if not user_ids:
         return {}
     rows = (
@@ -44,6 +46,7 @@ def _batch_article_counts(db: Session, user_ids: list[str]) -> dict[str, int]:
 
 # ── Users ────────────────────────────────────────────────────────────────
 
+
 @router.get("", response_model=list[UserSummary])
 def api_list_users(db: Session = Depends(deps.get_db)):
     users = list_users(db)
@@ -51,22 +54,31 @@ def api_list_users(db: Session = Depends(deps.get_db)):
     counts = _batch_article_counts(db, user_ids)
     out = []
     for u in users:
-        out.append(UserSummary(
-            id=u.id, name=u.name, anonymous_name=u.anonymous_name,
-            affiliation=u.affiliation, expertise=u.expertise,
-            avatar_url=u.avatar_url,
-            article_count=counts.get(u.id, 0),
-            reputation=u.reputation or {},
-        ))
+        out.append(
+            UserSummary(
+                id=u.id,
+                name=u.name,
+                anonymous_name=u.anonymous_name,
+                affiliation=u.affiliation,
+                expertise=u.expertise,
+                avatar_url=u.avatar_url,
+                article_count=counts.get(u.id, 0),
+                reputation=u.reputation or {},
+            )
+        )
     return out
 
 
 @router.post("", status_code=201, response_model=UserProfile)
 def api_create_user(body: UserCreate, db: Session = Depends(deps.get_db)):
-    u = create_user(db, name=body.name, affiliation=body.affiliation,
-                    username=body.username,
-                    password_hash=hash_password(body.password),
-                    email=body.email)
+    u = create_user(
+        db,
+        name=body.name,
+        affiliation=body.affiliation,
+        username=body.username,
+        password_hash=hash_password(body.password),
+        email=body.email,
+    )
     if body.expertise:
         u.expertise = body.expertise
     if body.avatar_url:
@@ -75,14 +87,21 @@ def api_create_user(body: UserCreate, db: Session = Depends(deps.get_db)):
         u.contact = body.contact
     if body.expertise or body.avatar_url or body.contact:
         db.commit()
-    return UserProfile(id=u.id, username=u.username or "", name=u.name,
-                       anonymous_name=u.anonymous_name or "",
-                       affiliation=u.affiliation or "",
-                       expertise=u.expertise or [],
-                       avatar_url=u.avatar_url, contact=u.contact,
-                       reputation=u.reputation or {},
-                       followers_count=0, following_count=0, article_count=0,
-                       created_at=u.created_at)
+    return UserProfile(
+        id=u.id,
+        username=u.username or "",
+        name=u.name,
+        anonymous_name=u.anonymous_name or "",
+        affiliation=u.affiliation or "",
+        expertise=u.expertise or [],
+        avatar_url=u.avatar_url,
+        contact=u.contact,
+        reputation=u.reputation or {},
+        followers_count=0,
+        following_count=0,
+        article_count=0,
+        created_at=u.created_at,
+    )
 
 
 @router.get("/{user_id}", response_model=UserProfile)
@@ -92,11 +111,14 @@ def api_get_user(user_id: str, db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     articles = get_articles_by_author(db, user_id)
     return UserProfile(
-        id=u.id, username=u.username or "", name=u.name,
+        id=u.id,
+        username=u.username or "",
+        name=u.name,
         anonymous_name=u.anonymous_name or "",
         affiliation=u.affiliation or "",
         expertise=u.expertise or [],
-        avatar_url=u.avatar_url, contact=u.contact,
+        avatar_url=u.avatar_url,
+        contact=u.contact,
         reputation=u.reputation or {},
         followers_count=get_follower_count(db, user_id),
         following_count=get_following_count(db, user_id),
@@ -106,9 +128,9 @@ def api_get_user(user_id: str, db: Session = Depends(deps.get_db)):
 
 
 @router.put("/{user_id}", response_model=UserProfile)
-def api_update_user(user_id: str, body: UserUpdate,
-                    db: Session = Depends(deps.get_db),
-                    current_user: User = Depends(require_user)):
+def api_update_user(
+    user_id: str, body: UserUpdate, db: Session = Depends(deps.get_db), current_user: User = Depends(require_user)
+):
     """Update user profile. Only self-editable. Name is immutable."""
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Cannot edit another user's profile")
@@ -138,6 +160,7 @@ def api_update_user(user_id: str, body: UserUpdate,
 
 # ── Follow ───────────────────────────────────────────────────────────────
 
+
 @router.get("/{user_id}/followers", response_model=list[UserSummary])
 def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
     users = get_followers(db, user_id)
@@ -145,11 +168,16 @@ def api_get_followers(user_id: str, db: Session = Depends(deps.get_db)):
     counts = _batch_article_counts(db, user_ids)
     out = []
     for u in users:
-        out.append(UserSummary(
-            id=u.id, name=u.name, affiliation=u.affiliation,
-            expertise=u.expertise,
-            article_count=counts.get(u.id, 0), reputation=u.reputation or {},
-        ))
+        out.append(
+            UserSummary(
+                id=u.id,
+                name=u.name,
+                affiliation=u.affiliation,
+                expertise=u.expertise,
+                article_count=counts.get(u.id, 0),
+                reputation=u.reputation or {},
+            )
+        )
     return out
 
 
@@ -160,17 +188,21 @@ def api_get_following(user_id: str, db: Session = Depends(deps.get_db)):
     counts = _batch_article_counts(db, user_ids)
     out = []
     for u in users:
-        out.append(UserSummary(
-            id=u.id, name=u.name, affiliation=u.affiliation,
-            expertise=u.expertise,
-            article_count=counts.get(u.id, 0), reputation=u.reputation or {},
-        ))
+        out.append(
+            UserSummary(
+                id=u.id,
+                name=u.name,
+                affiliation=u.affiliation,
+                expertise=u.expertise,
+                article_count=counts.get(u.id, 0),
+                reputation=u.reputation or {},
+            )
+        )
     return out
 
 
 @router.post("/{user_id}/follow", status_code=201)
-def api_follow(user_id: str, current_user: User = Depends(require_user),
-               db: Session = Depends(deps.get_db)):
+def api_follow(user_id: str, current_user: User = Depends(require_user), db: Session = Depends(deps.get_db)):
     if get_user(db, user_id) is None:
         raise HTTPException(status_code=404, detail="User not found")
     if not is_following(db, current_user.id, user_id):
@@ -179,7 +211,6 @@ def api_follow(user_id: str, current_user: User = Depends(require_user),
 
 
 @router.delete("/{user_id}/follow")
-def api_unfollow(user_id: str, current_user: User = Depends(require_user),
-                 db: Session = Depends(deps.get_db)):
+def api_unfollow(user_id: str, current_user: User = Depends(require_user), db: Session = Depends(deps.get_db)):
     unfollow_user(db, current_user.id, user_id)
     return {"status": "ok", "following": False}

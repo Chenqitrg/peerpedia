@@ -38,6 +38,7 @@ SPEC-SYNC-CONFLICT — Username conflict behavior
 
 SPECIFICATION STATUS = LOCKED.
 """
+
 import os
 import uuid
 
@@ -80,6 +81,7 @@ def client(seed_engine):
 # SPEC-SYNC-E2E — Complete registration → bookmark lifecycle
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestSpecSyncE2E:
     """Full journey: new user registers on server, browses, bookmarks."""
 
@@ -89,12 +91,15 @@ class TestSpecSyncE2E:
 
     def test_register_new_user(self, client):
         """Step 1: Register a user that does NOT exist in seed data."""
-        resp = client.post("/api/v1/auth/register", json={
-            "username": self.USER,
-            "password": self.PASS,
-            "email": f"{_UNIQ}@test.com",
-            "name": self.NAME,
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": self.USER,
+                "password": self.PASS,
+                "email": f"{_UNIQ}@test.com",
+                "name": self.NAME,
+            },
+        )
         assert resp.status_code == 201, f"Register failed: {resp.json()}"
         data = resp.json()
         assert "token" in data
@@ -103,10 +108,13 @@ class TestSpecSyncE2E:
 
     def test_login_new_user(self, client):
         """Step 2: Login with the newly registered credentials."""
-        resp = client.post("/api/v1/auth/login", json={
-            "username": self.USER,
-            "password": self.PASS,
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": self.USER,
+                "password": self.PASS,
+            },
+        )
         assert resp.status_code == 200, f"Login failed: {resp.json()}"
         data = resp.json()
         assert "token" in data
@@ -116,10 +124,13 @@ class TestSpecSyncE2E:
     def test_full_bookmark_lifecycle_after_registration(self, client):
         """Steps 3-7: Pool → Bookmark → Verify → Remove → Verify."""
         # Login
-        login = client.post("/api/v1/auth/login", json={
-            "username": self.USER,
-            "password": self.PASS,
-        })
+        login = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": self.USER,
+                "password": self.PASS,
+            },
+        )
         assert login.status_code == 200
         token = login.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
@@ -128,13 +139,9 @@ class TestSpecSyncE2E:
         pool = client.get("/api/v1/pool", headers=headers)
         assert pool.status_code == 200
         articles = pool.json().get("articles", [])
-        assert len(articles) > 0, (
-            "Pool is empty — seed data should have published/sedimentation articles"
-        )
+        assert len(articles) > 0, "Pool is empty — seed data should have published/sedimentation articles"
         article_id = articles[0]["id"]
-        assert not articles[0].get("is_bookmarked"), (
-            "New user should not have any bookmarks yet"
-        )
+        assert not articles[0].get("is_bookmarked"), "New user should not have any bookmarks yet"
 
         # Step 4: Bookmark
         add = client.post(
@@ -147,10 +154,7 @@ class TestSpecSyncE2E:
         bookmarks = client.get("/api/v1/bookmarks", headers=headers)
         assert bookmarks.status_code == 200
         bm_ids = [b["article_id"] for b in bookmarks.json().get("bookmarks", [])]
-        assert article_id in bm_ids, (
-            f"Article {article_id[:8]} not in bookmarks. "
-            f"Got {len(bm_ids)}: {[a[:8] for a in bm_ids]}"
-        )
+        assert article_id in bm_ids, f"Article {article_id[:8]} not in bookmarks. Got {len(bm_ids)}: {[a[:8] for a in bm_ids]}"
 
         # Step 6: Remove bookmark
         remove = client.delete(
@@ -163,9 +167,7 @@ class TestSpecSyncE2E:
         after = client.get("/api/v1/bookmarks", headers=headers)
         assert after.status_code == 200
         after_ids = [b["article_id"] for b in after.json().get("bookmarks", [])]
-        assert article_id not in after_ids, (
-            f"Article {article_id[:8]} still bookmarked after removal"
-        )
+        assert article_id not in after_ids, f"Article {article_id[:8]} still bookmarked after removal"
 
     def test_new_user_appears_in_users_list(self, client):
         """The registered user should be visible in GET /users."""
@@ -173,17 +175,17 @@ class TestSpecSyncE2E:
         assert resp.status_code == 200
         users = resp.json()
         names = [u["name"] for u in users]
-        assert self.NAME in names, (
-            f"{self.NAME} not found in /users list. "
-            f"Got {len(names)} users"
-        )
+        assert self.NAME in names, f"{self.NAME} not found in /users list. Got {len(names)} users"
 
     def test_cannot_bookmark_own_article(self, client):
         """Self-bookmark returns 400 — prevents local-self from syncing to server-self."""
-        login = client.post("/api/v1/auth/login", json={
-            "username": self.USER,
-            "password": self.PASS,
-        })
+        login = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": self.USER,
+                "password": self.PASS,
+            },
+        )
         token = login.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -201,22 +203,29 @@ class TestSpecSyncE2E:
 # SPEC-SYNC-PROFILE — Profile update after registration
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestSpecSyncProfile:
     """L3: Profile data sync — PUT /users/{id} updates server profile."""
 
     @pytest.fixture
     def user_headers(self, client):
         """Register a fresh user and return auth headers."""
-        client.post("/api/v1/auth/register", json={
-            "username": "syncprofile",
-            "password": "profile123",
-            "email": "profile@test.com",
-            "name": "Profile User",
-        })
-        login = client.post("/api/v1/auth/login", json={
-            "username": "syncprofile",
-            "password": "profile123",
-        })
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "syncprofile",
+                "password": "profile123",
+                "email": "profile@test.com",
+                "name": "Profile User",
+            },
+        )
+        login = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "syncprofile",
+                "password": "profile123",
+            },
+        )
         assert login.status_code == 200
         token = login.json()["token"]
         user_id = login.json()["user"]["id"]
@@ -244,16 +253,22 @@ class TestSpecSyncProfile:
         headers, _ = user_headers
 
         # Register a second user
-        client.post("/api/v1/auth/register", json={
-            "username": "syncprofile2",
-            "password": "profile123",
-            "email": "profile2@test.com",
-            "name": "Profile User 2",
-        })
-        login2 = client.post("/api/v1/auth/login", json={
-            "username": "syncprofile2",
-            "password": "profile123",
-        })
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "syncprofile2",
+                "password": "profile123",
+                "email": "profile2@test.com",
+                "name": "Profile User 2",
+            },
+        )
+        login2 = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "syncprofile2",
+                "password": "profile123",
+            },
+        )
         user2_id = login2.json()["user"]["id"]
 
         # Try to edit user2 with user1's token
@@ -262,9 +277,7 @@ class TestSpecSyncProfile:
             json={"affiliation": "Hacked University"},
             headers=headers,
         )
-        assert resp.status_code == 403, (
-            f"Should reject cross-user profile edit, got {resp.status_code}"
-        )
+        assert resp.status_code == 403, f"Should reject cross-user profile edit, got {resp.status_code}"
 
     def test_update_expertise(self, client, user_headers):
         """PUT with expertise list → GET reflects the list."""
@@ -283,58 +296,70 @@ class TestSpecSyncProfile:
 # SPEC-SYNC-CONFLICT — Username conflict + auth edge cases
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestSpecSyncConflict:
     """Server-side auth edge cases that affect sync."""
 
     def test_duplicate_username_rejected(self, client):
         """Registering an existing username returns 4xx."""
         # einstein is in seed data
-        resp = client.post("/api/v1/auth/register", json={
-            "username": "einstein",
-            "password": "somepass",
-            "email": "fake@test.com",
-            "name": "Fake Einstein",
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "einstein",
+                "password": "somepass",
+                "email": "fake@test.com",
+                "name": "Fake Einstein",
+            },
+        )
         assert resp.status_code in (400, 409, 422), (
             f"Duplicate username should be rejected, got {resp.status_code}: {resp.json()}"
         )
 
     def test_login_wrong_password(self, client):
         """Login with wrong password → 401."""
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "einstein",
-            "password": "wrongpassword",
-        })
-        assert resp.status_code == 401, (
-            f"Wrong password should return 401, got {resp.status_code}"
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "wrongpassword",
+            },
         )
+        assert resp.status_code == 401, f"Wrong password should return 401, got {resp.status_code}"
 
     def test_login_correct_password(self, client):
         """Login with correct seed password → 200 + valid JWT."""
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "einstein",
-            "password": "666666",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "666666",
+            },
+        )
         assert resp.status_code == 200
         assert "token" in resp.json()
         assert resp.json()["user"]["username"] == "einstein"
 
     def test_nonexistent_user_login(self, client):
         """Login with nonexistent username → 401/404."""
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "no_such_user_xyz",
-            "password": "anything",
-        })
-        assert resp.status_code in (401, 404), (
-            f"Nonexistent user should fail auth, got {resp.status_code}"
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "no_such_user_xyz",
+                "password": "anything",
+            },
         )
+        assert resp.status_code in (401, 404), f"Nonexistent user should fail auth, got {resp.status_code}"
 
     def test_token_works_for_authenticated_endpoints(self, client):
         """A valid JWT from login can access protected endpoints."""
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "einstein",
-            "password": "666666",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "666666",
+            },
+        )
         token = resp.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 

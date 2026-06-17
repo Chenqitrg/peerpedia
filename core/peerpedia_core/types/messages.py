@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Thread messages — used in Review and MergeProposal conversations."""
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 

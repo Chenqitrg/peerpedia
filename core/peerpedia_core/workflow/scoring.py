@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Score aggregation — weighted average of reviews."""
+
 from sqlalchemy.orm import Session
 
 from peerpedia_core.config.params import params
@@ -108,11 +109,13 @@ def compute_article_score_for_commit(
             user_weight_map[u.id] = 1.0
 
     for r in all_reviews:
-        review_dicts.append({
-            "scores": r.scores,
-            "is_self": r.reviewer_id in authors,
-            "reviewer_id": r.reviewer_id,
-        })
+        review_dicts.append(
+            {
+                "scores": r.scores,
+                "is_self": r.reviewer_id in authors,
+                "reviewer_id": r.reviewer_id,
+            }
+        )
         reviewer_weights[r.reviewer_id] = user_weight_map.get(r.reviewer_id, 1.0)
 
     return compute_article_score(review_dicts, reviewer_weights)

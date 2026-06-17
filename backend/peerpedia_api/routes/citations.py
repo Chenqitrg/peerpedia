@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Citation API routes."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from peerpedia_core.storage.db.crud_article import get_article
 from peerpedia_core.storage.db.crud_citation import (
@@ -55,6 +56,5 @@ def api_get_citations(article_id: str, db: Session = Depends(deps.get_db)):
 
 @router.post("/citations/click", status_code=201)
 def api_record_click(body: ClickRequest, db: Session = Depends(deps.get_db)):
-    create_or_update_citation(db, body.from_article_id, body.to_article_id,
-                              forward=0.5, backward=0.0)
+    create_or_update_citation(db, body.from_article_id, body.to_article_id, forward=0.5, backward=0.0)
     return {"status": "ok"}

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Shared score types used across models."""
+
 from dataclasses import dataclass
 
 
@@ -27,13 +28,11 @@ class FiveDimScores:
         self.impact = _clamp(self.impact)
 
     def average(self) -> float:
-        return (self.originality + self.rigor + self.completeness
-                + self.pedagogy + self.impact) / 5.0
+        return (self.originality + self.rigor + self.completeness + self.pedagogy + self.impact) / 5.0
 
     def weighted_average(self, weights: list[float]) -> float:
         """Weighted average with given dimension weights (5 floats)."""
-        values = [self.originality, self.rigor, self.completeness,
-                  self.pedagogy, self.impact]
+        values = [self.originality, self.rigor, self.completeness, self.pedagogy, self.impact]
         total_weight = sum(weights)
         if total_weight == 0:
             return 0.0
@@ -59,8 +58,7 @@ class ReputationScores:
     pedagogy: float = 0.0
 
     def average(self) -> float:
-        return (self.professionalism + self.objectivity
-                + self.collaboration + self.pedagogy) / 4.0
+        return (self.professionalism + self.objectivity + self.collaboration + self.pedagogy) / 4.0
 
     def to_dict(self) -> dict:
         return {

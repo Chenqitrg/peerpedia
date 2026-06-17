@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """FastAPI dependency injection."""
+
 import os
 import time
 from typing import Optional
@@ -18,6 +19,7 @@ _JWT_EXPIRY = 86400  # 24 hours
 
 if not _JWT_SECRET:
     import warnings
+
     warnings.warn("JWT_SECRET not set — using insecure default for development only")
     _JWT_SECRET = "peerpedia-dev-secret"
 
@@ -34,6 +36,7 @@ def get_db():
 
 # ── Password hashing ───────────────────────────────────────────────────
 
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -43,6 +46,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 # ── JWT token ──────────────────────────────────────────────────────────
+
 
 def create_token(user_id: str) -> str:
     payload = {"sub": user_id, "iat": int(time.time()), "exp": int(time.time()) + _JWT_EXPIRY}
@@ -59,6 +63,7 @@ def decode_token(token: str) -> Optional[str]:
 
 
 # ── Auth dependencies ──────────────────────────────────────────────────
+
 
 def get_current_user(
     authorization: Optional[str] = Header(None),

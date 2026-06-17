@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Tests for core value objects — sharable types used across models."""
+
 import pytest
 
 from peerpedia_core.types.messages import ThreadMessage
@@ -27,22 +28,31 @@ class TestFiveDimScores:
 
     def test_average(self):
         s = FiveDimScores(
-            originality=4.0, rigor=4.0, completeness=4.0,
-            pedagogy=4.0, impact=4.0,
+            originality=4.0,
+            rigor=4.0,
+            completeness=4.0,
+            pedagogy=4.0,
+            impact=4.0,
         )
         assert s.average() == 4.0
 
     def test_average_mixed(self):
         s = FiveDimScores(
-            originality=5.0, rigor=0.0, completeness=5.0,
-            pedagogy=0.0, impact=5.0,
+            originality=5.0,
+            rigor=0.0,
+            completeness=5.0,
+            pedagogy=0.0,
+            impact=5.0,
         )
         assert s.average() == 3.0
 
     def test_to_dict(self):
         s = FiveDimScores(
-            originality=4.0, rigor=3.0, completeness=5.0,
-            pedagogy=2.0, impact=1.0,
+            originality=4.0,
+            rigor=3.0,
+            completeness=5.0,
+            pedagogy=2.0,
+            impact=1.0,
         )
         d = s.to_dict()
         assert d == {
@@ -64,8 +74,11 @@ class TestFiveDimScores:
     def test_clamp_range(self):
         """值超出 0-5 时截断"""
         s = FiveDimScores(
-            originality=6.0, rigor=-1.0, completeness=5.0,
-            pedagogy=2.0, impact=7.0,
+            originality=6.0,
+            rigor=-1.0,
+            completeness=5.0,
+            pedagogy=2.0,
+            impact=7.0,
         )
         assert s.originality == 5.0
         assert s.rigor == 0.0
@@ -74,8 +87,11 @@ class TestFiveDimScores:
     def test_weighted_average(self):
         """带权重的平均"""
         s = FiveDimScores(
-            originality=5.0, rigor=5.0, completeness=5.0,
-            pedagogy=1.0, impact=1.0,
+            originality=5.0,
+            rigor=5.0,
+            completeness=5.0,
+            pedagogy=1.0,
+            impact=1.0,
         )
         # 权重一样 → 简单平均
         result = s.weighted_average([1, 1, 1, 1, 1])
@@ -84,8 +100,11 @@ class TestFiveDimScores:
     def test_weighted_average_zero_weights(self):
         """全零权重返回 0.0 而不是除零错误"""
         s = FiveDimScores(
-            originality=3.0, rigor=3.0, completeness=3.0,
-            pedagogy=3.0, impact=3.0,
+            originality=3.0,
+            rigor=3.0,
+            completeness=3.0,
+            pedagogy=3.0,
+            impact=3.0,
         )
         result = s.weighted_average([0, 0, 0, 0, 0])
         assert result == 0.0
@@ -93,8 +112,11 @@ class TestFiveDimScores:
     def test_weighted_average_custom_weights(self):
         """自定义权重影响各维度贡献"""
         s = FiveDimScores(
-            originality=5.0, rigor=5.0, completeness=1.0,
-            pedagogy=1.0, impact=1.0,
+            originality=5.0,
+            rigor=5.0,
+            completeness=1.0,
+            pedagogy=1.0,
+            impact=1.0,
         )
         # 只重视 originality 和 rigor
         result = s.weighted_average([0.5, 0.5, 0, 0, 0])
@@ -125,14 +147,15 @@ class TestReputationScores:
 
     def test_average(self):
         s = ReputationScores(
-            professionalism=4.0, objectivity=4.0,
-            collaboration=4.0, pedagogy=4.0,
+            professionalism=4.0,
+            objectivity=4.0,
+            collaboration=4.0,
+            pedagogy=4.0,
         )
         assert s.average() == 4.0
 
     def test_to_dict(self):
-        s = ReputationScores(professionalism=3.0, objectivity=4.0,
-                             collaboration=2.0, pedagogy=5.0)
+        s = ReputationScores(professionalism=3.0, objectivity=4.0, collaboration=2.0, pedagogy=5.0)
         assert s.to_dict() == {
             "professionalism": 3.0,
             "objectivity": 4.0,

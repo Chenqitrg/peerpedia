@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Integration tests for pool and bookmark routes."""
+
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
@@ -12,12 +13,14 @@ from peerpedia_core.storage.db.models import Article, User
 def client(db_engine):
     from peerpedia_api import deps
     from peerpedia_api.main import app
+
     def override_db():
         session = get_session(db_engine)
         try:
             yield session
         finally:
             session.close()
+
     app.dependency_overrides[deps.get_db] = override_db
     with TestClient(app) as c:
         yield c
@@ -43,8 +46,8 @@ class TestPool:
         s.add(u)
         s.commit()
         from datetime import datetime, timezone
-        a = Article(status="sedimentation", sink_start=datetime.now(timezone.utc),
-                    sink_duration_days=7)
+
+        a = Article(status="sedimentation", sink_start=datetime.now(timezone.utc), sink_duration_days=7)
         s.add(a)
         s.commit()
         uid = u.id
@@ -114,6 +117,7 @@ class TestBookmarks:
         s.commit()
         # 将 u 设为文章作者
         from peerpedia_core.storage.db.models import ArticleAuthor
+
         s.add(ArticleAuthor(article_id=a.id, author_id=u.id, position=0))
         s.commit()
         s.close()
@@ -133,6 +137,7 @@ class TestBookmarks:
         s.add(a)
         s.commit()
         from peerpedia_core.storage.db.models import ArticleAuthor
+
         s.add(ArticleAuthor(article_id=a.id, author_id=u.id, position=0))
         s.commit()
         s.close()

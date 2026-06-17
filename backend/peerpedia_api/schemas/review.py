@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Review API schemas."""
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -52,15 +53,11 @@ class ReviewCreate(BaseModel):
             for author_id, contrib in self.contributions.items():
                 c_missing = FIVE_DIMS - set(contrib.keys())
                 if c_missing:
-                    raise ValueError(
-                        f"Contributions for {author_id} missing dimensions: {c_missing}"
-                    )
+                    raise ValueError(f"Contributions for {author_id} missing dimensions: {c_missing}")
                 for dim in FIVE_DIMS:
                     v = contrib[dim]
                     if not isinstance(v, (int, float)) or v < 0 or v > 1:
-                        raise ValueError(
-                            f"Contribution {dim} for {author_id} must be 0-1, got {v}"
-                        )
+                        raise ValueError(f"Contribution {dim} for {author_id} must be 0-1, got {v}")
         return self
 
 

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Compile API route."""
+
 import tempfile
 from pathlib import Path
 
@@ -19,6 +20,7 @@ class CompileRequest(BaseModel):
 
 # ── Shared compilation helpers ────────────────────────────────────────────
 
+
 def _compile_markdown(content: str) -> str:
     """Compile Markdown content to HTML string."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -28,6 +30,7 @@ def _compile_markdown(content: str) -> str:
         out_dir = tmp_dir / "out"
         out_dir.mkdir()
         from peerpedia_core.storage.compiler import MarkdownBackend
+
         backend = MarkdownBackend()
         result = backend.compile(src, out_dir)
         if not result.success:
@@ -47,6 +50,7 @@ def _compile_typst_svg(content: str) -> str:
         out_dir = tmp_dir / "out"
         out_dir.mkdir()
         from peerpedia_core.storage.compiler import TypstBackend
+
         backend = TypstBackend()
         result = backend.compile(src, out_dir, fmt="svg")
         if not result.success:
@@ -66,6 +70,7 @@ def _compile_typst_pdf(content: str) -> bytes:
         out_dir = tmp_dir / "out"
         out_dir.mkdir()
         from peerpedia_core.storage.compiler import TypstBackend
+
         backend = TypstBackend()
         result = backend.compile(src, out_dir, fmt="pdf")
         if not result.success:
@@ -77,6 +82,7 @@ def _compile_typst_pdf(content: str) -> bytes:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
+
 
 @router.post("/compile-preview")
 def compile_preview(body: CompileRequest):

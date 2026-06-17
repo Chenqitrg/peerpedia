@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """User API schemas."""
+
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -55,6 +56,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     """Fields the user can edit about themselves. Name is immutable."""
+
     anonymous_name: Optional[str] = None
     affiliation: Optional[str] = None
     expertise: Optional[list[str]] = None

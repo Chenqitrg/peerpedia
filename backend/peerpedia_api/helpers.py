@@ -17,6 +17,7 @@ from peerpedia_api.schemas.article import ArticleSummary, AuthorInfo
 
 # ── Author resolution ─────────────────────────────────────────────────────
 
+
 def resolve_authors(db: Session, author_ids: list[str]) -> list[AuthorInfo]:
     """Resolve a list of author user IDs to AuthorInfo objects."""
     if not author_ids:
@@ -27,16 +28,22 @@ def resolve_authors(db: Session, author_ids: list[str]) -> list[AuthorInfo]:
     for uid in author_ids:
         u = user_map.get(uid)
         if u:
-            result.append(AuthorInfo(
-                id=u.id, name=u.name, anonymous_name=u.anonymous_name,
-                affiliation=u.affiliation, expertise=u.expertise,
-            ))
+            result.append(
+                AuthorInfo(
+                    id=u.id,
+                    name=u.name,
+                    anonymous_name=u.anonymous_name,
+                    affiliation=u.affiliation,
+                    expertise=u.expertise,
+                )
+            )
         else:
             result.append(AuthorInfo(id=uid, name="unknown"))
     return result
 
 
 # ── Git metadata (combined to avoid double git-log) ──────────────────────────
+
 
 def repo_path(article_id: str) -> Path:
     return DEFAULT_ARTICLES_DIR / article_id
@@ -81,6 +88,7 @@ def get_git_meta(article_id: str) -> tuple[str, int]:
 
 # ── Article summary builder (shared across 4+ route modules) ──────────────
 
+
 def build_article_summary(
     db: Session,
     a: Any,
@@ -104,11 +112,11 @@ def build_article_summary(
         authors = resolve_authors(db, get_author_ids(db, a.id))
 
     if is_bookmarked is None and current_user is not None:
-        uid = getattr(current_user, 'id', None)
+        uid = getattr(current_user, "id", None)
         is_bookmarked = _is_bookmarked(db, uid, a.id) if uid else False
 
     if is_own_article is None and current_user is not None:
-        user_id = getattr(current_user, 'id', None)
+        user_id = getattr(current_user, "id", None)
         is_own_article = user_id in get_author_ids(db, a.id) if user_id else False
 
     return ArticleSummary(
@@ -116,7 +124,7 @@ def build_article_summary(
         title=a.title or "",
         status=a.status,
         authors=authors,
-        abstract=getattr(a, 'abstract', None),
+        abstract=getattr(a, "abstract", None),
         content_preview=get_content_preview(a.id),
         commit_hash=ghash,
         fork_count=a.fork_count,

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Add SPDX copyright headers to source files."""
+
 import os
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 HEADERS = {
     ".py": (
-        "# SPDX-FileCopyrightText: 2024-2026 Chenqi Meng and PeerPedia contributors\n"
-        "# SPDX-License-Identifier: CC-BY-NC-SA-4.0\n"
+        "# SPDX-FileCopyrightText: 2024-2026 Chenqi Meng and PeerPedia contributors\n# SPDX-License-Identifier: CC-BY-NC-SA-4.0\n"
     ),
     ".ts": (
         "// SPDX-FileCopyrightText: 2024-2026 Chenqi Meng and PeerPedia contributors\n"
@@ -32,8 +32,15 @@ HEADERS = {
 }
 
 SKIP_DIRS = {
-    "node_modules", ".git", "__pycache__", ".venv", "venv",
-    "target", "dist", ".superpowers", ".claude",
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "target",
+    "dist",
+    ".superpowers",
+    ".claude",
 }
 
 SKIP_EXTENSIONS = {".json", ".toml", ".lock", ".css", ".svg", ".png", ".jpg", ".ico", ".md"}

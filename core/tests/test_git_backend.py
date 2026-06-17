@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Tests for git backend — article version control."""
+
 import tempfile
 from pathlib import Path
 
@@ -18,6 +19,7 @@ def articles_dir():
 def repo(articles_dir):
     """An initialized article repo with one commit."""
     from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
     rp = init_article_repo("test-article", articles_dir)
     # write initial content
     (rp / "article.md").write_text("# Test\n\nHello world.\n")
@@ -28,12 +30,14 @@ def repo(articles_dir):
 class TestInitAndCommit:
     def test_init_creates_git_dir(self, articles_dir):
         from peerpedia_core.storage.git_backend import init_article_repo
+
         rp = init_article_repo("test-1", articles_dir)
         assert (rp / ".git").is_dir()
         assert rp.name == "test-1"
 
     def test_commit_returns_hash(self, articles_dir):
         from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
         rp = init_article_repo("test-2", articles_dir)
         (rp / "notes.md").write_text("content")
         h = commit_article(rp, "add notes", "Author", "a@b.com")
@@ -41,6 +45,7 @@ class TestInitAndCommit:
 
     def test_commit_updates_file(self, articles_dir):
         from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
         rp = init_article_repo("test-3", articles_dir)
         f = rp / "article.md"
         f.write_text("v1")
@@ -53,6 +58,7 @@ class TestInitAndCommit:
     def test_commit_allow_empty_on_empty_repo(self, articles_dir):
         """commit_article with allow_empty=True on empty repo should create initial commit."""
         from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
         rp = init_article_repo("test-empty-allow", articles_dir)
         h = commit_article(rp, "initial", "A", "a@b.com", allow_empty=True)
         assert len(h) == 40
@@ -61,6 +67,7 @@ class TestInitAndCommit:
 class TestHistory:
     def test_history_returns_commits(self, repo):
         from peerpedia_core.storage.git_backend import get_commit_history
+
         history = get_commit_history(repo)
         assert len(history) >= 1
         assert history[0]["hash"] is not None
@@ -73,6 +80,7 @@ class TestHistory:
             get_commit_history,
             init_article_repo,
         )
+
         rp = init_article_repo("test-order", articles_dir)
         (rp / "a.md").write_text("v1")
         commit_article(rp, "first", "A", "a@b.com")
@@ -86,6 +94,7 @@ class TestHistory:
     def test_history_empty_repo_returns_empty_list(self, articles_dir):
         """Bug 2: get_commit_history crashes on empty repo. Should return empty list."""
         from peerpedia_core.storage.git_backend import get_commit_history, init_article_repo
+
         rp = init_article_repo("test-empty-history", articles_dir)
         history = get_commit_history(rp)
         assert history == []
@@ -94,6 +103,7 @@ class TestHistory:
 class TestDiff:
     def test_diff_returns_text(self, repo):
         from peerpedia_core.storage.git_backend import get_commit_history, get_diff
+
         history = get_commit_history(repo)
         result = get_diff(repo, history[-1]["hash"])  # oldest = initial commit
         assert "diff_text" in result
@@ -106,6 +116,7 @@ class TestDiff:
             get_diff_between,
             init_article_repo,
         )
+
         rp = init_article_repo("test-diff2", articles_dir)
         (rp / "a.md").write_text("line1\n")
         commit_article(rp, "first", "A", "a@b.com")
@@ -124,6 +135,7 @@ class TestDiff:
             get_diff_between,
             init_article_repo,
         )
+
         rp = init_article_repo("test-diff-stats", articles_dir)
         (rp / "a.md").write_text("line1\n")
         commit_article(rp, "first", "A", "a@b.com")
@@ -141,6 +153,7 @@ class TestDiff:
     def test_diff_initial_commit_has_no_parent(self, repo):
         """Initial commit diff has parent_hash=None."""
         from peerpedia_core.storage.git_backend import get_commit_history, get_diff
+
         history = get_commit_history(repo)
         initial = history[-1]
         result = get_diff(repo, initial["hash"])
@@ -154,6 +167,7 @@ class TestBlame:
         """Blame runs without import errors. Note: current GitPython has
         a pre-existing attribute mismatch in the blame code."""
         from peerpedia_core.storage.git_backend import get_blame
+
         try:
             blames = get_blame(repo, "article.md")
             assert isinstance(blames, list)
@@ -189,6 +203,7 @@ class TestBundleSync:
 
         # Create full bundle of all client objects
         import tempfile
+
         client_repo = gitmod.Repo(client_rp)
         with tempfile.NamedTemporaryFile(suffix=".bundle", delete=False) as f:
             bundle_path = f.name
@@ -335,8 +350,9 @@ class TestClosedLoopSync:
     - S4: Divergent history → 409 conflict
     """
 
-    def _make_client_repo(self, base_dir: Path, article_id: str, content: str,
-                          author_name: str, author_email: str) -> tuple[Path, str]:
+    def _make_client_repo(
+        self, base_dir: Path, article_id: str, content: str, author_name: str, author_email: str
+    ) -> tuple[Path, str]:
         """Create a repo simulating a Tauri client with one commit. Returns (rp, head)."""
         from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
@@ -359,8 +375,7 @@ class TestClosedLoopSync:
         base = articles_dir
 
         # ── S1: Client creates article, pushes to server ──────────────────
-        client_rp, h1 = self._make_client_repo(
-            base, "lifecycle-s1", "# v1", "Alice", "alice@peerpedia.com")
+        client_rp, h1 = self._make_client_repo(base, "lifecycle-s1", "# v1", "Alice", "alice@peerpedia.com")
         # Add second commit
         (client_rp / "article.md").write_text("# v2")
         h2 = commit_article(client_rp, "second", "Alice", "alice@peerpedia.com")
@@ -386,8 +401,7 @@ class TestClosedLoopSync:
         # ── S3: Server adds a review commit; client pulls it ──────────────
         (server_rp / "reviews").mkdir(exist_ok=True)
         (server_rp / "reviews" / "review.md").write_text("review: Good.")
-        server_h_review = commit_article(server_rp, "review commit", "Reviewer",
-                                         "reviewer@peerpedia.com")
+        server_h_review = commit_article(server_rp, "review commit", "Reviewer", "reviewer@peerpedia.com")
         assert server_h_review != h2
 
         # Client pulls server commits via incremental bundle
@@ -405,8 +419,7 @@ class TestClosedLoopSync:
 
         # ── S2: Client edits and pushes incrementally ─────────────────────
         (client_rp / "article.md").write_text("# v3 after review")
-        client_h3 = commit_article(client_rp, "v3 edit", "Alice",
-                                   "alice@peerpedia.com")
+        client_h3 = commit_article(client_rp, "v3 edit", "Alice", "alice@peerpedia.com")
 
         # Incremental bundle: server's HEAD → client's HEAD
         incr_bundle2 = create_bundle(client_rp, server_h_review)
@@ -438,8 +451,7 @@ class TestClosedLoopSync:
         base = articles_dir
 
         # Common ancestor
-        client_rp, h1 = self._make_client_repo(
-            base, "div-s4-client", "# shared v1", "Alice", "alice@test.com")
+        client_rp, h1 = self._make_client_repo(base, "div-s4-client", "# shared v1", "Alice", "alice@test.com")
         (client_rp / "article.md").write_text("# shared v2")
         h2 = commit_article(client_rp, "shared commit", "Alice", "alice@test.com")
 

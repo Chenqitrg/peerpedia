@@ -3,6 +3,7 @@
 
 """Tests for cleaned DB models — Article, Review, User, Follow, Bookmark,
 MergeProposal, Citation."""
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -20,10 +21,16 @@ from peerpedia_core.types.messages import ThreadMessage
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
+
 def _make_user(session: Session, name: str, **kwargs) -> User:
-    u = User(username=f"test_{name}", password_hash="$2b$12$test", name=name, affiliation=kwargs.pop("affiliation", "Test"),
-             anonymous_name=kwargs.pop("anonymous_name", f"anon_{name}"),
-             **kwargs)
+    u = User(
+        username=f"test_{name}",
+        password_hash="$2b$12$test",
+        name=name,
+        affiliation=kwargs.pop("affiliation", "Test"),
+        anonymous_name=kwargs.pop("anonymous_name", f"anon_{name}"),
+        **kwargs,
+    )
     session.add(u)
     session.commit()
     return u
@@ -31,6 +38,7 @@ def _make_user(session: Session, name: str, **kwargs) -> User:
 
 def _make_article(session: Session, **kwargs) -> Article:
     from peerpedia_core.storage.db.models import ArticleAuthor
+
     author_ids = kwargs.pop("authors", [])
     a = Article(
         status=kwargs.pop("status", "draft"),
@@ -47,12 +55,14 @@ def _make_article(session: Session, **kwargs) -> Article:
 
 # ── Article ──────────────────────────────────────────────────────────────
 
+
 class TestArticle:
     """文章模型 — git 管内容，数据库管元数据"""
 
     def test_create_minimal(self, engine):
         from peerpedia_core.storage.db.crud_article import get_author_ids
         from peerpedia_core.storage.db.models import ArticleAuthor
+
         session = get_session(engine)
         user = _make_user(session, "testuser")
         a = Article(status="draft")
@@ -84,8 +94,7 @@ class TestArticle:
         """JSONDict column stores score as dict, FiveDimScores wraps it."""
         session = get_session(engine)
         user = _make_user(session, "u3")
-        score_dict = {"originality": 4.0, "rigor": 3.0, "completeness": 5.0,
-                      "pedagogy": 2.0, "impact": 4.0}
+        score_dict = {"originality": 4.0, "rigor": 3.0, "completeness": 5.0, "pedagogy": 2.0, "impact": 4.0}
         a = _make_article(session, status="published", authors=[user.id], score=score_dict)
         a2 = session.get(Article, a.id)
         assert a2.score == score_dict
@@ -95,8 +104,7 @@ class TestArticle:
     def test_compiled_cache_for_html(self, engine):
         session = get_session(engine)
         user = _make_user(session, "u4")
-        a = _make_article(session, status="published", authors=[user.id],
-                          compiled_format="html", compiled_output="<h1>Test</h1>")
+        a = _make_article(session, status="published", authors=[user.id], compiled_format="html", compiled_output="<h1>Test</h1>")
         a2 = session.get(Article, a.id)
         assert a2.compiled_format == "html"
         assert a2.compiled_output == "<h1>Test</h1>"
@@ -105,9 +113,14 @@ class TestArticle:
     def test_compiled_cache_for_svg(self, engine):
         session = get_session(engine)
         user = _make_user(session, "u5")
-        a = _make_article(session, status="published", authors=[user.id],
-                          compiled_format="svg", compiled_output=None,
-                          compiled_pages=["<svg>p1</svg>", "<svg>p2</svg>"])
+        a = _make_article(
+            session,
+            status="published",
+            authors=[user.id],
+            compiled_format="svg",
+            compiled_output=None,
+            compiled_pages=["<svg>p1</svg>", "<svg>p2</svg>"],
+        )
         a2 = session.get(Article, a.id)
         assert a2.compiled_format == "svg"
         assert a2.compiled_pages == ["<svg>p1</svg>", "<svg>p2</svg>"]
@@ -142,6 +155,7 @@ class TestArticle:
 
 # ── Review ───────────────────────────────────────────────────────────────
 
+
 class TestReview:
     """评审 + 对话线程"""
 
@@ -151,10 +165,11 @@ class TestReview:
         author = _make_user(session, "author")
         article = _make_article(session, status="sedimentation", authors=[author.id])
         review = Review(
-            article_id=article.id, commit_hash="abc123",
-            reviewer_id=user.id, scope="pool",
-            scores={"originality": 4.0, "rigor": 3.0, "completeness": 4.0,
-                    "pedagogy": 3.0, "impact": 3.5},
+            article_id=article.id,
+            commit_hash="abc123",
+            reviewer_id=user.id,
+            scope="pool",
+            scores={"originality": 4.0, "rigor": 3.0, "completeness": 4.0, "pedagogy": 3.0, "impact": 3.5},
         )
         session.add(review)
         session.commit()
@@ -171,12 +186,20 @@ class TestReview:
         user = _make_user(session, "rv")
         author = _make_user(session, "au")
         article = _make_article(session, status="published", authors=[author.id])
-        r1 = Review(article_id=article.id, commit_hash="h1", reviewer_id=user.id,
-                     scope="pool", scores={"originality": 1.0, "rigor": 1.0,
-                                           "completeness": 1.0, "pedagogy": 1.0, "impact": 1.0})
-        r2 = Review(article_id=article.id, commit_hash="h2", reviewer_id=user.id,
-                     scope="published", scores={"originality": 2.0, "rigor": 2.0,
-                                                 "completeness": 2.0, "pedagogy": 2.0, "impact": 2.0})
+        r1 = Review(
+            article_id=article.id,
+            commit_hash="h1",
+            reviewer_id=user.id,
+            scope="pool",
+            scores={"originality": 1.0, "rigor": 1.0, "completeness": 1.0, "pedagogy": 1.0, "impact": 1.0},
+        )
+        r2 = Review(
+            article_id=article.id,
+            commit_hash="h2",
+            reviewer_id=user.id,
+            scope="published",
+            scores={"originality": 2.0, "rigor": 2.0, "completeness": 2.0, "pedagogy": 2.0, "impact": 2.0},
+        )
         session.add_all([r1, r2])
         session.commit()
         assert r1.scope != r2.scope
@@ -188,14 +211,22 @@ class TestReview:
         author = _make_user(session, "au3")
         reviewer = _make_user(session, "rv3")
         article = _make_article(session, status="published", authors=[author.id])
-        r1 = Review(article_id=article.id, commit_hash="h", reviewer_id=reviewer.id,
-                     scope="pool", scores={"originality": 1, "rigor": 1, "completeness": 1,
-                                           "pedagogy": 1, "impact": 1})
+        r1 = Review(
+            article_id=article.id,
+            commit_hash="h",
+            reviewer_id=reviewer.id,
+            scope="pool",
+            scores={"originality": 1, "rigor": 1, "completeness": 1, "pedagogy": 1, "impact": 1},
+        )
         session.add(r1)
         session.commit()
-        r2 = Review(article_id=article.id, commit_hash="h", reviewer_id=reviewer.id,
-                     scope="pool", scores={"originality": 2, "rigor": 2, "completeness": 2,
-                                           "pedagogy": 2, "impact": 2})
+        r2 = Review(
+            article_id=article.id,
+            commit_hash="h",
+            reviewer_id=reviewer.id,
+            scope="pool",
+            scores={"originality": 2, "rigor": 2, "completeness": 2, "pedagogy": 2, "impact": 2},
+        )
         session.add(r2)
         with pytest.raises(Exception):
             session.commit()
@@ -208,9 +239,11 @@ class TestReview:
         article = _make_article(session, status="published", authors=[author.id])
         msg = ThreadMessage(author_id=reviewer.id, content="需要补充证明。")
         review = Review(
-            article_id=article.id, commit_hash="abc", reviewer_id=reviewer.id,
-            scope="published", scores={"originality": 3, "rigor": 3, "completeness": 3,
-                                        "pedagogy": 3, "impact": 3},
+            article_id=article.id,
+            commit_hash="abc",
+            reviewer_id=reviewer.id,
+            scope="published",
+            scores={"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
             thread=[msg.to_dict()],
         )
         session.add(review)
@@ -226,13 +259,16 @@ class TestReview:
         author = _make_user(session, "self_author")
         article = _make_article(session, status="sedimentation", authors=[author.id])
         review = Review(
-            article_id=article.id, commit_hash="init", reviewer_id=author.id,
-            scope="pool", scores={"originality": 4.5, "rigor": 3.0, "completeness": 4.0,
-                                  "pedagogy": 5.0, "impact": 4.0},
+            article_id=article.id,
+            commit_hash="init",
+            reviewer_id=author.id,
+            scope="pool",
+            scores={"originality": 4.5, "rigor": 3.0, "completeness": 4.0, "pedagogy": 5.0, "impact": 4.0},
         )
         session.add(review)
         session.commit()
         from peerpedia_core.storage.db.crud_article import get_author_ids
+
         assert review.reviewer_id in get_author_ids(session, article.id)  # 这就是自评
         session.close()
 
@@ -243,9 +279,11 @@ class TestReview:
         author = _make_user(session, "au_up")
         article = _make_article(session, status="sedimentation", authors=[author.id])
         review = Review(
-            article_id=article.id, commit_hash="init", reviewer_id=user.id,
-            scope="pool", scores={"originality": 3.0, "rigor": 3.0, "completeness": 3.0,
-                                  "pedagogy": 3.0, "impact": 3.0},
+            article_id=article.id,
+            commit_hash="init",
+            reviewer_id=user.id,
+            scope="pool",
+            scores={"originality": 3.0, "rigor": 3.0, "completeness": 3.0, "pedagogy": 3.0, "impact": 3.0},
         )
         session.add(review)
         session.commit()
@@ -259,15 +297,19 @@ class TestReview:
 
 # ── User ─────────────────────────────────────────────────────────────────
 
+
 class TestUserModel:
     def test_create_user(self, engine):
         session = get_session(engine)
         u = User(
-            username="zhangsan", password_hash="$2b$12$test", name="张三",
-            anonymous_name="星云评审员", affiliation="清华大学",
+            username="zhangsan",
+            password_hash="$2b$12$test",
+            name="张三",
+            anonymous_name="星云评审员",
+            affiliation="清华大学",
             expertise=["理论物理", "数学"],
-                 reputation={"professionalism": 3.5, "objectivity": 4.0,
-                             "collaboration": 2.0, "pedagogy": 4.5})
+            reputation={"professionalism": 3.5, "objectivity": 4.0, "collaboration": 2.0, "pedagogy": 4.5},
+        )
         session.add(u)
         session.commit()
         u2 = session.get(User, u.id)
@@ -288,6 +330,7 @@ class TestUserModel:
 
 
 # ── Follow ───────────────────────────────────────────────────────────────
+
 
 class TestFollow:
     def test_follow_relationship(self, engine):
@@ -314,6 +357,7 @@ class TestFollow:
 
 
 # ── Bookmark ─────────────────────────────────────────────────────────────
+
 
 class TestBookmark:
     def test_bookmark_article(self, engine):
@@ -343,17 +387,15 @@ class TestBookmark:
 
 # ── MergeProposal ────────────────────────────────────────────────────────
 
+
 class TestMergeProposal:
     def test_create_merge_proposal(self, engine):
         session = get_session(engine)
         author = _make_user(session, "original_author")
         forker = _make_user(session, "forker")
         original = _make_article(session, status="published", authors=[author.id])
-        fork = _make_article(session, status="draft", authors=[forker.id],
-                             forked_from=original.id)
-        mp = MergeProposal(fork_article_id=fork.id,
-                           target_article_id=original.id,
-                           proposer_id=forker.id, status="open")
+        fork = _make_article(session, status="draft", authors=[forker.id], forked_from=original.id)
+        mp = MergeProposal(fork_article_id=fork.id, target_article_id=original.id, proposer_id=forker.id, status="open")
         session.add(mp)
         session.commit()
         assert mp.proposer_id == forker.id
@@ -366,11 +408,12 @@ class TestMergeProposal:
         author = _make_user(session, "oa2")
         forker = _make_user(session, "fo2")
         original = _make_article(session, status="published", authors=[author.id])
-        fork = _make_article(session, status="draft", authors=[forker.id],
-                             forked_from=original.id)
+        fork = _make_article(session, status="draft", authors=[forker.id], forked_from=original.id)
         mp = MergeProposal(
-            fork_article_id=fork.id, target_article_id=original.id,
-            proposer_id=forker.id, status="open",
+            fork_article_id=fork.id,
+            target_article_id=original.id,
+            proposer_id=forker.id,
+            status="open",
             thread=[
                 ThreadMessage(author_id=forker.id, content="请求合并，补充了第三章。").to_dict(),
                 ThreadMessage(author_id=author.id, content="收到，我看看。").to_dict(),
@@ -387,10 +430,8 @@ class TestMergeProposal:
         author = _make_user(session, "oa3")
         forker = _make_user(session, "fo3")
         original = _make_article(session, status="published", authors=[author.id])
-        fork = _make_article(session, status="draft", authors=[forker.id],
-                             forked_from=original.id)
-        mp = MergeProposal(fork_article_id=fork.id, target_article_id=original.id,
-                           proposer_id=forker.id, status="open")
+        fork = _make_article(session, status="draft", authors=[forker.id], forked_from=original.id)
+        mp = MergeProposal(fork_article_id=fork.id, target_article_id=original.id, proposer_id=forker.id, status="open")
         session.add(mp)
         session.commit()
         for status in ("accepted", "rejected"):
@@ -402,14 +443,14 @@ class TestMergeProposal:
 
 # ── Citation ─────────────────────────────────────────────────────────────
 
+
 class TestCitation:
     def test_citation_edge(self, engine):
         session = get_session(engine)
         author = _make_user(session, "cit_author")
         a1 = _make_article(session, status="published", authors=[author.id])
         a2 = _make_article(session, status="published", authors=[author.id])
-        c = Citation(from_article_id=a1.id, to_article_id=a2.id,
-                     forward_prob=0.3, backward_prob=0.1)
+        c = Citation(from_article_id=a1.id, to_article_id=a2.id, forward_prob=0.3, backward_prob=0.1)
         session.add(c)
         session.commit()
         assert c.from_article_id == a1.id

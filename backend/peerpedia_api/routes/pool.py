@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Sedimentation pool API routes."""
+
 from fastapi import APIRouter, Depends
 from peerpedia_core.storage.db.crud_article import get_author_ids_batch, list_articles
 from peerpedia_core.storage.db.crud_user import get_followers, get_following
@@ -58,16 +59,19 @@ def get_pool(
             sink_eta = eta
             days_remaining = max(0, (eta - now).days)
 
-        summaries.append(build_article_summary(
-            db, a,
-            current_user=current_user,
-            sink_eta=sink_eta,
-            days_remaining=days_remaining,
-            sink_duration_days=a.sink_duration_days,
-        ))
+        summaries.append(
+            build_article_summary(
+                db,
+                a,
+                current_user=current_user,
+                sink_eta=sink_eta,
+                days_remaining=days_remaining,
+                sink_duration_days=a.sink_duration_days,
+            )
+        )
 
     summaries.sort(key=lambda s: s.days_remaining or 0, reverse=True)
     total = len(summaries)
     start = (page - 1) * size
-    summaries = summaries[start:start + size]
+    summaries = summaries[start : start + size]
     return {"articles": [s.model_dump() for s in summaries], "total": total, "page": page, "size": size}

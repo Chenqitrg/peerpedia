@@ -20,8 +20,10 @@ from sqlalchemy.types import Text, TypeDecorator
 
 # ── JSON column types for list/dict fields ───────────────────────────────────
 
+
 def _make_json_type():
     """Factory for JSON column TypeDecorators (avoids duplicate implementations)."""
+
     class _JSONType(TypeDecorator):
         impl = Text
         cache_ok = True
@@ -48,8 +50,10 @@ JSONDict = _make_json_type()
 
 # ── Base + Engine ────────────────────────────────────────────────────────────
 
+
 class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
+
     pass
 
 
@@ -98,9 +102,7 @@ def migrate_db(engine: Engine) -> None:
         insp = sa.inspect(conn)
         columns = [c["name"] for c in insp.get_columns("articles")]
         if "last_author_rebuild_hash" not in columns:
-            conn.execute(sa.text(
-                "ALTER TABLE articles ADD COLUMN last_author_rebuild_hash TEXT"
-            ))
+            conn.execute(sa.text("ALTER TABLE articles ADD COLUMN last_author_rebuild_hash TEXT"))
             conn.commit()
 
 

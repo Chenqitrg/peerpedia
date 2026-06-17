@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Article API schemas — request/response Pydantic models."""
+
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
@@ -26,6 +27,7 @@ def _clamp(v: float) -> float:
 
 # ── Shared score / author types ────────────────────────────────────────────
 
+
 class FiveDimScoresOut(BaseModel):
     originality: float = 0.0
     rigor: float = 0.0
@@ -42,6 +44,7 @@ class FiveDimScoresOut(BaseModel):
 
 class FiveDimScoresIn(BaseModel):
     """Five-dimension scores input (0.0-5.0 each)."""
+
     originality: float
     rigor: float
     completeness: float
@@ -59,6 +62,7 @@ class FiveDimScoresIn(BaseModel):
 
 class AuthorInfo(BaseModel):
     """Resolved author information for API responses."""
+
     id: str
     name: str
     anonymous_name: str = ""
@@ -67,6 +71,7 @@ class AuthorInfo(BaseModel):
 
 
 # ── Output schemas ───────────────────────────────────────────────────────
+
 
 class ArticleSummary(BaseModel):
     id: str
@@ -113,6 +118,7 @@ class ArticleDetail(BaseModel):
 
 # ── Input schemas ────────────────────────────────────────────────────────
 
+
 class ArticleCreate(BaseModel):
     id: Optional[str] = None  # client-generated UUID (accepted, validated as UUID)
     title: str = ""
@@ -120,9 +126,9 @@ class ArticleCreate(BaseModel):
     keywords: list[str] = []
     categories: list[str] = []
     authors: list[str] = []  # optional: defaults to [current_user] in route handler
-    content: str = ""               # article body (markdown or typst)
-    format: str = "markdown"        # "markdown" | "typst"
-    commit_message: str = ""        # git commit message (required for submit)
+    content: str = ""  # article body (markdown or typst)
+    format: str = "markdown"  # "markdown" | "typst"
+    commit_message: str = ""  # git commit message (required for submit)
     self_review: Optional[FiveDimScoresIn] = None
     contributions: Optional[dict[str, FiveDimScoresIn]] = None
     forked_from: Optional[str] = None
@@ -149,6 +155,7 @@ class SinkExtensionRequest(BaseModel):
 
 
 # ── Source / download ────────────────────────────────────────────────────
+
 
 class ArticleSourceResponse(BaseModel):
     content: str

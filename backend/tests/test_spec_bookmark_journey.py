@@ -20,6 +20,7 @@ SPEC-CONN — Server connectivity regression
 
 SPECIFICATION STATUS = LOCKED.
 """
+
 import os
 
 import pytest
@@ -74,10 +75,13 @@ class TestSpecBookmarkJourney:
     @pytest.fixture
     def headers(self, client):
         """Login as einstein, return auth headers."""
-        r = client.post("/api/v1/auth/login", json={
-            "username": "einstein",
-            "password": "666666",
-        })
+        r = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "666666",
+            },
+        )
         assert r.status_code == 200, f"Login failed: {r.json()}"
         token = r.json()["token"]
         return {"Authorization": f"Bearer {token}"}
@@ -106,8 +110,7 @@ class TestSpecBookmarkJourney:
         bm_data = bookmarks.json()
         bm_ids = [b["article_id"] for b in bm_data.get("bookmarks", [])]
         assert article_id in bm_ids, (
-            f"Bookmarked article {article_id[:8]} not in bookmarks list. "
-            f"Got {len(bm_ids)} articles: {[a[:8] for a in bm_ids]}"
+            f"Bookmarked article {article_id[:8]} not in bookmarks list. Got {len(bm_ids)} articles: {[a[:8] for a in bm_ids]}"
         )
 
         # ── Step 4: Remove bookmark ─────────────────────────────────────
@@ -118,9 +121,7 @@ class TestSpecBookmarkJourney:
         after = client.get("/api/v1/bookmarks", headers=headers)
         assert after.status_code == 200
         after_ids = [b["article_id"] for b in after.json().get("bookmarks", [])]
-        assert article_id not in after_ids, (
-            f"Article {article_id[:8]} still in bookmarks after removal"
-        )
+        assert article_id not in after_ids, f"Article {article_id[:8]} still in bookmarks after removal"
 
     def test_cannot_bookmark_own_article(self, client, headers):
         """Self-bookmark returns 400."""

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Shared fixtures for backend tests."""
+
 import tempfile
 
 import pytest
@@ -39,15 +40,18 @@ def db_engine():
 @pytest.fixture
 def auth_header():
     """Return a helper that creates an Authorization header for a user ID."""
+
     def _make(user_id: str) -> dict:
         token = create_token(user_id)
         return {"Authorization": f"Bearer {token}"}
+
     return _make
 
 
 def _make_client_fixture(app, db_engine, db_override_only=False):
     """Create a TestClient with dep overrides. If db_override_only, does NOT
     override require_user — tests must pass auth_header explicitly."""
+
     def override_db():
         session = get_session(db_engine)
         try:
@@ -57,13 +61,13 @@ def _make_client_fixture(app, db_engine, db_override_only=False):
 
     app.dependency_overrides.clear()
     from peerpedia_api import deps
+
     app.dependency_overrides[deps.get_db] = override_db
 
     if not db_override_only:
         # Create a default user and override require_user for convenience.
         s = get_session(db_engine)
-        _u = User(username="test_auth_user", password_hash="",
-                   name="AuthUser", anonymous_name="anon", affiliation="TestU")
+        _u = User(username="test_auth_user", password_hash="", name="AuthUser", anonymous_name="anon", affiliation="TestU")
         s.add(_u)
         s.commit()
         _uid = _u.id
@@ -72,7 +76,9 @@ def _make_client_fixture(app, db_engine, db_override_only=False):
 
         def override_require_user():
             return _user_obj
+
         app.dependency_overrides[deps.require_user] = override_require_user
 
     from fastapi.testclient import TestClient
+
     return TestClient(app)

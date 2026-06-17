@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Authentication API routes."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from peerpedia_core.storage.db.crud_article import count_articles
 from peerpedia_core.storage.db.crud_user import (

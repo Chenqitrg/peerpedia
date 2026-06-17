@@ -5,6 +5,7 @@
 
 SPECIFICATION STATUS = LOCKED
 """
+
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
@@ -55,7 +56,6 @@ def _create_article_with_user(db_engine, username="spec_user"):
 
 
 class TestSpec3ForkUserValidation:
-
     def test_fork_works_with_server_user(self, client, db_engine):
         aid, uid = _create_article_with_user(db_engine, "fork_user_1")
         s = get_session(db_engine)
@@ -64,6 +64,7 @@ class TestSpec3ForkUserValidation:
 
         from peerpedia_api import deps as api_deps
         from peerpedia_api.main import app
+
         app.dependency_overrides[api_deps.require_user] = lambda: user
 
         resp = client.post(f"/api/v1/articles/{aid}/fork")
@@ -80,6 +81,7 @@ class TestSpec3ForkUserValidation:
 
         from peerpedia_api import deps as api_deps
         from peerpedia_api.main import app
+
         app.dependency_overrides[api_deps.require_user] = lambda: user
 
         resp = client.post("/api/v1/articles/nonexistent-id/fork")

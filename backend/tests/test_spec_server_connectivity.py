@@ -18,6 +18,7 @@ SPECIFICATION STATUS = LOCKED.
 These tests define product behavior. If implementation makes them fail,
 assume the implementation is wrong — not the spec.
 """
+
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_engine, get_session
@@ -70,6 +71,7 @@ class TestSpecS1HealthEndpoint:  # noqa: N801
 def seed_engine():
     """Connect to the seed database (peerpedia.db in project root)."""
     import os
+
     db_path = os.environ.get("PEERPEDIA_DB", "peerpedia.db")
     db_url = f"sqlite:///{db_path}"
     eng = get_engine(db_url)
@@ -104,10 +106,13 @@ class TestSpecS4SeedDataAccessible:  # noqa: N801
 
     def test_seed_user_einstein_can_login(self, seed_client):
         """Given seed data, einstein/666666 logs in and gets a JWT token."""
-        resp = seed_client.post("/api/v1/auth/login", json={
-            "username": "einstein",
-            "password": "666666",
-        })
+        resp = seed_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "666666",
+            },
+        )
         assert resp.status_code == 200, f"Login failed: {resp.json()}"
         data = resp.json()
         assert "token" in data, "Response must include a JWT token"
@@ -115,10 +120,13 @@ class TestSpecS4SeedDataAccessible:  # noqa: N801
 
     def test_pool_returns_non_empty_list(self, seed_client):
         """Given einstein is logged in, GET /pool returns articles."""
-        r = seed_client.post("/api/v1/auth/login", json={
-            "username": "einstein",
-            "password": "666666",
-        })
+        r = seed_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "666666",
+            },
+        )
         token = r.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -130,10 +138,13 @@ class TestSpecS4SeedDataAccessible:  # noqa: N801
 
     def test_feed_returns_list(self, seed_client):
         """Given einstein is logged in, GET /feed returns activity."""
-        r = seed_client.post("/api/v1/auth/login", json={
-            "username": "einstein",
-            "password": "666666",
-        })
+        r = seed_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "einstein",
+                "password": "666666",
+            },
+        )
         token = r.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 

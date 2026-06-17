@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Integration tests for search endpoint — SQL-level filtering."""
+
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
@@ -11,12 +12,14 @@ from peerpedia_core.storage.db.engine import get_session
 def client(db_engine):
     from peerpedia_api import deps
     from peerpedia_api.main import app
+
     def override_db():
         session = get_session(db_engine)
         try:
             yield session
         finally:
             session.close()
+
     app.dependency_overrides[deps.get_db] = override_db
     with TestClient(app) as c:
         yield c
@@ -53,9 +56,7 @@ class TestSearchSQL:
         articles = data["articles"]
         if len(articles) >= 2:
             dates = [a["created_at"] for a in articles]
-            assert dates == sorted(dates, reverse=True), (
-                f"Expected descending dates, got {dates}"
-            )
+            assert dates == sorted(dates, reverse=True), f"Expected descending dates, got {dates}"
 
     def test_search_pagination_sql(self, client):
         """Pagination: page 2 returns different articles than page 1."""
@@ -94,9 +95,14 @@ class TestSearchSQL:
 
     def test_search_combined_filters_sql(self, client):
         """Combined title + category + sort does not crash."""
-        res = client.get("/api/v1/search", params={
-            "q": "theory", "category": "physics", "sort": "newest",
-        })
+        res = client.get(
+            "/api/v1/search",
+            params={
+                "q": "theory",
+                "category": "physics",
+                "sort": "newest",
+            },
+        )
         assert res.status_code == 200
         data = res.json()
         assert isinstance(data["articles"], list)

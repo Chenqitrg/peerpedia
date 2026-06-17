@@ -23,18 +23,21 @@ from typing import Optional
 
 # ── Result types ───────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CompileResult:
     """Result of a compilation."""
+
     success: bool
     format: str
-    output_path: Optional[str] = None      # Path to compiled file (PDF, HTML)
-    html_content: Optional[str] = None     # Inline HTML (for Markdown rendering)
+    output_path: Optional[str] = None  # Path to compiled file (PDF, HTML)
+    html_content: Optional[str] = None  # Inline HTML (for Markdown rendering)
     error: Optional[str] = None
     warnings: list[str] = field(default_factory=list)
 
 
 # ── Frontmatter parsing ────────────────────────────────────────────────────────
+
 
 def extract_frontmatter(source: str) -> dict:
     """Extract YAML-like frontmatter from Typst or Markdown source.
@@ -157,6 +160,7 @@ def _parse_scalar(value: str):
 
 # ── Format detection ───────────────────────────────────────────────────────────
 
+
 def detect_format(file_path: Path) -> str:
     """Detect article format from file extension."""
     suffix = file_path.suffix.lower()
@@ -168,6 +172,7 @@ def detect_format(file_path: Path) -> str:
 
 
 # ── Abstract compiler ──────────────────────────────────────────────────────────
+
 
 class CompilerBackend(ABC):
     """Abstract compiler backend — versioned via PIP."""
@@ -186,13 +191,13 @@ class CompilerBackend(ABC):
 
 # ── Typst backend ──────────────────────────────────────────────────────────────
 
+
 class TypstBackend(CompilerBackend):
     """Compile Typst source via subprocess `typst compile`."""
 
     format_name = "typst"
 
-    def compile(self, source_path: Path, output_dir: Path,
-                fmt: str = "pdf") -> CompileResult:
+    def compile(self, source_path: Path, output_dir: Path, fmt: str = "pdf") -> CompileResult:
         """Run `typst compile --format <fmt> <source> <output>`.
 
         Supported formats: pdf (default), svg, png.
@@ -210,8 +215,7 @@ class TypstBackend(CompilerBackend):
         output_file = output_dir / f"{source_path.stem}.{fmt}"
         try:
             result = subprocess.run(
-                [typst_bin, "compile", "--format", fmt,
-                 str(source_path), str(output_file)],
+                [typst_bin, "compile", "--format", fmt, str(source_path), str(output_file)],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -262,6 +266,7 @@ def _parse_typst_warnings(stderr: str) -> list[str]:
 
 
 # ── Markdown backend ───────────────────────────────────────────────────────────
+
 
 class MarkdownBackend(CompilerBackend):
     """Compile Markdown to HTML with KaTeX math rendering.
@@ -337,6 +342,7 @@ def _render_markdown(md_text: str) -> str:
     """
     try:
         import markdown
+
         return markdown.markdown(
             md_text,
             extensions=["fenced_code", "tables", "codehilite"],
@@ -377,9 +383,9 @@ def _protect_math(text: str) -> tuple[str, dict[str, str]]:
         return key
 
     # Display math first (must be handled before inline to not conflict on $$)
-    text = re.sub(r'\$\$(.+?)\$\$', replace_display, text, flags=re.DOTALL)
+    text = re.sub(r"\$\$(.+?)\$\$", replace_display, text, flags=re.DOTALL)
     # Inline math $...$ (single $ not adjacent to another $)
-    text = re.sub(r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)', replace_inline, text)
+    text = re.sub(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", replace_inline, text)
     return text, placeholders
 
 

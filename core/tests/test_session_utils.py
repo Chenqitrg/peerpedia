@@ -14,6 +14,7 @@ Contract:
   S4 — The yielded session is usable for standard ORM operations.
   S5 — Nested begin/commit within the context work as expected (sub-transactions).
 """
+
 import pytest
 
 from peerpedia_core.storage.db.models import User
@@ -57,9 +58,7 @@ class TestSuccessfulCommit:
             session.add(_make_user(username="batch_c", name="C", anonymous_name="c"))
 
         with db_session_scope(db_url) as session:
-            count = session.query(User).filter(
-                User.username.in_(["batch_a", "batch_b", "batch_c"])
-            ).count()
+            count = session.query(User).filter(User.username.in_(["batch_a", "batch_b", "batch_c"])).count()
             assert count == 3
 
 
@@ -69,16 +68,14 @@ class TestRollbackOnException:
     def test_rollback_on_application_error(self, db_url):
         """If application code raises after adding data, nothing is persisted."""
         with db_session_scope(db_url) as session:
-            session.add(_make_user(username="will_rollback", name="RB",
-                            anonymous_name="rb"))
+            session.add(_make_user(username="will_rollback", name="RB", anonymous_name="rb"))
 
         class AppError(Exception):
             pass
 
         with pytest.raises(AppError):
             with db_session_scope(db_url) as session:
-                session.add(_make_user(username="should_disappear", name="Gone",
-                                anonymous_name="gone"))
+                session.add(_make_user(username="should_disappear", name="Gone", anonymous_name="gone"))
                 raise AppError("simulated failure")
 
         with db_session_scope(db_url) as session:
@@ -86,22 +83,18 @@ class TestRollbackOnException:
             found = session.query(User).filter(User.username == "will_rollback").first()
             assert found is not None
             # The record from the failed context must NOT exist
-            missing = session.query(User).filter(
-                User.username == "should_disappear"
-            ).first()
+            missing = session.query(User).filter(User.username == "should_disappear").first()
             assert missing is None
 
     def test_db_integrity_error_rolls_back(self, db_url):
         """An integrity error (e.g., duplicate primary key) triggers rollback
         and does not affect subsequent sessions."""
         with db_session_scope(db_url) as session:
-            session.add(_make_user(id="fixed-id-1", username="u1", name="U1",
-                            anonymous_name="a1"))
+            session.add(_make_user(id="fixed-id-1", username="u1", name="U1", anonymous_name="a1"))
 
         with pytest.raises(Exception):  # IntegrityError from duplicate PK
             with db_session_scope(db_url) as session:
-                session.add(_make_user(id="fixed-id-1", username="u2", name="U2",
-                                anonymous_name="a2"))
+                session.add(_make_user(id="fixed-id-1", username="u2", name="U2", anonymous_name="a2"))
 
         # Session should be usable after the error
         with db_session_scope(db_url) as session:
@@ -174,9 +167,7 @@ class TestSessionUsability:
             session.add(_make_user(username="q1", name="Q1", anonymous_name="a1"))
             session.add(_make_user(username="q2", name="Q2", anonymous_name="a2"))
 
-            results = session.query(User).filter(
-                User.username.like("q%")
-            ).all()
+            results = session.query(User).filter(User.username.like("q%")).all()
             assert len(results) == 2
 
 
@@ -187,22 +178,16 @@ class TestSubTransactions:
         """A savepoint rollback inside the context should not affect the outer
         transaction."""
         with db_session_scope(db_url) as session:
-            session.add(_make_user(username="outer_keep", name="OK",
-                            anonymous_name="ok"))
+            session.add(_make_user(username="outer_keep", name="OK", anonymous_name="ok"))
 
             # Try a savepoint that rolls back
             try:
                 with session.begin_nested():
-                    session.add(_make_user(username="inner_lose", name="IL",
-                                    anonymous_name="il"))
+                    session.add(_make_user(username="inner_lose", name="IL", anonymous_name="il"))
                     raise ValueError("rollback savepoint")
             except ValueError:
                 pass  # savepoint rolled back, outer still valid
 
         with db_session_scope(db_url) as session:
-            assert session.query(User).filter(
-                User.username == "outer_keep"
-            ).first() is not None
-            assert session.query(User).filter(
-                User.username == "inner_lose"
-            ).first() is None
+            assert session.query(User).filter(User.username == "outer_keep").first() is not None
+            assert session.query(User).filter(User.username == "inner_lose").first() is None

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """MergeProposal CRUD operations."""
+
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session

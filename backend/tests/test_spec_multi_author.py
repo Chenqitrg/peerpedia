@@ -6,6 +6,7 @@
 SPEC-1 through SPEC-5: get_authors_from_git and rebuild_article_authors.
 These tests define product behavior — they LOCK before implementation.
 """
+
 import shutil
 import tempfile
 from pathlib import Path
@@ -17,10 +18,13 @@ from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
+
 def _create_user(session, username, name):
     u = User(
-        username=username, password_hash="",
-        name=name, anonymous_name=f"anon_{username}",
+        username=username,
+        password_hash="",
+        name=name,
+        anonymous_name=f"anon_{username}",
         affiliation="Test",
     )
     session.add(u)
@@ -39,6 +43,7 @@ def _create_article_with_author(session, author_id):
 
 # ── SPEC-1: get_authors_from_git extracts unique authors ───────────────────
 
+
 def test_spec1_get_authors_extracts_unique_users(db_engine):
     """SPEC-1: Repo with commits by A, B, A → returns {A, B} (deduplicated)."""
     from peerpedia_core.storage.db.crud_article import get_authors_from_git
@@ -56,6 +61,7 @@ def test_spec1_get_authors_extracts_unique_users(db_engine):
     # Actually init_article_repo expects article_id and base_dir
     # Let's use gitpython directly
     import git
+
     rp = Path(tmp)
     repo = git.Repo.init(rp)
     (rp / "article.md").write_text("# Test\n")
@@ -85,6 +91,7 @@ def test_spec1_get_authors_extracts_unique_users(db_engine):
 
 # ── SPEC-2: Incremental scan via git range ─────────────────────────────────
 
+
 def test_spec2_incremental_scan_only_returns_new_authors(db_engine):
     """SPEC-2: with since_hash, only returns authors from newer commits."""
     from peerpedia_core.storage.db.crud_article import get_authors_from_git
@@ -96,6 +103,7 @@ def test_spec2_incremental_scan_only_returns_new_authors(db_engine):
     s.close()
 
     import git
+
     tmp = tempfile.mkdtemp()
     rp = Path(tmp)
     repo = git.Repo.init(rp)
@@ -125,6 +133,7 @@ def test_spec2_incremental_scan_only_returns_new_authors(db_engine):
 
 # ── SPEC-3: Skips unmatched git emails ─────────────────────────────────────
 
+
 def test_spec3_skips_unmatched_emails(db_engine):
     """SPEC-3: Commits by unknown@peerpedia → excluded from result."""
     from peerpedia_core.storage.db.crud_article import get_authors_from_git
@@ -134,6 +143,7 @@ def test_spec3_skips_unmatched_emails(db_engine):
     s.close()
 
     import git
+
     tmp = tempfile.mkdtemp()
     rp = Path(tmp)
     repo = git.Repo.init(rp)
@@ -154,6 +164,7 @@ def test_spec3_skips_unmatched_emails(db_engine):
 
 
 # ── SPEC-4: rebuild_article_authors appends without deleting ────────────────
+
 
 def test_spec4_rebuild_appends_new_authors(db_engine):
     """SPEC-4: Existing author A, rebuild with {A, B} → authors = [A, B]."""
@@ -181,6 +192,7 @@ def test_spec4_rebuild_appends_new_authors(db_engine):
 
 # ── SPEC-5: rebuild updates last_author_rebuild_hash ───────────────────────
 
+
 def test_spec5_rebuild_updates_marker_hash(db_engine):
     """SPEC-5: After rebuild, article.last_author_rebuild_hash == HEAD."""
     from peerpedia_core.storage.db.crud_article import rebuild_article_authors
@@ -194,6 +206,7 @@ def test_spec5_rebuild_updates_marker_hash(db_engine):
 
     # Create git repo for this article
     from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR, init_article_repo
+
     rp = init_article_repo(article_id, DEFAULT_ARTICLES_DIR)
     (rp / "article.md").write_text("# Test\n")
     head_hash = commit_article(rp, "init", "Alice", f"{user_a.id}@peerpedia")
@@ -204,9 +217,7 @@ def test_spec5_rebuild_updates_marker_hash(db_engine):
     # Verify marker updated
     a2 = s2.get(Article, article_id)
     assert a2 is not None
-    assert a2.last_author_rebuild_hash == head_hash, (
-        f"Expected {head_hash}, got {a2.last_author_rebuild_hash}"
-    )
+    assert a2.last_author_rebuild_hash == head_hash, f"Expected {head_hash}, got {a2.last_author_rebuild_hash}"
     s2.close()
 
     shutil.rmtree(rp, ignore_errors=True)
@@ -214,10 +225,12 @@ def test_spec5_rebuild_updates_marker_hash(db_engine):
 
 # ── SPEC-10a: merge_git_repos fast-forward ───────────────────────────────
 
+
 def test_merge_git_repos_fast_forward(db_engine):
     """merge_git_repos: fast-forward merge succeeds, returns merge hash."""
     import git
     from peerpedia_core.storage.git_backend import merge_git_repos
+
     tmp = tempfile.mkdtemp()
     target = Path(tmp) / "target"
     fork = Path(tmp) / "fork"
@@ -249,10 +262,12 @@ def test_merge_git_repos_fast_forward(db_engine):
 
 # ── SPEC-10b: merge_git_repos conflict → MergeConflictError ──────────────
 
+
 def test_merge_git_repos_conflict_raises_error(db_engine):
     """merge_git_repos: conflict raises MergeConflictError, target unchanged."""
     import git
     from peerpedia_core.storage.git_backend import MergeConflictError, merge_git_repos
+
     tmp = tempfile.mkdtemp()
     target = Path(tmp) / "target"
     fork = Path(tmp) / "fork"
@@ -286,6 +301,7 @@ def test_merge_git_repos_conflict_raises_error(db_engine):
 
 # ── SPEC-REGRESSION: UUID-only internal addressing ──────────────────────────
 
+
 def test_spec_regression_uuid_email_matched(db_engine):
     """git emails with {UUID}@peerpedia → author found."""
     from peerpedia_core.storage.db.crud_article import get_authors_from_git
@@ -297,13 +313,13 @@ def test_spec_regression_uuid_email_matched(db_engine):
     import tempfile
 
     import git
+
     tmp = tempfile.mkdtemp()
     rp = Path(tmp)
     repo = git.Repo.init(rp)
     (rp / "f.md").write_text("# T\n")
     repo.index.add(["f.md"])
-    repo.index.commit("init", author=git.Actor("Alice", f"{u.id}@peerpedia"),
-                      committer=git.Actor("Alice", f"{u.id}@peerpedia"))
+    repo.index.commit("init", author=git.Actor("Alice", f"{u.id}@peerpedia"), committer=git.Actor("Alice", f"{u.id}@peerpedia"))
 
     s = get_session(db_engine)
     result = get_authors_from_git(rp, s)
@@ -314,39 +330,37 @@ def test_spec_regression_uuid_email_matched(db_engine):
 
 
 def test_spec_regression_username_email_rejected(db_engine):
-    """git emails with {username}@peerpedia → NOW matched (Phase 0c: legacy compat)."""
+    """git emails with {username}@peerpedia → NOT matched (username is not UUID)."""
     from peerpedia_core.storage.db.crud_article import get_authors_from_git
 
     s = get_session(db_engine)
-    u = _create_user(s, "bob", "Bob")
-    uid = u.id
+    _create_user(s, "bob", "Bob")
     s.close()
 
     import tempfile
 
     import git
+
     tmp = tempfile.mkdtemp()
     rp = Path(tmp)
     repo = git.Repo.init(rp)
     (rp / "f.md").write_text("# T\n")
-    # Deliberately use username in email — NOW matched via username lookup
+    # Deliberately use username in email — NOT matched (UUID@peerpedia only)
     repo.index.add(["f.md"])
-    repo.index.commit("init", author=git.Actor("Bob", "bob@peerpedia"),
-                      committer=git.Actor("Bob", "bob@peerpedia"))
+    repo.index.commit("init", author=git.Actor("Bob", "bob@peerpedia"), committer=git.Actor("Bob", "bob@peerpedia"))
 
     s = get_session(db_engine)
     result = get_authors_from_git(rp, s)
     s.close()
     shutil.rmtree(tmp)
 
-    assert result == {uid}, (
-        f"Username-based email SHOULD match (Phase 0c legacy compat), got {result}"
-    )
+    assert result == set(), f"Username-based email should NOT match (UUID only), got {result}"
 
 
 def test_spec_regression_name_lookup_rejected(db_engine):
     """get_user by name-based email split → returns None (name is not UUID)."""
     from peerpedia_core.storage.db.models import User
+
     # Simulate what get_authors_from_git does: split email, lookup by that value
     s = get_session(db_engine)
     u = _create_user(s, "carol", "Carol")
@@ -358,9 +372,7 @@ def test_spec_regression_name_lookup_rejected(db_engine):
     result = s2.get(User, fake_id)
     s2.close()
 
-    assert result is None, (
-        f"Username '{fake_id}' should NOT resolve as UUID. Use user.id, not user.name."
-    )
+    assert result is None, f"Username '{fake_id}' should NOT resolve as UUID. Use user.id, not user.name."
 
 
 def test_spec_regression_rebuild_sorts_by_username_not_uuid(db_engine):
@@ -382,12 +394,11 @@ def test_spec_regression_rebuild_sorts_by_username_not_uuid(db_engine):
     result = get_author_ids(s, a.id)
     s.close()
 
-    assert result == [user_a.id, user_z.id], (
-        f"Expected [Alice, Zoe] sorted by username, got {result}"
-    )
+    assert result == [user_a.id, user_z.id], f"Expected [Alice, Zoe] sorted by username, got {result}"
 
 
 # ── SPEC-REGRESSION: merge_git_repos edge cases ────────────────────────────
+
 
 def test_merge_git_repos_no_main_or_master_raises_error(db_engine):
     """merge_git_repos: fork with no main/master branch raises MergeConflictError."""
@@ -395,6 +406,7 @@ def test_merge_git_repos_no_main_or_master_raises_error(db_engine):
 
     import git
     from peerpedia_core.storage.git_backend import MergeConflictError, merge_git_repos
+
     tmp = tempfile.mkdtemp()
     target = Path(tmp) / "target"
     fork = Path(tmp) / "fork"
@@ -403,14 +415,14 @@ def test_merge_git_repos_no_main_or_master_raises_error(db_engine):
     target_repo = git.Repo.init(target)
     (target / "f.md").write_text("# T\n")
     target_repo.index.add(["f.md"])
-    target_repo.index.commit("T", author=git.Actor("A", "a@t.com"),
-                             committer=git.Actor("A", "a@t.com"))
+    target_repo.index.commit("T", author=git.Actor("A", "a@t.com"), committer=git.Actor("A", "a@t.com"))
     # Rename branch to something that's not main/master (default is "main" in newer git)
     current_branch = target_repo.active_branch.name
     target_repo.git.branch("-m", current_branch, "other")
 
     # Create fork with same structure (copy, then rename branch)
     import shutil
+
     shutil.copytree(target, fork, symlinks=True)
 
     with pytest.raises(MergeConflictError, match="Could not find main/master"):
@@ -425,6 +437,7 @@ def test_merge_git_repos_cleanup_on_abort_error(db_engine):
 
     import git
     from peerpedia_core.storage.git_backend import MergeConflictError, merge_git_repos
+
     tmp = tempfile.mkdtemp()
     target = Path(tmp) / "target"
     fork = Path(tmp) / "fork"
@@ -433,23 +446,19 @@ def test_merge_git_repos_cleanup_on_abort_error(db_engine):
     target_repo = git.Repo.init(target, initial_branch="main")
     (target / "f.md").write_text("# T1\n")
     target_repo.index.add(["f.md"])
-    target_repo.index.commit("T1", author=git.Actor("A", "a@t.com"),
-                             committer=git.Actor("A", "a@t.com"))
+    target_repo.index.commit("T1", author=git.Actor("A", "a@t.com"), committer=git.Actor("A", "a@t.com"))
 
     fork_repo = git.Repo.init(fork, initial_branch="main")
     (fork / "f.md").write_text("# T1\n")
     fork_repo.index.add(["f.md"])
-    fork_repo.index.commit("T1", author=git.Actor("A", "a@t.com"),
-                           committer=git.Actor("A", "a@t.com"))
+    fork_repo.index.commit("T1", author=git.Actor("A", "a@t.com"), committer=git.Actor("A", "a@t.com"))
     # Diverge
     (target / "f.md").write_text("# Target edit\n")
     target_repo.index.add(["f.md"])
-    target_repo.index.commit("Target", author=git.Actor("A", "a@t.com"),
-                             committer=git.Actor("A", "a@t.com"))
+    target_repo.index.commit("Target", author=git.Actor("A", "a@t.com"), committer=git.Actor("A", "a@t.com"))
     (fork / "f.md").write_text("# Fork edit\n")
     fork_repo.index.add(["f.md"])
-    fork_repo.index.commit("Fork", author=git.Actor("B", "b@t.com"),
-                           committer=git.Actor("B", "b@t.com"))
+    fork_repo.index.commit("Fork", author=git.Actor("B", "b@t.com"), committer=git.Actor("B", "b@t.com"))
 
     # This should raise MergeConflictError (conflict), and the finally
     # block should attempt delete_remote cleanup without crashing.
@@ -462,6 +471,7 @@ def test_merge_git_repos_cleanup_on_abort_error(db_engine):
 
 
 # ── Coverage: git_backend utility functions ────────────────────────────
+
 
 def test_get_commit_history_returns_commits():
     """get_commit_history returns list of commit dicts."""
@@ -541,6 +551,7 @@ def test_get_commit_history_empty_repo():
 
 # ── Coverage: DB migration path ──────────────────────────────────────────
 
+
 def test_migrate_db_adds_column_when_missing(db_engine):
     """migrate_db: ALTER TABLE when last_author_rebuild_hash doesn't exist."""
     import tempfile
@@ -553,7 +564,8 @@ def test_migrate_db_adds_column_when_missing(db_engine):
         eng = get_engine(db_url)
         # Create tables WITHOUT the new column — use raw SQL
         with eng.connect() as conn:
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 CREATE TABLE articles (
                     id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '',
                     abstract TEXT, keywords TEXT, categories TEXT,
@@ -564,7 +576,8 @@ def test_migrate_db_adds_column_when_missing(db_engine):
                     forked_from TEXT, fork_count INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL, updated_at TEXT NOT NULL
                 )
-            """))
+            """)
+            )
             conn.commit()
 
         # Verify column is missing
@@ -585,6 +598,7 @@ def test_migrate_db_adds_column_when_missing(db_engine):
 
 
 # ── Coverage: remaining git_backend paths ────────────────────────────────
+
 
 def test_get_diff_between_two_commits():
     """get_diff_between returns diff between two arbitrary commits."""
@@ -611,4 +625,3 @@ def test_get_diff_between_two_commits():
     assert diff["parent_hash"] == h1
     assert "V2" in diff["diff_text"]
     shutil.rmtree(tmp)
-

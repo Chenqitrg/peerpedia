@@ -6,6 +6,7 @@
 Article content is stored in git repos (~/.peerpedia/articles/{id}/).
 Database stores metadata, scores, relationships, and compilation cache.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,6 +27,7 @@ def _utcnow() -> datetime:
 
 # ── Article ──────────────────────────────────────────────────────────────
 
+
 class Article(Base):
     __tablename__ = "articles"
 
@@ -35,10 +37,10 @@ class Article(Base):
     keywords = Column(JSONList, nullable=True)
     categories = Column(JSONList, nullable=True)
     status = Column(String, nullable=False, default="draft")  # draft|sedimentation|published
-    score = Column(JSONDict, nullable=True)                    # FiveDimScores as dict
-    compiled_format = Column(String, nullable=True)            # "html" | "svg"
-    compiled_output = Column(String, nullable=True)            # single-page result
-    compiled_pages = Column(JSONList, nullable=True)           # list[str] for multi-page SVG
+    score = Column(JSONDict, nullable=True)  # FiveDimScores as dict
+    compiled_format = Column(String, nullable=True)  # "html" | "svg"
+    compiled_output = Column(String, nullable=True)  # single-page result
+    compiled_pages = Column(JSONList, nullable=True)  # list[str] for multi-page SVG
     sink_start = Column(DateTime, nullable=True)
     sink_duration_days = Column(Integer, nullable=False, default=7)
     sink_extended_count = Column(Integer, nullable=False, default=0)
@@ -51,6 +53,7 @@ class Article(Base):
 
 # ── Review ───────────────────────────────────────────────────────────────
 
+
 class Review(Base):
     __tablename__ = "reviews"
     __table_args__ = (
@@ -61,21 +64,20 @@ class Review(Base):
     article_id = Column(String, ForeignKey("articles.id"), nullable=False)
     commit_hash = Column(String, nullable=False)
     reviewer_id = Column(String, ForeignKey("users.id"), nullable=False)
-    scope = Column(String, nullable=False)                  # "pool" | "published"
-    scores = Column(JSONDict, nullable=False)               # FiveDimScores as dict
-    contributions = Column(JSONDict, nullable=True)          # author_id → 5-dim ratios
-    thread = Column(JSONList, nullable=False, default=list) # list[dict] of ThreadMessage
+    scope = Column(String, nullable=False)  # "pool" | "published"
+    scores = Column(JSONDict, nullable=False)  # FiveDimScores as dict
+    contributions = Column(JSONDict, nullable=True)  # author_id → 5-dim ratios
+    thread = Column(JSONList, nullable=False, default=list)  # list[dict] of ThreadMessage
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
 
 # ── ArticleAuthor (join table) ────────────────────────────────────────────
 
+
 class ArticleAuthor(Base):
     __tablename__ = "article_authors"
-    __table_args__ = (
-        UniqueConstraint("article_id", "author_id", name="uq_article_author"),
-    )
+    __table_args__ = (UniqueConstraint("article_id", "author_id", name="uq_article_author"),)
 
     article_id = Column(String, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True)
     author_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
@@ -84,13 +86,14 @@ class ArticleAuthor(Base):
 
 # ── User ─────────────────────────────────────────────────────────────────
 
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=_new_id)
-    username = Column(String, unique=True, nullable=False)        # login identifier
-    password_hash = Column(String, nullable=False)                # bcrypt hash
-    email = Column(String, nullable=True)                         # format-validated
+    username = Column(String, unique=True, nullable=False)  # login identifier
+    password_hash = Column(String, nullable=False)  # bcrypt hash
+    email = Column(String, nullable=True)  # format-validated
     name = Column(String, nullable=False)
     anonymous_name = Column(String, nullable=False, default="")
     affiliation = Column(String, nullable=False, default="")
@@ -103,11 +106,10 @@ class User(Base):
 
 # ── Follow ───────────────────────────────────────────────────────────────
 
+
 class Follow(Base):
     __tablename__ = "follows"
-    __table_args__ = (
-        UniqueConstraint("follower_id", "followed_id", name="uq_follow"),
-    )
+    __table_args__ = (UniqueConstraint("follower_id", "followed_id", name="uq_follow"),)
 
     follower_id = Column(String, ForeignKey("users.id"), primary_key=True)
     followed_id = Column(String, ForeignKey("users.id"), primary_key=True)
@@ -116,11 +118,10 @@ class Follow(Base):
 
 # ── Bookmark ─────────────────────────────────────────────────────────────
 
+
 class Bookmark(Base):
     __tablename__ = "bookmarks"
-    __table_args__ = (
-        UniqueConstraint("user_id", "article_id", name="uq_bookmark"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "article_id", name="uq_bookmark"),)
 
     user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     article_id = Column(String, ForeignKey("articles.id"), primary_key=True)
@@ -128,6 +129,7 @@ class Bookmark(Base):
 
 
 # ── MergeProposal ────────────────────────────────────────────────────────
+
 
 class MergeProposal(Base):
     __tablename__ = "merge_proposals"
@@ -144,11 +146,10 @@ class MergeProposal(Base):
 
 # ── Citation ─────────────────────────────────────────────────────────────
 
+
 class Citation(Base):
     __tablename__ = "citations"
-    __table_args__ = (
-        UniqueConstraint("from_article_id", "to_article_id", name="uq_citation"),
-    )
+    __table_args__ = (UniqueConstraint("from_article_id", "to_article_id", name="uq_citation"),)
 
     from_article_id = Column(String, ForeignKey("articles.id"), primary_key=True)
     to_article_id = Column(String, ForeignKey("articles.id"), primary_key=True)

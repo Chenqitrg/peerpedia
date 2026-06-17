@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Tests for peerpedia_core.config.params — all tunable system parameters."""
+
 import pytest
 
 from peerpedia_core.config.params import (

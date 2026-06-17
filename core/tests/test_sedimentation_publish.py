@@ -15,6 +15,7 @@ Contract:
   SP5 — Author reputations are recalculated after publish.
   SP6 — Returns count of articles published in this call.
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -86,8 +87,7 @@ class TestIsReadyToPublish:
 
 
 def _build_score(orig=3, rig=3, comp=3, ped=3, imp=3):
-    return {"originality": orig, "rigor": rig, "completeness": comp,
-            "pedagogy": ped, "impact": imp}
+    return {"originality": orig, "rigor": rig, "completeness": comp, "pedagogy": ped, "impact": imp}
 
 
 class TestPublishReadyArticles:
@@ -118,7 +118,8 @@ class TestPublishReadyArticles:
         author = _make_user(session, "elapsed")
         past_start = datetime.now(timezone.utc) - timedelta(days=200)
         _make_article(
-            session, [author.id],
+            session,
+            [author.id],
             status="sedimentation",
             sink_start=past_start,
             sink_duration_days=7,
@@ -144,7 +145,8 @@ class TestPublishReadyArticles:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             article = _make_article(
-                session, [author.id],
+                session,
+                [author.id],
                 status="sedimentation",
                 sink_start=past_start,
                 sink_duration_days=7,
@@ -153,6 +155,7 @@ class TestPublishReadyArticles:
 
             # Monkey-patch DEFAULT_ARTICLES_DIR to point to our temp dir
             import peerpedia_core.storage.git_backend as gb_mod
+
             orig_dir = gb_mod.DEFAULT_ARTICLES_DIR
             try:
                 gb_mod.DEFAULT_ARTICLES_DIR = base
@@ -170,7 +173,8 @@ class TestPublishReadyArticles:
         author = _make_user(session, "future_sink")
         future_start = datetime.now(timezone.utc) - timedelta(days=5)
         _make_article(
-            session, [author.id],
+            session,
+            [author.id],
             status="sedimentation",
             sink_start=future_start,
             sink_duration_days=180,
@@ -184,14 +188,19 @@ class TestPublishReadyArticles:
         reviewer = _make_user(session, "rv_comm")
         past_start = datetime.now(timezone.utc) - timedelta(days=200)
         article = _make_article(
-            session, [author.id],
+            session,
+            [author.id],
             status="sedimentation",
             sink_start=past_start,
             sink_duration_days=7,
         )
         # Add a community review
         _make_review(
-            session, article.id, "hash1", reviewer.id, "pool",
+            session,
+            article.id,
+            "hash1",
+            reviewer.id,
+            "pool",
             _build_score(4, 4, 4, 4, 4),
         )
         count = publish_ready_articles(session)
@@ -204,7 +213,8 @@ class TestPublishReadyArticles:
 
         for i in range(3):
             _make_article(
-                session, [author.id],
+                session,
+                [author.id],
                 status="sedimentation",
                 sink_start=past_start,
                 sink_duration_days=7,
@@ -220,21 +230,30 @@ class TestPublishReadyArticles:
         past_start = datetime.now(timezone.utc) - timedelta(days=200)
 
         article = _make_article(
-            session, [author.id],
+            session,
+            [author.id],
             status="sedimentation",
             sink_start=past_start,
             sink_duration_days=7,
         )
         # Review was written against commit "old_hash"
         _make_review(
-            session, article.id, "old_hash", reviewer.id, "pool",
+            session,
+            article.id,
+            "old_hash",
+            reviewer.id,
+            "pool",
             _build_score(5, 5, 5, 5, 5),
         )
 
         # Simulate an edit: create a review against a new commit "new_hash"
         # The article was "edited" so reviews exist on two different commits.
         _make_review(
-            session, article.id, "new_hash", reviewer.id, "pool",
+            session,
+            article.id,
+            "new_hash",
+            reviewer.id,
+            "pool",
             _build_score(3, 3, 3, 3, 3),
         )
 

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Sedimentation pool logic — sink time calculation and auto-publish."""
+
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -29,10 +30,7 @@ def apply_no_review_penalty(scores: dict | None) -> dict:
     if scores is None:
         return {}
     penalty = params.score.no_review_penalty()
-    return {
-        dim: max(0.0, value - penalty)
-        for dim, value in scores.items()
-    }
+    return {dim: max(0.0, value - penalty) for dim, value in scores.items()}
 
 
 def publish_ready_articles(session: Session) -> int:

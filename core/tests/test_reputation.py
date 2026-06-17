@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Tests for the reputation mechanism (core calculation logic)."""
+
 import pytest
 
 from peerpedia_core.storage.db.crud_article import create_article
@@ -18,9 +19,7 @@ from peerpedia_core.workflow.reputation import (
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _build_score(
-    originality=3.0, rigor=3.0, completeness=3.0, pedagogy=3.0, impact=3.0
-) -> dict:
+def _build_score(originality=3.0, rigor=3.0, completeness=3.0, pedagogy=3.0, impact=3.0) -> dict:
     return {
         "originality": originality,
         "rigor": rigor,
@@ -70,8 +69,7 @@ class TestComputeAuthorReputation:
             session,
             authors=[user.id],
             status="published",
-            score=_build_score(originality=4, rigor=3, completeness=5,
-                               pedagogy=4, impact=4),
+            score=_build_score(originality=4, rigor=3, completeness=5, pedagogy=4, impact=4),
         )
 
         rep = compute_author_reputation(session, user.id)
@@ -90,16 +88,14 @@ class TestComputeAuthorReputation:
             session,
             authors=[user.id],
             status="published",
-            score=_build_score(originality=5, rigor=5, completeness=5,
-                               pedagogy=5, impact=5),
+            score=_build_score(originality=5, rigor=5, completeness=5, pedagogy=5, impact=5),
         )
         # sedimentation article with moderate scores
         create_article(
             session,
             authors=[user.id],
             status="sedimentation",
-            score=_build_score(originality=1, rigor=1, completeness=1,
-                               pedagogy=1, impact=1),
+            score=_build_score(originality=1, rigor=1, completeness=1, pedagogy=1, impact=1),
         )
 
         rep = compute_author_reputation(session, user.id)
@@ -125,8 +121,7 @@ class TestComputeAuthorReputation:
             session,
             authors=[user.id],
             status="published",
-            score=_build_score(originality=4, rigor=4, completeness=4,
-                               pedagogy=4, impact=4),
+            score=_build_score(originality=4, rigor=4, completeness=4, pedagogy=4, impact=4),
         )
         rep1 = compute_author_reputation(session, user.id)
 
@@ -139,8 +134,7 @@ class TestComputeAuthorReputation:
             session,
             authors=[user.id],
             status="published",
-            score=_build_score(originality=5, rigor=5, completeness=5,
-                               pedagogy=5, impact=5),
+            score=_build_score(originality=5, rigor=5, completeness=5, pedagogy=5, impact=5),
         )
         rep2 = compute_author_reputation(session, user.id)
 
@@ -173,8 +167,7 @@ class TestComputeAuthorReputation:
             session,
             authors=[user.id],
             status="published",
-            score=_build_score(originality=5, rigor=5, completeness=5,
-                               pedagogy=5, impact=5),
+            score=_build_score(originality=5, rigor=5, completeness=5, pedagogy=5, impact=5),
         )
         compute_author_reputation(session, user.id)
 
@@ -212,9 +205,9 @@ class TestGetReviewerWeight:
         """Avg reputation > 3.0 gives weight > 1.0."""
         user = create_user(session, "heidi")
         update_user_reputation(
-            session, user.id,
-            {"professionalism": 5.0, "objectivity": 5.0,
-             "collaboration": 5.0, "pedagogy": 5.0},
+            session,
+            user.id,
+            {"professionalism": 5.0, "objectivity": 5.0, "collaboration": 5.0, "pedagogy": 5.0},
         )
         rep = get_reviewer_weight(session, user.id)
         # avg_rep = 5.0 -> weight = 1.0 + 0.2 * (5.0 - 3.0) / 2.0 = 1.2
@@ -224,9 +217,9 @@ class TestGetReviewerWeight:
         """Avg reputation < 3.0 gives weight < 1.0."""
         user = create_user(session, "ivan")
         update_user_reputation(
-            session, user.id,
-            {"professionalism": 1.0, "objectivity": 1.0,
-             "collaboration": 1.0, "pedagogy": 1.0},
+            session,
+            user.id,
+            {"professionalism": 1.0, "objectivity": 1.0, "collaboration": 1.0, "pedagogy": 1.0},
         )
         rep = get_reviewer_weight(session, user.id)
         # avg_rep = 1.0 -> weight = 1.0 + 0.2 * (1.0 - 3.0) / 2.0 = 0.8
@@ -253,8 +246,7 @@ class TestRecalculateAllReputations:
             session,
             authors=[u1.id, u2.id],
             status="published",
-            score=_build_score(originality=5, rigor=5, completeness=5,
-                               pedagogy=5, impact=5),
+            score=_build_score(originality=5, rigor=5, completeness=5, pedagogy=5, impact=5),
         )
 
         count = recalculate_all_reputations(session)
@@ -291,9 +283,11 @@ class TestWeightedArticleScoring:
         from peerpedia_core.workflow.scoring import compute_article_score
 
         reviews = [
-            {"scores": {"originality": 4, "rigor": 3, "completeness": 5,
-                        "pedagogy": 4, "impact": 4}, "is_self": False,
-             "reviewer_id": "u1"},
+            {
+                "scores": {"originality": 4, "rigor": 3, "completeness": 5, "pedagogy": 4, "impact": 4},
+                "is_self": False,
+                "reviewer_id": "u1",
+            },
         ]
         result = compute_article_score(reviews)
         assert result["originality"] == 4.0
@@ -304,12 +298,16 @@ class TestWeightedArticleScoring:
         from peerpedia_core.workflow.scoring import compute_article_score
 
         reviews = [
-            {"scores": {"originality": 4, "rigor": 4, "completeness": 4,
-                        "pedagogy": 4, "impact": 4}, "is_self": False,
-             "reviewer_id": "trusted"},
-            {"scores": {"originality": 2, "rigor": 2, "completeness": 2,
-                        "pedagogy": 2, "impact": 2}, "is_self": False,
-             "reviewer_id": "low_rep"},
+            {
+                "scores": {"originality": 4, "rigor": 4, "completeness": 4, "pedagogy": 4, "impact": 4},
+                "is_self": False,
+                "reviewer_id": "trusted",
+            },
+            {
+                "scores": {"originality": 2, "rigor": 2, "completeness": 2, "pedagogy": 2, "impact": 2},
+                "is_self": False,
+                "reviewer_id": "low_rep",
+            },
         ]
         weights = {"trusted": 2.0, "low_rep": 0.5}
         result = compute_article_score(reviews, reviewer_weights=weights)
@@ -327,9 +325,11 @@ class TestWeightedArticleScoring:
         from peerpedia_core.workflow.scoring import compute_article_score
 
         reviews = [
-            {"scores": {"originality": 3, "rigor": 3, "completeness": 3,
-                        "pedagogy": 3, "impact": 3}, "is_self": False,
-             "reviewer_id": "unknown"},
+            {
+                "scores": {"originality": 3, "rigor": 3, "completeness": 3, "pedagogy": 3, "impact": 3},
+                "is_self": False,
+                "reviewer_id": "unknown",
+            },
         ]
         weights = {}
         result = compute_article_score(reviews, reviewer_weights=weights)
@@ -340,9 +340,11 @@ class TestWeightedArticleScoring:
         from peerpedia_core.workflow.scoring import compute_article_score
 
         reviews = [
-            {"scores": {"originality": 5, "rigor": 5, "completeness": 5,
-                        "pedagogy": 5, "impact": 5}, "is_self": True,
-             "reviewer_id": "author"},
+            {
+                "scores": {"originality": 5, "rigor": 5, "completeness": 5, "pedagogy": 5, "impact": 5},
+                "is_self": True,
+                "reviewer_id": "author",
+            },
         ]
         # Self-review base weight = 0.15, boosted by 2.0 = 0.30
         weights = {"author": 2.0}

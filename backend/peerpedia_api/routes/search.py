@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """Search API route — SQL-level filtering with file-based source fallback."""
+
 from fastapi import APIRouter, Depends, Query
 from peerpedia_core.storage.db.models import Article
 from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
@@ -26,11 +27,11 @@ _MAX_SOURCE_SCAN = 50
 def _score_avg_expr():
     """SQL expression for the average of five-dimension scores."""
     return (
-        func.coalesce(func.json_extract(Article.score, '$.originality'), 0) +
-        func.coalesce(func.json_extract(Article.score, '$.rigor'), 0) +
-        func.coalesce(func.json_extract(Article.score, '$.completeness'), 0) +
-        func.coalesce(func.json_extract(Article.score, '$.pedagogy'), 0) +
-        func.coalesce(func.json_extract(Article.score, '$.impact'), 0)
+        func.coalesce(func.json_extract(Article.score, "$.originality"), 0)
+        + func.coalesce(func.json_extract(Article.score, "$.rigor"), 0)
+        + func.coalesce(func.json_extract(Article.score, "$.completeness"), 0)
+        + func.coalesce(func.json_extract(Article.score, "$.pedagogy"), 0)
+        + func.coalesce(func.json_extract(Article.score, "$.impact"), 0)
     ) / 5.0
 
 
@@ -71,22 +72,20 @@ def search(
     sort_lower = sort.strip().lower()
 
     # ── Base query (visible articles only) ────────────────────────────
-    base = db.query(Article).filter(
-        Article.status.in_(["published", "sedimentation"])
-    )
+    base = db.query(Article).filter(Article.status.in_(["published", "sedimentation"]))
 
     # ── Category filter (SQL JSON) ────────────────────────────────────
     if category_lower:
-        base = base.filter(
-            func.lower(Article.categories.cast(String)).contains(category_lower)
-        )
+        base = base.filter(func.lower(Article.categories.cast(String)).contains(category_lower))
 
     # ── Text search: title + compiled_output (SQL) ────────────────────
     if q_lower:
-        query = base.filter(or_(
-            Article.title.ilike(f'%{q_lower}%'),
-            Article.compiled_output.ilike(f'%{q_lower}%'),
-        ))
+        query = base.filter(
+            or_(
+                Article.title.ilike(f"%{q_lower}%"),
+                Article.compiled_output.ilike(f"%{q_lower}%"),
+            )
+        )
     else:
         query = base
 

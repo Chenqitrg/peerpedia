@@ -9,6 +9,7 @@ The application entry point initializes the FastAPI app with:
   - Background auto-publish loop
   - Global exception handler for clean 500 responses
 """
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -204,6 +205,7 @@ class TestGlobalExceptionHandler:
         handler = app.exception_handlers.get(Exception)
 
         if handler:
+
             async def run():
                 resp = await handler(request, ValueError("Something broke"))
                 return resp
@@ -211,5 +213,6 @@ class TestGlobalExceptionHandler:
             result = asyncio.run(run())
             assert result.status_code == 500
             import json
+
             body = json.loads(result.body)
             assert "error" in body.get("detail", "").lower()

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: CC-BY-NC-SA-4.0
 
 """FastAPI application entry point."""
+
 import asyncio
 import logging
 from contextlib import asynccontextmanager
@@ -31,17 +32,17 @@ _LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
 
 _file_handler = logging.FileHandler(_LOG_DIR / "backend.log")
-_file_handler.setFormatter(logging.Formatter(
-    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-))
+_file_handler.setFormatter(
+    logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+)
 _file_handler.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(_file_handler)
 logging.getLogger("peerpedia_api").setLevel(logging.DEBUG)
 logging.getLogger("peerpedia_core").setLevel(logging.DEBUG)
 
 logger.info("Backend starting — logs written to %s", _LOG_DIR / "backend.log")
-
-
 
 
 async def _auto_publish_loop():
@@ -52,6 +53,7 @@ async def _auto_publish_loop():
             from peerpedia_core.workflow.sedimentation import publish_ready_articles
 
             from peerpedia_api import deps
+
             db_gen = deps.get_db()
             session = next(db_gen)
             try:
@@ -73,22 +75,11 @@ async def lifespan(app: FastAPI):
     import os
 
     from peerpedia_core.storage.db.engine import get_engine, init_db, migrate_db
+
     db_url = os.environ.get("PEERPEDIA_DB", "sqlite:///peerpedia.db")
     engine = get_engine(db_url)
     init_db(engine)
     migrate_db(engine)
-
-    # Repair: rebuild article_authors for articles that have none
-    try:
-        from peerpedia_core.storage.db.crud_article import repair_orphan_article_authors
-        from peerpedia_core.storage.db.engine import get_session
-        s = get_session(engine)
-        repaired = repair_orphan_article_authors(s)
-        if repaired:
-            logger.info("Startup repair: rebuilt authors for %d articles", repaired)
-        s.close()
-    except Exception:
-        logger.exception("Startup repair failed — continuing")
 
     task = asyncio.create_task(_auto_publish_loop())
     logger.info("Auto-publish background task started")
@@ -105,9 +96,9 @@ app = FastAPI(title="PeerPedia API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",      # Vite dev server
-        "http://localhost:5174",      # Vite dev server (alt port)
-        "tauri://localhost",          # Tauri production webview
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:5174",  # Vite dev server (alt port)
+        "tauri://localhost",  # Tauri production webview
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -120,7 +111,10 @@ async def audit_request(request: Request, call_next):
     """Log every request and its status for debugging."""
     response = await call_next(request)
     logger.debug(
-        "%s %s → %d", request.method, request.url.path, response.status_code,
+        "%s %s → %d",
+        request.method,
+        request.url.path,
+        response.status_code,
     )
     return response
 
@@ -144,6 +138,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Internal server error"},
     )
+
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(articles_router, prefix="/api/v1")
