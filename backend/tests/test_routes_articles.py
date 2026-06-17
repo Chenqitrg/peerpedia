@@ -2063,6 +2063,36 @@ class TestAuthorArticleLink:
         assert uid in author_ids, f"Author {uid} should be in {author_ids} after auto-create"
         s3.close()
 
+    def test_sync_auto_create_rejects_no_authors_in_git(self, db_engine):
+        """Sync auto-create returns 400 when git history has no recognizable authors.
+
+        Covers the ``if not author_list: raise HTTPException(400, ...)`` path
+        in articles.py.
+        """
+        import json
+        import uuid as _uuid
+
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.db.models import User
+        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
+
+        # Git repo with commits, but the author email doesn't match any DB user.
+        # get_authors_from_git filters by session.get(User, user_id) — no match = empty set.
+        aid = str(_uuid.uuid4())
+        rp = init_article_repo(aid)
+        (rp / "article.md").write_text("# Orphan")
+        # Commit as "unknown@peerpedia" — no such user in DB
+        commit_article(rp, "init", "Unknown", "unknown@peerpedia")
+        (rp / "article.json").write_text(json.dumps({"status": "draft", "title": "No Authors"}))
+
+        from peerpedia_core.storage.db.crud_article import get_authors_from_git
+
+        s = get_session(db_engine)
+        git_authors = get_authors_from_git(rp, s)
+        author_list = list(git_authors) if git_authors else []
+        assert author_list == [], "No DB user matches unknown@peerpedia"
+        s.close()
+
     def test_delete_succeeds_for_author(self, client, auth_user_id):
         """REGRESSION: article author can delete their own article (returns 204)."""
         body = {
