@@ -2,6 +2,37 @@
 
 > 重大架构决策及其原因。按时间倒序，每条记录：背景、决策、后果。
 
+## ADR-012: 沉淀池文章不可变——作者也不能编辑
+
+**日期**: 2026-06 | **状态**: 已实施（PR #71 评审修订）
+
+**背景**: ADR-011 将权限集中到 core，`_assert_is_author` 允许作者编辑任何状态的文章。但沉淀池的设计意图是模拟学术审稿期——文章提交后像断了线的风筝，作者不应再干预。如果允许作者在沉淀期修改内容，他可以上传空文档然后持续更新，绕过审稿机制。
+
+**决策**:
+
+1. **写操作按状态分层**:
+   - `draft` → 作者可直接编辑、删除、回滚、同步
+   - `sedimentation` → 完全不可变，所有人（含作者）只读
+   - `published` → 作者可编辑，但后续必须走 PR 流程（当前直接 commit 暂允许，PR 功能未实现）
+
+2. **`_assert_is_author` 接受 `allowed_statuses` 参数**，各操作指定允许的状态集合。默认 `{"draft", "published"}`；`assert_can_extend_sink` 覆盖为 `{"sedimentation"}`（延长沉淀期仅对沉淀池文章有意义）。
+
+3. **读操作不受影响** — `assert_can_read_article` 允许任何人读 `sedimentation, published`，作者额外可读 `draft`。
+
+**放弃的方案**:
+
+- 所有写操作统一 `draft`-only（过度限制——published 文章作者后续应有权修改）
+- 不检查状态，仅检查作者身份（违背沉淀池设计意图）
+
+**后果**:
+
+- ✅ 沉淀期作者无法干预——`PUT/DELETE/sync` 在 sedimentation 上返回 `NotAuthorizedError` → 403
+- ✅ 各操作可独立调校允许的状态集合（`allowed_statuses` 参数）
+- ❌ published 编辑走 PR 的功能尚未实现——当前直接 commit 仍允许
+- ❌ `api_publish_article` 目前不检查当前状态是否为 `draft`（未来可能需要）
+
+---
+
 ## ADR-011: 权限策略集中到 Core，语义异常解耦 HTTP
 
 **日期**: 2026-06 | **状态**: 已实施（PR #71）
