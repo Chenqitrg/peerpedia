@@ -1578,6 +1578,58 @@ class TestBundleSyncEndpoints:
 
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_sync_auto_creates_db_record(self, client, auth_user_id, db_engine):
+        """First bundle push auto-creates article DB record from existing Git repo."""
+        import json
+        import uuid
+
+        from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
+        from peerpedia_core.storage.db.engine import get_session
+        from peerpedia_core.storage.git_backend import (
+            commit_article,
+            create_bundle,
+            init_article_repo,
+        )
+
+        # Simulate Tauri first push: Git repo exists on disk but no DB record
+        aid = str(uuid.uuid4())
+        rp = init_article_repo(aid)
+
+        # Create empty root commit first (since_hash anchor)
+        import git as gitmod
+
+        repo = gitmod.Repo(rp)
+        with repo.config_writer() as cw:
+            cw.set_value("user", "name", "CI")
+            cw.set_value("user", "email", "ci@peerpedia")
+        repo.git.commit("--allow-empty", "-m", "root")
+        empty_hash = repo.head.commit.hexsha
+
+        # Then write real content on top
+        (rp / "article.md").write_text("# Content")
+        (rp / "article.json").write_text(json.dumps({"title": "Sync Auto", "status": "draft"}))
+        commit_article(rp, "init", "A", f"{auth_user_id}@peerpedia")
+
+        # Incremental bundle from empty root to real commit
+        bundle = create_bundle(rp, empty_hash)
+
+        # Push via /sync — triggers auto-create code path
+        resp = client.post(
+            f"/api/v1/articles/{aid}/sync",
+            files={"file": ("bundle", bundle, "application/octet-stream")},
+            auth=(auth_user_id, "test"),
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["head"] is not None
+
+        # DB record was created from git repo
+        s = get_session(db_engine)
+        a = get_article(s, aid)
+        assert a is not None
+        assert a.title == "Sync Auto"
+        assert auth_user_id in get_author_ids(s, aid)
+        s.close()
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # _refresh_db_from_git — DB cache sync from article.json

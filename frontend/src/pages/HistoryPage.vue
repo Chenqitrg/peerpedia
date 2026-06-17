@@ -128,12 +128,14 @@ async function loadDiff() {
         raw = parseUnifiedDiff(data.diff_text, data.files || [])
       }
     }
-    // Only show article content files — reviews/article.json are noise here
+    // Show article content, metadata, and status changes.
+    // article.json records status transitions (draft→sedimentation→published)
+    // that readers need to see in the article lifecycle.
     if (raw) {
       diffResult.value = {
         ...raw,
         files: raw.files.filter(
-          f => f === 'article.md' || f === 'article.typ',
+          f => ['article.md', 'article.typ', 'article.json'].includes(f),
         ),
       }
     } else {

@@ -841,8 +841,7 @@ async def api_sync_article(
         from peerpedia_core.storage.db.crud_article import create_article as _create_article
 
         a = _create_article(db, authors=[], id=article_id, status="draft")
-        db.commit()
-        # Rebuild authors from git commit history
+        # Rebuild authors from git commit history (single source of truth)
         from peerpedia_core.storage.db.crud_article import (
             get_authors_from_git,
             rebuild_article_authors,
