@@ -44,6 +44,7 @@ import { useArticleSync } from '../composables/useArticleSync'
 import { useFollowCache } from '../composables/useFollowCache'
 import { saveJSON, loadJSON } from '../composables/useLocalStorage'
 import DiffView from '../components/DiffView.vue'
+import { articlePermissions, disabledReason } from '../lib/permissions'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,7 +52,7 @@ const userStore = useUserStore()
 const tabStore = useTabStore()
 const reviewStore = useReviewStore()
 const { t } = useI18n()
-const { canRead, canWrite, getFallback } = useOffline()
+const { canRead } = useOffline()
 
 const article = ref<ArticleDetail | null>(null)
 const compiledHtml = ref('')
@@ -74,17 +75,14 @@ const articleBodyRef = ref<HTMLElement | null>(null)
 const articleTabId = tabStore.ensureTab('article', route.fullPath)
 useArticleTab(articleTabId, computed(() => article.value?.title), articleBodyRef)
 
-const isOwnArticle = computed(() => {
-  if (article.value?.is_own_article) return true
-  // Check both server identity (viewer.id) and local identity (localAccount.id).
-  // After server sync, viewer.id is the server UUID but local drafts use the
-  // local account UUID — the two IDs differ until the draft is synced.
-  const viewerId = userStore.viewer?.id
-  const localId = userStore.localAccount?.id
-  if ((viewerId && articleAuthorIds.value.includes(viewerId)) ||
-      (localId && articleAuthorIds.value.includes(localId))) return true
-  return false
-})
+const isOwnArticle = computed(() => article.value?.is_own_article ?? false)
+
+const articlePerms = computed(() =>
+  articlePermissions(
+    { status: article.value?.status ?? '', is_own_article: isOwnArticle.value },
+    !!userStore.viewer,
+  ),
+)
 
 function handleDeleted() {
   router.push(`/user/${userStore.viewer?.id}`)
@@ -159,7 +157,6 @@ const sortedReviews = computed(() => {
 
 function buildArticleFromDraft(draft: { id: string; account_id: string; title: string; content: string; format: string; updated_at: string }): ArticleDetail {
   const viewerId = userStore.viewer?.id
-  const localId = userStore.localAccount?.id
   return {
     id: draft.id,
     title: draft.title || 'Untitled',
@@ -178,7 +175,7 @@ function buildArticleFromDraft(draft: { id: string; account_id: string; title: s
     sink_duration_days: null,
     review_count: 0,
     is_bookmarked: false,
-    is_own_article: viewerId === draft.account_id || localId === draft.account_id,
+    is_own_article: viewerId === draft.account_id,
     created_at: draft.updated_at,
     updated_at: draft.updated_at,
   }
@@ -497,8 +494,8 @@ function _syncBookmarkCache(viewerId: string, articleId: string, add: boolean) {
 async function toggleBookmark() {
   if (!article.value || !userStore.viewer) return
 
-  // Silently ignore self-bookmark
-  if (article.value.is_own_article) return
+  // Guard: bookmarking requires auth + not own article
+  if (!articlePerms.value.canBookmark) return
 
   const wasBookmarked = article.value.is_bookmarked
   article.value.is_bookmarked = !wasBookmarked
@@ -704,7 +701,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             </span>
           </div>
           <button
-            v-if="!isOwnArticle"
+            v-if="articlePerms.canBookmark"
             class="flex items-center justify-center w-7 h-7 rounded
                    text-ink-muted hover:text-accent hover:bg-accent/10
                    transition-colors duration-200"
@@ -775,8 +772,12 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             </button>
 
             <button
-              v-if="isOwnArticle"
-              class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
+              class="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-colors"
+              :class="articlePerms.canEdit
+                ? 'text-ink-muted hover:text-ink hover:bg-[#21262d]'
+                : 'text-ink-muted/40 cursor-not-allowed'"
+              :disabled="!articlePerms.canEdit"
+              :data-tooltip="!articlePerms.canEdit ? t(disabledReason(articlePerms, 'canEdit')) : ''"
               @click="goToEdit"
             >
               <Edit class="w-3 h-3" stroke-width="2" />
@@ -784,7 +785,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             </button>
 
             <DeleteButton
-              v-if="isOwnArticle"
+              v-if="articlePerms.canDelete"
               :article-id="article?.id ?? ''"
               :author-id="article?.authors?.[0]?.id"
               @deleted="handleDeleted"
@@ -792,11 +793,11 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
 
             <button
               class="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-colors"
-              :class="canWrite('article.fork')
+              :class="articlePerms.canFork
                 ? 'text-ink-muted hover:text-ink hover:bg-[#21262d]'
                 : 'text-ink-muted/40 cursor-not-allowed'"
-              :disabled="!canWrite('article.fork')"
-              :data-tooltip="!canWrite('article.fork') ? t(getFallback('article.fork')) : ''"
+              :disabled="!articlePerms.canFork"
+              :data-tooltip="!articlePerms.canFork ? t(disabledReason(articlePerms, 'canFork')) : ''"
               @click="handleFork"
             >
               <GitFork class="w-3 h-3" stroke-width="2" />
@@ -830,7 +831,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             />
 
             <button
-              v-if="isOwnArticle && article.status === 'sedimentation'"
+              v-if="articlePerms.canExtendSink"
               class="flex items-center gap-1 px-2.5 py-1 text-xs text-ink-muted hover:text-ink hover:bg-[#21262d] rounded-md transition-colors"
               @click="handleSinkExtension"
             >

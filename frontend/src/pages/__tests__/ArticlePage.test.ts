@@ -499,7 +499,17 @@ describe('ArticlePage — delete', () => {
     }))
   })
 
-  it('shows delete button on own article', async () => {
+  it('shows delete button on own draft article', async () => {
+    const { getArticle } = await import('../../api/articles')
+    vi.mocked(getArticle).mockResolvedValue({
+      id: 'test-article-1', title: 'Draft Article', status: 'draft',
+      authors: [{ id: 'u1', name: 'Alice Chen', anonymous_name: 'anon1' }],
+      fork_count: 0, forked_from: null, commit_count: 1, commit_hash: 'abc123',
+      compiled_format: 'html', compiled_output: '<p>Content</p>', compiled_pages: 1,
+      score: null, sink_eta: null, days_remaining: null, sink_duration_days: null,
+      review_count: 0, is_bookmarked: false, is_own_article: true,
+      created_at: '2026-05-01T00:00:00Z', updated_at: '2026-06-05T00:00:00Z',
+    } as any)
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
@@ -511,6 +521,16 @@ describe('ArticlePage — delete', () => {
   })
 
   it('clicking delete shows confirmation with Delete and Cancel buttons', async () => {
+    const { getArticle } = await import('../../api/articles')
+    vi.mocked(getArticle).mockResolvedValue({
+      id: 'test-article-1', title: 'Draft Article', status: 'draft',
+      authors: [{ id: 'u1', name: 'Alice Chen', anonymous_name: 'anon1' }],
+      fork_count: 0, forked_from: null, commit_count: 1, commit_hash: 'abc123',
+      compiled_format: 'html', compiled_output: '<p>Content</p>', compiled_pages: 1,
+      score: null, sink_eta: null, days_remaining: null, sink_duration_days: null,
+      review_count: 0, is_bookmarked: false, is_own_article: true,
+      created_at: '2026-05-01T00:00:00Z', updated_at: '2026-06-05T00:00:00Z',
+    } as any)
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
@@ -530,6 +550,16 @@ describe('ArticlePage — delete', () => {
     userStore.viewer = { id: 'u1', name: 'Alice Chen' } as any
     userStore.token = 'test-token'
 
+    const { getArticle } = await import('../../api/articles')
+    vi.mocked(getArticle).mockResolvedValue({
+      id: 'test-article-1', title: 'Draft Article', status: 'draft',
+      authors: [{ id: 'u1', name: 'Alice Chen', anonymous_name: 'anon1' }],
+      fork_count: 0, forked_from: null, commit_count: 1, commit_hash: 'abc123',
+      compiled_format: 'html', compiled_output: '<p>Content</p>', compiled_pages: 1,
+      score: null, sink_eta: null, days_remaining: null, sink_duration_days: null,
+      review_count: 0, is_bookmarked: false, is_own_article: true,
+      created_at: '2026-05-01T00:00:00Z', updated_at: '2026-06-05T00:00:00Z',
+    } as any)
     const ArticlePage = (await import('../ArticlePage.vue')).default
     const wrapper = mount(ArticlePage, {
       global: { stubs: { 'router-link': RouterLinkStub, 'router-view': true } },
