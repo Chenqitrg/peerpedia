@@ -33,6 +33,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_engine, get_session
+from peerpedia_core.storage.db.models import Article
 
 _UNIQ = uuid.uuid4().hex[:8]
 
@@ -124,7 +125,8 @@ class TestSpecSyncUpload:
         """SPEC-SYNC-UPLOAD-2: After upload, article appears in GET /articles."""
         token, user = _register(client, f"list_{_UNIQ}")
         _create_article(client, token, user["id"], "Listable Article")
-        resp = client.get("/api/v1/articles", params={"author_id": user["id"]})
+        # Visibility filter: drafts only visible to their authors.
+        resp = client.get("/api/v1/articles", params={"author_id": user["id"]}, headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 200
         data = resp.json()
         articles = data.get("articles", data)
@@ -217,11 +219,17 @@ class TestSpecSyncUpdate:
 class TestSpecSyncSource:
     """SPEC-SYNC-SOURCE: Source endpoint for diff comparison"""
 
-    def test_article_source_endpoint(self, client):
+    def test_article_source_endpoint(self, client, engine):
         """SPEC-SYNC-SOURCE-1: GET /source returns { content, format }."""
         token, user = _register(client, f"source_{_UNIQ}")
         article = _create_article(client, token, user["id"], "Source Test", "# Remote Content", fmt="markdown")
         aid = article["id"]
+        # Source download requires published status.
+        s = get_session(engine)
+        a = s.query(Article).filter(Article.id == aid).first()
+        if a is not None:
+            a.status = "published"
+            s.commit()
 
         resp = client.get(f"/api/v1/articles/{aid}/source")
         assert resp.status_code == 200
