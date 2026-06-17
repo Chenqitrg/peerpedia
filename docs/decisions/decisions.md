@@ -2,6 +2,23 @@
 
 > 重大架构决策及其原因。按时间倒序，每条记录：背景、决策、后果。
 
+## ADR-009: History 展示 article.json 以暴露状态变更
+
+**日期**: 2026-06 | **状态**: 已实施（PR #66）
+
+**背景**: HistoryPage 的 diff 视图只过滤 `article.md` 和 `article.typ`。读者看不到文章的状态生命周期（draft → sedimentation → published），因为状态变更记录在 `article.json` 里。
+
+**决策**: diff filter 从 `['article.md', 'article.typ']` 扩展为 `['article.md', 'article.typ', 'article.json']`。
+
+**放弃的方案**: 在 UI 里单独展示状态变更时间线（过度设计，diff 已经够用）。
+
+**后果**:
+- ✅ 读者可以在 history 里看到文章状态转换
+- ✅ 改动极小——一行 filter 表达式
+- ❌ article.json 的 diff 是原始 JSON，阅读体验不如专门的状态时间线
+
+---
+
 ## ADR-008: 离线优先 + Bundle Sync
 
 **日期**: 2026-06 | **状态**: 已实施
