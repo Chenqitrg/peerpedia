@@ -550,7 +550,6 @@ def api_rollback(
     new_hash = commit_article(rp, f"Rollback to {hash[:8]}", "System", "system@peerpedia")
 
     set_sink_start(db, article_id, params.sink.edit_article_default_days)
-    neutral = 3.0
     rollback_author_ids = get_author_ids(db, article_id)
     create_review(
         db,
@@ -558,12 +557,13 @@ def api_rollback(
         commit_hash=new_hash,
         reviewer_id=rollback_author_ids[0] if rollback_author_ids else "system",
         scope="pool",
-        scores={"originality": neutral, "rigor": neutral, "completeness": neutral, "pedagogy": neutral, "impact": neutral},
+        scores={"originality": 0, "rigor": 0, "completeness": 0, "pedagogy": 0, "impact": 0},
     )
     score = compute_article_score_for_commit(db, article_id, new_hash)
-    if score is not None:
-        article.score = score
-        db.commit()
+    if score is None:
+        raise HTTPException(status_code=500, detail="Failed to compute score after rollback")
+    article.score = score
+    db.commit()
 
     return {"commit_hash": new_hash, "message": f"Rollback to {hash[:8]}"}
 
