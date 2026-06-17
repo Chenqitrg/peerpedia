@@ -1,0 +1,28 @@
+# Codecov configuration — block PRs that drop coverage below 94%
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: 94%           # overall coverage must stay >= 94%
+        threshold: 0.5%        # allow up to 0.5% drop for small PRs
+    patch:
+      default:
+        target: 94%           # new/modified lines must be >= 94% covered
+        threshold: 0%
+
+comment:
+  layout: "reach, diff, flags"
+  behavior: default
+  require_changes: false
+
+github_checks:
+  annotations: true
+
+flags:
+  backend:
+    paths:
+      - backend/
+      - core/
+    carryforward: false

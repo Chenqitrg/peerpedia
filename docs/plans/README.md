@@ -1,6 +1,6 @@
 # 实施计划索引
 
-> 原完整计划：[implementation-plan-2026-06-10.md](../implementation-plan-2026-06-10.md)  
+> 原完整计划：[implementation-plan-2026-06-10.md](implementation-plan-2026-06-10.md)  
 > 所有 Step **互相解耦**——每个 Step 只触碰自己的文件，可以按任意顺序执行。
 
 ## 建议执行顺序（按风险从低到高）
