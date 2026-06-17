@@ -944,9 +944,7 @@ $$
         try:
             rp = init_article_repo(a.id, base_dir=articles_dir)
             (rp / "article.md").write_text(ad["content"])
-            commit_article(rp, "Initial submission", author.name,
-                          f"{author.id}@peerpedia",
-                          allow_empty=True)
+            commit_article(rp, "Initial submission", author.name, f"{author.id}@peerpedia", allow_empty=True)
             # Write co-author attribution commits so git-derived authors
             # can recover the full author list on repair/rebuild.
             for co_author_id in co_author_ids:

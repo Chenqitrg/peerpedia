@@ -12,30 +12,56 @@ bugs are fixed:
 - repo_bundle create author rebuild
 - /sync auto-create doesn't leave orphan articles
 """
-import pytest
+
 from peerpedia_core.storage.db.crud_article import (
     add_article_authors,
     get_author_ids,
     get_authors_from_git,
-    rebuild_article_authors,
     repair_article_authors,
     repair_orphan_article_authors,
     replace_article_authors,
     resolve_user_id_from_git_email,
 )
-from peerpedia_core.storage.db.engine import get_session, init_db
-from peerpedia_core.storage.db.models import Article, ArticleAuthor, User
+from peerpedia_core.storage.db.engine import get_session
+from peerpedia_core.storage.db.models import Article, User
 from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
-
 # ── Unit tests: replace_article_authors ──────────────────────────────────
+
 
 class TestReplaceArticleAuthors:
     def test_replaces_all_authors(self, db_engine):
         s = get_session(db_engine)
-        u1 = User(id="u-replace-1", username="alice", password_hash="", name="A", anonymous_name="a", affiliation="X", expertise=[], reputation={})
-        u2 = User(id="u-replace-2", username="bob", password_hash="", name="B", anonymous_name="b", affiliation="X", expertise=[], reputation={})
-        u3 = User(id="u-replace-3", username="carol", password_hash="", name="C", anonymous_name="c", affiliation="X", expertise=[], reputation={})
+        u1 = User(
+            id="u-replace-1",
+            username="alice",
+            password_hash="",
+            name="A",
+            anonymous_name="a",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
+        u2 = User(
+            id="u-replace-2",
+            username="bob",
+            password_hash="",
+            name="B",
+            anonymous_name="b",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
+        u3 = User(
+            id="u-replace-3",
+            username="carol",
+            password_hash="",
+            name="C",
+            anonymous_name="c",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         for u in [u1, u2, u3]:
             s.add(u)
         a = Article(id="a-replace", status="draft", fork_count=0)
@@ -59,8 +85,26 @@ class TestReplaceArticleAuthors:
 
     def test_replace_sorts_by_username(self, db_engine):
         s = get_session(db_engine)
-        u1 = User(id="u-sort-1", username="zebra", password_hash="", name="Z", anonymous_name="z", affiliation="X", expertise=[], reputation={})
-        u2 = User(id="u-sort-2", username="alpha", password_hash="", name="A", anonymous_name="a", affiliation="X", expertise=[], reputation={})
+        u1 = User(
+            id="u-sort-1",
+            username="zebra",
+            password_hash="",
+            name="Z",
+            anonymous_name="z",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
+        u2 = User(
+            id="u-sort-2",
+            username="alpha",
+            password_hash="",
+            name="A",
+            anonymous_name="a",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         for u in [u1, u2]:
             s.add(u)
         a = Article(id="a-sort", status="draft", fork_count=0)
@@ -77,10 +121,20 @@ class TestReplaceArticleAuthors:
 
 # ── Unit tests: repair_article_authors ───────────────────────────────────
 
+
 class TestRepairArticleAuthors:
     def test_orphan_mode_skips_non_orphans(self, db_engine):
         s = get_session(db_engine)
-        u = User(id="u-rp-1", username="rp1", password_hash="", name="R", anonymous_name="r", affiliation="X", expertise=[], reputation={})
+        u = User(
+            id="u-rp-1",
+            username="rp1",
+            password_hash="",
+            name="R",
+            anonymous_name="r",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         s.add(u)
         a = Article(id="a-rp-1", status="draft", fork_count=0)
         s.add(a)
@@ -94,7 +148,16 @@ class TestRepairArticleAuthors:
 
     def test_orphan_mode_fixes_zero_authors(self, db_engine):
         s = get_session(db_engine)
-        u = User(id="u-rp-2", username="rp2", password_hash="", name="R2", anonymous_name="r", affiliation="X", expertise=[], reputation={})
+        u = User(
+            id="u-rp-2",
+            username="rp2",
+            password_hash="",
+            name="R2",
+            anonymous_name="r",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         s.add(u)
         a = Article(id="a-rp-2", status="draft", fork_count=0)
         s.add(a)
@@ -106,8 +169,26 @@ class TestRepairArticleAuthors:
     def test_full_mode_repairs_from_git_history(self, db_engine, tmp_path):
         """Full mode should replace article_authors from git commit history."""
         s = get_session(db_engine)
-        u1 = User(id="u-full-1", username="full1", password_hash="", name="F1", anonymous_name="f", affiliation="X", expertise=[], reputation={})
-        u2 = User(id="u-full-2", username="full2", password_hash="", name="F2", anonymous_name="f", affiliation="X", expertise=[], reputation={})
+        u1 = User(
+            id="u-full-1",
+            username="full1",
+            password_hash="",
+            name="F1",
+            anonymous_name="f",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
+        u2 = User(
+            id="u-full-2",
+            username="full2",
+            password_hash="",
+            name="F2",
+            anonymous_name="f",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         for u in [u1, u2]:
             s.add(u)
         a = Article(id="a-full", status="draft", fork_count=0)
@@ -133,13 +214,31 @@ class TestRepairArticleAuthors:
         db_authors_before = set(get_author_ids(s, "a-full"))
         assert db_authors_before == {"u-full-1"}
 
+        # All-mode repair should restore u2 from git history
+        repaired = repair_article_authors(s, mode="all", articles_dir=tmp_path)
+        assert repaired == 1, f"Expected 1 article repaired, got {repaired}"
+        db_authors_after = set(get_author_ids(s, "a-full"))
+        assert db_authors_after == {"u-full-1", "u-full-2"}, (
+            f"All-mode repair should restore both authors from git, got {db_authors_after}"
+        )
+
 
 # ── Unit tests: resolve_user_id_from_git_email ───────────────────────────
+
 
 class TestResolveUserFromGitEmail:
     def test_canonical_uuid_email(self, db_engine):
         s = get_session(db_engine)
-        u = User(id="u-email-1", username="email1", password_hash="", name="E", anonymous_name="e", affiliation="X", expertise=[], reputation={})
+        u = User(
+            id="u-email-1",
+            username="email1",
+            password_hash="",
+            name="E",
+            anonymous_name="e",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         s.add(u)
         s.commit()
 
@@ -148,7 +247,16 @@ class TestResolveUserFromGitEmail:
 
     def test_legacy_username_email(self, db_engine):
         s = get_session(db_engine)
-        u = User(id="u-email-2", username="einstein", password_hash="", name="Albert", anonymous_name="a", affiliation="X", expertise=[], reputation={})
+        u = User(
+            id="u-email-2",
+            username="einstein",
+            password_hash="",
+            name="Albert",
+            anonymous_name="a",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         s.add(u)
         s.commit()
 
@@ -157,7 +265,16 @@ class TestResolveUserFromGitEmail:
 
     def test_legacy_username_other_domain(self, db_engine):
         s = get_session(db_engine)
-        u = User(id="u-email-3", username="dirac", password_hash="", name="Paul", anonymous_name="d", affiliation="X", expertise=[], reputation={})
+        u = User(
+            id="u-email-3",
+            username="dirac",
+            password_hash="",
+            name="Paul",
+            anonymous_name="d",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         s.add(u)
         s.commit()
 
@@ -172,6 +289,7 @@ class TestResolveUserFromGitEmail:
 
 # ── Integration tests: repo_bundle create ────────────────────────────────
 
+
 class TestRepoBundleAuthorRebuild:
     def test_bundle_create_rebuilds_authors_from_git(self, db_engine):
         """After creating via repo_bundle, article_authors should include the
@@ -184,14 +302,20 @@ class TestRepoBundleAuthorRebuild:
 
         import git as gitmod
         from fastapi.testclient import TestClient
-
         from peerpedia_api import deps
         from peerpedia_api.main import app
 
         s = get_session(db_engine)
-        user = User(id="u-bundle-1", username="bundle_u1", password_hash="",
-                    name="BundleUser", anonymous_name="b", affiliation="X",
-                    expertise=[], reputation={})
+        user = User(
+            id="u-bundle-1",
+            username="bundle_u1",
+            password_hash="",
+            name="BundleUser",
+            anonymous_name="b",
+            affiliation="X",
+            expertise=[],
+            reputation={},
+        )
         s.add(user)
         s.commit()
         uid = user.id
@@ -219,21 +343,24 @@ class TestRepoBundleAuthorRebuild:
                 repo = gitmod.Repo.init(rp)
                 (rp / "article.md").write_text("# Bundle Test\n")
                 repo.index.add(["article.md"])
-                repo.index.commit("Initial",
-                                  author=gitmod.Actor("Test", f"{uid}@peerpedia"),
-                                  committer=gitmod.Actor("Test", f"{uid}@peerpedia"))
+                repo.index.commit(
+                    "Initial", author=gitmod.Actor("Test", f"{uid}@peerpedia"), committer=gitmod.Actor("Test", f"{uid}@peerpedia")
+                )
                 buf = io.BytesIO()
                 with tarfile.open(fileobj=buf, mode="w:gz") as tar:
                     tar.add(str(rp), arcname=article_id)
                 bundle_b64 = base64.b64encode(buf.getvalue()).decode()
 
             with TestClient(app) as client:
-                resp = client.post("/api/v1/articles", json={
-                    "id": article_id,
-                    "title": "Bundle Auth Test",
-                    "content": "",
-                    "repo_bundle": bundle_b64,
-                })
+                resp = client.post(
+                    "/api/v1/articles",
+                    json={
+                        "id": article_id,
+                        "title": "Bundle Auth Test",
+                        "content": "",
+                        "repo_bundle": bundle_b64,
+                    },
+                )
                 assert resp.status_code == 201, resp.text
                 returned_id = resp.json()["id"]
                 assert returned_id == article_id
@@ -246,6 +373,7 @@ class TestRepoBundleAuthorRebuild:
 
 
 # ── Backward compat ──────────────────────────────────────────────────────
+
 
 class TestRepairOrphanBackwardCompat:
     def test_repair_orphan_delegates_to_repair_article_authors(self, db_engine):

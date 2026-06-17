@@ -264,6 +264,7 @@ def api_create_article(
                 get_authors_from_git,
                 rebuild_article_authors,
             )
+
             git_authors = get_authors_from_git(rp, db)
             if git_authors:
                 rebuild_article_authors(db, a.id, git_authors | {current_user.id})
@@ -848,12 +849,14 @@ async def api_sync_article(
             if not (rp / ".git").is_dir():
                 raise HTTPException(status_code=404, detail="Article not found")
             from peerpedia_core.storage.db.crud_article import create_article as _create_article
+
             a = _create_article(db, authors=[], id=article_id, status="draft")
             # Rebuild authors from git commit history
             from peerpedia_core.storage.db.crud_article import (
                 get_authors_from_git,
                 rebuild_article_authors,
             )
+
             git_authors = get_authors_from_git(rp, db)
             if git_authors:
                 rebuild_article_authors(db, article_id, git_authors)
@@ -861,8 +864,7 @@ async def api_sync_article(
                 # No recognizable authors in git — don't leave an authorless record
                 raise HTTPException(
                     status_code=422,
-                    detail="Cannot derive authors from git history — "
-                           "ensure commit emails use UUID@peerpedia format",
+                    detail="Cannot derive authors from git history — ensure commit emails use UUID@peerpedia format",
                 )
             # Refresh metadata from article.json
             _refresh_db_from_git(article_id, rp, db)

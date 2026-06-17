@@ -3,6 +3,8 @@
 
 """Article CRUD operations."""
 
+from pathlib import Path
+
 from sqlalchemy.orm import Session
 
 from peerpedia_core.storage.db.models import Article, ArticleAuthor
@@ -30,9 +32,7 @@ def replace_article_authors(session: Session, article_id: str, author_ids: set[s
     """
     from peerpedia_core.storage.db.models import User
 
-    session.query(ArticleAuthor).filter(
-        ArticleAuthor.article_id == article_id
-    ).delete()
+    session.query(ArticleAuthor).filter(ArticleAuthor.article_id == article_id).delete()
 
     # Sort by username for stable ordering
     rows = session.query(User).filter(User.id.in_(list(author_ids))).all()
@@ -44,11 +44,13 @@ def replace_article_authors(session: Session, article_id: str, author_ids: set[s
     sorted_ids.extend(uid for uid in author_ids if uid not in row_map)
 
     for pos, author_id in enumerate(sorted_ids):
-        session.add(ArticleAuthor(
-            article_id=article_id,
-            author_id=author_id,
-            position=pos,
-        ))
+        session.add(
+            ArticleAuthor(
+                article_id=article_id,
+                author_id=author_id,
+                position=pos,
+            )
+        )
 
 
 def get_author_ids(session: Session, article_id: str) -> list[str]:
@@ -357,7 +359,12 @@ def rebuild_article_authors(
     session.commit()
 
 
-def repair_article_authors(session: Session, *, mode: str = "orphans") -> int:
+def repair_article_authors(
+    session: Session,
+    *,
+    mode: str = "orphans",
+    articles_dir: str | Path | None = None,
+) -> int:
     """Repair article_authors from git commit history.
 
     Parameters
@@ -366,6 +373,8 @@ def repair_article_authors(session: Session, *, mode: str = "orphans") -> int:
         ``"orphans"`` — only fix articles with zero author rows (startup-safe).
         ``"all"``    — force-rebuild ALL articles from git history; uses
                        ``replace_article_authors`` to overwrite DB with git truth.
+    articles_dir : str or Path or None
+        Override the default articles directory (for testing).
 
     Returns
     -------
@@ -373,9 +382,12 @@ def repair_article_authors(session: Session, *, mode: str = "orphans") -> int:
         Number of articles repaired.
     """
     import logging
+
     from peerpedia_core.storage.git_backend import DEFAULT_ARTICLES_DIR
 
     assert mode in {"orphans", "all"}, f"Invalid mode: {mode}"
+
+    base_dir = Path(articles_dir) if articles_dir else DEFAULT_ARTICLES_DIR
 
     logger = logging.getLogger(__name__)
     articles = session.query(Article).all()
@@ -387,7 +399,7 @@ def repair_article_authors(session: Session, *, mode: str = "orphans") -> int:
         if mode == "orphans" and db_authors:
             continue
 
-        rp = DEFAULT_ARTICLES_DIR / article.id
+        rp = base_dir / article.id
         if not (rp / ".git").is_dir():
             continue
 
@@ -417,7 +429,11 @@ def repair_article_authors(session: Session, *, mode: str = "orphans") -> int:
     return repaired
 
 
-def repair_orphan_article_authors(session: Session) -> int:
+def repair_orphan_article_authors(
+    session: Session,
+    *,
+    articles_dir: str | Path | None = None,
+) -> int:
     """Rebuild article_authors for articles that have none.
 
     Scans all articles, finds those with zero rows in article_authors,
@@ -429,7 +445,7 @@ def repair_orphan_article_authors(session: Session) -> int:
 
     Delegates to ``repair_article_authors(mode="orphans")``.
     """
-    return repair_article_authors(session, mode="orphans")
+    return repair_article_authors(session, mode="orphans", articles_dir=articles_dir)
 
 
 def validate_article_has_authors(session: Session, article_id: str) -> None:

@@ -1631,9 +1631,9 @@ class TestBundleSyncEndpoints:
         s.close()
 
     def test_sync_auto_create_rejects_no_authors(self, client, auth_user_id):
-        """Sync auto-create returns 400 when git history has no DB-matched authors.
+        """Sync auto-create returns 422 when git history has no DB-matched authors.
 
-        Covers the ``if not author_list: raise HTTPException(400, ...)`` path
+        Covers the ``if not git_authors: raise HTTPException(422, ...)`` path
         in api_sync_article.
         """
         import json
@@ -1670,8 +1670,8 @@ class TestBundleSyncEndpoints:
             files={"file": ("bundle", bundle, "application/octet-stream")},
             auth=(auth_user_id, "test"),
         )
-        assert resp.status_code == 400, resp.text
-        assert "no authors found" in resp.json()["detail"]
+        assert resp.status_code == 422, resp.text
+        assert "Cannot derive authors" in resp.json()["detail"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -355,9 +355,7 @@ def test_spec_regression_username_email_rejected(db_engine):
     s.close()
     shutil.rmtree(tmp)
 
-    assert result == {uid}, (
-        f"Username-based email SHOULD match (Phase 0c legacy compat), got {result}"
-    )
+    assert result == {uid}, f"Username-based email SHOULD match (Phase 0c legacy compat), got {result}"
 
 
 def test_spec_regression_name_lookup_rejected(db_engine):
