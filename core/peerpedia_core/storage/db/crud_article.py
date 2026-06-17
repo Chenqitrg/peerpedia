@@ -203,7 +203,6 @@ def delete_article(session: Session, article_id: str) -> None:
     Raises ValueError if the article does not exist.
     """
     import shutil
-    from pathlib import Path
 
     from peerpedia_core.storage.db.models import (
         Bookmark,
@@ -352,8 +351,6 @@ def rebuild_article_authors(
                 article.last_author_rebuild_hash = repo.head.commit.hexsha
 
     session.commit()
-
-
 
 
 def validate_article_has_authors(session: Session, article_id: str) -> None:

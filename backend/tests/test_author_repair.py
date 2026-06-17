@@ -16,13 +16,11 @@ bugs are fixed:
 from peerpedia_core.storage.db.crud_article import (
     add_article_authors,
     get_author_ids,
-    get_authors_from_git,
     replace_article_authors,
     resolve_user_id_from_git_email,
 )
 from peerpedia_core.storage.db.engine import get_session
 from peerpedia_core.storage.db.models import Article, User
-from peerpedia_core.storage.git_backend import commit_article, init_article_repo
 
 # ── Unit tests: replace_article_authors ──────────────────────────────────
 

@@ -840,6 +840,8 @@ async def api_sync_article(
             raise HTTPException(status_code=404, detail="Article not found")
         from peerpedia_core.storage.db.crud_article import (
             create_article as _create_article,
+        )
+        from peerpedia_core.storage.db.crud_article import (
             get_authors_from_git,
         )
 
@@ -848,8 +850,7 @@ async def api_sync_article(
         if not author_list:
             raise HTTPException(
                 status_code=422,
-                detail="Cannot derive authors from git history — "
-                       "ensure commit emails use UUID@peerpedia format",
+                detail="Cannot derive authors from git history — ensure commit emails use UUID@peerpedia format",
             )
         article = _create_article(db, authors=author_list, id=article_id, status="draft")
         db.commit()
