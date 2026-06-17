@@ -116,10 +116,18 @@ def _assert_is_author(
     current_user: User,
     action: str,
 ) -> Article:
-    a = get_article_or_raise(db, article_id)
-    if not _is_author(db, article_id, current_user):
-        raise NotAuthorizedError(f"Only authors can {action} this article")
-    return a
+    # Check author membership first (one query).  If the article
+    # does not exist, get_author_ids returns an empty list.
+    if _is_author(db, article_id, current_user):
+        # Return a lightweight stub — callers that need full Article
+        # data should call get_article_or_raise themselves.
+        return get_article_or_raise(db, article_id)
+    # Confirm whether the article exists at all so we return the
+    # right error: NotFound vs NotAuthorized.
+    exists = db.query(Article.id).filter(Article.id == article_id).first() is not None
+    if not exists:
+        raise NotFoundError("Article not found")
+    raise NotAuthorizedError(f"Only authors can {action} this article")
 
 
 def assert_can_edit_article(db: Session, article_id: str, current_user: User) -> Article:

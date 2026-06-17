@@ -3,12 +3,20 @@
 
 """Tests for article permission policy functions."""
 
+import pytest
+
 from peerpedia_core.exceptions import ConflictError, NotAuthorizedError, NotFoundError
 from peerpedia_core.policies.articles import (
     FORKABLE_STATUSES,
     PUBLIC_READABLE_STATUSES,
+    assert_can_delete_article,
+    assert_can_download_repo,
+    assert_can_edit_article,
+    assert_can_extend_sink,
     assert_can_fork_article,
+    assert_can_publish_article,
     assert_can_read_article,
+    assert_can_rollback_article,
     assert_can_sync_article,
     get_article_or_raise,
     visible_statuses_for_user,
@@ -172,3 +180,138 @@ class TestForkPermissions:
 
         with pytest.raises(ConflictError, match="Already forked"):
             assert_can_fork_article(s, "a-dup-fork", u)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Download permissions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestDownloadPermissions:
+    def test_anyone_can_download_published(self, db_engine):
+        s = get_session(db_engine)
+        a = Article(id="a-dl-pub", status="published", fork_count=0)
+        s.add(a)
+        s.commit()
+
+        result = assert_can_download_repo(s, "a-dl-pub", None)
+        assert result.id == "a-dl-pub"
+
+    def test_author_can_download_draft(self, db_engine):
+        s = get_session(db_engine)
+        u = _user(id="u-dl-author", username="dl_author")
+        s.add(u)
+        a = Article(id="a-dl-draft", status="draft", fork_count=0)
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id="a-dl-draft", author_id="u-dl-author", position=0))
+        s.commit()
+
+        result = assert_can_download_repo(s, "a-dl-draft", u)
+        assert result.id == "a-dl-draft"
+
+    def test_non_author_cannot_download_draft(self, db_engine):
+        s = get_session(db_engine)
+        u = _user(id="u-dl-nonauth", username="dl_nonauth")
+        s.add(u)
+        a = Article(id="a-dl-draft2", status="draft", fork_count=0)
+        s.add(a)
+        s.commit()
+
+        with pytest.raises(NotAuthorizedError, match="Repo download not available"):
+            assert_can_download_repo(s, "a-dl-draft2", u)
+
+    def test_raises_not_found_for_missing(self, db_engine):
+        s = get_session(db_engine)
+        with pytest.raises(NotFoundError, match="Article not found"):
+            assert_can_download_repo(s, "nonexistent", None)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Anonymous read edge case
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestAnonymousRead:
+    def test_anonymous_cannot_read_draft(self, db_engine):
+        s = get_session(db_engine)
+        a = Article(id="a-anon-draft", status="draft", fork_count=0)
+        s.add(a)
+        s.commit()
+
+        with pytest.raises(NotAuthorizedError, match="Article is private"):
+            assert_can_read_article(s, "a-anon-draft", None)
+
+    def test_anonymous_can_read_published(self, db_engine):
+        s = get_session(db_engine)
+        a = Article(id="a-anon-pub", status="published", fork_count=0)
+        s.add(a)
+        s.commit()
+
+        result = assert_can_read_article(s, "a-anon-pub", None)
+        assert result.id == "a-anon-pub"
+
+    def test_anonymous_can_read_sedimentation(self, db_engine):
+        s = get_session(db_engine)
+        a = Article(id="a-anon-sed", status="sedimentation", fork_count=0)
+        s.add(a)
+        s.commit()
+
+        result = assert_can_read_article(s, "a-anon-sed", None)
+        assert result.id == "a-anon-sed"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Author-only wrappers — parametrized smoke test
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestAllAuthorOnlyWrappers:
+    """Every assert_can_{edit,delete,rollback,publish,extend_sink}
+    delegates to the same _assert_is_author helper.  A parametrized
+    smoke test ensures each wrapper dispatches correctly.
+    """
+
+    @pytest.mark.parametrize(
+        "func,action",
+        [
+            (assert_can_edit_article, "edit"),
+            (assert_can_delete_article, "delete"),
+            (assert_can_rollback_article, "rollback"),
+            (assert_can_publish_article, "publish"),
+            (assert_can_extend_sink, "extend sink"),
+        ],
+    )
+    def test_non_author_raises(self, db_engine, func, action):
+        s = get_session(db_engine)
+        u = _user(id=f"u-{action}", username=f"user_{action}")
+        s.add(u)
+        a = Article(id=f"a-{action}", status="draft", fork_count=0)
+        s.add(a)
+        s.commit()
+
+        with pytest.raises(NotAuthorizedError, match=f"Only authors can {action}"):
+            func(s, f"a-{action}", u)
+
+    @pytest.mark.parametrize(
+        "func",
+        [
+            assert_can_edit_article,
+            assert_can_delete_article,
+            assert_can_rollback_article,
+            assert_can_publish_article,
+            assert_can_extend_sink,
+        ],
+    )
+    def test_author_succeeds(self, db_engine, func):
+        s = get_session(db_engine)
+        u = _user(id="u-auth-all", username="auth_all")
+        s.add(u)
+        a = Article(id="a-auth-all", status="draft", fork_count=0)
+        s.add(a)
+        s.flush()
+        s.add(ArticleAuthor(article_id="a-auth-all", author_id="u-auth-all", position=0))
+        s.commit()
+
+        result = func(s, "a-auth-all", u)
+        assert result.id == "a-auth-all"
