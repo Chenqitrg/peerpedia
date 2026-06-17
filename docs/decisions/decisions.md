@@ -2,6 +2,71 @@
 
 > 重大架构决策及其原因。按时间倒序，每条记录：背景、决策、后果。
 
+## ADR-012: 沉淀池文章不可变——作者也不能编辑
+
+**日期**: 2026-06 | **状态**: 已实施（PR #71 评审修订）
+
+**背景**: ADR-011 将权限集中到 core，`_assert_is_author` 允许作者编辑任何状态的文章。但沉淀池的设计意图是模拟学术审稿期——文章提交后像断了线的风筝，作者不应再干预。如果允许作者在沉淀期修改内容，他可以上传空文档然后持续更新，绕过审稿机制。
+
+**决策**:
+
+1. **写操作按状态分层**:
+   - `draft` → 作者可直接编辑、删除、回滚、同步
+   - `sedimentation` → 完全不可变，所有人（含作者）只读
+   - `published` → 作者可编辑，但后续必须走 PR 流程（当前直接 commit 暂允许，PR 功能未实现）
+
+2. **`_assert_is_author` 接受 `allowed_statuses` 参数**，各操作指定允许的状态集合。默认 `{"draft", "published"}`；`assert_can_extend_sink` 覆盖为 `{"sedimentation"}`（延长沉淀期仅对沉淀池文章有意义）。
+
+3. **读操作不受影响** — `assert_can_read_article` 允许任何人读 `sedimentation, published`，作者额外可读 `draft`。
+
+**放弃的方案**:
+
+- 所有写操作统一 `draft`-only（过度限制——published 文章作者后续应有权修改）
+- 不检查状态，仅检查作者身份（违背沉淀池设计意图）
+
+**后果**:
+
+- ✅ 沉淀期作者无法干预——`PUT/DELETE/sync` 在 sedimentation 上返回 `NotAuthorizedError` → 403
+- ✅ 各操作可独立调校允许的状态集合（`allowed_statuses` 参数）
+- ❌ published 编辑走 PR 的功能尚未实现——当前直接 commit 仍允许
+- ❌ `api_publish_article` 目前不检查当前状态是否为 `draft`（未来可能需要）
+
+---
+
+## ADR-011: 权限策略集中到 Core，语义异常解耦 HTTP
+
+**日期**: 2026-06 | **状态**: 已实施（PR #71）
+
+**背景**: PR #71 在 `backend/peerpedia_api/policies/articles.py` 中引入集中化权限策略，但依赖 `fastapi.HTTPException`（`raise HTTPException(status_code=403)`）。这与 ADR-002（backend = HTTP 翻译，core = 业务逻辑）冲突——HTTP 状态码泄露到了业务层。同时 `crud_article.py` 用 `ValueError`、路由层用内联 `HTTPException`，三处三种异常，同一类错误表达方式不统一。
+
+**原则依据**: [Fail Fast](https://martinfowler.com/ieeeSoftware/failFast.pdf)（Jim Shore, 2004）——错误在最早时刻暴露。Core 不知道 HTTP，异常名字描述**什么错了**，不描述**HTTP 返回什么**。
+
+**决策**:
+
+1. **定义语义异常在 Core**。`core/peerpedia_core/exceptions.py`：`PeerpediaError` → `NotFoundError` / `NotAuthorizedError` / `ConflictError` / `BadRequestError`。零 HTTP 概念——没有 `status_code`，没有 `headers`。
+
+2. **权限函数搬到 Core**。`backend/peerpedia_api/policies/articles.py` → `core/peerpedia_core/policies/articles.py`。所有 `raise HTTPException(403)` 替换为 `raise NotAuthorizedError("...")`。
+
+3. **一个 Handler 做翻译**。`main.py` 注册 `@app.exception_handler(PeerpediaError)`，一个字典映射语义异常 → HTTP 状态码。只有这一个地方知道映射关系。
+
+4. **`validate_article_has_authors` 保留 `ValueError`**。零作者是数据完整性 bug（服务器内部错误），不是权限拒绝。语义对，不改。
+
+**放弃的方案**:
+
+- 异常带 `status_code` 属性（换名字不换耦合——`ForbiddenError(status_code=403)` 和 `HTTPException(403)` 本质相同）
+- 独立的"翻译层"文件（过度设计——一个 handler 函数就够）
+- 一次性替换所有路由的内联检查（风险 > 收益，后续 PR 逐步做）
+
+**后果**:
+
+- ✅ Core 零 FastAPI 依赖——`grep fastapi core/` 返回空
+- ✅ 报错语义统一：`NotFoundError` / `NotAuthorizedError` / `ConflictError` / `BadRequestError`
+- ✅ 路由接入成本低：调 `assert_can_*`，异常自动转 HTTP
+- ❌ 路由层仍有内联 `get_author_ids` 检查未替换——后续 PR 逐步接入
+- ❌ `visible_statuses_for_user` 同时被 core 和 backend 引用——未来可能要进一步统一
+
+---
+
 ## ADR-010: 作者解析失败必须报错，禁止静默修复
 
 **日期**: 2026-06 | **状态**: 已实施（PR #68 评审修订）

@@ -17,6 +17,7 @@ Philosophy per docs/test_requirement.md:
 import pytest
 from fastapi.testclient import TestClient
 from peerpedia_core.storage.db.engine import get_session
+from peerpedia_core.storage.db.models import Article
 
 
 @pytest.fixture
@@ -172,7 +173,7 @@ class TestJourneyWriteReviewPublish:
 class TestJourneyForkEditMerge:
     """A user forks an article, edits it, and proposes a merge back."""
 
-    def test_full_fork_edit_merge_flow(self, client):
+    def test_full_fork_edit_merge_flow(self, client, db_engine):
         # 1. Register original author and forker
         orig = _register(client, "merge_orig", "pass123!", "orig@test.com", "老子")
         forker = _register(client, "merge_forker", "pass123!", "fork@test.com", "庄子")
@@ -197,15 +198,27 @@ class TestJourneyForkEditMerge:
         assert resp.status_code == 201
         original_id = resp.json()["id"]
 
-        # Publish the article (transitions draft → sedimentation pool)
-        pub_resp = client.post(
-            f"/api/v1/articles/{original_id}/publish",
+        # Publish with self-review (creates review record + publishes to pool).
+        # The update flow creates the review required by require_self_review_for_publish.
+        pub_resp = client.put(
+            f"/api/v1/articles/{original_id}",
+            json={
+                "publish": True,
+                "self_review": {"originality": 5, "rigor": 4, "completeness": 5, "pedagogy": 4, "impact": 5},
+            },
             headers=orig_headers,
         )
         assert pub_resp.status_code == 200
         assert pub_resp.json()["status"] == "sedimentation"
 
-        # 3. Forker forks the article (now in the pool)
+        # Fork requires published status.
+        s = get_session(db_engine)
+        a = s.query(Article).filter(Article.id == original_id).first()
+        assert a is not None
+        a.status = "published"
+        s.commit()
+
+        # 3. Forker forks the article (now published)
         fork_resp = client.post(
             f"/api/v1/articles/{original_id}/fork",
             headers=forker_headers,
@@ -432,8 +445,8 @@ class TestJourneyDeleteArticle:
         assert resp.status_code == 201
         article_id = resp.json()["id"]
 
-        # 3. Verify article exists
-        get_resp = client.get(f"/api/v1/articles/{article_id}")
+        # 3. Verify article exists (auth required for draft)
+        get_resp = client.get(f"/api/v1/articles/{article_id}", headers=headers)
         assert get_resp.status_code == 200
         assert get_resp.json()["title"] == "韩非子"
 
@@ -442,7 +455,7 @@ class TestJourneyDeleteArticle:
         assert del_resp.status_code == 204, f"Delete should return 204, got {del_resp.status_code}: {del_resp.text}"
 
         # 5. Verify article is gone — GET returns 404
-        get_resp2 = client.get(f"/api/v1/articles/{article_id}")
+        get_resp2 = client.get(f"/api/v1/articles/{article_id}", headers=headers)
         assert get_resp2.status_code == 404, "Article should return 404 after deletion"
 
     def test_delete_non_author_rejected(self, client):
@@ -475,6 +488,6 @@ class TestJourneyDeleteArticle:
         del_resp = client.delete(f"/api/v1/articles/{article_id}", headers=other_headers)
         assert del_resp.status_code == 403, f"Non-author should get 403, got {del_resp.status_code}"
 
-        # 4. Verify article still exists
-        get_resp = client.get(f"/api/v1/articles/{article_id}")
+        # 4. Verify article still exists (auth required for draft)
+        get_resp = client.get(f"/api/v1/articles/{article_id}", headers=author_headers)
         assert get_resp.status_code == 200

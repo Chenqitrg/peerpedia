@@ -14,15 +14,27 @@ import git
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from peerpedia_core.config.params import params
+from peerpedia_core.policies.articles import (
+    assert_can_delete_article,
+    assert_can_download_content,
+    assert_can_edit_article,
+    assert_can_extend_sink,
+    assert_can_fork_article,
+    assert_can_publish_article,
+    assert_can_read_article,
+    assert_can_rollback_article,
+    require_self_review_for_publish,
+    visible_statuses_for_user,
+)
 from peerpedia_core.storage.db.crud_article import (
-    count_articles,
+    count_articles_multi_status,
     create_article,
     delete_article,
     extend_sink,
     get_article,
     get_author_ids,
     increment_fork_count,
-    list_articles,
+    list_articles_multi_status,
     set_sink_start,
     update_article_status,
 )
@@ -151,8 +163,22 @@ def api_list_articles(
     size: int = 20,
     db: Session = Depends(deps.get_db),
 ):
-    articles = list_articles(db, status=status, author_id=author_id, limit=size, offset=(page - 1) * size)
-    total = count_articles(db, status=status, author_id=author_id)
+    # Visibility filtering via centralized policy: unauthenticated users
+    # only see sedimentation + published; authenticated additionally see
+    # their own drafts (frontend still filters by author for drafts).
+    visible = visible_statuses_for_user(current_user)
+    if status is not None:
+        if status not in visible:
+            return {"articles": [], "total": 0, "page": page, "size": size}
+        effective_statuses = {status}
+    else:
+        effective_statuses = visible
+
+    articles = list_articles_multi_status(
+        db, statuses=effective_statuses, author_id=author_id,
+        limit=size, offset=(page - 1) * size,
+    )
+    total = count_articles_multi_status(db, statuses=effective_statuses, author_id=author_id)
     summaries = [
         build_article_summary(
             db,
@@ -173,6 +199,7 @@ def api_get_article(
     current_user: User | None = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
+    assert_can_read_article(db, article_id, current_user)
     return build_article_detail(db, article_id, current_user=current_user)
 
 
@@ -299,8 +326,9 @@ def api_create_article(
             contributions=contributions,
         )
         score = compute_article_score_for_commit(db, a.id, commit_hash)
-        if score is not None:
-            a.score = score
+        if score is None:
+            raise HTTPException(status_code=500, detail="Failed to compute score after self-review")
+        a.score = score
 
     # Publish to pool if requested
     if body.publish:
@@ -319,12 +347,7 @@ def api_update_article(
     db: Session = Depends(deps.get_db),
 ):
     """Edit an article: update content, commit to git, re-enter pool."""
-    a = get_article(db, article_id)
-    if a is None:
-        raise HTTPException(status_code=404, detail="Article not found")
-
-    if current_user.id not in get_author_ids(db, article_id):
-        raise HTTPException(status_code=403, detail="Only authors can edit their articles")
+    a = assert_can_edit_article(db, article_id, current_user)
 
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
@@ -394,8 +417,9 @@ def api_update_article(
             )
 
         score = compute_article_score_for_commit(db, a.id, commit_hash)
-        if score is not None:
-            a.score = score
+        if score is None:
+            raise HTTPException(status_code=500, detail="Failed to compute score after publish")
+        a.score = score
     db.commit()
 
     return build_article_detail(db, a.id)
@@ -408,11 +432,7 @@ def api_delete_article(
     db: Session = Depends(deps.get_db),
 ):
     """Delete an article. Only authors can delete their own articles."""
-    a = get_article(db, article_id)
-    if a is None:
-        raise HTTPException(status_code=404, detail="Article not found")
-    if current_user.id not in get_author_ids(db, article_id):
-        raise HTTPException(status_code=403, detail="Only authors can delete their articles")
+    assert_can_delete_article(db, article_id, current_user)
     delete_article(db, article_id)
 
 
@@ -450,9 +470,7 @@ def api_fork_article(
     db: Session = Depends(deps.get_db),
 ):
     """Fork an article: clone its git repo and create a new Article record."""
-    original = get_article(db, article_id)
-    if original is None:
-        raise HTTPException(status_code=404, detail="Article not found")
+    original = assert_can_fork_article(db, article_id, current_user)
 
     # Verify user exists in server DB — local-only accounts can't fork.
     user = get_user(db, current_user.id)
@@ -522,6 +540,7 @@ def api_rollback(
     db: Session = Depends(deps.get_db),
 ):
     """Rollback to a previous commit (creates a new commit, not force-push)."""
+    article = assert_can_rollback_article(db, article_id, current_user)
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=404, detail="Article repo not found")
@@ -532,23 +551,21 @@ def api_rollback(
     # @deprecated Phase B: rollback via revert commit in bundle, not server-side.
     new_hash = commit_article(rp, f"Rollback to {hash[:8]}", "System", "system@peerpedia")
 
-    article = get_article(db, article_id)
-    if article:
-        set_sink_start(db, article_id, params.sink.edit_article_default_days)
-        neutral = 3.0
-        rollback_author_ids = get_author_ids(db, article_id)
-        create_review(
-            db,
-            article_id=article_id,
-            commit_hash=new_hash,
-            reviewer_id=rollback_author_ids[0] if rollback_author_ids else "system",
-            scope="pool",
-            scores={"originality": neutral, "rigor": neutral, "completeness": neutral, "pedagogy": neutral, "impact": neutral},
-        )
-        score = compute_article_score_for_commit(db, article_id, new_hash)
-        if score is not None:
-            article.score = score
-            db.commit()
+    set_sink_start(db, article_id, params.sink.edit_article_default_days)
+    rollback_author_ids = get_author_ids(db, article_id)
+    create_review(
+        db,
+        article_id=article_id,
+        commit_hash=new_hash,
+        reviewer_id=rollback_author_ids[0] if rollback_author_ids else "system",
+        scope="pool",
+        scores={"originality": 0, "rigor": 0, "completeness": 0, "pedagogy": 0, "impact": 0},
+    )
+    score = compute_article_score_for_commit(db, article_id, new_hash)
+    if score is None:
+        raise HTTPException(status_code=500, detail="Failed to compute score after rollback")
+    article.score = score
+    db.commit()
 
     return {"commit_hash": new_hash, "message": f"Rollback to {hash[:8]}"}
 
@@ -565,6 +582,7 @@ def api_extend_sink(
     current_user: User = Depends(deps.require_user),
     db: Session = Depends(deps.get_db),
 ):
+    assert_can_extend_sink(db, article_id, current_user)
     try:
         a = extend_sink(db, article_id, body.extra_days, params.sink.max_days)
         return build_article_detail(db, a.id)
@@ -579,9 +597,8 @@ def api_publish_article(
     db: Session = Depends(deps.get_db),
 ):
     """Explicitly publish a draft article to the sedimentation pool."""
-    a = get_article(db, article_id)
-    if a is None:
-        raise HTTPException(status_code=404, detail="Article not found")
+    assert_can_publish_article(db, article_id, current_user)
+    require_self_review_for_publish(db, article_id, current_user)
     a = set_sink_start(db, article_id, params.sink.new_article_default_days)
     a = update_article_status(db, article_id, "sedimentation")
     return build_article_detail(db, a.id)
@@ -591,7 +608,12 @@ def api_publish_article(
 
 
 @router.get("/{article_id}/source", response_model=ArticleSourceResponse)
-def api_get_source(article_id: str):
+def api_get_source(
+    article_id: str,
+    current_user: User | None = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    assert_can_download_content(db, article_id, current_user)
     rp = repo_path(article_id)
     for ext in [".md", ".typ"]:
         f = rp / f"article{ext}"
@@ -602,7 +624,12 @@ def api_get_source(article_id: str):
 
 
 @router.get("/{article_id}/download/source")
-def api_download_source(article_id: str):
+def api_download_source(
+    article_id: str,
+    current_user: User | None = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    assert_can_download_content(db, article_id, current_user)
     rp = repo_path(article_id)
     for ext in [".md", ".typ"]:
         f = rp / f"article{ext}"
@@ -616,8 +643,13 @@ def api_download_source(article_id: str):
 
 
 @router.get("/{article_id}/download/pdf")
-def api_download_pdf(article_id: str):
+def api_download_pdf(
+    article_id: str,
+    current_user: User | None = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
     """Compile article to PDF and return as downloadable file."""
+    assert_can_read_article(db, article_id, current_user)
     rp = repo_path(article_id)
     for ext in [".typ", ".md"]:
         f = rp / f"article{ext}"
@@ -662,8 +694,13 @@ def api_download_pdf(article_id: str):
 
 
 @router.get("/{article_id}/download/repo")
-def api_download_repo(article_id: str):
+def api_download_repo(
+    article_id: str,
+    current_user: User | None = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
     """Export the entire article git repository as a tar.gz bundle."""
+    assert_can_download_content(db, article_id, current_user)
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():
         raise HTTPException(status_code=404, detail="Git repo not found")
@@ -857,8 +894,9 @@ async def api_sync_article(
         # Refresh metadata from article.json
         _refresh_db_from_git(article_id, rp, db)
 
-    if current_user.id not in get_author_ids(db, article_id):
-        raise HTTPException(status_code=403, detail="Only authors can sync article content")
+    from peerpedia_core.policies.articles import assert_can_sync_article
+
+    assert_can_sync_article(db, article_id, current_user)
 
     rp = repo_path(article_id)
     if not (rp / ".git").is_dir():

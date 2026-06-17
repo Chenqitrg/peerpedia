@@ -26,3 +26,9 @@ def engine(db_url):
     init_db(eng)
     yield eng
     eng.dispose()
+
+
+@pytest.fixture
+def db_engine(engine):
+    """Alias for `engine` — used by policy and exception tests."""
+    return engine

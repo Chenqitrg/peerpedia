@@ -59,6 +59,11 @@ class TestSpec3ForkUserValidation:
     def test_fork_works_with_server_user(self, client, db_engine):
         aid, uid = _create_article_with_user(db_engine, "fork_user_1")
         s = get_session(db_engine)
+        # Fork requires published status.
+        a = s.query(Article).filter(Article.id == aid).first()
+        if a is not None:
+            a.status = "published"
+            s.commit()
         user = s.query(User).filter(User.id == uid).first()
         s.close()
 
