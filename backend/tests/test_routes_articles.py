@@ -1630,6 +1630,49 @@ class TestBundleSyncEndpoints:
         assert auth_user_id in get_author_ids(s, aid)
         s.close()
 
+    def test_sync_auto_create_rejects_no_authors(self, client, auth_user_id):
+        """Sync auto-create returns 400 when git history has no DB-matched authors.
+
+        Covers the ``if not author_list: raise HTTPException(400, ...)`` path
+        in api_sync_article.
+        """
+        import json
+        import uuid
+        import git as gitmod  # noqa: I001
+
+        from peerpedia_core.storage.git_backend import (
+            commit_article,
+            create_bundle,
+            init_article_repo,
+        )
+
+        # Git repo with a commit by unknown@peerpedia — no matching DB user
+        aid = str(uuid.uuid4())
+        rp = init_article_repo(aid)
+
+        # Empty root commit (since_hash anchor)
+        repo = gitmod.Repo(rp)
+        with repo.config_writer() as cw:
+            cw.set_value("user", "name", "CI")
+            cw.set_value("user", "email", "ci@peerpedia")
+        repo.git.commit("--allow-empty", "-m", "root")
+        empty_hash = repo.head.commit.hexsha
+
+        # Real content, committed by unknown user
+        (rp / "article.md").write_text("# No Authors")
+        (rp / "article.json").write_text(json.dumps({"title": "No Authors", "status": "draft"}))
+        commit_article(rp, "init", "Unknown", "unknown@peerpedia")
+
+        bundle = create_bundle(rp, empty_hash)
+
+        resp = client.post(
+            f"/api/v1/articles/{aid}/sync",
+            files={"file": ("bundle", bundle, "application/octet-stream")},
+            auth=(auth_user_id, "test"),
+        )
+        assert resp.status_code == 400, resp.text
+        assert "no authors found" in resp.json()["detail"]
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # _refresh_db_from_git — DB cache sync from article.json
@@ -2062,36 +2105,6 @@ class TestAuthorArticleLink:
         author_ids = get_author_ids(s3, aid)
         assert uid in author_ids, f"Author {uid} should be in {author_ids} after auto-create"
         s3.close()
-
-    def test_sync_auto_create_rejects_no_authors_in_git(self, db_engine):
-        """Sync auto-create returns 400 when git history has no recognizable authors.
-
-        Covers the ``if not author_list: raise HTTPException(400, ...)`` path
-        in articles.py.
-        """
-        import json
-        import uuid as _uuid
-
-        from peerpedia_core.storage.db.engine import get_session
-        from peerpedia_core.storage.db.models import User
-        from peerpedia_core.storage.git_backend import commit_article, init_article_repo
-
-        # Git repo with commits, but the author email doesn't match any DB user.
-        # get_authors_from_git filters by session.get(User, user_id) — no match = empty set.
-        aid = str(_uuid.uuid4())
-        rp = init_article_repo(aid)
-        (rp / "article.md").write_text("# Orphan")
-        # Commit as "unknown@peerpedia" — no such user in DB
-        commit_article(rp, "init", "Unknown", "unknown@peerpedia")
-        (rp / "article.json").write_text(json.dumps({"status": "draft", "title": "No Authors"}))
-
-        from peerpedia_core.storage.db.crud_article import get_authors_from_git
-
-        s = get_session(db_engine)
-        git_authors = get_authors_from_git(rp, s)
-        author_list = list(git_authors) if git_authors else []
-        assert author_list == [], "No DB user matches unknown@peerpedia"
-        s.close()
 
     def test_delete_succeeds_for_author(self, client, auth_user_id):
         """REGRESSION: article author can delete their own article (returns 204)."""
