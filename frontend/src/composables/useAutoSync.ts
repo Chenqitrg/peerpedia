@@ -216,7 +216,7 @@ export function useAutoSync() {
             try { await tauri.clearPending({ id: op.id }) } catch { /* best-effort */ }
           } else {
             const viewer = userStore.viewer
-            if (!viewer) continue
+            if (!viewer) throw new Error('[flushPendingOps] viewer is null — must be logged in')
             const res = await pushRepo(op.id, viewer.name, viewer.id, 'Auto-sync')
             if (res.pushed) {
               synced++
