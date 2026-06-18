@@ -4,6 +4,7 @@
 """Bookmark API routes."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from peerpedia_core.policies.articles import assert_can_bookmark_article
 from peerpedia_core.storage.db.crud_article import get_article, get_author_ids
 from peerpedia_core.storage.db.crud_bookmark import (
     add_bookmark,
@@ -40,9 +41,7 @@ def list_bookmarks(current_user: User = Depends(deps.require_user), db: Session 
 def bookmark(article_id: str, current_user: User = Depends(deps.require_user), db: Session = Depends(deps.get_db)):
     if get_article(db, article_id) is None:
         raise HTTPException(status_code=404, detail="Article not found")
-    author_ids = get_author_ids(db, article_id)
-    if current_user.id in author_ids:
-        raise HTTPException(status_code=400, detail="Cannot bookmark your own article")
+    assert_can_bookmark_article(db, article_id, current_user)
     if not is_bookmarked(db, current_user.id, article_id):
         add_bookmark(db, current_user.id, article_id)
     return {"bookmarked": True}
@@ -50,8 +49,6 @@ def bookmark(article_id: str, current_user: User = Depends(deps.require_user), d
 
 @router.delete("/{article_id}")
 def unbookmark(article_id: str, current_user: User = Depends(deps.require_user), db: Session = Depends(deps.get_db)):
-    author_ids = get_author_ids(db, article_id)
-    if current_user.id in author_ids:
-        raise HTTPException(status_code=400, detail="Cannot bookmark your own article")
+    assert_can_bookmark_article(db, article_id, current_user)
     remove_bookmark(db, current_user.id, article_id)
     return {"bookmarked": False}

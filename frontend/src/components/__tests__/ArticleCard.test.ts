@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ArticleCard from '../ArticleCard.vue'
+import { useUserStore } from '../../stores/useUserStore'
 
 const RouterLinkStub = {
   props: ['to'],
@@ -41,6 +42,7 @@ function makeArticle(overrides = {}) {
 describe('ArticleCard (Article Bar)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    useUserStore().viewer = { id: 'u1', name: 'Alice Chen' } as any
   })
 
   it('renders article title', () => {
@@ -125,7 +127,9 @@ describe('ArticleCard (Article Bar)', () => {
     expect(bookmarkBtn.exists()).toBe(false)
   })
 
-  it('renders bookmark toggle button on other articles', () => {
+  it('renders bookmark toggle button on other articles (authenticated)', () => {
+    const userStore = useUserStore()
+    userStore.viewer = { id: 'u-viewer', name: 'Viewer' } as any
     const wrapper = mount(ArticleCard, {
       props: { article: makeArticle({ is_own_article: false }) },
       global: { stubs: { 'router-link': RouterLinkStub } },
@@ -143,13 +147,14 @@ describe('ArticleCard (Article Bar)', () => {
     expect(editBtn.exists()).toBe(true)
   })
 
-  it('hides edit button when is_own_article is false', () => {
+  it('disables edit button when is_own_article is false', () => {
     const wrapper = mount(ArticleCard, {
       props: { article: makeArticle({ is_own_article: false }) },
       global: { stubs: { 'router-link': RouterLinkStub } },
     })
-    const editBtns = wrapper.findAll('button[aria-label="Edit"]')
-    expect(editBtns.length).toBe(0)
+    const editBtn = wrapper.find('button[aria-label="Edit"]')
+    expect(editBtn.exists()).toBe(true)
+    expect(editBtn.attributes('disabled')).toBeDefined()
   })
 
   it('renders commit count badge when edited multiple times', () => {

@@ -10,6 +10,8 @@ import type { ArticleSummary } from '../api/types'
 import { forkArticle } from '../api/articles'
 import ScoreBadges from './ScoreBadges.vue'
 import DeleteButton from './DeleteButton.vue'
+import { articlePermissions, disabledReason } from '../lib/permissions'
+import { useUserStore } from '../stores/useUserStore'
 import {
   FileText,
   Users,
@@ -45,6 +47,11 @@ const progressPercent = computed(() => {
 })
 
 const statusLabel = useStatusLabel(() => props.article.status)
+
+const userStore = useUserStore()
+const articlePerms = computed(() =>
+  articlePermissions(props.article, !!userStore.viewer),
+)
 const statusClass = computed(() => getStatusInfo(props.article.status).class)
 
 const authorNames = computed(() => {
@@ -177,7 +184,7 @@ async function goToFork() {
 
         <!-- Actions -->
         <button
-          v-if="!article.is_own_article"
+          v-if="articlePerms.canBookmark"
           class="flex items-center justify-center w-7 h-7 rounded
                  text-ink-muted hover:text-accent hover:bg-accent/10
                  transition-colors duration-200"
@@ -201,30 +208,34 @@ async function goToFork() {
         </router-link>
 
         <button
-          v-if="article.is_own_article && !showDeleteConfirm"
-          class="flex items-center justify-center w-7 h-7 rounded
-                 text-ink-muted hover:text-accent hover:bg-accent/10
-                 transition-colors duration-200"
+          v-if="!showDeleteConfirm"
+          class="flex items-center justify-center w-7 h-7 rounded transition-colors duration-200"
+          :class="articlePerms.canEdit
+            ? 'text-ink-muted hover:text-accent hover:bg-accent/10'
+            : 'text-ink-muted/40 cursor-not-allowed'"
+          :disabled="!articlePerms.canEdit"
           :aria-label="t('card.edit')"
-          :data-tooltip="t('card.edit')"
+          :data-tooltip="!articlePerms.canEdit ? t(disabledReason(articlePerms, 'canEdit')) : t('card.edit')"
           @click="goToEdit"
         >
           <Edit class="w-3.5 h-3.5" stroke-width="2" />
         </button>
 
         <DeleteButton
-          v-if="article.is_own_article"
+          v-if="articlePerms.canDelete"
           :article-id="article.id"
-          :author-id="article.authors?.[0]?.id"
+          :author-id="userStore.viewer!.id"
           @deleted="(id: string) => emit('deleted', id)"
         />
 
         <button
-          class="flex items-center justify-center w-7 h-7 rounded
-                 text-ink-muted hover:text-accent hover:bg-accent/10
-                 transition-colors duration-200"
+          class="flex items-center justify-center w-7 h-7 rounded transition-colors duration-200"
+          :class="articlePerms.canFork
+            ? 'text-ink-muted hover:text-accent hover:bg-accent/10'
+            : 'text-ink-muted/40 cursor-not-allowed'"
+          :disabled="!articlePerms.canFork"
           :aria-label="t('card.fork')"
-          :data-tooltip="t('card.fork')"
+          :data-tooltip="!articlePerms.canFork ? t(disabledReason(articlePerms, 'canFork')) : t('card.fork')"
           @click="goToFork"
         >
           <GitFork class="w-3.5 h-3.5" stroke-width="2" />

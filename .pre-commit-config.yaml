@@ -3,6 +3,15 @@ repos:
     rev: v0.15.17
     hooks:
       - id: ruff
-        args: [check, --fix, backend/, core/, seed.py]
+        args: [--fix, backend/, core/, seed.py]
       - id: ruff-format
         args: [backend/, core/, seed.py]
+
+  - repo: local
+    hooks:
+      - id: vitest
+        name: vitest
+        entry: bash -c 'cd frontend && npx vitest run'
+        language: system
+        files: ^frontend/.*\.(ts|vue)$
+        pass_filenames: false

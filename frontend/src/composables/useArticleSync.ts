@@ -110,11 +110,13 @@ export function useArticleSync(
     error.value = null
 
     try {
+      const viewer = userStore.viewer
+      if (!viewer) throw new Error('[useRemote] viewer is null — must be logged in')
       await tauri.gitRollback({
         article_id: id,
         commit_hash: remoteCommitHash,
-        author: userStore.viewer?.name || 'PeerPedia',
-        author_id: userStore.viewer?.id || 'local',
+        author: viewer.name,
+        author_id: viewer.id,
       })
 
       return true

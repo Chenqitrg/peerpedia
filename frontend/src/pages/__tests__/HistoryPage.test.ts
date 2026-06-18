@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { useUserStore } from '../../stores/useUserStore'
 
 const RouterLinkStub = {
   props: ['to'],
@@ -210,6 +211,9 @@ describe('HistoryPage', () => {
 
   describe('S2 E2E: rollback in Tauri/local mode', () => {
     beforeEach(() => {
+      setActivePinia(createPinia())
+      const userStore = useUserStore()
+      userStore.viewer = { id: 'test-uuid-123', name: 'Alice' } as any
       _isTauri = true
       _gitHistoryReturn = [
         { hash: 'abc1234', message: 'Add conclusion', author: 'Alice', timestamp: '2026-06-01T12:00:00Z' },
@@ -241,8 +245,8 @@ describe('HistoryPage', () => {
       expect(_mockGitRollback).toHaveBeenCalledWith({
         article_id: 'art-1',
         commit_hash: 'ghi9012',
-        author: 'User',
-        author_id: 'local',
+        author: 'Alice',
+        author_id: 'test-uuid-123',
       })
     })
 

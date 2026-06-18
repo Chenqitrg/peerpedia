@@ -41,7 +41,7 @@ describe('DeleteButton', () => {
 
   it('shows trash icon by default, no confirm UI', () => {
     const wrapper = mount(DeleteButton, {
-      props: { articleId: 'test-1' },
+      props: { articleId: 'test-1', authorId: 'u1' },
     })
     expect(wrapper.find('[aria-label="Delete article"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Confirm?')
@@ -50,7 +50,7 @@ describe('DeleteButton', () => {
 
   it('shows confirm UI after clicking trash', async () => {
     const wrapper = mount(DeleteButton, {
-      props: { articleId: 'test-1' },
+      props: { articleId: 'test-1', authorId: 'u1' },
     })
     await wrapper.find('[aria-label="Delete article"]').trigger('click')
     expect(wrapper.text()).toContain('Confirm?')
@@ -60,7 +60,7 @@ describe('DeleteButton', () => {
 
   it('Cancel hides confirm UI, trash returns', async () => {
     const wrapper = mount(DeleteButton, {
-      props: { articleId: 'test-1' },
+      props: { articleId: 'test-1', authorId: 'u1' },
     })
     await wrapper.find('[aria-label="Delete article"]').trigger('click')
     const cancelBtn = wrapper.findAll('button').find(b => b.text().trim() === 'Cancel')
@@ -72,7 +72,7 @@ describe('DeleteButton', () => {
   it('emits deleted on successful server delete', async () => {
     ;(deleteArticle as any).mockResolvedValueOnce({})
     const wrapper = mount(DeleteButton, {
-      props: { articleId: 'test-1' },
+      props: { articleId: 'test-1', authorId: 'u1' },
     })
     await wrapper.find('[aria-label="Delete article"]').trigger('click')
     const deleteBtn = wrapper.findAll('button').find(b => b.text().includes('Delete'))
@@ -88,7 +88,7 @@ describe('DeleteButton', () => {
   it('emits error on API failure, confirm still visible', async () => {
     ;(deleteArticle as any).mockRejectedValueOnce(new Error('fail'))
     const wrapper = mount(DeleteButton, {
-      props: { articleId: 'test-1' },
+      props: { articleId: 'test-1', authorId: 'u1' },
     })
     await wrapper.find('[aria-label="Delete article"]').trigger('click')
     const deleteBtn = wrapper.findAll('button').find(b => b.text().includes('Delete'))

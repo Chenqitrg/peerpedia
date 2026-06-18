@@ -84,8 +84,10 @@ vi.mock('../../api/articles', () => ({
 }))
 
 describe('UserPage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia())
+    const { useUserStore } = await import('../../stores/useUserStore')
+    useUserStore().viewer = { id: 'viewer-1', name: 'Viewer' } as any
   })
 
   it('renders user name', async () => {

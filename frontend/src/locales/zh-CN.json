@@ -266,5 +266,19 @@
     "radarChart": "五维度雷达图",
     "previousPage": "上一页",
     "nextPage": "下一页"
+  },
+  "perms": {
+    "disabled": {
+      "canEdit": "同行评审期间不可编辑",
+      "canDelete": "同行评审期间不可删除",
+      "canRollback": "同行评审期间不可回滚",
+      "canPublish": "同行评审期间不可发布",
+      "canExtendSink": "仅同行评审期间可延长沉淀",
+      "canSync": "同行评审期间不可同步",
+      "canSelfReview": "仅草稿或同行评审阶段可自评",
+      "canFork": "仅已发布文章可分叉",
+      "canBookmark": "不能收藏自己的文章",
+      "canDownload": "仅已发布文章可下载"
+    }
   }
 }

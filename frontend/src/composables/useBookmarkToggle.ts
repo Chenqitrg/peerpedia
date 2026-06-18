@@ -10,6 +10,7 @@ import { saveJSON, loadJSON } from './useLocalStorage'
 import { addBookmark, removeBookmark } from '../api/bookmarks'
 import { getArticle } from '../api/articles'
 import type { ArticleSummary } from '../api/types'
+import { articlePermissions } from '../lib/permissions'
 
 /**
  * Shared bookmark toggle logic used by HomePage, PoolPage, UserPage,
@@ -55,8 +56,8 @@ export function useBookmarkToggle(
     const article = articles.value.find(a => a.id === articleId)
     if (!article) return
 
-    // SPEC-1.5: 静默忽略自收藏（防止 API 调用）
-    if (article.is_own_article) return
+    // Policy gate: bookmark requires auth + not own article
+    if (!articlePermissions(article, !!userStore.viewer).canBookmark) return
 
     const previous = article.is_bookmarked
     article.is_bookmarked = !currentlyBookmarked

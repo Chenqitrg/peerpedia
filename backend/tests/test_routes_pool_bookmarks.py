@@ -124,7 +124,7 @@ class TestBookmarks:
 
         headers = auth_header(u.id)
         resp = client.post(f"/api/v1/bookmarks?article_id={a.id}", headers=headers)
-        assert resp.status_code == 400
+        assert resp.status_code == 403
         assert "own article" in resp.json()["detail"].lower()
 
     def test_self_unbookmark_rejected(self, client, db_engine, auth_header):
@@ -144,4 +144,4 @@ class TestBookmarks:
 
         headers = auth_header(u.id)
         resp = client.delete(f"/api/v1/bookmarks/{a.id}", headers=headers)
-        assert resp.status_code == 400
+        assert resp.status_code == 403

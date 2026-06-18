@@ -273,5 +273,19 @@
     "radarChart": "Five dimension radar chart",
     "previousPage": "Previous page",
     "nextPage": "Next page"
+  },
+  "perms": {
+    "disabled": {
+      "canEdit": "Editing is disabled during peer review",
+      "canDelete": "Deleting is disabled during peer review",
+      "canRollback": "Rollback is disabled during peer review",
+      "canPublish": "Cannot publish during peer review",
+      "canExtendSink": "Sink extension is only available during peer review",
+      "canSync": "Sync is disabled during peer review",
+      "canSelfReview": "Self-review is only available in draft or peer review",
+      "canFork": "Only published articles can be forked",
+      "canBookmark": "Cannot bookmark your own article",
+      "canDownload": "Download is only available for published articles"
+    }
   }
 }

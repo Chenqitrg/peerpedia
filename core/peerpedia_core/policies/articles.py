@@ -130,9 +130,7 @@ def _assert_is_author(
     if not _is_author(db, article_id, current_user):
         raise NotAuthorizedError(f"Only authors can {action} this article")
     if a.status not in eff:
-        raise NotAuthorizedError(
-            f"Cannot {action} an article in {a.status} status"
-        )
+        raise NotAuthorizedError(f"Cannot {action} an article in {a.status} status")
     return a
 
 
@@ -158,6 +156,15 @@ def assert_can_extend_sink(db: Session, article_id: str, current_user: User) -> 
 
 def assert_can_sync_article(db: Session, article_id: str, current_user: User) -> Article:
     return _assert_is_author(db, article_id, current_user, "sync")
+
+
+def assert_can_self_review(db: Session, article_id: str, current_user: User) -> Article:
+    """Raise if *current_user* cannot submit a pool-scoped self-review.
+
+    Only the article author can self-review, and only while the article is
+    in ``draft`` or ``sedimentation`` status.
+    """
+    return _assert_is_author(db, article_id, current_user, "self-review", allowed_statuses={"draft", "sedimentation"})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -193,6 +200,25 @@ def assert_can_fork_article(
         raise ConflictError("Already forked this article")
 
     return a
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Bookmark — author self-bookmark prevention
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def assert_can_bookmark_article(
+    db: Session,
+    article_id: str,
+    current_user: User,
+) -> None:
+    """Raise if *current_user* cannot bookmark this article.
+
+    Authors cannot bookmark their own articles.
+    """
+    get_article_or_raise(db, article_id)
+    if _is_author(db, article_id, current_user):
+        raise NotAuthorizedError("Cannot bookmark your own article")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -15,7 +15,7 @@ const { t } = useI18n()
 
 const props = defineProps<{
   articleId: string
-  authorId?: string
+  authorId: string
 }>()
 
 const emit = defineEmits<{
@@ -46,7 +46,7 @@ async function handleDelete() {
         try {
           await tauri.deleteArticle({
             id: props.articleId,
-            account_id: props.authorId || '',
+            account_id: props.authorId,
           })
         } catch {
           // Local cleanup is best-effort — server already succeeded
