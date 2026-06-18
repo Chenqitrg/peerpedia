@@ -216,6 +216,7 @@ def assert_can_bookmark_article(
 
     Authors cannot bookmark their own articles.
     """
+    get_article_or_raise(db, article_id)
     if _is_author(db, article_id, current_user):
         raise NotAuthorizedError("Cannot bookmark your own article")
 

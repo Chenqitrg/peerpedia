@@ -81,6 +81,13 @@ class TestGetArticleOrRaise:
 # ── assert_can_bookmark_article ──────────────────────────────────────────
 
 class TestBookmarkPolicy:
+    def test_raises_not_found_for_missing_article(self, db_engine):
+        s = get_session(db_engine)
+        u = _user(s, "ub0")
+        with pytest.raises(NotFoundError):
+            assert_can_bookmark_article(s, "nonexistent", u)
+        s.close()
+
     def test_author_raises(self, db_engine):
         s = get_session(db_engine)
         u, a = _setup(s, "ub1", "ab1", "published")
