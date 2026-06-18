@@ -22,7 +22,6 @@ export const useUserStore = defineStore('user', () => {
 
   // ── Local account layer (Tauri or dev mock) ──────────────────────────
 
-  const localAccount = ref<Account | null>(null)
   const localAccounts = ref<AccountSummary[]>([])
   const localToken = ref<string | null>(null)  // Session token from Tauri login
   const isTauriMode = ref(false)
@@ -80,7 +79,6 @@ export const useUserStore = defineStore('user', () => {
     if (!result) throw new Error('Tauri unavailable')
     if ('error' in result) throw new Error(result.error)
     const acctWithToken = result as { id: string; username: string; token: string; email: string; name: string }
-    localAccount.value = { id: acctWithToken.id, username: acctWithToken.username }
     localToken.value = acctWithToken.token
     tauri.setSessionToken(acctWithToken.token)
     saveString('peerpedia_local_token', acctWithToken.token)
@@ -164,7 +162,6 @@ export const useUserStore = defineStore('user', () => {
     const result = await tauri.createAccount({ username, password, email, name })
     if (!result) throw new Error('Tauri unavailable')
     if ('error' in result) throw new Error(result.error)
-    localAccount.value = result as Account
     const profile = {
       id: (result as Account).id,
       username: (result as Account).username,
@@ -234,7 +231,6 @@ export const useUserStore = defineStore('user', () => {
     const uid = viewer.value?.id
     viewer.value = null
     token.value = null
-    localAccount.value = null
     localToken.value = null
     tauri.setSessionToken(null)
     _savePendingCreds(null)
@@ -386,7 +382,6 @@ export const useUserStore = defineStore('user', () => {
     showAuthModal,
     intendedRoute,
     syncError,
-    localAccount,
     localAccounts,
     localToken,
     isTauriMode,

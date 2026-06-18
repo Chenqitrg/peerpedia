@@ -47,7 +47,9 @@ export function useAutoSync() {
       pendingOps.value = []
       return
     }
-    const ops = await tauri.getPendingOps({ account_id: userStore.viewer?.id || 'local' })
+    const viewer = userStore.viewer
+    if (!viewer) throw new Error('[loadPendingOps] viewer is null — must be logged in')
+    const ops = await tauri.getPendingOps({ account_id: viewer.id })
     if (ops && Array.isArray(ops) && !isTauriError(ops)) {
       pendingOps.value = ops
     } else {
@@ -213,7 +215,9 @@ export function useAutoSync() {
             else failed++
             try { await tauri.clearPending({ id: op.id }) } catch { /* best-effort */ }
           } else {
-            const res = await pushRepo(op.id, 'PeerPedia', 'local', 'Auto-sync')
+            const authorId = userStore.viewer?.id
+            if (!authorId) continue
+            const res = await pushRepo(op.id, 'PeerPedia', authorId, 'Auto-sync')
             if (res.pushed) {
               synced++
               try { await tauri.clearPending({ id: op.id }) } catch { /* best-effort */ }

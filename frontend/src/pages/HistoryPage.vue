@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { getHistory, rollbackArticle } from '../api/articles'
 import { useTauri, type CommitEntry } from '../composables/useTauri'
+import { useUserStore } from '../stores/useUserStore'
 import DiffView from '../components/DiffView.vue'
 import type { DiffResult } from '../components/DiffView.vue'
 import { useAsyncResource } from '../composables/useAsyncResource'
@@ -24,6 +25,7 @@ const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
 const tauri = useTauri()
+const userStore = useUserStore()
 
 const selectedHash1 = ref<string | null>(null)
 const selectedHash2 = ref<string | null>(null)
@@ -225,7 +227,7 @@ async function confirmRollback() {
         article_id: id,
         commit_hash: hash,
         author: 'User',
-        author_id: 'local',
+        author_id: userStore.viewer?.id,
       })
       if (result && 'error' in result) {
         rollbackError.value = typeof result.error === 'string' ? result.error : 'Rollback failed'

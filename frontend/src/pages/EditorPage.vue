@@ -113,7 +113,7 @@ useEditorTab(tabId, title, isClean, editorAreaRef)
 // Split panel resize
 const { splitRatio, splitterEl, isDragging, onSplitterMouseDown } = useSplitPane()
 
-const draftUid = computed(() => userStore.viewer?.id || 'anonymous')
+const draftUid = computed(() => userStore.viewer?.id)
 const DRAFT_KEY = computed(() => `editor-draft-${draftUid.value}-${editId.value || 'new'}`)
 const DRAFT_ID_KEY = computed(() => `editor-draft-id-${draftUid.value}-${editId.value || 'new'}`)
 
@@ -255,7 +255,7 @@ async function loadExistingArticle() {
             format.value = 'markdown' // gitShow returns raw content; infer format from draft metadata
             commitHash.value = latestHash
             // Try draft metadata for title and format
-            const accountId = userStore.viewer?.id || 'local'
+            const accountId = userStore.viewer?.id
             const draft = await draftPersistence.load(editId.value!, accountId)
             if (draft && draft.title) title.value = draft.title
             if (draft && draft.format) format.value = draft.format as 'markdown' | 'typst'
@@ -266,7 +266,7 @@ async function loadExistingArticle() {
         }
       } catch { /* gitShow failed — fall through to draft persistence */ }
 
-      const accountId = userStore.viewer?.id || 'local'
+      const accountId = userStore.viewer?.id
       const draft = await draftPersistence.load(editId.value!, accountId)
       if (draft && draft.content !== undefined) {
         title.value = draft.title || ''
@@ -299,7 +299,7 @@ async function restoreDraft() {
   if (!currentDraftId.value) return
 
   // Try Tauri persistence first with the real draft ID.
-  const accountId = userStore.viewer?.id || 'local'
+  const accountId = userStore.viewer?.id
   const result = await draftPersistence.load(currentDraftId.value, accountId)
 
   if (result && !('error' in result) && result.content !== undefined) {
@@ -391,8 +391,10 @@ function markSaved() {
 }
 
 async function saveDraft() {
-  const accountId = userStore.viewer?.id || 'local'
-  const authorName = userStore.viewer?.name || userStore.viewer?.username || 'local'
+  const viewer = userStore.viewer
+  if (!viewer) throw new Error('[saveDraft] viewer is null — must be logged in')
+  const accountId = viewer.id
+  const authorName = viewer.name || viewer.username || ''
   const authorId = accountId  // UUID identity for git commits
 
   if (tauri.isTauri.value || tauri.isBrowserLocal.value) {
@@ -521,8 +523,10 @@ async function handleSubmitToPool() {
     return
   }
 
-  const accountId = userStore.viewer?.id || 'local'
-  const authorName = userStore.viewer?.name || userStore.viewer?.username || 'local'
+  const viewer = userStore.viewer
+  if (!viewer) throw new Error('[handleSubmitToPool] viewer is null — must be logged in')
+  const accountId = viewer.id
+  const authorName = viewer.name || viewer.username || ''
   const aid = editId.value || currentDraftId.value
 
   // S5: Tauri mode — update article.json status → commit → bundle push.
