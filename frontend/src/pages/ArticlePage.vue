@@ -787,7 +787,7 @@ defineExpose({ updateSingleScore, reviewStore, mergeError })
             <DeleteButton
               v-if="articlePerms.canDelete"
               :article-id="article?.id ?? ''"
-              :author-id="article?.authors?.[0]?.id"
+              :author-id="userStore.viewer!.id"
               @deleted="handleDeleted"
             />
 

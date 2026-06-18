@@ -224,7 +224,7 @@ async function goToFork() {
         <DeleteButton
           v-if="articlePerms.canDelete"
           :article-id="article.id"
-          :author-id="article.authors?.[0]?.id"
+          :author-id="userStore.viewer!.id"
           @deleted="(id: string) => emit('deleted', id)"
         />
 

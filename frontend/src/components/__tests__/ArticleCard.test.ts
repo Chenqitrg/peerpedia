@@ -42,6 +42,7 @@ function makeArticle(overrides = {}) {
 describe('ArticleCard (Article Bar)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    useUserStore().viewer = { id: 'u1', name: 'Alice Chen' } as any
   })
 
   it('renders article title', () => {
